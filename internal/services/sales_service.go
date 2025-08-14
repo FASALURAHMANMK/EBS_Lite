@@ -707,3 +707,158 @@ func (s *SalesService) verifySaleInCompany(saleID, companyID int) error {
 
 	return nil
 }
+
+// GetSalesHistory retrieves sales for a company with optional filtering by
+// date range, customer, product and payment method. This is used for the sales
+// history endpoint.
+func (s *SalesService) GetSalesHistory(companyID int, filters map[string]string) ([]models.Sale, error) {
+	query := `
+                SELECT s.sale_id, s.sale_number, s.location_id, s.customer_id, s.sale_date, s.sale_time,
+                       s.subtotal, s.tax_amount, s.discount_amount, s.total_amount, s.paid_amount,
+                       s.payment_method_id, s.status, s.pos_status, s.is_quick_sale, s.notes,
+                       s.created_by, s.updated_by, s.sync_status, s.created_at, s.updated_at,
+                       c.name as customer_name, pm.name as payment_method_name
+                FROM sales s
+                JOIN locations l ON s.location_id = l.location_id
+                LEFT JOIN customers c ON s.customer_id = c.customer_id
+                LEFT JOIN payment_methods pm ON s.payment_method_id = pm.method_id
+                WHERE l.company_id = $1 AND s.is_deleted = FALSE
+        `
+
+	args := []interface{}{companyID}
+	argCount := 1
+
+	if dateFrom := filters["date_from"]; dateFrom != "" {
+		argCount++
+		query += fmt.Sprintf(" AND s.sale_date >= $%d", argCount)
+		args = append(args, dateFrom)
+	}
+	if dateTo := filters["date_to"]; dateTo != "" {
+		argCount++
+		query += fmt.Sprintf(" AND s.sale_date <= $%d", argCount)
+		args = append(args, dateTo)
+	}
+	if customerID := filters["customer_id"]; customerID != "" {
+		argCount++
+		query += fmt.Sprintf(" AND s.customer_id = $%d", argCount)
+		args = append(args, customerID)
+	}
+	if paymentMethodID := filters["payment_method_id"]; paymentMethodID != "" {
+		argCount++
+		query += fmt.Sprintf(" AND s.payment_method_id = $%d", argCount)
+		args = append(args, paymentMethodID)
+	}
+	if productID := filters["product_id"]; productID != "" {
+		argCount++
+		query += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM sale_details sd WHERE sd.sale_id = s.sale_id AND sd.product_id = $%d)", argCount)
+		args = append(args, productID)
+	}
+
+	query += " ORDER BY s.created_at DESC"
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sales history: %w", err)
+	}
+	defer rows.Close()
+
+	var sales []models.Sale
+	for rows.Next() {
+		var sale models.Sale
+		var customerName, paymentMethodName sql.NullString
+
+		err := rows.Scan(
+			&sale.SaleID, &sale.SaleNumber, &sale.LocationID, &sale.CustomerID,
+			&sale.SaleDate, &sale.SaleTime, &sale.Subtotal, &sale.TaxAmount,
+			&sale.DiscountAmount, &sale.TotalAmount, &sale.PaidAmount,
+			&sale.PaymentMethodID, &sale.Status, &sale.POSStatus, &sale.IsQuickSale,
+			&sale.Notes, &sale.CreatedBy, &sale.UpdatedBy, &sale.SyncStatus,
+			&sale.CreatedAt, &sale.UpdatedAt, &customerName, &paymentMethodName,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan sale: %w", err)
+		}
+
+		if customerName.Valid {
+			sale.Customer = &models.Customer{
+				CustomerID: *sale.CustomerID,
+				Name:       customerName.String,
+			}
+		}
+
+		if paymentMethodName.Valid {
+			sale.PaymentMethod = &models.PaymentMethod{
+				MethodID: *sale.PaymentMethodID,
+				Name:     paymentMethodName.String,
+			}
+		}
+
+		sales = append(sales, sale)
+	}
+
+	return sales, nil
+}
+
+// ExportInvoices returns the list of sales matching the provided filters. In a
+// real implementation this could generate files (PDF/CSV). For now it simply
+// returns the sales data.
+func (s *SalesService) ExportInvoices(companyID int, filters map[string]string) ([]models.Sale, error) {
+	return s.GetSalesHistory(companyID, filters)
+}
+
+// Quote-related operations ---------------------------------------------------
+
+// GetQuotes returns quotes for a company. Currently returns an empty list until
+// a persistent store is introduced.
+func (s *SalesService) GetQuotes(companyID int, filters map[string]string) ([]models.Quote, error) {
+	return []models.Quote{}, nil
+}
+
+// GetQuoteByID returns a single quote. This is a stub implementation.
+func (s *SalesService) GetQuoteByID(quoteID, companyID int) (*models.Quote, error) {
+	return &models.Quote{QuoteID: quoteID}, nil
+}
+
+// CreateQuote creates a new quote. Currently this is an in-memory placeholder
+// without persistence.
+func (s *SalesService) CreateQuote(companyID, locationID, userID int, req *models.CreateQuoteRequest) (*models.Quote, error) {
+	quote := &models.Quote{
+		QuoteID:     0,
+		QuoteNumber: fmt.Sprintf("QUO-%d", time.Now().Unix()),
+		LocationID:  locationID,
+		CustomerID:  req.CustomerID,
+		QuoteDate:   time.Now(),
+		Status:      "draft",
+		Items:       []models.QuoteDetail{},
+		CreatedBy:   userID,
+	}
+	return quote, nil
+}
+
+// UpdateQuote updates an existing quote.
+func (s *SalesService) UpdateQuote(quoteID, companyID int, req *models.UpdateQuoteRequest) error {
+	return nil
+}
+
+// DeleteQuote deletes a quote.
+func (s *SalesService) DeleteQuote(quoteID, companyID int) error {
+	return nil
+}
+
+// PrintQuote handles printing of a quote. For now it only logs the request.
+func (s *SalesService) PrintQuote(quoteID, companyID int) error {
+	fmt.Printf("Print requested for quote ID: %d\n", quoteID)
+	return nil
+}
+
+// ShareQuote handles quote sharing logic. Currently a placeholder that logs the
+// request.
+func (s *SalesService) ShareQuote(quoteID, companyID int, req *models.ShareQuoteRequest) error {
+	fmt.Printf("Share requested for quote ID: %d with %s\n", quoteID, req.Email)
+	return nil
+}
+
+// ExportQuotes returns quotes that match provided filters.
+func (s *SalesService) ExportQuotes(companyID int, filters map[string]string) ([]models.Quote, error) {
+	return s.GetQuotes(companyID, filters)
+}

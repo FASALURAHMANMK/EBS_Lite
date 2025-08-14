@@ -198,6 +198,8 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 			sales.Use(middleware.RequireCompanyAccess())
 			{
 				sales.GET("", middleware.RequirePermission("VIEW_SALES"), salesHandler.GetSales)
+				sales.GET("/history", middleware.RequirePermission("VIEW_SALES"), salesHandler.GetSalesHistory)
+				sales.GET("/history/export", middleware.RequirePermission("VIEW_SALES"), salesHandler.ExportInvoices)
 				sales.GET("/:id", middleware.RequirePermission("VIEW_SALES"), salesHandler.GetSale)
 				sales.POST("", middleware.RequirePermission("CREATE_SALES"), salesHandler.CreateSale)
 				sales.PUT("/:id", middleware.RequirePermission("UPDATE_SALES"), salesHandler.UpdateSale)
@@ -205,6 +207,18 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 				sales.POST("/:id/hold", middleware.RequirePermission("CREATE_SALES"), salesHandler.HoldSale)
 				sales.POST("/:id/resume", middleware.RequirePermission("CREATE_SALES"), salesHandler.ResumeSale)
 				sales.POST("/quick", middleware.RequirePermission("CREATE_SALES"), salesHandler.CreateQuickSale)
+
+				quotes := sales.Group("/quotes")
+				{
+					quotes.GET("", middleware.RequirePermission("VIEW_SALES"), salesHandler.GetQuotes)
+					quotes.GET("/export", middleware.RequirePermission("VIEW_SALES"), salesHandler.ExportQuotes)
+					quotes.GET("/:id", middleware.RequirePermission("VIEW_SALES"), salesHandler.GetQuote)
+					quotes.POST("", middleware.RequirePermission("CREATE_SALES"), salesHandler.CreateQuote)
+					quotes.PUT("/:id", middleware.RequirePermission("UPDATE_SALES"), salesHandler.UpdateQuote)
+					quotes.DELETE("/:id", middleware.RequirePermission("DELETE_SALES"), salesHandler.DeleteQuote)
+					quotes.POST("/:id/print", middleware.RequirePermission("PRINT_INVOICES"), salesHandler.PrintQuote)
+					quotes.POST("/:id/share", middleware.RequirePermission("VIEW_SALES"), salesHandler.ShareQuote)
+				}
 			}
 
 			// POS specific routes (require company and location)
