@@ -36,8 +36,9 @@ func (s *AttendanceService) AutoMarkNonWorkingDays(companyID int, date time.Time
 		return nil
 	}
 
-	note := "Holiday"
+	note := "Weekend"
 	if isHoliday {
+		note = "Holiday"
 		var desc sql.NullString
 		if err := s.db.QueryRow(`SELECT description FROM holidays
                         WHERE company_id = $1 AND is_deleted = FALSE AND (
