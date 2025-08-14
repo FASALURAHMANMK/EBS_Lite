@@ -41,6 +41,7 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 	reportsHandler := handlers.NewReportsHandler()
 	employeeHandler := handlers.NewEmployeeHandler()
 	payrollHandler := handlers.NewPayrollHandler()
+	attendanceHandler := handlers.NewAttendanceHandler()
 	workflowHandler := handlers.NewWorkflowHandler()
 	settingsHandler := handlers.NewSettingsHandler()
 	auditLogHandler := handlers.NewAuditLogHandler()
@@ -302,6 +303,16 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 				employees.DELETE("/:id", middleware.RequirePermission("DELETE_EMPLOYEES"), employeeHandler.DeleteEmployee)
 			}
 
+			// Attendance routes (require company)
+			attendance := protected.Group("/attendance")
+			attendance.Use(middleware.RequireCompanyAccess())
+			{
+				attendance.POST("/check-in", middleware.RequirePermission("MANAGE_ATTENDANCE"), attendanceHandler.CheckIn)
+				attendance.POST("/check-out", middleware.RequirePermission("MANAGE_ATTENDANCE"), attendanceHandler.CheckOut)
+				attendance.POST("/leave", middleware.RequirePermission("MANAGE_ATTENDANCE"), attendanceHandler.ApplyLeave)
+				attendance.GET("/holidays", middleware.RequirePermission("VIEW_ATTENDANCE"), attendanceHandler.GetHolidays)
+			}
+
 			// Payroll routes (require company)
 			payrolls := protected.Group("/payrolls")
 			payrolls.Use(middleware.RequireCompanyAccess())
@@ -309,6 +320,10 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 				payrolls.GET("", middleware.RequirePermission("VIEW_PAYROLLS"), payrollHandler.GetPayrolls)
 				payrolls.POST("", middleware.RequirePermission("CREATE_PAYROLLS"), payrollHandler.CreatePayroll)
 				payrolls.PUT("/:id/mark-paid", middleware.RequirePermission("PROCESS_PAYROLLS"), payrollHandler.MarkPayrollPaid)
+				payrolls.POST("/:id/components", middleware.RequirePermission("CREATE_PAYROLLS"), payrollHandler.AddSalaryComponent)
+				payrolls.POST("/:id/advances", middleware.RequirePermission("CREATE_PAYROLLS"), payrollHandler.RecordAdvance)
+				payrolls.POST("/:id/deductions", middleware.RequirePermission("CREATE_PAYROLLS"), payrollHandler.RecordDeduction)
+				payrolls.GET("/:id/payslip", middleware.RequirePermission("VIEW_PAYROLLS"), payrollHandler.GeneratePayslip)
 			}
 
 			// Collection routes (require company)
