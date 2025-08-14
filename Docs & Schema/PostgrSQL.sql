@@ -622,6 +622,20 @@ CREATE TABLE employee_leaves (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Holidays Table
+CREATE TABLE holidays (
+    holiday_id SERIAL PRIMARY KEY,
+    company_id INTEGER NOT NULL REFERENCES companies(company_id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    description TEXT,
+    is_recurring BOOLEAN DEFAULT FALSE,
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    UNIQUE(company_id, date)
+);
+
 -- Attendance Table
 CREATE TABLE attendance (
     attendance_id SERIAL PRIMARY KEY,
