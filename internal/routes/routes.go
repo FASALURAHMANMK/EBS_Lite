@@ -44,6 +44,7 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 	workflowHandler := handlers.NewWorkflowHandler()
 	settingsHandler := handlers.NewSettingsHandler()
 	auditLogHandler := handlers.NewAuditLogHandler()
+	dashboardHandler := handlers.NewDashboardHandler()
 	translationHandler := handlers.NewTranslationHandler()
 	printHandler := handlers.NewPrintHandler()
 	// Health check endpoint
@@ -76,6 +77,14 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 			{
 				authProtected.GET("/me", authHandler.GetMe)
 				authProtected.POST("/logout", authHandler.Logout)
+			}
+
+			// Dashboard routes
+			dashboard := protected.Group("/dashboard")
+			dashboard.Use(middleware.RequireCompanyAccess())
+			{
+				dashboard.GET("/metrics", middleware.RequirePermission("VIEW_DASHBOARD"), dashboardHandler.GetMetrics)
+				dashboard.GET("/quick-actions", middleware.RequirePermission("VIEW_DASHBOARD"), dashboardHandler.GetQuickActions)
 			}
 
 			// User management routes
