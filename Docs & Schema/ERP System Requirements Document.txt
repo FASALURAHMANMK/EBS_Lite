@@ -1,0 +1,546 @@
+ERP System Requirements Document
+
+General Overview
+
+A modern, lightweight, cross-platform ERP system with offline/online support. Designed for small to mid-sized businesses managing multiple companies and locations, the system handles sales, inventory, purchases, customers, basic accounting, HR (payroll/attendance), and reporting with granular role-based access control.
+
+Offline Functionality & Sync Strategy
+
+Offline support should be carefully planned to ensure usability without overcomplicating data management. Not all modules require offline support. Here's a strategic breakdown:
+
+Recommended Offline Modules:
+
+Sales (POS): Full offline support. Enables uninterrupted billing, including quick sale and invoice generation.
+
+Customers (Basic Info): Partial support for customer lookup, credit limit checks, and adding new customers.
+
+Inventory (Essential): Partial support for stock and pricing data to validate during sales.
+
+Quick Expenses: Support for recording expenses at the store level.
+
+Reports (Basic) : Basic sales & expense reports based on local data
+
+Modules NOT Recommended for Offline:
+
+Accounting: Requires real-time data; not suitable for offline use.
+
+Reports: Needs full, up-to-date data; restrict to online-only.
+
+Purchases: Primarily a back-office function; can be handled when online.
+
+HR: Attendance and payroll processing don’t require offline access.
+
+Settings/Admin: Configuration and role management should be restricted to online mode.
+
+Sync Strategy:
+
+DB Flags: Use flags like dirty, synced, and deleted on local records to manage sync status.
+
+MQTT: Utilize MQTT for real-time push/pull updates when the system goes online.
+
+Batch Sync with Conflict Resolution:
+
+Queue offline operations.
+
+Sync upon reconnection.
+
+Use timestamps and unique constraints to resolve conflicts.
+
+Time-Based Data Retention:
+
+Keep only 1 month of transactional data offline.
+
+Automatically purge old data.
+
+Safety Nets:
+
+Every Transactions are with created by and updated by user ids.
+
+Alert users when local data is stale.
+
+Block new transactions if unsynced data is too old.
+
+Implementation Notes:
+
+Frontend (Next.js):
+
+ Provide clear sync status and fallback notices.
+
+Backend (Go):
+
+ Sync APIs should support batch operations and delta updates.
+
+ Database (PostgreSQL + SQLite):
+
+ Maintain schema parity between local and remote.
+
+ Leverage timestamp-based delta sync.
+
+🛠 Technical Recommendations
+
+ Layer		Tech Stack
+ Frontend	Next.js, Tailwind CSS
+ Backend	Go Lang
+ Database	PostgreSQL (remote), SQLite (local)
+ Sync Engine	Custom sync Logic with DB Flags, MQTT and GO
+ Auth		DB Based + JWT
+
+
+🎨 User Interface Structure
+
+Overall Theme
+
+Use Black, Red and White as primary colors with a modern, clean design. Use Tailwind CSS for responsive layouts and components.
+Use lucid icons for intuitive navigation and actions.
+
+📌 Header (Top Navigation)
+ Left:
+
+  Company logo
+
+  Company name
+
+  Selected location (dropdown switcher)
+
+ Right:
+
+  App status indicator (Online/Offline)
+
+  Manual sync / Refresh button with Sync status
+
+  Dark/Light mode toggle
+
+  Language selector :
+  (English, Mandarin Chinese, Spanish, French, Arabic, Portuguese, German, Japanese, Russian, Hindi, Korean, Italian, Dutch)
+  User can select a Primary Language and a secondary one.(Like English for UI, Arabic for receipts)
+
+  Help menu (FAQs, Contact Support)
+
+  Logout
+
+📂 Sidebar (Collapsible Navigation Panel)
+
+Sidebar sections:
+
+ Dashboard
+
+ Sales
+
+ Customers
+
+ Purchases
+
+ Inventory
+
+ Accounting
+
+ Reports
+
+ HR
+
+ Settings
+
+🔐 Authentication & Access Control
+
+ Login Page
+
+ Register Page
+
+ Password Reset Page
+
+ Company create Page if no company linked
+
+ Authentication:
+
+ Email/password with password reset
+
+ DB-based multi-tenant auth
+
+ Role-Based Access Control:
+
+ Roles: Admin, Manager, Sales, Store, HR, Accountant
+
+ Users are linked to company + location
+
+ Company Structure:
+
+ A company can have multiple locations
+
+ Single Postgres DB with row level security(company_id, locaion_id, user_id)
+
+ All transactions (stock, cash, reports) are location-specific
+
+🏠 Dashboard
+
+Quick Action Button (Populate circle with icons on click):
+
+ Sale
+
+ Purchase
+
+ Collection
+
+ Quick Expense Entry
+
+
+Widgets
+
+ Total Credit Outstanding
+
+ Total Inventory Value
+
+ Today’s Sales & Purchases
+
+ Daily Cash Summary (Cash In, Out, Balance)
+
+Insights
+
+ Month Progress Graph (with drill-down to report page)
+
+ Low Stock Alerts (link to Purchase screen)
+
+ Top Selling Products
+
+ Recent Sales History
+
+
+🛒 Sales Module
+
+ Quick Sale:
+
+  Ideal for fast billing of unlisted items or services
+
+  Add unnamed items with price/qty only
+
+  Track Quick Sales separately
+
+  Helpful for service businesses, misc items
+
+POS Interface
+
+ Switchable UI: Classic / Modern
+
+ Modern Exclusively For Mobile devices(also available for PC) :
+ 
+ Cart like Interface
+
+ Live product search (Product list with categories)
+
+ Live customer search + Add new
+
+ Add multiple items with real-time total
+
+ Discount, Tax, Barcode support
+
+ Warranty, Loyalty and Promotions
+
+ Hold / Resume bills
+
+ Print/WhatsApp/SMS/Email Invoices
+
+ Classic:
+
+ Standard Table like POS Interface(Not for Mobile Devices. Only for PC)
+
+ Live product search (in line)
+
+ Live customer search + Add new
+
+ Add multiple items with real-time total
+
+ Discount, Tax, Barcode support
+
+ Warranty, Loyalty and Promotions
+
+ Hold / Resume bills
+
+ Print/WhatsApp/SMS/Email Invoices
+ 
+Returns
+
+ Search invoice and return specific items
+
+ Stock and accounts auto-adjusted
+
+Sales History
+
+ Filters: Date, Customer, Product, Payment method
+
+ Invoice print/download/export
+
+ Searchable and live updated
+
+Invoice & Quotes
+
+ Invoice Management(Create/Update/Delete/Print/Share/View)
+
+ Quotation Management(Create/Update/Delete/Print/Share/View)
+
+
+📦 Inventory Module
+
+Inventory Summary
+
+ Total stock value
+
+ Number of SKUs
+
+ Out-of-stock & Low stock lists
+
+Products
+
+ Product List with Live filters: category, brand, stock level
+
+ On-Click Product Summary (right pane/modal):
+
+  Real-time data:
+
+  Current stock at all locations
+
+  Product movement history
+
+  Sales, Purchases, Returns
+
+  Recent transactions
+
+Stock Management
+
+ Products can have dynamic attributes like stored location(warehouse number, rack number/shelf number),IMEI, SN, Size(In case of textiles), Colours, Year of MF etc.
+
+ Attributes can be created, ticked and filled on creation time as needed.ie It should be capable of listing any items.
+
+ Add/Update/Delete products
+
+ Category and Brand management
+
+ Reorder level setup
+
+ Unit definitions (kg, pcs, etc.)
+
+ Stock Adjustments (Qty & Value)
+
+ Excel Import/Export
+
+ Barcode & Label Printing
+
+Stock Transfer
+
+ Inter-branch stock request
+
+ Request approvals and tracking
+
+ Branch wise Stock status of products
+
+📥 Purchase Module
+
+Suppliers
+
+ Supplier List with Live search and filters
+
+ On-click transaction summary (Purchases, Returns, Payments, Notes)
+
+ Outstanding balances
+
+Management
+
+ Add/Edit/Delete supplier info
+
+ Excel Import/Export
+
+Purchase
+
+ Purchase order
+
+ Goods Receipt Note
+
+ Quick purchase entry
+
+ Tax, payment term setup
+
+Returns
+
+ Process purchase returns
+
+ Adjust stock & payable accounts
+
+History
+
+ Full history with filters and search
+
+👥 Customer Module
+
+Customers
+
+ Customer List with Filters: name, phone, balance, credit limit
+
+ On-click summary: Sales, Payments, Returns, Loyalty
+
+Customer Management
+
+ Add/Edit/Delete customer info
+
+ Set credit limit and payment terms
+
+ Excel Import/Export
+
+Collections
+
+ Quick Collection Entry
+
+ View outstanding receivables
+
+ Record payments (cash, bank, partial/full, Invoice based or amount based)
+
+ Print Payment receipts
+
+ Linked with accounting ledger
+
+💰 Accounting Module
+
+Application-level accounting focused on cash & daily activities:
+
+ Cash Register
+
+ Record all cash in/out entries
+
+Daily expenses
+
+ Withdrawals, petty cash, deposits
+
+ Custom reason entry
+
+ Auto-linked to sales, collections, purchases
+
+Cash Tally & Balance
+
+ Real-time cash in hand
+
+ Daily opening/closing balance
+
+ Manual tallying with actual count
+
+Vouchers
+
+Payment, Receipt, Journal
+
+Ledgers
+
+Customer/Supplier/Bank/Cash
+
+View all debit/credit and balances
+
+Reports
+
+Trial Balance
+
+Profit & Loss
+
+Balance Sheet
+
+Tax Reports (GST/VAT if applicable)
+
+🛡️ Audit
+
+ Stock adjustments
+
+ Invoice edits/voids
+
+ Manual tally overrides
+
+ Price changes
+
+🧾 Reports Module
+
+All reports can be exported to excel & pdf
+
+Sales Reports
+
+ Filter by product, customer, date
+
+ Compare location-wise or monthly
+
+Inventory Reports
+
+ Stock Status
+
+ Item movement report
+
+ Valuation report (FIFO, Avg.)
+
+Purchase Reports
+
+ Purchase vs Returns
+
+ Supplier-wise reports
+
+Accounting Reports
+
+ Daily cash report
+
+ Income/Expense by category
+
+ General Ledger, Trial Balance, PL/BS
+
+ Customer/Supplier Outstanding
+
+Top Performers (products, customers, staff)
+
+🧑‍💼 HR Module
+
+Attendance Management
+
+ Manual or external integration
+
+ Daily in/out time
+
+ Mark leaves and holidays
+
+Payroll Management
+
+ Set fixed or variable salary
+
+ Add advances/deductions
+
+ Generate monthly payslips
+
+ Payroll ledger for auditing
+
+
+⚙️ Settings
+
+Company Settings
+
+ Company info, logo, currency, Exchange rates
+
+ Invoice format and numbering
+
+ Tax settings: Custom names, Custom Slabs, Custom Percentages(Respective to their region)
+ Optional E-Invoicing and reporting add-on. 
+
+Location Settings
+
+ Add/edit locations
+
+User Management
+
+ Assign users
+
+ User & Role Management
+
+ Create/edit users
+
+ Assign role, location & permissions
+
+Device & User Control
+
+ Remote logout/ Limit devices or users
+
+ Online/offline/sync status
+
+POS & Printer Settings
+
+ Printer Settings: Connectivity, Size etc.
+
+ Receipt template
+
+ Payment methods(External Payment integrations)
