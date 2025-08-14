@@ -312,3 +312,272 @@ func (h *SalesHandler) CreateQuickSale(c *gin.Context) {
 
 	utils.CreatedResponse(c, "Quick sale created successfully", sale)
 }
+
+// GET /sales/history
+func (h *SalesHandler) GetSalesHistory(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	filters := make(map[string]string)
+	if dateFrom := c.Query("date_from"); dateFrom != "" {
+		filters["date_from"] = dateFrom
+	}
+	if dateTo := c.Query("date_to"); dateTo != "" {
+		filters["date_to"] = dateTo
+	}
+	if customerID := c.Query("customer_id"); customerID != "" {
+		filters["customer_id"] = customerID
+	}
+	if productID := c.Query("product_id"); productID != "" {
+		filters["product_id"] = productID
+	}
+	if paymentMethodID := c.Query("payment_method_id"); paymentMethodID != "" {
+		filters["payment_method_id"] = paymentMethodID
+	}
+
+	sales, err := h.salesService.GetSalesHistory(companyID, filters)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get sales history", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Sales history retrieved successfully", sales)
+}
+
+// GET /sales/history/export
+func (h *SalesHandler) ExportInvoices(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	filters := make(map[string]string)
+	if dateFrom := c.Query("date_from"); dateFrom != "" {
+		filters["date_from"] = dateFrom
+	}
+	if dateTo := c.Query("date_to"); dateTo != "" {
+		filters["date_to"] = dateTo
+	}
+	if customerID := c.Query("customer_id"); customerID != "" {
+		filters["customer_id"] = customerID
+	}
+	if productID := c.Query("product_id"); productID != "" {
+		filters["product_id"] = productID
+	}
+	if paymentMethodID := c.Query("payment_method_id"); paymentMethodID != "" {
+		filters["payment_method_id"] = paymentMethodID
+	}
+
+	invoices, err := h.salesService.ExportInvoices(companyID, filters)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to export invoices", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Invoices exported successfully", invoices)
+}
+
+// GET /sales/quotes
+func (h *SalesHandler) GetQuotes(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	quotes, err := h.salesService.GetQuotes(companyID, nil)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get quotes", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Quotes retrieved successfully", quotes)
+}
+
+// GET /sales/quotes/:id
+func (h *SalesHandler) GetQuote(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	quoteID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid quote ID", err)
+		return
+	}
+
+	quote, err := h.salesService.GetQuoteByID(quoteID, companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get quote", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Quote retrieved successfully", quote)
+}
+
+// POST /sales/quotes
+func (h *SalesHandler) CreateQuote(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+	userID := c.GetInt("user_id")
+
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	var req models.CreateQuoteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	if err := utils.ValidateStruct(&req); err != nil {
+		validationErrors := utils.GetValidationErrors(err)
+		utils.ValidationErrorResponse(c, validationErrors)
+		return
+	}
+
+	quote, err := h.salesService.CreateQuote(companyID, locationID, userID, &req)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create quote", err)
+		return
+	}
+
+	utils.CreatedResponse(c, "Quote created successfully", quote)
+}
+
+// PUT /sales/quotes/:id
+func (h *SalesHandler) UpdateQuote(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	quoteID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid quote ID", err)
+		return
+	}
+
+	var req models.UpdateQuoteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	if err := utils.ValidateStruct(&req); err != nil {
+		validationErrors := utils.GetValidationErrors(err)
+		utils.ValidationErrorResponse(c, validationErrors)
+		return
+	}
+
+	if err := h.salesService.UpdateQuote(quoteID, companyID, &req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update quote", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Quote updated successfully", nil)
+}
+
+// DELETE /sales/quotes/:id
+func (h *SalesHandler) DeleteQuote(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	quoteID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid quote ID", err)
+		return
+	}
+
+	if err := h.salesService.DeleteQuote(quoteID, companyID); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to delete quote", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Quote deleted successfully", nil)
+}
+
+// POST /sales/quotes/:id/print
+func (h *SalesHandler) PrintQuote(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	quoteID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid quote ID", err)
+		return
+	}
+
+	if err := h.salesService.PrintQuote(quoteID, companyID); err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to print quote", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Quote print initiated", nil)
+}
+
+// POST /sales/quotes/:id/share
+func (h *SalesHandler) ShareQuote(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	quoteID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid quote ID", err)
+		return
+	}
+
+	var req models.ShareQuoteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	if err := utils.ValidateStruct(&req); err != nil {
+		validationErrors := utils.GetValidationErrors(err)
+		utils.ValidationErrorResponse(c, validationErrors)
+		return
+	}
+
+	if err := h.salesService.ShareQuote(quoteID, companyID, &req); err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to share quote", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Quote shared successfully", nil)
+}
+
+// GET /sales/quotes/export
+func (h *SalesHandler) ExportQuotes(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	quotes, err := h.salesService.ExportQuotes(companyID, nil)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to export quotes", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Quotes exported successfully", quotes)
+}
