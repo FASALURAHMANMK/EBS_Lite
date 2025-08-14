@@ -5,15 +5,16 @@ go 1.23.0
 toolchain go1.24.4
 
 require (
-	github.com/gin-gonic/gin v1.10.1
-	github.com/go-playground/validator/v10 v10.27.0
-	github.com/golang-jwt/jwt/v5 v5.3.0
-	github.com/google/uuid v1.3.1
-	github.com/jackc/pgx/v5 v5.4.3
-	github.com/joho/godotenv v1.5.1
-	github.com/lib/pq v1.10.9
-	github.com/rs/cors v1.10.1
-	golang.org/x/crypto v0.40.0
+        github.com/gin-gonic/gin v1.10.1
+        github.com/go-playground/validator/v10 v10.27.0
+        github.com/golang-jwt/jwt/v5 v5.3.0
+        github.com/google/uuid v1.3.1
+        github.com/jackc/pgx/v5 v5.4.3
+        github.com/joho/godotenv v1.5.1
+        github.com/lib/pq v1.10.9
+        github.com/rs/cors v1.10.1
+        golang.org/x/crypto v0.40.0
+       github.com/xuri/excelize/v2 v2.8.1
 )
 
 require (
