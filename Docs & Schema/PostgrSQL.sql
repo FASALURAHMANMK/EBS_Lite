@@ -378,12 +378,41 @@ CREATE TABLE sale_return_details (
     line_total NUMERIC(12,2) NOT NULL
 );
 
+-- Purchase Orders Table
+CREATE TABLE purchase_orders (
+    purchase_order_id SERIAL PRIMARY KEY,
+    order_number VARCHAR(100) NOT NULL,
+    location_id INTEGER NOT NULL REFERENCES locations(location_id),
+    supplier_id INTEGER NOT NULL REFERENCES suppliers(supplier_id),
+    order_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    status VARCHAR(50) DEFAULT 'PENDING',
+    total_amount NUMERIC(12,2) DEFAULT 0,
+    created_by INTEGER NOT NULL REFERENCES users(user_id),
+    workflow_state_id INTEGER REFERENCES workflow_states(state_id),
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE
+);
+
+-- Purchase Order Items Table
+CREATE TABLE purchase_order_items (
+    purchase_order_item_id SERIAL PRIMARY KEY,
+    purchase_order_id INTEGER NOT NULL REFERENCES purchase_orders(purchase_order_id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(product_id),
+    quantity NUMERIC(10,3) NOT NULL,
+    unit_price NUMERIC(12,2) NOT NULL,
+    line_total NUMERIC(12,2) NOT NULL
+);
+
 -- Purchases Table
 CREATE TABLE purchases (
     purchase_id SERIAL PRIMARY KEY,
     purchase_number VARCHAR(100) NOT NULL,
     location_id INTEGER NOT NULL REFERENCES locations(location_id),
     supplier_id INTEGER NOT NULL REFERENCES suppliers(supplier_id),
+    purchase_order_id INTEGER REFERENCES purchase_orders(purchase_order_id),
+    workflow_state_id INTEGER REFERENCES workflow_states(state_id),
     purchase_date DATE NOT NULL DEFAULT CURRENT_DATE,
     subtotal NUMERIC(12,2) NOT NULL DEFAULT 0,
     tax_amount NUMERIC(12,2) DEFAULT 0,
@@ -450,6 +479,34 @@ CREATE TABLE purchase_return_details (
     line_total NUMERIC(12,2) NOT NULL
 );
 
+-- Goods Receipts Table
+CREATE TABLE goods_receipts (
+    goods_receipt_id SERIAL PRIMARY KEY,
+    receipt_number VARCHAR(100) NOT NULL,
+    purchase_order_id INTEGER REFERENCES purchase_orders(purchase_order_id),
+    purchase_id INTEGER REFERENCES purchases(purchase_id),
+    location_id INTEGER NOT NULL REFERENCES locations(location_id),
+    supplier_id INTEGER NOT NULL REFERENCES suppliers(supplier_id),
+    received_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    received_by INTEGER NOT NULL REFERENCES users(user_id),
+    workflow_state_id INTEGER REFERENCES workflow_states(state_id),
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE
+);
+
+-- Goods Receipt Items Table
+CREATE TABLE goods_receipt_items (
+    goods_receipt_item_id SERIAL PRIMARY KEY,
+    goods_receipt_id INTEGER NOT NULL REFERENCES goods_receipts(goods_receipt_id) ON DELETE CASCADE,
+    purchase_order_item_id INTEGER REFERENCES purchase_order_items(purchase_order_item_id),
+    product_id INTEGER NOT NULL REFERENCES products(product_id),
+    received_quantity NUMERIC(10,3) NOT NULL,
+    unit_price NUMERIC(12,2) NOT NULL,
+    line_total NUMERIC(12,2) NOT NULL
+);
+
 -- Stock Table
 CREATE TABLE stock (
     stock_id SERIAL PRIMARY KEY,
@@ -468,6 +525,7 @@ CREATE TABLE stock_lots (
     location_id INTEGER NOT NULL REFERENCES locations(location_id),
     supplier_id INTEGER REFERENCES suppliers(supplier_id),
     purchase_id INTEGER REFERENCES purchases(purchase_id),
+    goods_receipt_id INTEGER REFERENCES goods_receipts(goods_receipt_id),
     quantity NUMERIC(10,3) NOT NULL,
     remaining_quantity NUMERIC(10,3) NOT NULL,
     cost_price NUMERIC(12,2) NOT NULL,
@@ -1007,7 +1065,6 @@ CREATE TABLE workflow_approvals (
     approved_at TIMESTAMP
 );
 
-ALTER TABLE purchases ADD COLUMN workflow_state_id INT REFERENCES workflow_states(state_id);
 ALTER TABLE stock_transfers ADD COLUMN workflow_state_id INT REFERENCES workflow_states(state_id);
 
 -- Reporting Views

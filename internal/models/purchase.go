@@ -9,6 +9,8 @@ type Purchase struct {
 	PurchaseNumber  string           `json:"purchase_number" db:"purchase_number"`
 	LocationID      int              `json:"location_id" db:"location_id"`
 	SupplierID      int              `json:"supplier_id" db:"supplier_id"`
+	PurchaseOrderID *int             `json:"purchase_order_id,omitempty" db:"purchase_order_id"`
+	WorkflowStateID *int             `json:"workflow_state_id,omitempty" db:"workflow_state_id"`
 	PurchaseDate    time.Time        `json:"purchase_date" db:"purchase_date"`
 	Subtotal        float64          `json:"subtotal" db:"subtotal"`
 	TaxAmount       float64          `json:"tax_amount" db:"tax_amount"`
@@ -135,4 +137,57 @@ type ReceivePurchaseItemRequest struct {
 	ExpiryDate       *time.Time `json:"expiry_date,omitempty"`
 	BatchNumber      *string    `json:"batch_number,omitempty"`
 	SerialNumbers    []string   `json:"serial_numbers,omitempty"`
+}
+
+// Purchase Order Models
+type PurchaseOrder struct {
+	PurchaseOrderID int                 `json:"purchase_order_id" db:"purchase_order_id"`
+	OrderNumber     string              `json:"order_number" db:"order_number"`
+	LocationID      int                 `json:"location_id" db:"location_id"`
+	SupplierID      int                 `json:"supplier_id" db:"supplier_id"`
+	OrderDate       time.Time           `json:"order_date" db:"order_date"`
+	Status          string              `json:"status" db:"status"`
+	TotalAmount     float64             `json:"total_amount" db:"total_amount"`
+	CreatedBy       int                 `json:"created_by" db:"created_by"`
+	WorkflowStateID *int                `json:"workflow_state_id,omitempty" db:"workflow_state_id"`
+	Items           []PurchaseOrderItem `json:"items,omitempty"`
+	Supplier        *Supplier           `json:"supplier,omitempty"`
+	Location        *Location           `json:"location,omitempty"`
+	SyncModel
+}
+
+type PurchaseOrderItem struct {
+	PurchaseOrderItemID int      `json:"purchase_order_item_id" db:"purchase_order_item_id"`
+	PurchaseOrderID     int      `json:"purchase_order_id" db:"purchase_order_id"`
+	ProductID           int      `json:"product_id" db:"product_id"`
+	Quantity            float64  `json:"quantity" db:"quantity"`
+	UnitPrice           float64  `json:"unit_price" db:"unit_price"`
+	LineTotal           float64  `json:"line_total" db:"line_total"`
+	Product             *Product `json:"product,omitempty"`
+}
+
+// Goods Receipt Models
+type GoodsReceipt struct {
+	GoodsReceiptID  int                `json:"goods_receipt_id" db:"goods_receipt_id"`
+	ReceiptNumber   string             `json:"receipt_number" db:"receipt_number"`
+	PurchaseOrderID *int               `json:"purchase_order_id,omitempty" db:"purchase_order_id"`
+	PurchaseID      *int               `json:"purchase_id,omitempty" db:"purchase_id"`
+	LocationID      int                `json:"location_id" db:"location_id"`
+	SupplierID      int                `json:"supplier_id" db:"supplier_id"`
+	ReceivedDate    time.Time          `json:"received_date" db:"received_date"`
+	ReceivedBy      int                `json:"received_by" db:"received_by"`
+	WorkflowStateID *int               `json:"workflow_state_id,omitempty" db:"workflow_state_id"`
+	Items           []GoodsReceiptItem `json:"items,omitempty"`
+	SyncModel
+}
+
+type GoodsReceiptItem struct {
+	GoodsReceiptItemID  int      `json:"goods_receipt_item_id" db:"goods_receipt_item_id"`
+	GoodsReceiptID      int      `json:"goods_receipt_id" db:"goods_receipt_id"`
+	PurchaseOrderItemID *int     `json:"purchase_order_item_id,omitempty" db:"purchase_order_item_id"`
+	ProductID           int      `json:"product_id" db:"product_id"`
+	ReceivedQuantity    float64  `json:"received_quantity" db:"received_quantity"`
+	UnitPrice           float64  `json:"unit_price" db:"unit_price"`
+	LineTotal           float64  `json:"line_total" db:"line_total"`
+	Product             *Product `json:"product,omitempty"`
 }
