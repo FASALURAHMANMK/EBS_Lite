@@ -41,6 +41,11 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 	reportsHandler := handlers.NewReportsHandler()
 	employeeHandler := handlers.NewEmployeeHandler()
 	payrollHandler := handlers.NewPayrollHandler()
+	workflowHandler := handlers.NewWorkflowHandler()
+	settingsHandler := handlers.NewSettingsHandler()
+	auditLogHandler := handlers.NewAuditLogHandler()
+	translationHandler := handlers.NewTranslationHandler()
+	printHandler := handlers.NewPrintHandler()
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -344,6 +349,45 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 				suppliers.DELETE("/:id", middleware.RequirePermission("DELETE_SUPPLIERS"), supplierHandler.DeleteSupplier)
 			}
 
+			// Settings routes
+			settings := protected.Group("/settings")
+			settings.Use(middleware.RequireCompanyAccess())
+			{
+				settings.GET("", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetSettings)
+				settings.PUT("", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.UpdateSettings)
+			}
+
+			// Audit log routes
+			audit := protected.Group("/audit-logs")
+			audit.Use(middleware.RequireCompanyAccess())
+			{
+				audit.GET("", middleware.RequirePermission("VIEW_AUDIT_LOGS"), auditLogHandler.GetAuditLogs)
+			}
+
+			// Translation routes
+			translations := protected.Group("/translations")
+			translations.Use(middleware.RequireCompanyAccess())
+			{
+				translations.GET("", middleware.RequirePermission("VIEW_TRANSLATIONS"), translationHandler.GetTranslations)
+				translations.PUT("", middleware.RequirePermission("MANAGE_TRANSLATIONS"), translationHandler.UpdateTranslations)
+			}
+
+			// Printing routes
+			printGroup := protected.Group("/print")
+			printGroup.Use(middleware.RequireCompanyAccess())
+			{
+				printGroup.POST("/receipt", middleware.RequirePermission("PRINT_RECEIPTS"), printHandler.PrintReceipt)
+			}
+
+			// Workflow & Approvals routes
+			workflow := protected.Group("/workflow-requests")
+			workflow.Use(middleware.RequireCompanyAccess())
+			{
+				workflow.GET("", middleware.RequirePermission("VIEW_WORKFLOWS"), workflowHandler.GetWorkflowRequests)
+				workflow.POST("", middleware.RequirePermission("CREATE_WORKFLOWS"), workflowHandler.CreateWorkflowRequest)
+				workflow.PUT("/:id/approve", middleware.RequirePermission("APPROVE_WORKFLOWS"), workflowHandler.ApproveWorkflowRequest)
+				workflow.PUT("/:id/reject", middleware.RequirePermission("APPROVE_WORKFLOWS"), workflowHandler.RejectWorkflowRequest)
+			}
 		}
 	}
 
