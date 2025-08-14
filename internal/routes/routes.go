@@ -355,6 +355,28 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 			{
 				settings.GET("", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetSettings)
 				settings.PUT("", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.UpdateSettings)
+
+				settings.GET("/company", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetCompanySettings)
+				settings.PUT("/company", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.UpdateCompanySettings)
+
+				settings.GET("/invoice", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetInvoiceSettings)
+				settings.PUT("/invoice", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.UpdateInvoiceSettings)
+
+				settings.GET("/tax", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetTaxSettings)
+				settings.PUT("/tax", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.UpdateTaxSettings)
+
+				settings.GET("/device-control", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetDeviceControlSettings)
+				settings.PUT("/device-control", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.UpdateDeviceControlSettings)
+
+				settings.GET("/payment-methods", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetPaymentMethods)
+				settings.POST("/payment-methods", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.CreatePaymentMethod)
+				settings.PUT("/payment-methods/:id", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.UpdatePaymentMethod)
+				settings.DELETE("/payment-methods/:id", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.DeletePaymentMethod)
+
+				settings.GET("/printer", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetPrinters)
+				settings.POST("/printer", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.CreatePrinter)
+				settings.PUT("/printer/:id", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.UpdatePrinter)
+				settings.DELETE("/printer/:id", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.DeletePrinter)
 			}
 
 			// Audit log routes
