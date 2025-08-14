@@ -35,6 +35,8 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 	loyaltyHandler := handlers.NewLoyaltyHandler()
 	returnsHandler := handlers.NewReturnsHandler()
 	purchaseHandler := handlers.NewPurchaseHandler()
+	purchaseOrderHandler := handlers.NewPurchaseOrderHandler()
+	goodsReceiptHandler := handlers.NewGoodsReceiptHandler()
 	supplierHandler := handlers.NewSupplierHandler()
 	customerHandler := handlers.NewCustomerHandler()
 	collectionHandler := handlers.NewCollectionHandler()
@@ -304,12 +306,29 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 			purchases.Use(middleware.RequireCompanyAccess())
 			{
 				purchases.GET("", middleware.RequirePermission("VIEW_PURCHASES"), purchaseHandler.GetPurchases)
+				purchases.GET("/history", middleware.RequirePermission("VIEW_PURCHASES"), purchaseHandler.GetPurchaseHistory)
 				purchases.GET("/pending", middleware.RequirePermission("VIEW_PURCHASES"), purchaseHandler.GetPendingPurchases)
 				purchases.GET("/:id", middleware.RequirePermission("VIEW_PURCHASES"), purchaseHandler.GetPurchase)
 				purchases.POST("", middleware.RequirePermission("CREATE_PURCHASES"), purchaseHandler.CreatePurchase)
+				purchases.POST("/quick", middleware.RequirePermission("CREATE_PURCHASES"), purchaseHandler.CreateQuickPurchase)
 				purchases.PUT("/:id", middleware.RequirePermission("UPDATE_PURCHASES"), purchaseHandler.UpdatePurchase)
 				purchases.PUT("/:id/receive", middleware.RequirePermission("RECEIVE_PURCHASES"), purchaseHandler.ReceivePurchase)
 				purchases.DELETE("/:id", middleware.RequirePermission("DELETE_PURCHASES"), purchaseHandler.DeletePurchase)
+			}
+
+			purchaseOrders := protected.Group("/purchase-orders")
+			purchaseOrders.Use(middleware.RequireCompanyAccess())
+			{
+				purchaseOrders.POST("", middleware.RequirePermission("CREATE_PURCHASES"), purchaseOrderHandler.CreatePurchaseOrder)
+				purchaseOrders.PUT("/:id", middleware.RequirePermission("UPDATE_PURCHASES"), purchaseOrderHandler.UpdatePurchaseOrder)
+				purchaseOrders.DELETE("/:id", middleware.RequirePermission("DELETE_PURCHASES"), purchaseOrderHandler.DeletePurchaseOrder)
+				purchaseOrders.PUT("/:id/approve", middleware.RequirePermission("UPDATE_PURCHASES"), purchaseOrderHandler.ApprovePurchaseOrder)
+			}
+
+			goodsReceipts := protected.Group("/goods-receipts")
+			goodsReceipts.Use(middleware.RequireCompanyAccess())
+			{
+				goodsReceipts.POST("", middleware.RequirePermission("RECEIVE_PURCHASES"), goodsReceiptHandler.RecordGoodsReceipt)
 			}
 
 			// Purchase Returns management routes (require company and location)

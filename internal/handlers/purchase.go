@@ -69,6 +69,50 @@ func (h *PurchaseHandler) GetPurchases(c *gin.Context) {
 	utils.SuccessResponse(c, "Purchases retrieved successfully", purchases)
 }
 
+// GET /purchases/history
+func (h *PurchaseHandler) GetPurchaseHistory(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	if locationParam := c.Query("location_id"); locationParam != "" {
+		if id, err := strconv.Atoi(locationParam); err == nil {
+			locationID = id
+		}
+	}
+
+	if locationID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+		return
+	}
+
+	filters := make(map[string]string)
+	if supplierID := c.Query("supplier_id"); supplierID != "" {
+		filters["supplier_id"] = supplierID
+	}
+	if status := c.Query("status"); status != "" {
+		filters["status"] = status
+	}
+	if dateFrom := c.Query("date_from"); dateFrom != "" {
+		filters["date_from"] = dateFrom
+	}
+	if dateTo := c.Query("date_to"); dateTo != "" {
+		filters["date_to"] = dateTo
+	}
+
+	purchases, err := h.purchaseService.GetPurchases(companyID, locationID, filters)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get purchase history", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Purchase history retrieved successfully", purchases)
+}
+
 // GET /purchases/:id
 func (h *PurchaseHandler) GetPurchase(c *gin.Context) {
 	companyID := c.GetInt("company_id")
@@ -143,6 +187,42 @@ func (h *PurchaseHandler) CreatePurchase(c *gin.Context) {
 	}
 
 	utils.CreatedResponse(c, "Purchase created successfully", purchase)
+}
+
+// POST /purchases/quick
+func (h *PurchaseHandler) CreateQuickPurchase(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+	userID := c.GetInt("user_id")
+
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	if locationID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+		return
+	}
+
+	var req models.CreatePurchaseRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	if err := utils.ValidateStruct(&req); err != nil {
+		validationErrors := utils.GetValidationErrors(err)
+		utils.ValidationErrorResponse(c, validationErrors)
+		return
+	}
+
+	purchase, err := h.purchaseService.CreatePurchase(companyID, locationID, userID, &req)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create quick purchase", err)
+		return
+	}
+
+	utils.CreatedResponse(c, "Quick purchase created successfully", purchase)
 }
 
 // PUT /purchases/:id
