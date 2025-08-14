@@ -2,55 +2,7 @@ ERP System Requirements Document
 
 General Overview
 
-A modern, lightweight, cross-platform ERP system with offline/online support. Designed for small to mid-sized businesses managing multiple companies and locations, the system handles sales, inventory, purchases, customers, basic accounting, HR (payroll/attendance), and reporting with granular role-based access control.
-
-Offline Functionality & Sync Strategy
-
-Offline support should be carefully planned to ensure usability without overcomplicating data management. Not all modules require offline support. Here's a strategic breakdown:
-
-Recommended Offline Modules:
-
-Sales (POS): Full offline support. Enables uninterrupted billing, including quick sale and invoice generation.
-
-Customers (Basic Info): Partial support for customer lookup, credit limit checks, and adding new customers.
-
-Inventory (Essential): Partial support for stock and pricing data to validate during sales.
-
-Quick Expenses: Support for recording expenses at the store level.
-
-Reports (Basic) : Basic sales & expense reports based on local data
-
-Modules NOT Recommended for Offline:
-
-Accounting: Requires real-time data; not suitable for offline use.
-
-Reports: Needs full, up-to-date data; restrict to online-only.
-
-Purchases: Primarily a back-office function; can be handled when online.
-
-HR: Attendance and payroll processing don’t require offline access.
-
-Settings/Admin: Configuration and role management should be restricted to online mode.
-
-Sync Strategy:
-
-DB Flags: Use flags like dirty, synced, and deleted on local records to manage sync status.
-
-MQTT: Utilize MQTT for real-time push/pull updates when the system goes online.
-
-Batch Sync with Conflict Resolution:
-
-Queue offline operations.
-
-Sync upon reconnection.
-
-Use timestamps and unique constraints to resolve conflicts.
-
-Time-Based Data Retention:
-
-Keep only 1 month of transactional data offline.
-
-Automatically purge old data.
+A modern, lightweight, cross-platform ERP system. Designed for small to mid-sized businesses managing multiple companies and locations, the system handles sales, inventory, purchases, customers, basic accounting, HR (payroll/attendance), and reporting with granular role-based access control.
 
 Safety Nets:
 
@@ -63,26 +15,15 @@ Block new transactions if unsynced data is too old.
 Implementation Notes:
 
 Frontend (Next.js):
-
- Provide clear sync status and fallback notices.
-
 Backend (Go):
-
- Sync APIs should support batch operations and delta updates.
-
- Database (PostgreSQL + SQLite):
-
- Maintain schema parity between local and remote.
-
- Leverage timestamp-based delta sync.
+Database (PostgreSQL):
 
 🛠 Technical Recommendations
 
  Layer		Tech Stack
  Frontend	Next.js, Tailwind CSS
  Backend	Go Lang
- Database	PostgreSQL (remote), SQLite (local)
- Sync Engine	Custom sync Logic with DB Flags, MQTT and GO
+ Database	PostgreSQL
  Auth		DB Based + JWT
 
 
