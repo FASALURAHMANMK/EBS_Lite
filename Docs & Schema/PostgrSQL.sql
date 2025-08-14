@@ -515,8 +515,16 @@ CREATE TABLE collections (
     notes TEXT,
     created_by INTEGER NOT NULL REFERENCES users(user_id),
     sync_status VARCHAR(20) DEFAULT 'synced',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Link collections to sales invoices for partial payments
+CREATE TABLE collection_invoices (
+    id SERIAL PRIMARY KEY,
+    collection_id INTEGER NOT NULL REFERENCES collections(collection_id) ON DELETE CASCADE,
+    sale_id INTEGER NOT NULL REFERENCES sales(sale_id),
+    amount NUMERIC(12,2) NOT NULL
 );
 
 -- Expenses Table
