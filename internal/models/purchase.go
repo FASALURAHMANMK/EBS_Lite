@@ -178,6 +178,8 @@ type GoodsReceipt struct {
 	ReceivedBy      int                `json:"received_by" db:"received_by"`
 	WorkflowStateID *int               `json:"workflow_state_id,omitempty" db:"workflow_state_id"`
 	Items           []GoodsReceiptItem `json:"items,omitempty"`
+	Supplier        *Supplier          `json:"supplier,omitempty"`
+	Location        *Location          `json:"location,omitempty"`
 	SyncModel
 }
 
