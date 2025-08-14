@@ -39,6 +39,8 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 	collectionHandler := handlers.NewCollectionHandler()
 	cashRegisterHandler := handlers.NewCashRegisterHandler()
 	reportsHandler := handlers.NewReportsHandler()
+	employeeHandler := handlers.NewEmployeeHandler()
+	payrollHandler := handlers.NewPayrollHandler()
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -283,6 +285,25 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 				customers.POST("", middleware.RequirePermission("CREATE_CUSTOMERS"), customerHandler.CreateCustomer)
 				customers.PUT("/:id", middleware.RequirePermission("UPDATE_CUSTOMERS"), customerHandler.UpdateCustomer)
 				customers.DELETE("/:id", middleware.RequirePermission("DELETE_CUSTOMERS"), customerHandler.DeleteCustomer)
+			}
+
+			// Employee management routes (require company)
+			employees := protected.Group("/employees")
+			employees.Use(middleware.RequireCompanyAccess())
+			{
+				employees.GET("", middleware.RequirePermission("VIEW_EMPLOYEES"), employeeHandler.GetEmployees)
+				employees.POST("", middleware.RequirePermission("CREATE_EMPLOYEES"), employeeHandler.CreateEmployee)
+				employees.PUT("/:id", middleware.RequirePermission("UPDATE_EMPLOYEES"), employeeHandler.UpdateEmployee)
+				employees.DELETE("/:id", middleware.RequirePermission("DELETE_EMPLOYEES"), employeeHandler.DeleteEmployee)
+			}
+
+			// Payroll routes (require company)
+			payrolls := protected.Group("/payrolls")
+			payrolls.Use(middleware.RequireCompanyAccess())
+			{
+				payrolls.GET("", middleware.RequirePermission("VIEW_PAYROLLS"), payrollHandler.GetPayrolls)
+				payrolls.POST("", middleware.RequirePermission("CREATE_PAYROLLS"), payrollHandler.CreatePayroll)
+				payrolls.PUT("/:id/mark-paid", middleware.RequirePermission("PROCESS_PAYROLLS"), payrollHandler.MarkPayrollPaid)
 			}
 
 			// Collection routes (require company)
