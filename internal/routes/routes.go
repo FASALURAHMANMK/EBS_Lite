@@ -29,6 +29,7 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 	roleHandler := handlers.NewRoleHandler()
 	productHandler := handlers.NewProductHandler()
 	inventoryHandler := handlers.NewInventoryHandler()
+	productAttributeHandler := handlers.NewProductAttributeHandler()
 	salesHandler := handlers.NewSalesHandler()
 	posHandler := handlers.NewPOSHandler()
 	loyaltyHandler := handlers.NewLoyaltyHandler()
@@ -150,6 +151,7 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 			{
 				products.GET("", middleware.RequirePermission("VIEW_PRODUCTS"), productHandler.GetProducts)
 				products.GET("/:id", middleware.RequirePermission("VIEW_PRODUCTS"), productHandler.GetProduct)
+				products.GET("/:id/summary", middleware.RequirePermission("VIEW_PRODUCTS"), productHandler.GetProductSummary)
 				products.POST("", middleware.RequirePermission("CREATE_PRODUCTS"), productHandler.CreateProduct)
 				products.PUT("/:id", middleware.RequirePermission("UPDATE_PRODUCTS"), productHandler.UpdateProduct)
 				products.DELETE("/:id", middleware.RequirePermission("DELETE_PRODUCTS"), productHandler.DeleteProduct)
@@ -178,6 +180,16 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 				units.POST("", middleware.RequireRole("Admin"), productHandler.CreateUnit)
 			}
 
+			// Product attribute management routes
+			attributes := protected.Group("/product-attributes")
+			attributes.Use(middleware.RequireCompanyAccess())
+			{
+				attributes.GET("", middleware.RequirePermission("VIEW_PRODUCTS"), productAttributeHandler.GetAttributes)
+				attributes.POST("", middleware.RequirePermission("CREATE_PRODUCTS"), productAttributeHandler.CreateAttribute)
+				attributes.PUT("/:id", middleware.RequirePermission("UPDATE_PRODUCTS"), productAttributeHandler.UpdateAttribute)
+				attributes.DELETE("/:id", middleware.RequirePermission("DELETE_PRODUCTS"), productAttributeHandler.DeleteAttribute)
+			}
+
 			// ADD THESE NEW INVENTORY ROUTES:
 			// Inventory management routes (require company and location)
 			inventory := protected.Group("/inventory")
@@ -186,6 +198,10 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 				inventory.GET("/stock", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStock)
 				inventory.POST("/stock-adjustment", middleware.RequirePermission("ADJUST_STOCK"), inventoryHandler.AdjustStock)
 				inventory.GET("/stock-adjustments", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockAdjustments)
+				inventory.GET("/summary", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetInventorySummary)
+				inventory.POST("/import", middleware.RequirePermission("ADJUST_STOCK"), inventoryHandler.ImportInventory)
+				inventory.GET("/export", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.ExportInventory)
+				inventory.POST("/barcode", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GenerateBarcode)
 				inventory.GET("/transfers", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockTransfers)
 				inventory.GET("/transfers/:id", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockTransfer)
 				inventory.POST("/transfers", middleware.RequirePermission("CREATE_TRANSFERS"), inventoryHandler.CreateStockTransfer)
