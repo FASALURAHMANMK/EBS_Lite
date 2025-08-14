@@ -38,6 +38,7 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 	customerHandler := handlers.NewCustomerHandler()
 	collectionHandler := handlers.NewCollectionHandler()
 	cashRegisterHandler := handlers.NewCashRegisterHandler()
+	reportsHandler := handlers.NewReportsHandler()
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -299,6 +300,16 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 				cashRegisters.GET("", middleware.RequirePermission("VIEW_CASH_REGISTERS"), cashRegisterHandler.GetCashRegisters)
 				cashRegisters.POST("/open", middleware.RequirePermission("OPEN_CASH_REGISTER"), cashRegisterHandler.OpenCashRegister)
 				cashRegisters.POST("/close", middleware.RequirePermission("CLOSE_CASH_REGISTER"), cashRegisterHandler.CloseCashRegister)
+			}
+
+			reports := protected.Group("/reports")
+			reports.Use(middleware.RequireCompanyAccess())
+			{
+				reports.GET("/sales-summary", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetSalesSummary)
+				reports.GET("/stock-summary", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetStockSummary)
+				reports.GET("/top-products", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetTopProducts)
+				reports.GET("/customer-balances", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetCustomerBalances)
+				reports.GET("/expenses-summary", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetExpensesSummary)
 			}
 
 			// Supplier management routes (require company)
