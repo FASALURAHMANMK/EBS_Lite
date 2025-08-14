@@ -248,3 +248,67 @@ func (s *ReportsService) GetExpensesSummary(companyID int, groupBy string) ([]mo
 	}
 	return summaries, nil
 }
+
+// The following report methods are placeholders for future implementation.
+// They currently return a not implemented error and will be expanded to
+// query the appropriate tables and support data export in future iterations.
+
+// GetItemMovement returns stock movement details for products
+func (s *ReportsService) GetItemMovement(companyID int) ([]map[string]interface{}, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetValuationReport returns inventory valuation information
+func (s *ReportsService) GetValuationReport(companyID int) ([]map[string]interface{}, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetPurchaseVsReturns compares purchases against returns
+func (s *ReportsService) GetPurchaseVsReturns(companyID int) ([]map[string]interface{}, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetSupplierReport aggregates supplier performance metrics
+func (s *ReportsService) GetSupplierReport(companyID int) ([]map[string]interface{}, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetDailyCashReport summarizes daily cash activity
+func (s *ReportsService) GetDailyCashReport(companyID int) ([]map[string]interface{}, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetIncomeExpenseReport returns income vs expense details
+func (s *ReportsService) GetIncomeExpenseReport(companyID int) ([]map[string]interface{}, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetGeneralLedger returns general ledger entries
+func (s *ReportsService) GetGeneralLedger(companyID int) ([]map[string]interface{}, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetTrialBalance returns the trial balance
+func (s *ReportsService) GetTrialBalance(companyID int) ([]map[string]interface{}, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetProfitLoss returns profit and loss information
+func (s *ReportsService) GetProfitLoss(companyID int) ([]map[string]interface{}, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetBalanceSheet returns balance sheet data
+func (s *ReportsService) GetBalanceSheet(companyID int) ([]map[string]interface{}, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetOutstandingReport returns outstanding invoices or payments
+func (s *ReportsService) GetOutstandingReport(companyID int) ([]map[string]interface{}, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetTopPerformers returns top performing employees or products
+func (s *ReportsService) GetTopPerformers(companyID int) ([]map[string]interface{}, error) {
+	return nil, fmt.Errorf("not implemented")
+}
