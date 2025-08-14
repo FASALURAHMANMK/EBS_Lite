@@ -417,6 +417,10 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
+	// Record ledger entry
+	ledgerService := NewLedgerService()
+	_ = ledgerService.RecordSale(companyID, saleID, totalAmount)
+
 	// Award loyalty points if customer is provided (async operation)
 	if req.CustomerID != nil {
 		go func() {
