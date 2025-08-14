@@ -35,6 +35,8 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 	returnsHandler := handlers.NewReturnsHandler()
 	purchaseHandler := handlers.NewPurchaseHandler()
 	supplierHandler := handlers.NewSupplierHandler()
+	customerHandler := handlers.NewCustomerHandler()
+	collectionHandler := handlers.NewCollectionHandler()
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -269,6 +271,25 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 				purchaseReturns.GET("", middleware.RequirePermission("VIEW_PURCHASE_RETURNS"), purchaseHandler.GetPurchaseReturns)
 				purchaseReturns.GET("/:id", middleware.RequirePermission("VIEW_PURCHASE_RETURNS"), purchaseHandler.GetPurchaseReturn)
 				purchaseReturns.POST("", middleware.RequirePermission("CREATE_PURCHASE_RETURNS"), purchaseHandler.CreatePurchaseReturn)
+			}
+
+			// Customer management routes (require company)
+			customers := protected.Group("/customers")
+			customers.Use(middleware.RequireCompanyAccess())
+			{
+				customers.GET("", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.GetCustomers)
+				customers.POST("", middleware.RequirePermission("CREATE_CUSTOMERS"), customerHandler.CreateCustomer)
+				customers.PUT("/:id", middleware.RequirePermission("UPDATE_CUSTOMERS"), customerHandler.UpdateCustomer)
+				customers.DELETE("/:id", middleware.RequirePermission("DELETE_CUSTOMERS"), customerHandler.DeleteCustomer)
+			}
+
+			// Collection routes (require company)
+			collections := protected.Group("/collections")
+			collections.Use(middleware.RequireCompanyAccess())
+			{
+				collections.GET("", middleware.RequirePermission("VIEW_COLLECTIONS"), collectionHandler.GetCollections)
+				collections.POST("", middleware.RequirePermission("CREATE_COLLECTIONS"), collectionHandler.CreateCollection)
+				collections.DELETE("/:id", middleware.RequirePermission("DELETE_COLLECTIONS"), collectionHandler.DeleteCollection)
 			}
 
 			// Supplier management routes (require company)
