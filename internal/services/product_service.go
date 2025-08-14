@@ -1,0 +1,497 @@
+package services
+
+import (
+	"database/sql"
+	"fmt"
+	"strings"
+
+	"erp-backend/internal/database"
+	"erp-backend/internal/models"
+)
+
+type ProductService struct {
+	db *sql.DB
+}
+
+func NewProductService() *ProductService {
+	return &ProductService{
+		db: database.GetDB(),
+	}
+}
+
+func (s *ProductService) GetProducts(companyID int, filters map[string]string) ([]models.Product, error) {
+	query := `
+		SELECT product_id, company_id, category_id, brand_id, unit_id, name, sku, barcode,
+			   description, cost_price, selling_price, reorder_level, weight, dimensions,
+			   is_serialized, is_active, sync_status, created_at, updated_at, is_deleted
+		FROM products 
+		WHERE company_id = $1 AND is_deleted = FALSE
+	`
+
+	args := []interface{}{companyID}
+	argCount := 1
+
+	// Add filters
+	if categoryID := filters["category_id"]; categoryID != "" {
+		argCount++
+		query += fmt.Sprintf(" AND category_id = $%d", argCount)
+		args = append(args, categoryID)
+	}
+
+	if brandID := filters["brand_id"]; brandID != "" {
+		argCount++
+		query += fmt.Sprintf(" AND brand_id = $%d", argCount)
+		args = append(args, brandID)
+	}
+
+	if isActive := filters["is_active"]; isActive != "" {
+		argCount++
+		query += fmt.Sprintf(" AND is_active = $%d", argCount)
+		args = append(args, isActive == "true")
+	}
+
+	query += " ORDER BY name"
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get products: %w", err)
+	}
+	defer rows.Close()
+
+	var products []models.Product
+	for rows.Next() {
+		var product models.Product
+		err := rows.Scan(
+			&product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
+			&product.UnitID, &product.Name, &product.SKU, &product.Barcode, &product.Description,
+			&product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
+			&product.Dimensions, &product.IsSerialized, &product.IsActive, &product.SyncStatus,
+			&product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan product: %w", err)
+		}
+		products = append(products, product)
+	}
+
+	return products, nil
+}
+
+func (s *ProductService) GetProductByID(productID, companyID int) (*models.Product, error) {
+	query := `
+		SELECT product_id, company_id, category_id, brand_id, unit_id, name, sku, barcode,
+			   description, cost_price, selling_price, reorder_level, weight, dimensions,
+			   is_serialized, is_active, sync_status, created_at, updated_at, is_deleted
+		FROM products 
+		WHERE product_id = $1 AND company_id = $2 AND is_deleted = FALSE
+	`
+
+	var product models.Product
+	err := s.db.QueryRow(query, productID, companyID).Scan(
+		&product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
+		&product.UnitID, &product.Name, &product.SKU, &product.Barcode, &product.Description,
+		&product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
+		&product.Dimensions, &product.IsSerialized, &product.IsActive, &product.SyncStatus,
+		&product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("product not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get product: %w", err)
+	}
+
+	return &product, nil
+}
+
+func (s *ProductService) CreateProduct(companyID int, req *models.CreateProductRequest) (*models.Product, error) {
+	// Check for duplicate SKU or barcode if provided
+	if req.SKU != nil || req.Barcode != nil {
+		exists, err := s.checkProductExists(companyID, req.SKU, req.Barcode, 0)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check product existence: %w", err)
+		}
+		if exists {
+			return nil, fmt.Errorf("product with this SKU or barcode already exists")
+		}
+	}
+
+	query := `
+		INSERT INTO products (
+			company_id, category_id, brand_id, unit_id, name, sku, barcode, description,
+			cost_price, selling_price, reorder_level, weight, dimensions, is_serialized
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		RETURNING product_id, created_at
+	`
+
+	var product models.Product
+	err := s.db.QueryRow(query,
+		companyID, req.CategoryID, req.BrandID, req.UnitID, req.Name, req.SKU, req.Barcode,
+		req.Description, req.CostPrice, req.SellingPrice, req.ReorderLevel, req.Weight,
+		req.Dimensions, req.IsSerialized,
+	).Scan(&product.ProductID, &product.CreatedAt)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create product: %w", err)
+	}
+
+	// Set the response fields
+	product.CompanyID = companyID
+	product.CategoryID = req.CategoryID
+	product.BrandID = req.BrandID
+	product.UnitID = req.UnitID
+	product.Name = req.Name
+	product.SKU = req.SKU
+	product.Barcode = req.Barcode
+	product.Description = req.Description
+	product.CostPrice = req.CostPrice
+	product.SellingPrice = req.SellingPrice
+	product.ReorderLevel = req.ReorderLevel
+	product.Weight = req.Weight
+	product.Dimensions = req.Dimensions
+	product.IsSerialized = req.IsSerialized
+	product.IsActive = true
+
+	return &product, nil
+}
+
+func (s *ProductService) UpdateProduct(productID, companyID int, req *models.UpdateProductRequest) error {
+	// Check for duplicate SKU or barcode if provided
+	if req.SKU != nil || req.Barcode != nil {
+		exists, err := s.checkProductExists(companyID, req.SKU, req.Barcode, productID)
+		if err != nil {
+			return fmt.Errorf("failed to check product existence: %w", err)
+		}
+		if exists {
+			return fmt.Errorf("product with this SKU or barcode already exists")
+		}
+	}
+
+	setParts := []string{}
+	args := []interface{}{}
+	argCount := 0
+
+	if req.CategoryID != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("category_id = $%d", argCount))
+		args = append(args, *req.CategoryID)
+	}
+	if req.BrandID != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("brand_id = $%d", argCount))
+		args = append(args, *req.BrandID)
+	}
+	if req.UnitID != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("unit_id = $%d", argCount))
+		args = append(args, *req.UnitID)
+	}
+	if req.Name != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("name = $%d", argCount))
+		args = append(args, *req.Name)
+	}
+	if req.SKU != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("sku = $%d", argCount))
+		args = append(args, *req.SKU)
+	}
+	if req.Barcode != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("barcode = $%d", argCount))
+		args = append(args, *req.Barcode)
+	}
+	if req.Description != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("description = $%d", argCount))
+		args = append(args, *req.Description)
+	}
+	if req.CostPrice != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("cost_price = $%d", argCount))
+		args = append(args, *req.CostPrice)
+	}
+	if req.SellingPrice != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("selling_price = $%d", argCount))
+		args = append(args, *req.SellingPrice)
+	}
+	if req.ReorderLevel != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("reorder_level = $%d", argCount))
+		args = append(args, *req.ReorderLevel)
+	}
+	if req.Weight != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("weight = $%d", argCount))
+		args = append(args, *req.Weight)
+	}
+	if req.Dimensions != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("dimensions = $%d", argCount))
+		args = append(args, *req.Dimensions)
+	}
+	if req.IsSerialized != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("is_serialized = $%d", argCount))
+		args = append(args, *req.IsSerialized)
+	}
+	if req.IsActive != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("is_active = $%d", argCount))
+		args = append(args, *req.IsActive)
+	}
+
+	if len(setParts) == 0 {
+		return fmt.Errorf("no fields to update")
+	}
+
+	argCount++
+	setParts = append(setParts, "updated_at = CURRENT_TIMESTAMP")
+
+	query := fmt.Sprintf("UPDATE products SET %s WHERE product_id = $%d AND company_id = $%d",
+		strings.Join(setParts, ", "), argCount, argCount+1)
+	args = append(args, productID, companyID)
+
+	result, err := s.db.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to update product: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("product not found")
+	}
+
+	return nil
+}
+
+func (s *ProductService) DeleteProduct(productID, companyID int) error {
+	query := `UPDATE products SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP 
+			  WHERE product_id = $1 AND company_id = $2`
+
+	result, err := s.db.Exec(query, productID, companyID)
+	if err != nil {
+		return fmt.Errorf("failed to delete product: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("product not found")
+	}
+
+	return nil
+}
+
+// Categories
+func (s *ProductService) GetCategories(companyID int) ([]models.Category, error) {
+	query := `
+		SELECT category_id, company_id, name, description, parent_id, is_active, created_at, updated_at
+		FROM categories 
+		WHERE company_id = $1 AND is_active = TRUE
+		ORDER BY name
+	`
+
+	rows, err := s.db.Query(query, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get categories: %w", err)
+	}
+	defer rows.Close()
+
+	var categories []models.Category
+	for rows.Next() {
+		var category models.Category
+		err := rows.Scan(
+			&category.CategoryID, &category.CompanyID, &category.Name, &category.Description,
+			&category.ParentID, &category.IsActive, &category.CreatedAt, &category.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan category: %w", err)
+		}
+		categories = append(categories, category)
+	}
+
+	return categories, nil
+}
+
+func (s *ProductService) CreateCategory(companyID int, req *models.CreateCategoryRequest) (*models.Category, error) {
+	query := `
+		INSERT INTO categories (company_id, name, description, parent_id)
+		VALUES ($1, $2, $3, $4)
+		RETURNING category_id, created_at
+	`
+
+	var category models.Category
+	err := s.db.QueryRow(query, companyID, req.Name, req.Description, req.ParentID).Scan(
+		&category.CategoryID, &category.CreatedAt)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create category: %w", err)
+	}
+
+	category.CompanyID = companyID
+	category.Name = req.Name
+	category.Description = req.Description
+	category.ParentID = req.ParentID
+	category.IsActive = true
+
+	return &category, nil
+}
+
+// Brands
+func (s *ProductService) GetBrands(companyID int) ([]models.Brand, error) {
+	query := `
+		SELECT brand_id, company_id, name, description, is_active, created_at, updated_at
+		FROM brands 
+		WHERE company_id = $1 AND is_active = TRUE
+		ORDER BY name
+	`
+
+	rows, err := s.db.Query(query, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get brands: %w", err)
+	}
+	defer rows.Close()
+
+	var brands []models.Brand
+	for rows.Next() {
+		var brand models.Brand
+		err := rows.Scan(
+			&brand.BrandID, &brand.CompanyID, &brand.Name, &brand.Description,
+			&brand.IsActive, &brand.CreatedAt, &brand.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan brand: %w", err)
+		}
+		brands = append(brands, brand)
+	}
+
+	return brands, nil
+}
+
+func (s *ProductService) CreateBrand(companyID int, req *models.CreateBrandRequest) (*models.Brand, error) {
+	query := `
+		INSERT INTO brands (company_id, name, description)
+		VALUES ($1, $2, $3)
+		RETURNING brand_id, created_at
+	`
+
+	var brand models.Brand
+	err := s.db.QueryRow(query, companyID, req.Name, req.Description).Scan(
+		&brand.BrandID, &brand.CreatedAt)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create brand: %w", err)
+	}
+
+	brand.CompanyID = companyID
+	brand.Name = req.Name
+	brand.Description = req.Description
+	brand.IsActive = true
+
+	return &brand, nil
+}
+
+// Units
+func (s *ProductService) GetUnits() ([]models.Unit, error) {
+	query := `
+		SELECT unit_id, name, symbol, base_unit_id, conversion_factor
+		FROM units 
+		ORDER BY name
+	`
+
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get units: %w", err)
+	}
+	defer rows.Close()
+
+	var units []models.Unit
+	for rows.Next() {
+		var unit models.Unit
+		err := rows.Scan(
+			&unit.UnitID, &unit.Name, &unit.Symbol, &unit.BaseUnitID, &unit.ConversionFactor,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan unit: %w", err)
+		}
+		units = append(units, unit)
+	}
+
+	return units, nil
+}
+
+func (s *ProductService) CreateUnit(req *models.CreateUnitRequest) (*models.Unit, error) {
+	query := `
+		INSERT INTO units (name, symbol, base_unit_id, conversion_factor)
+		VALUES ($1, $2, $3, $4)
+		RETURNING unit_id
+	`
+
+	var unit models.Unit
+	err := s.db.QueryRow(query, req.Name, req.Symbol, req.BaseUnitID, req.ConversionFactor).Scan(&unit.UnitID)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create unit: %w", err)
+	}
+
+	unit.Name = req.Name
+	unit.Symbol = req.Symbol
+	unit.BaseUnitID = req.BaseUnitID
+	unit.ConversionFactor = req.ConversionFactor
+
+	return &unit, nil
+}
+
+// Helper methods
+func (s *ProductService) checkProductExists(companyID int, sku, barcode *string, excludeProductID int) (bool, error) {
+	if sku == nil && barcode == nil {
+		return false, nil
+	}
+
+	conditions := []string{"company_id = $1", "is_deleted = FALSE"}
+	args := []interface{}{companyID}
+	argCount := 1
+
+	if excludeProductID > 0 {
+		argCount++
+		conditions = append(conditions, fmt.Sprintf("product_id != $%d", argCount))
+		args = append(args, excludeProductID)
+	}
+
+	var orConditions []string
+	if sku != nil && *sku != "" {
+		argCount++
+		orConditions = append(orConditions, fmt.Sprintf("sku = $%d", argCount))
+		args = append(args, *sku)
+	}
+	if barcode != nil && *barcode != "" {
+		argCount++
+		orConditions = append(orConditions, fmt.Sprintf("barcode = $%d", argCount))
+		args = append(args, *barcode)
+	}
+
+	if len(orConditions) == 0 {
+		return false, nil
+	}
+
+	query := fmt.Sprintf("SELECT COUNT(*) FROM products WHERE %s AND (%s)",
+		strings.Join(conditions, " AND "), strings.Join(orConditions, " OR "))
+
+	var count int
+	err := s.db.QueryRow(query, args...).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}

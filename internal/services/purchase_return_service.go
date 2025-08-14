@@ -1,0 +1,296 @@
+package services
+
+import (
+	"database/sql"
+	"fmt"
+	"time"
+
+	"erp-backend/internal/database"
+	"erp-backend/internal/models"
+)
+
+type PurchaseReturnService struct {
+	db *sql.DB
+}
+
+func NewPurchaseReturnService() *PurchaseReturnService {
+	return &PurchaseReturnService{
+		db: database.GetDB(),
+	}
+}
+
+func (s *PurchaseReturnService) GetPurchaseReturns(companyID, locationID int, filters map[string]string) ([]models.PurchaseReturn, error) {
+	query := `
+		SELECT pr.return_id, pr.return_number, pr.purchase_id, pr.location_id, pr.supplier_id,
+			   pr.return_date, pr.total_amount, pr.reason, pr.status, pr.created_by,
+			   pr.sync_status, pr.created_at, pr.updated_at,
+			   p.purchase_number, s.name as supplier_name
+		FROM purchase_returns pr
+		JOIN purchases p ON pr.purchase_id = p.purchase_id
+		JOIN suppliers s ON pr.supplier_id = s.supplier_id
+		WHERE s.company_id = $1 AND pr.location_id = $2 AND pr.is_deleted = FALSE
+	`
+
+	args := []interface{}{companyID, locationID}
+	argCount := 2
+
+	// Apply filters
+	if purchaseID, ok := filters["purchase_id"]; ok && purchaseID != "" {
+		argCount++
+		query += fmt.Sprintf(" AND pr.purchase_id = $%d", argCount)
+		args = append(args, purchaseID)
+	}
+
+	if supplierID, ok := filters["supplier_id"]; ok && supplierID != "" {
+		argCount++
+		query += fmt.Sprintf(" AND pr.supplier_id = $%d", argCount)
+		args = append(args, supplierID)
+	}
+
+	if dateFrom, ok := filters["date_from"]; ok && dateFrom != "" {
+		argCount++
+		query += fmt.Sprintf(" AND pr.return_date >= $%d", argCount)
+		args = append(args, dateFrom)
+	}
+
+	if dateTo, ok := filters["date_to"]; ok && dateTo != "" {
+		argCount++
+		query += fmt.Sprintf(" AND pr.return_date <= $%d", argCount)
+		args = append(args, dateTo)
+	}
+
+	query += " ORDER BY pr.return_date DESC, pr.return_id DESC"
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get purchase returns: %w", err)
+	}
+	defer rows.Close()
+
+	var returns []models.PurchaseReturn
+	for rows.Next() {
+		var pr models.PurchaseReturn
+		var purchaseNumber, supplierName string
+
+		err := rows.Scan(
+			&pr.ReturnID, &pr.ReturnNumber, &pr.PurchaseID, &pr.LocationID, &pr.SupplierID,
+			&pr.ReturnDate, &pr.TotalAmount, &pr.Reason, &pr.Status, &pr.CreatedBy,
+			&pr.SyncStatus, &pr.CreatedAt, &pr.UpdatedAt,
+			&purchaseNumber, &supplierName,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan purchase return: %w", err)
+		}
+
+		// Set purchase and supplier info
+		pr.Purchase = &models.Purchase{PurchaseNumber: purchaseNumber}
+		pr.Supplier = &models.Supplier{Name: supplierName}
+
+		returns = append(returns, pr)
+	}
+
+	return returns, nil
+}
+
+func (s *PurchaseReturnService) GetPurchaseReturnByID(returnID, companyID int) (*models.PurchaseReturn, error) {
+	// Get return header
+	query := `
+		SELECT pr.return_id, pr.return_number, pr.purchase_id, pr.location_id, pr.supplier_id,
+			   pr.return_date, pr.total_amount, pr.reason, pr.status, pr.created_by,
+			   pr.sync_status, pr.created_at, pr.updated_at,
+			   p.purchase_number, s.name as supplier_name
+		FROM purchase_returns pr
+		JOIN purchases p ON pr.purchase_id = p.purchase_id
+		JOIN suppliers s ON pr.supplier_id = s.supplier_id
+		WHERE pr.return_id = $1 AND s.company_id = $2 AND pr.is_deleted = FALSE
+	`
+
+	var returnData models.PurchaseReturn
+	var purchaseNumber, supplierName string
+
+	err := s.db.QueryRow(query, returnID, companyID).Scan(
+		&returnData.ReturnID, &returnData.ReturnNumber, &returnData.PurchaseID, &returnData.LocationID, &returnData.SupplierID,
+		&returnData.ReturnDate, &returnData.TotalAmount, &returnData.Reason, &returnData.Status, &returnData.CreatedBy,
+		&returnData.SyncStatus, &returnData.CreatedAt, &returnData.UpdatedAt,
+		&purchaseNumber, &supplierName,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("purchase return not found")
+		}
+		return nil, fmt.Errorf("failed to get purchase return: %w", err)
+	}
+
+	// Set purchase and supplier info
+	returnData.Purchase = &models.Purchase{PurchaseNumber: purchaseNumber}
+	returnData.Supplier = &models.Supplier{Name: supplierName}
+
+	// Get return details
+	detailsQuery := `
+		SELECT prd.return_detail_id, prd.return_id, prd.purchase_detail_id, prd.product_id,
+			   prd.quantity, prd.unit_price, prd.line_total,
+			   p.name as product_name, p.sku, p.barcode
+		FROM purchase_return_details prd
+		JOIN products p ON prd.product_id = p.product_id
+		WHERE prd.return_id = $1
+		ORDER BY prd.return_detail_id
+	`
+
+	rows, err := s.db.Query(detailsQuery, returnID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get purchase return details: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var detail models.PurchaseReturnDetail
+		var productName, sku, barcode sql.NullString
+
+		err := rows.Scan(
+			&detail.ReturnDetailID, &detail.ReturnID, &detail.PurchaseDetailID, &detail.ProductID,
+			&detail.Quantity, &detail.UnitPrice, &detail.LineTotal,
+			&productName, &sku, &barcode,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan purchase return detail: %w", err)
+		}
+
+		// Set product info
+		detail.Product = &models.Product{
+			ProductID: detail.ProductID,
+			Name:      productName.String,
+			SKU:       nullStringToStringPtr(sku),
+			Barcode:   nullStringToStringPtr(barcode),
+		}
+
+		returnData.Items = append(returnData.Items, detail)
+	}
+
+	return &returnData, nil
+}
+
+func (s *PurchaseReturnService) CreatePurchaseReturn(companyID, locationID, userID int, req *models.CreatePurchaseReturnRequest) (*models.PurchaseReturn, error) {
+	// Start transaction
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Verify purchase exists and belongs to company
+	var supplierID int
+	var purchaseLocationID int
+	err = tx.QueryRow(`
+		SELECT p.supplier_id, p.location_id FROM purchases p
+		JOIN suppliers s ON p.supplier_id = s.supplier_id
+		WHERE p.purchase_id = $1 AND s.company_id = $2 AND p.is_deleted = FALSE
+	`, req.PurchaseID, companyID).Scan(&supplierID, &purchaseLocationID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("purchase not found")
+		}
+		return nil, fmt.Errorf("failed to verify purchase: %w", err)
+	}
+
+	// Generate return number
+	returnNumber, err := s.generateReturnNumber(tx, locationID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate return number: %w", err)
+	}
+
+	// Calculate total amount
+	var totalAmount float64
+	for _, item := range req.Items {
+		// Verify product exists
+		var productCompanyID int
+		err = tx.QueryRow("SELECT company_id FROM products WHERE product_id = $1 AND is_deleted = FALSE",
+			item.ProductID).Scan(&productCompanyID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return nil, fmt.Errorf("product with ID %d not found", item.ProductID)
+			}
+			return nil, fmt.Errorf("failed to verify product: %w", err)
+		}
+
+		if productCompanyID != companyID {
+			return nil, fmt.Errorf("product with ID %d does not belong to company", item.ProductID)
+		}
+
+		lineTotal := item.Quantity * item.UnitPrice
+		totalAmount += lineTotal
+	}
+
+	// Insert purchase return
+	insertQuery := `
+		INSERT INTO purchase_returns (return_number, purchase_id, location_id, supplier_id,
+									 return_date, total_amount, reason, status, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		RETURNING return_id, created_at
+	`
+
+	var returnData models.PurchaseReturn
+	err = tx.QueryRow(insertQuery,
+		returnNumber, req.PurchaseID, locationID, supplierID,
+		time.Now(), totalAmount, req.Reason, "COMPLETED", userID,
+	).Scan(&returnData.ReturnID, &returnData.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert purchase return: %w", err)
+	}
+
+	// Insert return details and update stock
+	for _, item := range req.Items {
+		lineTotal := item.Quantity * item.UnitPrice
+
+		_, err = tx.Exec(`
+			INSERT INTO purchase_return_details (return_id, purchase_detail_id, product_id,
+											   quantity, unit_price, line_total)
+			VALUES ($1, $2, $3, $4, $5, $6)
+		`,
+			returnData.ReturnID, item.PurchaseDetailID, item.ProductID,
+			item.Quantity, item.UnitPrice, lineTotal,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to insert purchase return detail: %w", err)
+		}
+
+		// Update stock - reduce quantity
+		_, err = tx.Exec(`
+			UPDATE stock SET quantity = quantity - $1, last_updated = CURRENT_TIMESTAMP
+			WHERE location_id = $2 AND product_id = $3
+		`, item.Quantity, locationID, item.ProductID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update stock: %w", err)
+		}
+	}
+
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	// Set response data
+	returnData.ReturnNumber = returnNumber
+	returnData.PurchaseID = req.PurchaseID
+	returnData.LocationID = locationID
+	returnData.SupplierID = supplierID
+	returnData.ReturnDate = time.Now()
+	returnData.TotalAmount = totalAmount
+	returnData.Reason = req.Reason
+	returnData.Status = "COMPLETED"
+	returnData.CreatedBy = userID
+
+	return &returnData, nil
+}
+
+func (s *PurchaseReturnService) generateReturnNumber(tx *sql.Tx, locationID int) (string, error) {
+	var count int
+	err := tx.QueryRow(`
+		SELECT COUNT(*) FROM purchase_returns 
+		WHERE location_id = $1 AND DATE(created_at) = CURRENT_DATE
+	`, locationID).Scan(&count)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("PRET-%d-%s-%04d", locationID, time.Now().Format("20060102"), count+1), nil
+}

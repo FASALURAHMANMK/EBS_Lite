@@ -1,0 +1,368 @@
+package handlers
+
+import (
+	"net/http"
+	"strconv"
+
+	"erp-backend/internal/models"
+	"erp-backend/internal/services"
+	"erp-backend/internal/utils"
+
+	"github.com/gin-gonic/gin"
+)
+
+type InventoryHandler struct {
+	inventoryService *services.InventoryService
+}
+
+func NewInventoryHandler() *InventoryHandler {
+	return &InventoryHandler{
+		inventoryService: services.NewInventoryService(),
+	}
+}
+
+// GET /inventory/stock
+func (h *InventoryHandler) GetStock(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	// Use location from context or query parameter
+	if locationParam := c.Query("location_id"); locationParam != "" {
+		if id, err := strconv.Atoi(locationParam); err == nil {
+			locationID = id
+		}
+	}
+
+	if locationID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+		return
+	}
+
+	// Optional product filter
+	var productID *int
+	if productParam := c.Query("product_id"); productParam != "" {
+		if id, err := strconv.Atoi(productParam); err == nil {
+			productID = &id
+		}
+	}
+
+	stock, err := h.inventoryService.GetStock(companyID, locationID, productID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get stock", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Stock retrieved successfully", stock)
+}
+
+// POST /inventory/stock-adjustment
+func (h *InventoryHandler) AdjustStock(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+	userID := c.GetInt("user_id")
+
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	// Use location from context or request body
+	if locationParam := c.Query("location_id"); locationParam != "" {
+		if id, err := strconv.Atoi(locationParam); err == nil {
+			locationID = id
+		}
+	}
+
+	if locationID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+		return
+	}
+
+	var req models.CreateStockAdjustmentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	// Validate request
+	if err := utils.ValidateStruct(&req); err != nil {
+		validationErrors := utils.GetValidationErrors(err)
+		utils.ValidationErrorResponse(c, validationErrors)
+		return
+	}
+
+	err := h.inventoryService.AdjustStock(companyID, locationID, userID, &req)
+	if err != nil {
+		if err.Error() == "product not found" {
+			utils.NotFoundResponse(c, "Product not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to adjust stock", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Stock adjusted successfully", nil)
+}
+
+// GET /inventory/stock-adjustments
+func (h *InventoryHandler) GetStockAdjustments(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	// Use location from context or query parameter
+	if locationParam := c.Query("location_id"); locationParam != "" {
+		if id, err := strconv.Atoi(locationParam); err == nil {
+			locationID = id
+		}
+	}
+
+	if locationID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+		return
+	}
+
+	adjustments, err := h.inventoryService.GetStockAdjustments(companyID, locationID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get stock adjustments", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Stock adjustments retrieved successfully", adjustments)
+}
+
+// GET /inventory/transfers
+// func (h *InventoryHandler) GetStockTransfers(c *gin.Context) {
+// 	companyID := c.GetInt("company_id")
+// 	locationID := c.GetInt("location_id")
+
+// 	if companyID == 0 {
+// 		utils.ForbiddenResponse(c, "Company access required")
+// 		return
+// 	}
+
+// 	// Use location from context or query parameter
+// 	if locationParam := c.Query("location_id"); locationParam != "" {
+// 		if id, err := strconv.Atoi(locationParam); err == nil {
+// 			locationID = id
+// 		}
+// 	}
+
+// 	if locationID == 0 {
+// 		utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+// 		return
+// 	}
+
+// 	transfers, err := h.inventoryService.GetStockTransfers(companyID, locationID)
+// 	if err != nil {
+// 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get stock transfers", err)
+// 		return
+// 	}
+
+// 	utils.SuccessResponse(c, "Stock transfers retrieved successfully", transfers)
+// }
+
+func (h *InventoryHandler) GetStockTransfers(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	// Parse query parameters for filtering
+	sourceLocationID := 0
+	destinationLocationID := 0
+	status := c.Query("status")
+
+	if sourceParam := c.Query("source_location_id"); sourceParam != "" {
+		if id, err := strconv.Atoi(sourceParam); err == nil {
+			sourceLocationID = id
+		}
+	}
+
+	if destParam := c.Query("destination_location_id"); destParam != "" {
+		if id, err := strconv.Atoi(destParam); err == nil {
+			destinationLocationID = id
+		}
+	}
+
+	// Use location from context or query parameter
+	if locationParam := c.Query("location_id"); locationParam != "" {
+		if id, err := strconv.Atoi(locationParam); err == nil {
+			locationID = id
+		}
+	}
+
+	if locationID == 0 && sourceLocationID == 0 && destinationLocationID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "At least one location filter required", nil)
+		return
+	}
+
+	filters := &models.StockTransferFilters{
+		CompanyID:             companyID,
+		LocationID:            locationID,
+		SourceLocationID:      sourceLocationID,
+		DestinationLocationID: destinationLocationID,
+		Status:                status,
+	}
+
+	transfers, err := h.inventoryService.GetStockTransfersWithFilters(filters)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get stock transfers", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Stock transfers retrieved successfully", transfers)
+}
+
+func (h *InventoryHandler) GetStockTransfer(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	transferID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid transfer ID", err)
+		return
+	}
+
+	transfer, err := h.inventoryService.GetStockTransfer(transferID, companyID)
+	if err != nil {
+		if err.Error() == "transfer not found" {
+			utils.NotFoundResponse(c, "Transfer not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get transfer", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Transfer retrieved successfully", transfer)
+}
+
+// DELETE /inventory/transfers/:id - Cancel pending transfer
+func (h *InventoryHandler) CancelStockTransfer(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
+
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	transferID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid transfer ID", err)
+		return
+	}
+
+	err = h.inventoryService.CancelStockTransfer(transferID, companyID, userID)
+	if err != nil {
+		if err.Error() == "transfer not found" {
+			utils.NotFoundResponse(c, "Transfer not found")
+			return
+		}
+		if err.Error() == "only pending transfers can be cancelled" {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Only pending transfers can be cancelled", err)
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to cancel transfer", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Transfer cancelled successfully", nil)
+}
+
+// POST /inventory/transfers
+func (h *InventoryHandler) CreateStockTransfer(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+	userID := c.GetInt("user_id")
+
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	// Use location from context as source location
+	if locationParam := c.Query("location_id"); locationParam != "" {
+		if id, err := strconv.Atoi(locationParam); err == nil {
+			locationID = id
+		}
+	}
+
+	if locationID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Source location ID required", nil)
+		return
+	}
+
+	var req models.CreateStockTransferRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	// Validate request
+	if err := utils.ValidateStruct(&req); err != nil {
+		validationErrors := utils.GetValidationErrors(err)
+		utils.ValidationErrorResponse(c, validationErrors)
+		return
+	}
+
+	transfer, err := h.inventoryService.CreateStockTransfer(companyID, locationID, userID, &req)
+	if err != nil {
+		if err.Error() == "invalid locations" {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Invalid source or destination location", err)
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create stock transfer", err)
+		return
+	}
+
+	utils.CreatedResponse(c, "Stock transfer created successfully", transfer)
+}
+
+// PUT /inventory/transfers/:id/complete
+func (h *InventoryHandler) CompleteStockTransfer(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
+
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	transferID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid transfer ID", err)
+		return
+	}
+
+	err = h.inventoryService.CompleteStockTransfer(transferID, companyID, userID)
+	if err != nil {
+		if err.Error() == "transfer not found" {
+			utils.NotFoundResponse(c, "Transfer not found")
+			return
+		}
+		if err.Error() == "transfer is not pending" {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Transfer is not pending", err)
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to complete transfer", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Stock transfer completed successfully", nil)
+}
