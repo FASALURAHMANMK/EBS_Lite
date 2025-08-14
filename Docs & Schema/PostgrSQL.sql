@@ -803,6 +803,31 @@ CREATE TABLE printer_settings (
     is_active BOOLEAN DEFAULT TRUE
 );
 
+-- Numbering Sequences Table
+CREATE TABLE numbering_sequences (
+    sequence_id SERIAL PRIMARY KEY,
+    company_id INTEGER NOT NULL REFERENCES companies(company_id) ON DELETE CASCADE,
+    location_id INTEGER REFERENCES locations(location_id),
+    name VARCHAR(100) NOT NULL,
+    prefix VARCHAR(20),
+    sequence_length INTEGER NOT NULL DEFAULT 6,
+    current_number INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Invoice Formats Table
+CREATE TABLE invoice_formats (
+    format_id SERIAL PRIMARY KEY,
+    company_id INTEGER NOT NULL REFERENCES companies(company_id) ON DELETE CASCADE,
+    location_id INTEGER REFERENCES locations(location_id),
+    sequence_id INTEGER REFERENCES numbering_sequences(sequence_id),
+    name VARCHAR(100) NOT NULL,
+    tax_fields JSONB,
+    is_default BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Invoice Templates Table
 CREATE TABLE invoice_templates (
     template_id SERIAL PRIMARY KEY,
@@ -944,6 +969,8 @@ CREATE INDEX idx_audit_log_timestamp ON audit_log(timestamp);
 -- Settings and Configuration
 CREATE INDEX idx_settings_company_key ON settings(company_id, key);
 CREATE INDEX idx_translations_key_lang ON translations(key, language_code);
+CREATE INDEX idx_invoice_formats_company_location ON invoice_formats(company_id, location_id);
+CREATE INDEX idx_numbering_sequences_company_location ON numbering_sequences(company_id, location_id);
 
 -- ===============================================
 -- TRIGGERS FOR UPDATED_AT TIMESTAMPS
