@@ -41,6 +41,9 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 	customerHandler := handlers.NewCustomerHandler()
 	collectionHandler := handlers.NewCollectionHandler()
 	cashRegisterHandler := handlers.NewCashRegisterHandler()
+	expenseHandler := handlers.NewExpenseHandler()
+	voucherHandler := handlers.NewVoucherHandler()
+	ledgerHandler := handlers.NewLedgerHandler()
 	reportsHandler := handlers.NewReportsHandler()
 	employeeHandler := handlers.NewEmployeeHandler()
 	payrollHandler := handlers.NewPayrollHandler()
@@ -382,12 +385,36 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 				collections.DELETE("/:id", middleware.RequirePermission("DELETE_COLLECTIONS"), collectionHandler.DeleteCollection)
 			}
 
+			expenses := protected.Group("/expenses")
+			expenses.Use(middleware.RequireCompanyAccess())
+			{
+				expenses.POST("", middleware.RequirePermission("CREATE_EXPENSES"), expenseHandler.CreateExpense)
+				categories := expenses.Group("/categories")
+				{
+					categories.GET("", middleware.RequirePermission("VIEW_EXPENSES"), expenseHandler.GetCategories)
+					categories.POST("", middleware.RequirePermission("CREATE_EXPENSES"), expenseHandler.CreateCategory)
+				}
+			}
+
+			vouchers := protected.Group("/vouchers")
+			vouchers.Use(middleware.RequireCompanyAccess())
+			{
+				vouchers.POST("/:type", middleware.RequirePermission("MANAGE_VOUCHERS"), voucherHandler.CreateVoucher)
+			}
+
+			ledgers := protected.Group("/ledgers")
+			ledgers.Use(middleware.RequireCompanyAccess())
+			{
+				ledgers.GET("", middleware.RequirePermission("VIEW_LEDGER"), ledgerHandler.GetBalances)
+			}
+
 			cashRegisters := protected.Group("/cash-registers")
 			cashRegisters.Use(middleware.RequireCompanyAccess())
 			{
 				cashRegisters.GET("", middleware.RequirePermission("VIEW_CASH_REGISTERS"), cashRegisterHandler.GetCashRegisters)
 				cashRegisters.POST("/open", middleware.RequirePermission("OPEN_CASH_REGISTER"), cashRegisterHandler.OpenCashRegister)
 				cashRegisters.POST("/close", middleware.RequirePermission("CLOSE_CASH_REGISTER"), cashRegisterHandler.CloseCashRegister)
+				cashRegisters.POST("/tally", middleware.RequirePermission("TALLY_CASH_REGISTER"), cashRegisterHandler.RecordTally)
 			}
 
 			reports := protected.Group("/reports")
