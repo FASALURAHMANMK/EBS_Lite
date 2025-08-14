@@ -751,6 +751,26 @@ func (s *PurchaseService) DeletePurchase(purchaseID, companyID int) error {
 	return nil
 }
 
+// ApprovePurchaseOrder sets a purchase order's status to APPROVED
+func (s *PurchaseService) ApprovePurchaseOrder(purchaseID, companyID, userID int) error {
+	_, err := s.db.Exec(`
+                UPDATE purchases p
+                SET status = 'APPROVED', updated_by = $1, updated_at = CURRENT_TIMESTAMP
+                FROM suppliers s
+                WHERE p.purchase_id = $2 AND p.supplier_id = s.supplier_id AND s.company_id = $3 AND p.is_deleted = FALSE
+        `, userID, purchaseID, companyID)
+	if err != nil {
+		return fmt.Errorf("failed to approve purchase: %w", err)
+	}
+	return nil
+}
+
+// RecordGoodsReceipt records a goods receipt note for a purchase
+func (s *PurchaseService) RecordGoodsReceipt(purchaseID, companyID, userID int, req *models.RecordGoodsReceiptRequest) error {
+	receiveReq := &models.ReceivePurchaseRequest{Items: req.Items}
+	return s.ReceivePurchase(purchaseID, companyID, userID, receiveReq)
+}
+
 func (s *PurchaseService) generatePurchaseNumber(tx *sql.Tx, locationID int) (string, error) {
 	var count int
 	err := tx.QueryRow(`
