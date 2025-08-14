@@ -37,6 +37,7 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 	supplierHandler := handlers.NewSupplierHandler()
 	customerHandler := handlers.NewCustomerHandler()
 	collectionHandler := handlers.NewCollectionHandler()
+	cashRegisterHandler := handlers.NewCashRegisterHandler()
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -290,6 +291,14 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 				collections.GET("", middleware.RequirePermission("VIEW_COLLECTIONS"), collectionHandler.GetCollections)
 				collections.POST("", middleware.RequirePermission("CREATE_COLLECTIONS"), collectionHandler.CreateCollection)
 				collections.DELETE("/:id", middleware.RequirePermission("DELETE_COLLECTIONS"), collectionHandler.DeleteCollection)
+			}
+
+			cashRegisters := protected.Group("/cash-registers")
+			cashRegisters.Use(middleware.RequireCompanyAccess())
+			{
+				cashRegisters.GET("", middleware.RequirePermission("VIEW_CASH_REGISTERS"), cashRegisterHandler.GetCashRegisters)
+				cashRegisters.POST("/open", middleware.RequirePermission("OPEN_CASH_REGISTER"), cashRegisterHandler.OpenCashRegister)
+				cashRegisters.POST("/close", middleware.RequirePermission("CLOSE_CASH_REGISTER"), cashRegisterHandler.CloseCashRegister)
 			}
 
 			// Supplier management routes (require company)
