@@ -8,6 +8,7 @@ import (
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
 	"erp-backend/internal/utils"
+	"github.com/google/uuid"
 )
 
 type AuthService struct {
@@ -142,16 +143,45 @@ func (s *AuthService) ForgotPassword(req *models.ForgotPasswordRequest) error {
 		return nil // Don't reveal if user is inactive
 	}
 
-	// TODO: Generate reset code and send email
-	// For now, just return success
-	fmt.Printf("Password reset requested for user: %s\n", user.Email)
+	// Generate token
+	token := uuid.NewString()
+	expiresAt := time.Now().Add(1 * time.Hour)
+
+	// Remove existing tokens for this user
+	_, _ = s.db.Exec("DELETE FROM password_reset_tokens WHERE user_id = $1", user.UserID)
+
+	// Store token
+	query := `INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)`
+	if _, err = s.db.Exec(query, user.UserID, token, expiresAt); err != nil {
+		return fmt.Errorf("failed to store reset token: %w", err)
+	}
+
+	// Send email with reset link
+	resetLink := fmt.Sprintf("https://example.com/reset-password?token=%s", token)
+	subject := "Password Reset Request"
+	body := fmt.Sprintf("Click the link to reset your password: %s", resetLink)
+	if err := utils.SendEmail(user.Email, subject, body); err != nil {
+		return fmt.Errorf("failed to send reset email: %w", err)
+	}
 
 	return nil
 }
 
 func (s *AuthService) ResetPassword(req *models.ResetPasswordRequest) error {
-	// TODO: Implement reset code validation
-	// For now, just update password directly
+	// Validate token
+	var userID int
+	var expiresAt time.Time
+	err := s.db.QueryRow(`SELECT user_id, expires_at FROM password_reset_tokens WHERE token = $1`, req.Token).Scan(&userID, &expiresAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("invalid or expired token")
+		}
+		return fmt.Errorf("failed to validate token: %w", err)
+	}
+
+	if time.Now().After(expiresAt) {
+		return fmt.Errorf("invalid or expired token")
+	}
 
 	// Hash new password
 	hashedPassword, err := utils.HashPassword(req.NewPassword)
@@ -160,11 +190,13 @@ func (s *AuthService) ResetPassword(req *models.ResetPasswordRequest) error {
 	}
 
 	// Update password
-	query := `UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE email = $2`
-	_, err = s.db.Exec(query, hashedPassword, req.Email)
-	if err != nil {
+	updateQuery := `UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`
+	if _, err = s.db.Exec(updateQuery, hashedPassword, userID); err != nil {
 		return fmt.Errorf("failed to update password: %w", err)
 	}
+
+	// Delete token after successful reset
+	_, _ = s.db.Exec(`DELETE FROM password_reset_tokens WHERE token = $1`, req.Token)
 
 	return nil
 }
