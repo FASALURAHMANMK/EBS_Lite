@@ -12,12 +12,14 @@ import (
 )
 
 type ProductHandler struct {
-	productService *services.ProductService
+	productService   *services.ProductService
+	inventoryService *services.InventoryService
 }
 
 func NewProductHandler() *ProductHandler {
 	return &ProductHandler{
-		productService: services.NewProductService(),
+		productService:   services.NewProductService(),
+		inventoryService: services.NewInventoryService(),
 	}
 }
 
@@ -180,6 +182,26 @@ func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, "Product deleted successfully", nil)
+}
+
+// GET /products/:id/summary
+func (h *ProductHandler) GetProductSummary(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	productID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid product ID", err)
+		return
+	}
+	summary, err := h.inventoryService.GetProductSummary(companyID, productID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get product summary", err)
+		return
+	}
+	utils.SuccessResponse(c, "Product summary retrieved successfully", summary)
 }
 
 // GET /categories

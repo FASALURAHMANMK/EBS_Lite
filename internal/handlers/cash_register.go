@@ -138,3 +138,27 @@ func (h *CashRegisterHandler) CloseCashRegister(c *gin.Context) {
 
 	utils.SuccessResponse(c, "Cash register closed successfully", nil)
 }
+
+// POST /cash-registers/tally
+func (h *CashRegisterHandler) RecordTally(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+	userID := c.GetInt("user_id")
+
+	var req models.CashTallyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		validationErrors := utils.GetValidationErrors(err)
+		utils.ValidationErrorResponse(c, validationErrors)
+		return
+	}
+
+	if err := h.service.RecordTally(companyID, locationID, userID, req.Count, req.Notes); err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to record tally", err)
+		return
+	}
+	utils.SuccessResponse(c, "Cash tally recorded", nil)
+}

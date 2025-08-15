@@ -118,3 +118,42 @@ func (h *CollectionHandler) DeleteCollection(c *gin.Context) {
 
 	utils.SuccessResponse(c, "Collection deleted successfully", nil)
 }
+
+// GET /collections/:id/receipt
+func (h *CollectionHandler) GetCollectionReceipt(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	collectionID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid collection ID", err)
+		return
+	}
+
+	col, err := h.collectionService.GetCollectionByID(collectionID, companyID)
+	if err != nil {
+		if err.Error() == "collection not found" {
+			utils.NotFoundResponse(c, "Collection not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get collection", err)
+		return
+	}
+
+	receipt := map[string]interface{}{
+		"collection_id":     col.CollectionID,
+		"collection_number": col.CollectionNumber,
+		"collection_date":   col.CollectionDate,
+		"customer_id":       col.CustomerID,
+		"amount":            col.Amount,
+		"payment_method":    col.PaymentMethod,
+		"reference_number":  col.ReferenceNumber,
+		"notes":             col.Notes,
+		"invoices":          col.Invoices,
+	}
+
+	utils.SuccessResponse(c, "Collection receipt data retrieved successfully", receipt)
+}

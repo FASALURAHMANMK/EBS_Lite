@@ -25,3 +25,8 @@ type OpenCashRegisterRequest struct {
 type CloseCashRegisterRequest struct {
 	ClosingBalance float64 `json:"closing_balance" validate:"required"`
 }
+
+type CashTallyRequest struct {
+	Count float64 `json:"count" validate:"required"`
+	Notes *string `json:"notes,omitempty"`
+}

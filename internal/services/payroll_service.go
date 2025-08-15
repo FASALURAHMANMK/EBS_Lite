@@ -121,3 +121,145 @@ func (s *PayrollService) MarkPayrollPaid(payrollID, companyID int) error {
 	}
 	return nil
 }
+
+func (s *PayrollService) AddSalaryComponent(payrollID, companyID int, req *models.AddComponentRequest) (*models.SalaryComponent, error) {
+	var exists bool
+	err := s.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM payroll p JOIN employees e ON p.employee_id = e.employee_id WHERE p.payroll_id = $1 AND e.company_id = $2)`, payrollID, companyID).Scan(&exists)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify payroll: %w", err)
+	}
+	if !exists {
+		return nil, fmt.Errorf("payroll not found")
+	}
+	var comp models.SalaryComponent
+	err = s.db.QueryRow(`INSERT INTO salary_components (payroll_id, type, amount) VALUES ($1,$2,$3) RETURNING component_id, created_at`, payrollID, req.Type, req.Amount).Scan(&comp.ComponentID, &comp.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add component: %w", err)
+	}
+	comp.PayrollID = payrollID
+	comp.Type = req.Type
+	comp.Amount = req.Amount
+	comp.SyncStatus = "SYNCED"
+	return &comp, nil
+}
+
+func (s *PayrollService) AddAdvance(payrollID, companyID int, req *models.AdvanceRequest) (*models.Advance, error) {
+	var exists bool
+	err := s.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM payroll p JOIN employees e ON p.employee_id = e.employee_id WHERE p.payroll_id = $1 AND e.company_id = $2)`, payrollID, companyID).Scan(&exists)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify payroll: %w", err)
+	}
+	if !exists {
+		return nil, fmt.Errorf("payroll not found")
+	}
+	date, err := time.Parse("2006-01-02", req.Date)
+	if err != nil {
+		return nil, fmt.Errorf("invalid date")
+	}
+	var adv models.Advance
+	err = s.db.QueryRow(`INSERT INTO payroll_advances (payroll_id, amount, date) VALUES ($1,$2,$3) RETURNING advance_id, created_at`, payrollID, req.Amount, date).Scan(&adv.AdvanceID, &adv.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add advance: %w", err)
+	}
+	adv.PayrollID = payrollID
+	adv.Amount = req.Amount
+	adv.Date = date
+	adv.SyncStatus = "SYNCED"
+	return &adv, nil
+}
+
+func (s *PayrollService) AddDeduction(payrollID, companyID int, req *models.DeductionRequest) (*models.Deduction, error) {
+	var exists bool
+	err := s.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM payroll p JOIN employees e ON p.employee_id = e.employee_id WHERE p.payroll_id = $1 AND e.company_id = $2)`, payrollID, companyID).Scan(&exists)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify payroll: %w", err)
+	}
+	if !exists {
+		return nil, fmt.Errorf("payroll not found")
+	}
+	date, err := time.Parse("2006-01-02", req.Date)
+	if err != nil {
+		return nil, fmt.Errorf("invalid date")
+	}
+	var ded models.Deduction
+	err = s.db.QueryRow(`INSERT INTO payroll_deductions (payroll_id, type, amount, date) VALUES ($1,$2,$3,$4) RETURNING deduction_id, created_at`, payrollID, req.Type, req.Amount, date).Scan(&ded.DeductionID, &ded.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to add deduction: %w", err)
+	}
+	ded.PayrollID = payrollID
+	ded.Type = req.Type
+	ded.Amount = req.Amount
+	ded.Date = date
+	ded.SyncStatus = "SYNCED"
+	return &ded, nil
+}
+
+func (s *PayrollService) GeneratePayslip(payrollID, companyID int) (*models.Payslip, error) {
+	var exists bool
+	err := s.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM payroll p JOIN employees e ON p.employee_id = e.employee_id WHERE p.payroll_id = $1 AND e.company_id = $2)`, payrollID, companyID).Scan(&exists)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify payroll: %w", err)
+	}
+	if !exists {
+		return nil, fmt.Errorf("payroll not found")
+	}
+	var p models.Payroll
+	err = s.db.QueryRow(`SELECT payroll_id, employee_id, pay_period_start, pay_period_end, basic_salary, gross_salary, total_deductions, net_salary, status, processed_by FROM payroll WHERE payroll_id = $1`, payrollID).Scan(&p.PayrollID, &p.EmployeeID, &p.PayPeriodStart, &p.PayPeriodEnd, &p.BasicSalary, &p.GrossSalary, &p.TotalDeductions, &p.NetSalary, &p.Status, &p.ProcessedBy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get payroll: %w", err)
+	}
+	compRows, err := s.db.Query(`SELECT component_id, payroll_id, type, amount, sync_status, created_at, updated_at, is_deleted FROM salary_components WHERE payroll_id = $1 AND is_deleted = FALSE`, payrollID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get components: %w", err)
+	}
+	defer compRows.Close()
+	var components []models.SalaryComponent
+	var compTotal float64
+	for compRows.Next() {
+		var c models.SalaryComponent
+		if err := compRows.Scan(&c.ComponentID, &c.PayrollID, &c.Type, &c.Amount, &c.SyncStatus, &c.CreatedAt, &c.UpdatedAt, &c.IsDeleted); err != nil {
+			return nil, fmt.Errorf("failed to scan component: %w", err)
+		}
+		compTotal += c.Amount
+		components = append(components, c)
+	}
+	advRows, err := s.db.Query(`SELECT advance_id, payroll_id, amount, date, sync_status, created_at, updated_at, is_deleted FROM payroll_advances WHERE payroll_id = $1 AND is_deleted = FALSE`, payrollID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get advances: %w", err)
+	}
+	defer advRows.Close()
+	var advances []models.Advance
+	var advTotal float64
+	for advRows.Next() {
+		var a models.Advance
+		if err := advRows.Scan(&a.AdvanceID, &a.PayrollID, &a.Amount, &a.Date, &a.SyncStatus, &a.CreatedAt, &a.UpdatedAt, &a.IsDeleted); err != nil {
+			return nil, fmt.Errorf("failed to scan advance: %w", err)
+		}
+		advTotal += a.Amount
+		advances = append(advances, a)
+	}
+	dedRows, err := s.db.Query(`SELECT deduction_id, payroll_id, type, amount, date, sync_status, created_at, updated_at, is_deleted FROM payroll_deductions WHERE payroll_id = $1 AND is_deleted = FALSE`, payrollID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get deductions: %w", err)
+	}
+	defer dedRows.Close()
+	var deductions []models.Deduction
+	var dedTotal float64
+	for dedRows.Next() {
+		var d models.Deduction
+		if err := dedRows.Scan(&d.DeductionID, &d.PayrollID, &d.Type, &d.Amount, &d.Date, &d.SyncStatus, &d.CreatedAt, &d.UpdatedAt, &d.IsDeleted); err != nil {
+			return nil, fmt.Errorf("failed to scan deduction: %w", err)
+		}
+		dedTotal += d.Amount
+		deductions = append(deductions, d)
+	}
+	netPay := p.BasicSalary + compTotal - dedTotal - advTotal
+	payslip := &models.Payslip{
+		Payroll:    p,
+		Components: components,
+		Advances:   advances,
+		Deductions: deductions,
+		NetPay:     netPay,
+	}
+	return payslip, nil
+}

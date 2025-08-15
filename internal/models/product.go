@@ -1,22 +1,23 @@
 package models
 
 type Product struct {
-	ProductID    int      `json:"product_id" db:"product_id"`
-	CompanyID    int      `json:"company_id" db:"company_id"`
-	CategoryID   *int     `json:"category_id,omitempty" db:"category_id"`
-	BrandID      *int     `json:"brand_id,omitempty" db:"brand_id"`
-	UnitID       *int     `json:"unit_id,omitempty" db:"unit_id"`
-	Name         string   `json:"name" db:"name" validate:"required,min=2,max=255"`
-	SKU          *string  `json:"sku,omitempty" db:"sku"`
-	Barcode      *string  `json:"barcode,omitempty" db:"barcode"`
-	Description  *string  `json:"description,omitempty" db:"description"`
-	CostPrice    *float64 `json:"cost_price,omitempty" db:"cost_price"`
-	SellingPrice *float64 `json:"selling_price,omitempty" db:"selling_price"`
-	ReorderLevel int      `json:"reorder_level" db:"reorder_level"`
-	Weight       *float64 `json:"weight,omitempty" db:"weight"`
-	Dimensions   *string  `json:"dimensions,omitempty" db:"dimensions"`
-	IsSerialized bool     `json:"is_serialized" db:"is_serialized"`
-	IsActive     bool     `json:"is_active" db:"is_active"`
+	ProductID    int                `json:"product_id" db:"product_id"`
+	CompanyID    int                `json:"company_id" db:"company_id"`
+	CategoryID   *int               `json:"category_id,omitempty" db:"category_id"`
+	BrandID      *int               `json:"brand_id,omitempty" db:"brand_id"`
+	UnitID       *int               `json:"unit_id,omitempty" db:"unit_id"`
+	Name         string             `json:"name" db:"name" validate:"required,min=2,max=255"`
+	SKU          *string            `json:"sku,omitempty" db:"sku"`
+	Barcode      *string            `json:"barcode,omitempty" db:"barcode"`
+	Description  *string            `json:"description,omitempty" db:"description"`
+	CostPrice    *float64           `json:"cost_price,omitempty" db:"cost_price"`
+	SellingPrice *float64           `json:"selling_price,omitempty" db:"selling_price"`
+	ReorderLevel int                `json:"reorder_level" db:"reorder_level"`
+	Weight       *float64           `json:"weight,omitempty" db:"weight"`
+	Dimensions   *string            `json:"dimensions,omitempty" db:"dimensions"`
+	IsSerialized bool               `json:"is_serialized" db:"is_serialized"`
+	IsActive     bool               `json:"is_active" db:"is_active"`
+	Attributes   []ProductAttribute `json:"attributes,omitempty" db:"-"`
 	SyncModel
 }
 

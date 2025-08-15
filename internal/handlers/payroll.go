@@ -92,3 +92,122 @@ func (h *PayrollHandler) MarkPayrollPaid(c *gin.Context) {
 	}
 	utils.SuccessResponse(c, "Payroll marked as paid", nil)
 }
+
+func (h *PayrollHandler) AddSalaryComponent(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	payrollID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid payroll ID", err)
+		return
+	}
+	var req models.AddComponentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+	comp, err := h.payrollService.AddSalaryComponent(payrollID, companyID, &req)
+	if err != nil {
+		if err.Error() == "payroll not found" {
+			utils.NotFoundResponse(c, "Payroll not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to add component", err)
+		return
+	}
+	utils.CreatedResponse(c, "Salary component added", comp)
+}
+
+func (h *PayrollHandler) RecordAdvance(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	payrollID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid payroll ID", err)
+		return
+	}
+	var req models.AdvanceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+	adv, err := h.payrollService.AddAdvance(payrollID, companyID, &req)
+	if err != nil {
+		if err.Error() == "payroll not found" {
+			utils.NotFoundResponse(c, "Payroll not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to add advance", err)
+		return
+	}
+	utils.CreatedResponse(c, "Advance recorded", adv)
+}
+
+func (h *PayrollHandler) RecordDeduction(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	payrollID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid payroll ID", err)
+		return
+	}
+	var req models.DeductionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+	ded, err := h.payrollService.AddDeduction(payrollID, companyID, &req)
+	if err != nil {
+		if err.Error() == "payroll not found" {
+			utils.NotFoundResponse(c, "Payroll not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to add deduction", err)
+		return
+	}
+	utils.CreatedResponse(c, "Deduction recorded", ded)
+}
+
+func (h *PayrollHandler) GeneratePayslip(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	payrollID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid payroll ID", err)
+		return
+	}
+	payslip, err := h.payrollService.GeneratePayslip(payrollID, companyID)
+	if err != nil {
+		if err.Error() == "payroll not found" {
+			utils.NotFoundResponse(c, "Payroll not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to generate payslip", err)
+		return
+	}
+	utils.SuccessResponse(c, "Payslip generated", payslip)
+}

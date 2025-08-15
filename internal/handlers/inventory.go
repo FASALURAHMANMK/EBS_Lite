@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"io"
 	"net/http"
 	"strconv"
 
@@ -224,6 +225,91 @@ func (h *InventoryHandler) GetStockTransfers(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, "Stock transfers retrieved successfully", transfers)
+}
+
+// GET /inventory/summary
+func (h *InventoryHandler) GetInventorySummary(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	summary, err := h.inventoryService.GetInventorySummary(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get inventory summary", err)
+		return
+	}
+	utils.SuccessResponse(c, "Inventory summary retrieved successfully", summary)
+}
+
+// POST /inventory/import
+func (h *InventoryHandler) ImportInventory(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	file, err := c.FormFile("file")
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "File is required", err)
+		return
+	}
+	f, err := file.Open()
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to open file", err)
+		return
+	}
+	defer f.Close()
+	data, err := io.ReadAll(f)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to read file", err)
+		return
+	}
+	if err := h.inventoryService.ImportInventory(companyID, data); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to import inventory", err)
+		return
+	}
+	utils.SuccessResponse(c, "Inventory imported successfully", nil)
+}
+
+// GET /inventory/export
+func (h *InventoryHandler) ExportInventory(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	data, err := h.inventoryService.ExportInventory(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to export inventory", err)
+		return
+	}
+	c.Header("Content-Disposition", "attachment; filename=inventory.xlsx")
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+}
+
+// POST /inventory/barcode
+func (h *InventoryHandler) GenerateBarcode(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	var req models.BarcodeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+	data, err := h.inventoryService.GenerateBarcode(companyID, &req)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate barcode", err)
+		return
+	}
+	c.Data(http.StatusOK, "application/pdf", data)
 }
 
 func (h *InventoryHandler) GetStockTransfer(c *gin.Context) {

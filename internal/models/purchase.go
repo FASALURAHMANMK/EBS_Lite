@@ -23,6 +23,7 @@ type Purchase struct {
 	CreatedBy       int              `json:"created_by" db:"created_by"`
 	UpdatedBy       *int             `json:"updated_by,omitempty" db:"updated_by"`
 	Items           []PurchaseDetail `json:"items,omitempty"`
+	GoodsReceipts   []GoodsReceipt   `json:"goods_receipts,omitempty"`
 	Supplier        *Supplier        `json:"supplier,omitempty"`
 	Location        *Location        `json:"location,omitempty"`
 	SyncModel
@@ -135,4 +136,30 @@ type ReceivePurchaseItemRequest struct {
 	ExpiryDate       *time.Time `json:"expiry_date,omitempty"`
 	BatchNumber      *string    `json:"batch_number,omitempty"`
 	SerialNumbers    []string   `json:"serial_numbers,omitempty"`
+}
+
+// Goods Receipt Models
+type GoodsReceipt struct {
+	ReceiptID     int                `json:"receipt_id" db:"receipt_id"`
+	PurchaseID    int                `json:"purchase_id" db:"purchase_id"`
+	ReceiptNumber string             `json:"receipt_number" db:"receipt_number"`
+	ReceiptDate   time.Time          `json:"receipt_date" db:"receipt_date"`
+	Notes         *string            `json:"notes,omitempty" db:"notes"`
+	Items         []GoodsReceiptItem `json:"items,omitempty"`
+	SyncModel
+}
+
+type GoodsReceiptItem struct {
+	ReceiptItemID    int     `json:"receipt_item_id" db:"receipt_item_id"`
+	ReceiptID        int     `json:"receipt_id" db:"receipt_id"`
+	PurchaseDetailID int     `json:"purchase_detail_id" db:"purchase_detail_id"`
+	ReceivedQuantity float64 `json:"received_quantity" db:"received_quantity"`
+}
+
+type RecordGoodsReceiptRequest struct {
+	PurchaseID    int                          `json:"purchase_id" validate:"required"`
+	ReceiptNumber *string                      `json:"receipt_number,omitempty"`
+	ReceiptDate   *time.Time                   `json:"receipt_date,omitempty"`
+	Notes         *string                      `json:"notes,omitempty"`
+	Items         []ReceivePurchaseItemRequest `json:"items" validate:"required,min=1"`
 }

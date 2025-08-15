@@ -582,3 +582,72 @@ func (s *InventoryService) verifyLocationsInCompany(companyID, fromLocationID, t
 
 	return nil
 }
+
+// GetInventorySummary returns aggregated stock and recent activity for a company
+func (s *InventoryService) GetInventorySummary(companyID int) (*models.InventorySummary, error) {
+	summary := &models.InventorySummary{}
+
+	// Aggregate stock by location
+	rows, err := s.db.Query(`
+               SELECT l.location_id, l.name, COALESCE(SUM(s.quantity),0) as total_qty
+               FROM locations l
+               LEFT JOIN stock s ON l.location_id = s.location_id
+               LEFT JOIN products p ON s.product_id = p.product_id
+               WHERE l.company_id = $1 AND (p.company_id = $1 OR p.company_id IS NULL)
+               GROUP BY l.location_id, l.name
+       `, companyID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var item models.StockLocationSummary
+			if err := rows.Scan(&item.LocationID, &item.LocationName, &item.TotalQuantity); err == nil {
+				summary.StockByLocation = append(summary.StockByLocation, item)
+			}
+		}
+	}
+
+	// Recent movement and transactions are left empty for now
+	summary.MovementHistory = []models.StockAdjustment{}
+	summary.RecentTransactions = []models.StockTransfer{}
+	return summary, nil
+}
+
+// GetProductSummary returns stock and history for a single product
+func (s *InventoryService) GetProductSummary(companyID, productID int) (*models.ProductSummary, error) {
+	summary := &models.ProductSummary{ProductID: productID}
+
+	rows, err := s.db.Query(`
+               SELECT location_id, product_id, quantity, reserved_quantity, last_updated
+               FROM stock WHERE product_id = $1`, productID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var st models.Stock
+			if err := rows.Scan(&st.LocationID, &st.ProductID, &st.Quantity, &st.ReservedQuantity, &st.LastUpdated); err == nil {
+				summary.StockByLocation = append(summary.StockByLocation, st)
+			}
+		}
+	}
+
+	summary.MovementHistory = []models.StockAdjustment{}
+	summary.RecentTransfers = []models.StockTransferDetailWithProduct{}
+	return summary, nil
+}
+
+// ImportInventory processes inventory data from an uploaded file
+func (s *InventoryService) ImportInventory(companyID int, data []byte) error {
+	// Placeholder implementation - in real code this would parse the Excel data
+	return nil
+}
+
+// ExportInventory returns inventory data as an Excel file
+func (s *InventoryService) ExportInventory(companyID int) ([]byte, error) {
+	// Placeholder - return empty content
+	return []byte{}, nil
+}
+
+// GenerateBarcode creates barcode labels for the provided products
+func (s *InventoryService) GenerateBarcode(companyID int, req *models.BarcodeRequest) ([]byte, error) {
+	// Placeholder - return empty PDF/label content
+	return []byte{}, nil
+}

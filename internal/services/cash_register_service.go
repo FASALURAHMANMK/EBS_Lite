@@ -121,3 +121,11 @@ func (s *CashRegisterService) CloseCashRegister(companyID, locationID, userID in
 
 	return nil
 }
+
+func (s *CashRegisterService) RecordTally(companyID, locationID, userID int, count float64, notes *string) error {
+	_, err := s.db.Exec(`INSERT INTO cash_register_tally (location_id, count, notes, recorded_by) VALUES ($1,$2,$3,$4)`, locationID, count, notes, userID)
+	if err != nil {
+		return fmt.Errorf("failed to record tally: %w", err)
+	}
+	return nil
+}
