@@ -534,7 +534,8 @@ func (s *LoyaltyService) CheckPromotionEligibility(companyID int, req *models.Pr
 
 		// Check applicability
 		if promotion.ApplicableTo != nil && *promotion.ApplicableTo != "ALL" {
-			if *promotion.ApplicableTo == "PRODUCTS" {
+			switch *promotion.ApplicableTo {
+			case "PRODUCTS":
 				if promotion.Conditions == nil {
 					continue
 				}
@@ -565,7 +566,38 @@ func (s *LoyaltyService) CheckPromotionEligibility(companyID int, req *models.Pr
 				if !match {
 					continue
 				}
-			} else {
+			case "CATEGORIES":
+				if promotion.Conditions == nil {
+					continue
+				}
+				rawIDs, ok := (*promotion.Conditions)["category_ids"]
+				if !ok {
+					continue
+				}
+				idsSlice, ok := rawIDs.([]interface{})
+				if !ok {
+					continue
+				}
+				condSet := make(map[int]struct{})
+				for _, v := range idsSlice {
+					switch id := v.(type) {
+					case float64:
+						condSet[int(id)] = struct{}{}
+					case int:
+						condSet[id] = struct{}{}
+					}
+				}
+				match := false
+				for _, cid := range req.CategoryIDs {
+					if _, exists := condSet[cid]; exists {
+						match = true
+						break
+					}
+				}
+				if !match {
+					continue
+				}
+			default:
 				continue
 			}
 		}

@@ -82,3 +82,79 @@ func TestCheckPromotionEligibility_ProductSpecificPromotion_NotEligible(t *testi
 		t.Fatalf("expected discount 0, got %f", resp.TotalDiscount)
 	}
 }
+
+func TestCheckPromotionEligibility_CategorySpecificPromotion(t *testing.T) {
+	start := time.Now().Add(-time.Hour)
+	end := time.Now().Add(time.Hour)
+	cond := models.JSONB{"category_ids": []interface{}{10, 20}}
+	promo := models.Promotion{
+		PromotionID:  2,
+		CompanyID:    1,
+		Name:         "Category Promo",
+		DiscountType: func() *string { s := "FIXED"; return &s }(),
+		Value:        func() *float64 { v := 5.0; return &v }(),
+		StartDate:    start,
+		EndDate:      end,
+		ApplicableTo: func() *string { s := "CATEGORIES"; return &s }(),
+		Conditions:   &cond,
+		IsActive:     true,
+	}
+
+	s := &LoyaltyService{}
+	orig := getPromotions
+	defer func() { getPromotions = orig }()
+	getPromotions = func(_ *LoyaltyService, companyID int, activeOnly bool) ([]models.Promotion, error) {
+		return []models.Promotion{promo}, nil
+	}
+
+	req := &models.PromotionEligibilityRequest{TotalAmount: 50, CategoryIDs: []int{10}}
+
+	resp, err := s.CheckPromotionEligibility(1, req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.EligiblePromotions) != 1 {
+		t.Fatalf("expected 1 promotion, got %d", len(resp.EligiblePromotions))
+	}
+	if resp.TotalDiscount != 5 {
+		t.Fatalf("expected discount 5, got %f", resp.TotalDiscount)
+	}
+}
+
+func TestCheckPromotionEligibility_CategorySpecificPromotion_NotEligible(t *testing.T) {
+	start := time.Now().Add(-time.Hour)
+	end := time.Now().Add(time.Hour)
+	cond := models.JSONB{"category_ids": []interface{}{10, 20}}
+	promo := models.Promotion{
+		PromotionID:  2,
+		CompanyID:    1,
+		Name:         "Category Promo",
+		DiscountType: func() *string { s := "FIXED"; return &s }(),
+		Value:        func() *float64 { v := 5.0; return &v }(),
+		StartDate:    start,
+		EndDate:      end,
+		ApplicableTo: func() *string { s := "CATEGORIES"; return &s }(),
+		Conditions:   &cond,
+		IsActive:     true,
+	}
+
+	s := &LoyaltyService{}
+	orig := getPromotions
+	defer func() { getPromotions = orig }()
+	getPromotions = func(_ *LoyaltyService, companyID int, activeOnly bool) ([]models.Promotion, error) {
+		return []models.Promotion{promo}, nil
+	}
+
+	req := &models.PromotionEligibilityRequest{TotalAmount: 50, CategoryIDs: []int{30}}
+
+	resp, err := s.CheckPromotionEligibility(1, req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.EligiblePromotions) != 0 {
+		t.Fatalf("expected 0 promotions, got %d", len(resp.EligiblePromotions))
+	}
+	if resp.TotalDiscount != 0 {
+		t.Fatalf("expected discount 0, got %f", resp.TotalDiscount)
+	}
+}
