@@ -24,6 +24,7 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler()
 	userHandler := handlers.NewUserHandler()
+	deviceSessionHandler := handlers.NewDeviceSessionHandler()
 	companyHandler := handlers.NewCompanyHandler()
 	locationHandler := handlers.NewLocationHandler()
 	roleHandler := handlers.NewRoleHandler()
@@ -84,6 +85,14 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 			{
 				authProtected.GET("/me", authHandler.GetMe)
 				authProtected.POST("/logout", authHandler.Logout)
+			}
+
+			// Device session routes
+			deviceSessions := protected.Group("/device-sessions")
+			deviceSessions.Use(middleware.RequireCompanyAccess())
+			{
+				deviceSessions.GET("", deviceSessionHandler.GetDeviceSessions)
+				deviceSessions.DELETE("/:session_id", deviceSessionHandler.RevokeSession)
 			}
 
 			// Dashboard routes
