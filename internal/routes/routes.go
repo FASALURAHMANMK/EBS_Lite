@@ -53,6 +53,7 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 	settingsHandler := handlers.NewSettingsHandler()
 	auditLogHandler := handlers.NewAuditLogHandler()
 	dashboardHandler := handlers.NewDashboardHandler()
+	languageHandler := handlers.NewLanguageHandler()
 	translationHandler := handlers.NewTranslationHandler()
 	printHandler := handlers.NewPrintHandler()
 	// Health check endpoint
@@ -75,6 +76,8 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 			auth.POST("/reset-password", authHandler.ResetPassword)
 			auth.POST("/refresh-token", authHandler.RefreshToken)
 		}
+
+		v1.GET("/languages", languageHandler.GetLanguages)
 
 		// Protected routes (require authentication)
 		protected := v1.Group("")
@@ -509,6 +512,13 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 			audit.Use(middleware.RequireCompanyAccess())
 			{
 				audit.GET("", middleware.RequirePermission("VIEW_AUDIT_LOGS"), auditLogHandler.GetAuditLogs)
+			}
+
+			// Language routes
+			languages := protected.Group("/languages")
+			languages.Use(middleware.RequireRole("Admin"))
+			{
+				languages.PUT("/:code", languageHandler.UpdateLanguageStatus)
 			}
 
 			// Translation routes
