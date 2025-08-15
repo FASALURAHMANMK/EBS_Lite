@@ -1100,8 +1100,42 @@ ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchases ENABLE ROW LEVEL SECURITY;
 
--- Example RLS Policies (customize based on your auth system)
--- CREATE POLICY company_isolation ON companies FOR ALL TO authenticated_users USING (company_id = current_setting('app.current_company_id')::int);
+-- Tenant isolation policies
+CREATE POLICY companies_rls ON companies FOR ALL TO authenticated
+  USING (company_id = current_setting('app.current_company_id')::int)
+  WITH CHECK (company_id = current_setting('app.current_company_id')::int);
+
+CREATE POLICY locations_rls ON locations FOR ALL TO authenticated
+  USING (company_id = current_setting('app.current_company_id')::int)
+  WITH CHECK (company_id = current_setting('app.current_company_id')::int);
+
+CREATE POLICY users_rls ON users FOR ALL TO authenticated
+  USING (
+    company_id = current_setting('app.current_company_id')::int AND
+    (location_id = current_setting('app.current_location_id')::int OR
+     current_setting('app.current_location_id', true) IS NULL)
+  )
+  WITH CHECK (
+    company_id = current_setting('app.current_company_id')::int AND
+    (location_id = current_setting('app.current_location_id')::int OR
+     current_setting('app.current_location_id', true) IS NULL)
+  );
+
+CREATE POLICY products_rls ON products FOR ALL TO authenticated
+  USING (company_id = current_setting('app.current_company_id')::int)
+  WITH CHECK (company_id = current_setting('app.current_company_id')::int);
+
+CREATE POLICY sales_rls ON sales FOR ALL TO authenticated
+  USING (location_id = current_setting('app.current_location_id')::int)
+  WITH CHECK (location_id = current_setting('app.current_location_id')::int);
+
+CREATE POLICY quotes_rls ON quotes FOR ALL TO authenticated
+  USING (location_id = current_setting('app.current_location_id')::int)
+  WITH CHECK (location_id = current_setting('app.current_location_id')::int);
+
+CREATE POLICY purchases_rls ON purchases FOR ALL TO authenticated
+  USING (location_id = current_setting('app.current_location_id')::int)
+  WITH CHECK (location_id = current_setting('app.current_location_id')::int);
 
 CREATE TABLE workflow_templates (
     workflow_id SERIAL PRIMARY KEY,
