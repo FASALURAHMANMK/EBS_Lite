@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
+
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
 )
@@ -300,6 +302,7 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 			CustomerID:  req.CustomerID,
 			TotalAmount: subtotal,
 			ProductIDs:  []int{},
+			CategoryIDs: []int{},
 		}
 
 		productIDSet := make(map[int]struct{})
@@ -313,6 +316,31 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 			}
 			productIDSet[id] = struct{}{}
 			eligibilityReq.ProductIDs = append(eligibilityReq.ProductIDs, id)
+		}
+
+		// Fetch categories for the collected products
+		if len(eligibilityReq.ProductIDs) > 0 {
+			rows, err := s.db.Query("SELECT product_id, category_id FROM products WHERE product_id = ANY($1)", pq.Array(eligibilityReq.ProductIDs))
+			if err != nil {
+				return nil, fmt.Errorf("failed to get product categories: %w", err)
+			}
+			defer rows.Close()
+
+			categorySet := make(map[int]struct{})
+			for rows.Next() {
+				var pid int
+				var cid sql.NullInt64
+				if err := rows.Scan(&pid, &cid); err != nil {
+					return nil, fmt.Errorf("failed to scan product category: %w", err)
+				}
+				if cid.Valid {
+					id := int(cid.Int64)
+					if _, exists := categorySet[id]; !exists {
+						categorySet[id] = struct{}{}
+						eligibilityReq.CategoryIDs = append(eligibilityReq.CategoryIDs, id)
+					}
+				}
+			}
 		}
 
 		eligibility, err := loyaltyService.CheckPromotionEligibility(companyID, eligibilityReq)

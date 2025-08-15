@@ -103,10 +103,20 @@ type CustomerLoyaltyResponse struct {
 	RecentActivity []LoyaltyTransaction `json:"recent_activity"`
 }
 
+// PromotionEligibilityRequest defines the payload for checking promotion eligibility.
+// Expected JSON format:
+//
+//	{
+//	  "customer_id": 123,       // optional
+//	  "total_amount": 100.0,    // required
+//	  "product_ids": [1,2],     // optional - products in the transaction
+//	  "category_ids": [10,20]   // optional - categories represented in the transaction
+//	}
 type PromotionEligibilityRequest struct {
 	CustomerID  *int    `json:"customer_id,omitempty"`
 	TotalAmount float64 `json:"total_amount" validate:"required,gt=0"`
 	ProductIDs  []int   `json:"product_ids,omitempty"`
+	CategoryIDs []int   `json:"category_ids,omitempty"`
 }
 
 type PromotionEligibilityResponse struct {
