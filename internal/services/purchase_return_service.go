@@ -222,16 +222,16 @@ func (s *PurchaseReturnService) CreatePurchaseReturn(companyID, locationID, user
 
 	// Insert purchase return
 	insertQuery := `
-		INSERT INTO purchase_returns (return_number, purchase_id, location_id, supplier_id,
-									 return_date, total_amount, reason, status, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		RETURNING return_id, created_at
-	`
+                INSERT INTO purchase_returns (return_number, purchase_id, location_id, supplier_id,
+                                                                         return_date, total_amount, reason, status, created_by, updated_by)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                RETURNING return_id, created_at
+        `
 
 	var returnData models.PurchaseReturn
 	err = tx.QueryRow(insertQuery,
 		returnNumber, req.PurchaseID, locationID, supplierID,
-		time.Now(), totalAmount, req.Reason, "COMPLETED", userID,
+		time.Now(), totalAmount, req.Reason, "COMPLETED", userID, userID,
 	).Scan(&returnData.ReturnID, &returnData.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert purchase return: %w", err)

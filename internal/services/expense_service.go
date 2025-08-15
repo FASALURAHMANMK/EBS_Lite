@@ -18,9 +18,9 @@ func NewExpenseService() *ExpenseService {
 
 func (s *ExpenseService) CreateExpense(companyID, locationID, userID int, req *models.CreateExpenseRequest) (int, error) {
 	var id int
-	err := s.db.QueryRow(`INSERT INTO expenses (category_id, location_id, amount, notes, expense_date, created_by)
-                VALUES ($1,$2,$3,$4,$5,$6) RETURNING expense_id`,
-		req.CategoryID, locationID, req.Amount, req.Notes, req.ExpenseDate, userID).Scan(&id)
+	err := s.db.QueryRow(`INSERT INTO expenses (category_id, location_id, amount, notes, expense_date, created_by, updated_by)
+                VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING expense_id`,
+		req.CategoryID, locationID, req.Amount, req.Notes, req.ExpenseDate, userID, userID).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create expense: %w", err)
 	}

@@ -196,11 +196,11 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 	// Create return
 	var returnID int
 	err = tx.QueryRow(`
-		INSERT INTO sale_returns (return_number, sale_id, location_id, customer_id, return_date, 
-								 total_amount, reason, created_by)
-		VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, $6, $7)
-		RETURNING return_id
-	`, returnNumber, req.SaleID, locationID, customerID, totalAmount, req.Reason, userID).Scan(&returnID)
+                INSERT INTO sale_returns (return_number, sale_id, location_id, customer_id, return_date,
+                                                                 total_amount, reason, created_by, updated_by)
+                VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, $6, $7, $8)
+                RETURNING return_id
+        `, returnNumber, req.SaleID, locationID, customerID, totalAmount, req.Reason, userID, userID).Scan(&returnID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create return: %w", err)
@@ -248,7 +248,7 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 	return s.GetSaleReturnByID(returnID, companyID)
 }
 
-func (s *ReturnsService) UpdateSaleReturn(returnID, companyID int, updates map[string]interface{}) error {
+func (s *ReturnsService) UpdateSaleReturn(returnID, companyID, userID int, updates map[string]interface{}) error {
 	// Verify return belongs to company
 	err := s.verifyReturnInCompany(returnID, companyID)
 	if err != nil {
@@ -288,6 +288,10 @@ func (s *ReturnsService) UpdateSaleReturn(returnID, companyID int, updates map[s
 	}
 
 	argCount++
+	setParts = append(setParts, fmt.Sprintf("updated_by = $%d", argCount))
+	args = append(args, userID)
+
+	argCount++
 	setParts = append(setParts, "updated_at = CURRENT_TIMESTAMP")
 
 	query := fmt.Sprintf("UPDATE sale_returns SET %s WHERE return_id = $%d",
@@ -311,7 +315,7 @@ func (s *ReturnsService) UpdateSaleReturn(returnID, companyID int, updates map[s
 	return nil
 }
 
-func (s *ReturnsService) DeleteSaleReturn(returnID, companyID int) error {
+func (s *ReturnsService) DeleteSaleReturn(returnID, companyID, userID int) error {
 	// Verify return belongs to company
 	err := s.verifyReturnInCompany(returnID, companyID)
 	if err != nil {
@@ -329,9 +333,9 @@ func (s *ReturnsService) DeleteSaleReturn(returnID, companyID int) error {
 		return fmt.Errorf("completed returns cannot be deleted")
 	}
 
-	query := `UPDATE sale_returns SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE return_id = $1`
+	query := `UPDATE sale_returns SET is_deleted = TRUE, updated_by = $2, updated_at = CURRENT_TIMESTAMP WHERE return_id = $1`
 
-	result, err := s.db.Exec(query, returnID)
+	result, err := s.db.Exec(query, returnID, userID)
 	if err != nil {
 		return fmt.Errorf("failed to delete return: %w", err)
 	}
