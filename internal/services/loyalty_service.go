@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"erp-backend/internal/database"
@@ -457,11 +458,10 @@ func (s *LoyaltyService) UpdatePromotion(promotionID, companyID int, req *models
 		return fmt.Errorf("no fields to update")
 	}
 
-	argCount++
 	setParts = append(setParts, "updated_at = CURRENT_TIMESTAMP")
 
 	query := fmt.Sprintf("UPDATE promotions SET %s WHERE promotion_id = $%d",
-		fmt.Sprintf("%s", setParts), argCount)
+		strings.Join(setParts, ", "), argCount+1)
 	args = append(args, promotionID)
 
 	result, err := s.db.Exec(query, args...)

@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"erp-backend/internal/database"
@@ -631,7 +632,7 @@ func (s *PurchaseService) UpdatePurchase(purchaseID, companyID, userID int, req 
 
 		argCount++
 		query := fmt.Sprintf("UPDATE purchases SET %s WHERE purchase_id = $%d",
-			fmt.Sprintf("%s", updates), argCount)
+			strings.Join(updates, ", "), argCount)
 		args = append(args, purchaseID)
 
 		_, err = tx.Exec(query, args...)

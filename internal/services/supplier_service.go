@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"erp-backend/internal/database"
@@ -287,7 +288,7 @@ func (s *SupplierService) UpdateSupplier(supplierID, companyID int, req *models.
 	// Add WHERE clause
 	argCount++
 	query := fmt.Sprintf("UPDATE suppliers SET %s WHERE supplier_id = $%d",
-		fmt.Sprintf("%s", updates), argCount)
+		strings.Join(updates, ", "), argCount)
 	args = append(args, supplierID)
 
 	_, err = s.db.Exec(query, args...)

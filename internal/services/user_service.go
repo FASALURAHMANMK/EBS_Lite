@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
@@ -178,11 +179,10 @@ func (s *UserService) UpdateUser(userID int, req *models.UpdateUserRequest) erro
 		return fmt.Errorf("no fields to update")
 	}
 
-	argCount++
-	setParts = append(setParts, fmt.Sprintf("updated_at = CURRENT_TIMESTAMP"))
+	setParts = append(setParts, "updated_at = CURRENT_TIMESTAMP")
 
 	query := fmt.Sprintf("UPDATE users SET %s WHERE user_id = $%d",
-		fmt.Sprintf("%s", setParts), argCount)
+		strings.Join(setParts, ", "), argCount+1)
 	args = append(args, userID)
 
 	result, err := s.db.Exec(query, args...)
