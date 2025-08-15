@@ -377,7 +377,6 @@ CREATE TABLE sale_return_details (
     unit_price NUMERIC(12,2) NOT NULL,
     line_total NUMERIC(12,2) NOT NULL
 );
-
 -- Purchase Orders Table
 CREATE TABLE purchase_orders (
     purchase_order_id SERIAL PRIMARY KEY,
@@ -389,20 +388,26 @@ CREATE TABLE purchase_orders (
     total_amount NUMERIC(12,2) DEFAULT 0,
     created_by INTEGER NOT NULL REFERENCES users(user_id),
     workflow_state_id INTEGER REFERENCES workflow_states(state_id),
+-- Quotes Table
+CREATE TABLE quotes (
+    quote_id SERIAL PRIMARY KEY,
+    quote_number VARCHAR(100) NOT NULL,
+    location_id INTEGER NOT NULL REFERENCES locations(location_id),
+    customer_id INTEGER REFERENCES customers(customer_id),
+    quote_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    valid_until DATE,
+    subtotal NUMERIC(12,2) NOT NULL DEFAULT 0,
+    tax_amount NUMERIC(12,2) DEFAULT 0,
+    discount_amount NUMERIC(12,2) DEFAULT 0,
+    total_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+    status VARCHAR(50) DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','SENT','ACCEPTED')),
+    notes TEXT,
+    created_by INTEGER NOT NULL REFERENCES users(user_id),
+    updated_by INTEGER REFERENCES users(user_id),
     sync_status VARCHAR(20) DEFAULT 'synced',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_deleted BOOLEAN DEFAULT FALSE
-);
-
--- Purchase Order Items Table
-CREATE TABLE purchase_order_items (
-    purchase_order_item_id SERIAL PRIMARY KEY,
-    purchase_order_id INTEGER NOT NULL REFERENCES purchase_orders(purchase_order_id) ON DELETE CASCADE,
-    product_id INTEGER NOT NULL REFERENCES products(product_id),
-    quantity NUMERIC(10,3) NOT NULL,
-    unit_price NUMERIC(12,2) NOT NULL,
-    line_total NUMERIC(12,2) NOT NULL
 );
 
 -- Purchases Table
@@ -573,8 +578,16 @@ CREATE TABLE collections (
     notes TEXT,
     created_by INTEGER NOT NULL REFERENCES users(user_id),
     sync_status VARCHAR(20) DEFAULT 'synced',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Link collections to sales invoices for partial payments
+CREATE TABLE collection_invoices (
+    id SERIAL PRIMARY KEY,
+    collection_id INTEGER NOT NULL REFERENCES collections(collection_id) ON DELETE CASCADE,
+    sale_id INTEGER NOT NULL REFERENCES sales(sale_id),
+    amount NUMERIC(12,2) NOT NULL
 );
 
 -- Expenses Table
@@ -678,6 +691,20 @@ CREATE TABLE employee_leaves (
     applied_date DATE DEFAULT CURRENT_DATE,
     sync_status VARCHAR(20) DEFAULT 'synced',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Holidays Table
+CREATE TABLE holidays (
+    holiday_id SERIAL PRIMARY KEY,
+    company_id INTEGER NOT NULL REFERENCES companies(company_id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    description TEXT,
+    is_recurring BOOLEAN DEFAULT FALSE,
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    UNIQUE(company_id, date)
 );
 
 -- Attendance Table
@@ -814,6 +841,31 @@ CREATE TABLE printer_settings (
     is_active BOOLEAN DEFAULT TRUE
 );
 
+-- Numbering Sequences Table
+CREATE TABLE numbering_sequences (
+    sequence_id SERIAL PRIMARY KEY,
+    company_id INTEGER NOT NULL REFERENCES companies(company_id) ON DELETE CASCADE,
+    location_id INTEGER REFERENCES locations(location_id),
+    name VARCHAR(100) NOT NULL,
+    prefix VARCHAR(20),
+    sequence_length INTEGER NOT NULL DEFAULT 6,
+    current_number INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Invoice Formats Table
+CREATE TABLE invoice_formats (
+    format_id SERIAL PRIMARY KEY,
+    company_id INTEGER NOT NULL REFERENCES companies(company_id) ON DELETE CASCADE,
+    location_id INTEGER REFERENCES locations(location_id),
+    sequence_id INTEGER REFERENCES numbering_sequences(sequence_id),
+    name VARCHAR(100) NOT NULL,
+    tax_fields JSONB,
+    is_default BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Invoice Templates Table
 CREATE TABLE invoice_templates (
     template_id SERIAL PRIMARY KEY,
@@ -902,6 +954,11 @@ CREATE INDEX idx_sales_created_by ON sales(created_by);
 CREATE INDEX idx_sale_details_sale ON sale_details(sale_id);
 CREATE INDEX idx_sale_details_product ON sale_details(product_id);
 
+-- Quotes
+CREATE INDEX idx_quotes_customer ON quotes(customer_id);
+CREATE INDEX idx_quotes_date ON quotes(quote_date);
+CREATE INDEX idx_quotes_status ON quotes(status);
+
 -- Purchases
 CREATE INDEX idx_purchases_location ON purchases(location_id);
 CREATE INDEX idx_purchases_supplier ON purchases(supplier_id);
@@ -950,6 +1007,8 @@ CREATE INDEX idx_audit_log_timestamp ON audit_log(timestamp);
 -- Settings and Configuration
 CREATE INDEX idx_settings_company_key ON settings(company_id, key);
 CREATE INDEX idx_translations_key_lang ON translations(key, language_code);
+CREATE INDEX idx_invoice_formats_company_location ON invoice_formats(company_id, location_id);
+CREATE INDEX idx_numbering_sequences_company_location ON numbering_sequences(company_id, location_id);
 
 -- ===============================================
 -- TRIGGERS FOR UPDATED_AT TIMESTAMPS
@@ -970,6 +1029,7 @@ CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECU
 CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_customers_updated_at BEFORE UPDATE ON customers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_suppliers_updated_at BEFORE UPDATE ON suppliers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_quotes_updated_at BEFORE UPDATE ON quotes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_sales_updated_at BEFORE UPDATE ON sales FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_purchases_updated_at BEFORE UPDATE ON purchases FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -1037,6 +1097,7 @@ ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchases ENABLE ROW LEVEL SECURITY;
 
 -- Example RLS Policies (customize based on your auth system)
@@ -1233,6 +1294,10 @@ INSERT INTO permissions (name, description, module, action) VALUES
 ('UPDATE_SALES', 'Update existing sales records', 'sales', 'update'),
 ('DELETE_SALES', 'Delete or void sales records', 'sales', 'delete'),
 ('CREATE_RETURNS', 'Process sale returns', 'sales', 'return'),
+('VIEW_QUOTES', 'View quotes and proposals', 'quotes', 'view'),
+('CREATE_QUOTES', 'Create new quotes', 'quotes', 'create'),
+('UPDATE_QUOTES', 'Update existing quotes', 'quotes', 'update'),
+('DELETE_QUOTES', 'Delete quotes', 'quotes', 'delete'),
 
 -- POS permissions
 ('PRINT_INVOICES', 'Print invoices and receipts', 'pos', 'print'),
@@ -1262,7 +1327,8 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT 2, permission_id FROM permissions 
 WHERE name IN (
     'VIEW_SALES', 'CREATE_SALES', 'UPDATE_SALES', 'CREATE_RETURNS',
-    'PRINT_INVOICES', 'VIEW_REPORTS', 'VIEW_CUSTOMERS', 'CREATE_CUSTOMERS', 
+    'VIEW_QUOTES', 'CREATE_QUOTES', 'UPDATE_QUOTES',
+    'PRINT_INVOICES', 'VIEW_REPORTS', 'VIEW_CUSTOMERS', 'CREATE_CUSTOMERS',
     'UPDATE_CUSTOMERS'
 )
 ON CONFLICT (role_id, permission_id) DO NOTHING;
@@ -1272,6 +1338,7 @@ INSERT INTO role_permissions (role_id, permission_id)
 SELECT 4, permission_id FROM permissions 
 WHERE name IN (
     'VIEW_SALES', 'CREATE_SALES', 'CREATE_RETURNS', 'PRINT_INVOICES',
+    'VIEW_QUOTES', 'CREATE_QUOTES', 'UPDATE_QUOTES',
     'VIEW_CUSTOMERS', 'CREATE_CUSTOMERS', 'UPDATE_CUSTOMERS'
 )
 ON CONFLICT (role_id, permission_id) DO NOTHING;
@@ -1280,7 +1347,8 @@ ON CONFLICT (role_id, permission_id) DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT 5, permission_id FROM permissions 
 WHERE name IN (
-    'VIEW_SALES', 'CREATE_SALES', 'PRINT_INVOICES', 'VIEW_CUSTOMERS'
+    'VIEW_SALES', 'CREATE_SALES', 'PRINT_INVOICES', 'VIEW_CUSTOMERS',
+    'VIEW_QUOTES', 'CREATE_QUOTES'
 )
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
@@ -1291,6 +1359,8 @@ CREATE INDEX IF NOT EXISTS idx_sales_location_date ON sales(location_id, sale_da
 CREATE INDEX IF NOT EXISTS idx_sales_customer_date ON sales(customer_id, sale_date);
 CREATE INDEX IF NOT EXISTS idx_sales_status ON sales(status);
 CREATE INDEX IF NOT EXISTS idx_sales_pos_status ON sales(pos_status);
+CREATE INDEX IF NOT EXISTS idx_quotes_customer_date ON quotes(customer_id, quote_date);
+CREATE INDEX IF NOT EXISTS idx_quotes_status ON quotes(status);
 CREATE INDEX IF NOT EXISTS idx_sale_details_product ON sale_details(product_id);
 CREATE INDEX IF NOT EXISTS idx_payment_methods_company ON payment_methods(company_id);
 

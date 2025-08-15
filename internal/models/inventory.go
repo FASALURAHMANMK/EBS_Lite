@@ -138,3 +138,30 @@ type StockTransferDetailWithProduct struct {
 	Quantity         float64 `json:"quantity" db:"quantity"`
 	ReceivedQuantity float64 `json:"received_quantity" db:"received_quantity"`
 }
+
+// StockLocationSummary aggregates stock quantity per location
+type StockLocationSummary struct {
+	LocationID    int     `json:"location_id"`
+	LocationName  string  `json:"location_name"`
+	TotalQuantity float64 `json:"total_quantity"`
+}
+
+// InventorySummary provides overall stock information and recent activity
+type InventorySummary struct {
+	StockByLocation    []StockLocationSummary `json:"stock_by_location"`
+	MovementHistory    []StockAdjustment      `json:"movement_history"`
+	RecentTransactions []StockTransfer        `json:"recent_transactions"`
+}
+
+// ProductSummary provides stock and movement details for a single product
+type ProductSummary struct {
+	ProductID       int                              `json:"product_id"`
+	StockByLocation []Stock                          `json:"stock_by_location"`
+	MovementHistory []StockAdjustment                `json:"movement_history"`
+	RecentTransfers []StockTransferDetailWithProduct `json:"recent_transfers"`
+}
+
+// BarcodeRequest defines the payload for generating inventory labels
+type BarcodeRequest struct {
+	ProductIDs []int `json:"product_ids" validate:"required,min=1"`
+}

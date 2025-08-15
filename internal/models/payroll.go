@@ -23,3 +23,52 @@ type CreatePayrollRequest struct {
 	Allowances  float64 `json:"allowances" validate:"gte=0"`
 	Deductions  float64 `json:"deductions" validate:"gte=0"`
 }
+
+type SalaryComponent struct {
+	ComponentID int     `json:"component_id" db:"component_id"`
+	PayrollID   int     `json:"payroll_id" db:"payroll_id"`
+	Type        string  `json:"type" db:"type"`
+	Amount      float64 `json:"amount" db:"amount"`
+	SyncModel
+}
+
+type AddComponentRequest struct {
+	Type   string  `json:"type" validate:"required"`
+	Amount float64 `json:"amount" validate:"required,gt=0"`
+}
+
+type Advance struct {
+	AdvanceID int       `json:"advance_id" db:"advance_id"`
+	PayrollID int       `json:"payroll_id" db:"payroll_id"`
+	Amount    float64   `json:"amount" db:"amount"`
+	Date      time.Time `json:"date" db:"date"`
+	SyncModel
+}
+
+type AdvanceRequest struct {
+	Amount float64 `json:"amount" validate:"required,gt=0"`
+	Date   string  `json:"date" validate:"required"`
+}
+
+type Deduction struct {
+	DeductionID int       `json:"deduction_id" db:"deduction_id"`
+	PayrollID   int       `json:"payroll_id" db:"payroll_id"`
+	Type        string    `json:"type" db:"type"`
+	Amount      float64   `json:"amount" db:"amount"`
+	Date        time.Time `json:"date" db:"date"`
+	SyncModel
+}
+
+type DeductionRequest struct {
+	Type   string  `json:"type" validate:"required"`
+	Amount float64 `json:"amount" validate:"required,gt=0"`
+	Date   string  `json:"date" validate:"required"`
+}
+
+type Payslip struct {
+	Payroll    Payroll           `json:"payroll"`
+	Components []SalaryComponent `json:"components"`
+	Advances   []Advance         `json:"advances"`
+	Deductions []Deduction       `json:"deductions"`
+	NetPay     float64           `json:"net_pay"`
+}

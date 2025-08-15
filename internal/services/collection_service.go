@@ -65,6 +65,19 @@ func (s *CollectionService) GetCollections(companyID int, filters map[string]str
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan collection: %w", err)
 		}
+		invRows, err := s.db.Query(`SELECT ci.sale_id, s.sale_number, ci.amount
+                        FROM collection_invoices ci
+                        JOIN sales s ON ci.sale_id = s.sale_id
+                        WHERE ci.collection_id = $1`, col.CollectionID)
+		if err == nil {
+			for invRows.Next() {
+				var inv models.CollectionInvoice
+				if err := invRows.Scan(&inv.SaleID, &inv.SaleNumber, &inv.Amount); err == nil {
+					col.Invoices = append(col.Invoices, inv)
+				}
+			}
+			invRows.Close()
+		}
 		collections = append(collections, col)
 	}
 
@@ -121,6 +134,17 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 		return nil, fmt.Errorf("failed to insert collection: %w", err)
 	}
 
+	// Link invoices if provided
+	for _, inv := range req.Invoices {
+		if _, err := tx.Exec(`INSERT INTO collection_invoices (collection_id, sale_id, amount) VALUES ($1,$2,$3)`,
+			col.CollectionID, inv.SaleID, inv.Amount); err != nil {
+			return nil, fmt.Errorf("failed to insert collection invoice: %w", err)
+		}
+		var saleNumber string
+		_ = tx.QueryRow("SELECT sale_number FROM sales WHERE sale_id = $1", inv.SaleID).Scan(&saleNumber)
+		col.Invoices = append(col.Invoices, models.CollectionInvoice{SaleID: inv.SaleID, SaleNumber: saleNumber, Amount: inv.Amount})
+	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
@@ -171,4 +195,44 @@ func (s *CollectionService) generateCollectionNumber(tx *sql.Tx, locationID int)
 		return "", err
 	}
 	return fmt.Sprintf("COL-%d-%s-%04d", locationID, time.Now().Format("20060102"), count+1), nil
+}
+
+// GetCollectionByID retrieves a single collection with invoice references
+func (s *CollectionService) GetCollectionByID(collectionID, companyID int) (*models.Collection, error) {
+	query := `SELECT c.collection_id, c.collection_number, c.customer_id, c.location_id, c.amount,
+                         c.collection_date, c.payment_method_id, pm.name as payment_method,
+                         c.reference_number, c.notes, c.created_by, c.sync_status, c.created_at, c.updated_at
+                  FROM collections c
+                  JOIN customers cu ON c.customer_id = cu.customer_id
+                  LEFT JOIN payment_methods pm ON c.payment_method_id = pm.method_id
+                  WHERE c.collection_id = $1 AND cu.company_id = $2`
+
+	var col models.Collection
+	err := s.db.QueryRow(query, collectionID, companyID).Scan(
+		&col.CollectionID, &col.CollectionNumber, &col.CustomerID, &col.LocationID,
+		&col.Amount, &col.CollectionDate, &col.PaymentMethodID, &col.PaymentMethod,
+		&col.ReferenceNumber, &col.Notes, &col.CreatedBy, &col.SyncStatus, &col.CreatedAt, &col.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("collection not found")
+		}
+		return nil, fmt.Errorf("failed to get collection: %w", err)
+	}
+
+	rows, err := s.db.Query(`SELECT ci.sale_id, s.sale_number, ci.amount
+                FROM collection_invoices ci
+                JOIN sales s ON ci.sale_id = s.sale_id
+                WHERE ci.collection_id = $1`, collectionID)
+	if err == nil {
+		for rows.Next() {
+			var inv models.CollectionInvoice
+			if err := rows.Scan(&inv.SaleID, &inv.SaleNumber, &inv.Amount); err == nil {
+				col.Invoices = append(col.Invoices, inv)
+			}
+		}
+		rows.Close()
+	}
+
+	return &col, nil
 }

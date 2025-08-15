@@ -22,6 +22,19 @@ func NewReportsHandler() *ReportsHandler {
 	}
 }
 
+// handleReportResponse sends the report data or returns a not implemented
+// error if export to Excel or PDF is requested. Actual export logic will be
+// implemented in future iterations.
+func (h *ReportsHandler) handleReportResponse(c *gin.Context, message string, data interface{}) {
+	format := c.Query("format")
+	switch format {
+	case "excel", "pdf":
+		utils.ErrorResponse(c, http.StatusNotImplemented, "Export to "+format+" not implemented", nil)
+	default:
+		utils.SuccessResponse(c, message, data)
+	}
+}
+
 // GET /reports/sales-summary
 func (h *ReportsHandler) GetSalesSummary(c *gin.Context) {
 	companyID := c.GetInt("company_id")
@@ -140,4 +153,185 @@ func (h *ReportsHandler) GetExpensesSummary(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, "Expenses summary retrieved successfully", summary)
+}
+
+// GET /reports/item-movement
+func (h *ReportsHandler) GetItemMovement(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	data, err := h.reportsService.GetItemMovement(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusNotImplemented, "Item movement report not implemented", err)
+		return
+	}
+	h.handleReportResponse(c, "Item movement retrieved successfully", data)
+}
+
+// GET /reports/valuation
+func (h *ReportsHandler) GetValuationReport(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	data, err := h.reportsService.GetValuationReport(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusNotImplemented, "Valuation report not implemented", err)
+		return
+	}
+	h.handleReportResponse(c, "Valuation report retrieved successfully", data)
+}
+
+// GET /reports/purchase-vs-returns
+func (h *ReportsHandler) GetPurchaseVsReturns(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	data, err := h.reportsService.GetPurchaseVsReturns(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusNotImplemented, "Purchase vs returns report not implemented", err)
+		return
+	}
+	h.handleReportResponse(c, "Purchase vs returns retrieved successfully", data)
+}
+
+// GET /reports/supplier
+func (h *ReportsHandler) GetSupplierReport(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	data, err := h.reportsService.GetSupplierReport(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusNotImplemented, "Supplier report not implemented", err)
+		return
+	}
+	h.handleReportResponse(c, "Supplier report retrieved successfully", data)
+}
+
+// GET /reports/daily-cash
+func (h *ReportsHandler) GetDailyCashReport(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	data, err := h.reportsService.GetDailyCashReport(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusNotImplemented, "Daily cash report not implemented", err)
+		return
+	}
+	h.handleReportResponse(c, "Daily cash report retrieved successfully", data)
+}
+
+// GET /reports/income-expense
+func (h *ReportsHandler) GetIncomeExpenseReport(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	data, err := h.reportsService.GetIncomeExpenseReport(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusNotImplemented, "Income vs expense report not implemented", err)
+		return
+	}
+	h.handleReportResponse(c, "Income vs expense report retrieved successfully", data)
+}
+
+// GET /reports/general-ledger
+func (h *ReportsHandler) GetGeneralLedger(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	data, err := h.reportsService.GetGeneralLedger(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusNotImplemented, "General ledger report not implemented", err)
+		return
+	}
+	h.handleReportResponse(c, "General ledger retrieved successfully", data)
+}
+
+// GET /reports/trial-balance
+func (h *ReportsHandler) GetTrialBalance(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	data, err := h.reportsService.GetTrialBalance(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusNotImplemented, "Trial balance report not implemented", err)
+		return
+	}
+	h.handleReportResponse(c, "Trial balance retrieved successfully", data)
+}
+
+// GET /reports/profit-loss
+func (h *ReportsHandler) GetProfitLoss(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	data, err := h.reportsService.GetProfitLoss(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusNotImplemented, "Profit and loss report not implemented", err)
+		return
+	}
+	h.handleReportResponse(c, "Profit and loss report retrieved successfully", data)
+}
+
+// GET /reports/balance-sheet
+func (h *ReportsHandler) GetBalanceSheet(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	data, err := h.reportsService.GetBalanceSheet(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusNotImplemented, "Balance sheet report not implemented", err)
+		return
+	}
+	h.handleReportResponse(c, "Balance sheet report retrieved successfully", data)
+}
+
+// GET /reports/outstanding
+func (h *ReportsHandler) GetOutstandingReport(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	data, err := h.reportsService.GetOutstandingReport(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusNotImplemented, "Outstanding report not implemented", err)
+		return
+	}
+	h.handleReportResponse(c, "Outstanding report retrieved successfully", data)
+}
+
+// GET /reports/top-performers
+func (h *ReportsHandler) GetTopPerformers(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	data, err := h.reportsService.GetTopPerformers(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusNotImplemented, "Top performers report not implemented", err)
+		return
+	}
+	h.handleReportResponse(c, "Top performers report retrieved successfully", data)
 }

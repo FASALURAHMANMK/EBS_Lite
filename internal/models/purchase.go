@@ -25,6 +25,7 @@ type Purchase struct {
 	CreatedBy       int              `json:"created_by" db:"created_by"`
 	UpdatedBy       *int             `json:"updated_by,omitempty" db:"updated_by"`
 	Items           []PurchaseDetail `json:"items,omitempty"`
+	GoodsReceipts   []GoodsReceipt   `json:"goods_receipts,omitempty"`
 	Supplier        *Supplier        `json:"supplier,omitempty"`
 	Location        *Location        `json:"location,omitempty"`
 	SyncModel
@@ -180,7 +181,6 @@ type GoodsReceipt struct {
 	Items           []GoodsReceiptItem `json:"items,omitempty"`
 	Supplier        *Supplier          `json:"supplier,omitempty"`
 	Location        *Location          `json:"location,omitempty"`
-	SyncModel
 }
 
 type GoodsReceiptItem struct {
@@ -192,4 +192,16 @@ type GoodsReceiptItem struct {
 	UnitPrice           float64  `json:"unit_price" db:"unit_price"`
 	LineTotal           float64  `json:"line_total" db:"line_total"`
 	Product             *Product `json:"product,omitempty"`
+	ReceiptItemID    int     `json:"receipt_item_id" db:"receipt_item_id"`
+	ReceiptID        int     `json:"receipt_id" db:"receipt_id"`
+	PurchaseDetailID int     `json:"purchase_detail_id" db:"purchase_detail_id"`
+	ReceivedQuantity float64 `json:"received_quantity" db:"received_quantity"`
+}
+
+type RecordGoodsReceiptRequest struct {
+	PurchaseID    int                          `json:"purchase_id" validate:"required"`
+	ReceiptNumber *string                      `json:"receipt_number,omitempty"`
+	ReceiptDate   *time.Time                   `json:"receipt_date,omitempty"`
+	Notes         *string                      `json:"notes,omitempty"`
+	Items         []ReceivePurchaseItemRequest `json:"items" validate:"required,min=1"`
 }

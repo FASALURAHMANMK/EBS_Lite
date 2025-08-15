@@ -180,3 +180,53 @@ func (s *CustomerService) DeleteCustomer(customerID, companyID int) error {
 	}
 	return nil
 }
+
+// GetCustomerSummary aggregates sales, payments, returns and loyalty for a customer
+func (s *CustomerService) GetCustomerSummary(customerID, companyID int) (*models.CustomerSummary, error) {
+	var exists int
+	err := s.db.QueryRow(
+		"SELECT 1 FROM customers WHERE customer_id = $1 AND company_id = $2 AND is_deleted = FALSE",
+		customerID, companyID,
+	).Scan(&exists)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("customer not found")
+		}
+		return nil, fmt.Errorf("failed to verify customer: %w", err)
+	}
+
+	summary := &models.CustomerSummary{CustomerID: customerID}
+
+	if err := s.db.QueryRow(
+		"SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE customer_id = $1 AND is_deleted = FALSE",
+		customerID,
+	).Scan(&summary.TotalSales); err != nil {
+		return nil, fmt.Errorf("failed to get sales total: %w", err)
+	}
+
+	if err := s.db.QueryRow(
+		`SELECT COALESCE(SUM(c.amount),0)
+                 FROM collections c
+                 JOIN customers cu ON c.customer_id = cu.customer_id
+                 WHERE c.customer_id = $1 AND cu.company_id = $2`,
+		customerID, companyID,
+	).Scan(&summary.TotalPayments); err != nil {
+		return nil, fmt.Errorf("failed to get payments total: %w", err)
+	}
+
+	if err := s.db.QueryRow(
+		"SELECT COALESCE(SUM(total_amount),0) FROM sale_returns WHERE customer_id = $1 AND is_deleted = FALSE",
+		customerID,
+	).Scan(&summary.TotalReturns); err != nil {
+		return nil, fmt.Errorf("failed to get returns total: %w", err)
+	}
+
+	if err := s.db.QueryRow(
+		"SELECT COALESCE(points,0) FROM loyalty_programs WHERE customer_id = $1",
+		customerID,
+	).Scan(&summary.LoyaltyPoints); err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("failed to get loyalty points: %w", err)
+	}
+
+	return summary, nil
+}

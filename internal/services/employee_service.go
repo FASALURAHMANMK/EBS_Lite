@@ -22,6 +22,7 @@ func (s *EmployeeService) GetEmployees(companyID int, filters map[string]string)
 	query := `
                 SELECT employee_id, company_id, location_id, employee_code, name, phone, email,
                        address, position, department, salary, hire_date, is_active,
+                       last_check_in, last_check_out, leave_balance,
                        sync_status, created_at, updated_at, is_deleted
                 FROM employees
                 WHERE company_id = $1 AND is_deleted = FALSE`
@@ -49,7 +50,8 @@ func (s *EmployeeService) GetEmployees(companyID int, filters map[string]string)
 		if err := rows.Scan(
 			&e.EmployeeID, &e.CompanyID, &e.LocationID, &e.EmployeeCode, &e.Name,
 			&e.Phone, &e.Email, &e.Address, &e.Position, &e.Department,
-			&e.Salary, &e.HireDate, &e.IsActive, &e.SyncStatus, &e.CreatedAt, &e.UpdatedAt, &e.IsDeleted,
+			&e.Salary, &e.HireDate, &e.IsActive, &e.LastCheckIn, &e.LastCheckOut, &e.LeaveBalance,
+			&e.SyncStatus, &e.CreatedAt, &e.UpdatedAt, &e.IsDeleted,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan employee: %w", err)
 		}
@@ -65,13 +67,17 @@ func (s *EmployeeService) CreateEmployee(companyID int, req *models.CreateEmploy
 	}
 	query := `
                 INSERT INTO employees (company_id, location_id, employee_code, name, phone, email, address,
-                                       position, department, salary, hire_date, is_active)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+                                       position, department, salary, hire_date, is_active, leave_balance)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
                 RETURNING employee_id, created_at`
 	var emp models.Employee
+	leaveBalance := 0.0
+	if req.LeaveBalance != nil {
+		leaveBalance = *req.LeaveBalance
+	}
 	err := s.db.QueryRow(query,
 		companyID, req.LocationID, req.EmployeeCode, req.Name, req.Phone, req.Email, req.Address,
-		req.Position, req.Department, req.Salary, req.HireDate, isActive,
+		req.Position, req.Department, req.Salary, req.HireDate, isActive, leaveBalance,
 	).Scan(&emp.EmployeeID, &emp.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create employee: %w", err)
@@ -88,6 +94,7 @@ func (s *EmployeeService) CreateEmployee(companyID int, req *models.CreateEmploy
 	emp.Salary = req.Salary
 	emp.HireDate = req.HireDate
 	emp.IsActive = isActive
+	emp.LeaveBalance = &leaveBalance
 	return &emp, nil
 }
 
@@ -148,6 +155,11 @@ func (s *EmployeeService) UpdateEmployee(employeeID, companyID int, req *models.
 	if req.IsActive != nil {
 		updates = append(updates, fmt.Sprintf("is_active = $%d", argPos))
 		args = append(args, *req.IsActive)
+		argPos++
+	}
+	if req.LeaveBalance != nil {
+		updates = append(updates, fmt.Sprintf("leave_balance = $%d", argPos))
+		args = append(args, *req.LeaveBalance)
 		argPos++
 	}
 	if len(updates) == 0 {
