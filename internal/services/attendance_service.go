@@ -60,6 +60,7 @@ func (s *AttendanceService) AutoMarkNonWorkingDays(companyID int, date time.Time
 		return fmt.Errorf("failed to insert attendance: %w", err)
 	}
 	return nil
+}
 func (s *AttendanceService) CheckIn(companyID, employeeID int) (*models.Attendance, error) {
 	var exists bool
 	err := s.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM employees WHERE employee_id = $1 AND company_id = $2 AND is_deleted = FALSE)`, employeeID, companyID).Scan(&exists)
