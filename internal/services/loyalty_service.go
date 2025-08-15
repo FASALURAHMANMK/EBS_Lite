@@ -20,6 +20,8 @@ func NewLoyaltyService() *LoyaltyService {
 	}
 }
 
+var getPromotions = (*LoyaltyService).GetPromotions
+
 // Loyalty Programs
 func (s *LoyaltyService) GetCustomerLoyalty(customerID, companyID int) (*models.CustomerLoyaltyResponse, error) {
 	// Verify customer belongs to company
@@ -509,7 +511,7 @@ func (s *LoyaltyService) DeletePromotion(promotionID, companyID int) error {
 
 func (s *LoyaltyService) CheckPromotionEligibility(companyID int, req *models.PromotionEligibilityRequest) (*models.PromotionEligibilityResponse, error) {
 	// Get active promotions
-	promotions, err := s.GetPromotions(companyID, true)
+	promotions, err := getPromotions(s, companyID, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get promotions: %w", err)
 	}
@@ -530,11 +532,42 @@ func (s *LoyaltyService) CheckPromotionEligibility(companyID int, req *models.Pr
 			continue
 		}
 
-		// Check applicability (simplified logic)
+		// Check applicability
 		if promotion.ApplicableTo != nil && *promotion.ApplicableTo != "ALL" {
-			// TODO: Implement specific product/category checks based on conditions
-			// For now, skip non-ALL promotions
-			continue
+			if *promotion.ApplicableTo == "PRODUCTS" {
+				if promotion.Conditions == nil {
+					continue
+				}
+				rawIDs, ok := (*promotion.Conditions)["product_ids"]
+				if !ok {
+					continue
+				}
+				idsSlice, ok := rawIDs.([]interface{})
+				if !ok {
+					continue
+				}
+				condSet := make(map[int]struct{})
+				for _, v := range idsSlice {
+					switch id := v.(type) {
+					case float64:
+						condSet[int(id)] = struct{}{}
+					case int:
+						condSet[id] = struct{}{}
+					}
+				}
+				match := false
+				for _, pid := range req.ProductIDs {
+					if _, exists := condSet[pid]; exists {
+						match = true
+						break
+					}
+				}
+				if !match {
+					continue
+				}
+			} else {
+				continue
+			}
 		}
 
 		var discountAmount float64

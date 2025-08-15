@@ -299,7 +299,20 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 		eligibilityReq := &models.PromotionEligibilityRequest{
 			CustomerID:  req.CustomerID,
 			TotalAmount: subtotal,
-			ProductIDs:  []int{}, // TODO: Extract product IDs from items
+			ProductIDs:  []int{},
+		}
+
+		productIDSet := make(map[int]struct{})
+		for _, item := range req.Items {
+			if item.ProductID == nil {
+				continue
+			}
+			id := *item.ProductID
+			if _, exists := productIDSet[id]; exists {
+				continue
+			}
+			productIDSet[id] = struct{}{}
+			eligibilityReq.ProductIDs = append(eligibilityReq.ProductIDs, id)
 		}
 
 		eligibility, err := loyaltyService.CheckPromotionEligibility(companyID, eligibilityReq)
