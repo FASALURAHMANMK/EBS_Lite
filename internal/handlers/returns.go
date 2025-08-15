@@ -243,17 +243,28 @@ func (h *ReturnsHandler) SearchReturnableSale(c *gin.Context) {
 		return
 	}
 
+	returnedQty, err := h.returnsService.GetReturnedQuantitiesBySaleDetail(saleID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get returned quantities", err)
+		return
+	}
+
 	// Format response for return creation
 	returnableItems := make([]map[string]interface{}, 0)
 	for _, item := range sale.Items {
 		if item.ProductID != nil {
+			returned := returnedQty[item.SaleDetailID]
+			maxQuantity := item.Quantity - returned
+			if maxQuantity < 0 {
+				maxQuantity = 0
+			}
 			returnableItems = append(returnableItems, map[string]interface{}{
 				"product_id":   *item.ProductID,
 				"product_name": item.ProductName,
 				"quantity":     item.Quantity,
 				"unit_price":   item.UnitPrice,
 				"line_total":   item.LineTotal,
-				"max_quantity": item.Quantity, // TODO: Calculate actual returnable quantity
+				"max_quantity": maxQuantity,
 			})
 		}
 	}
