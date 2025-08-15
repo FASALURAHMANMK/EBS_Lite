@@ -349,12 +349,12 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 	// Create sale
 	var saleID int
 	err = tx.QueryRow(`
-		INSERT INTO sales (sale_number, location_id, customer_id, sale_date, sale_time,
-						  subtotal, tax_amount, discount_amount, total_amount, paid_amount,
-						  payment_method_id, status, pos_status, is_quick_sale, notes, created_by)
-		VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIME, $4, $5, $6, $7, $7, $8, 'COMPLETED', 'COMPLETED', FALSE, $9, $10)
-		RETURNING sale_id
-	`, saleNumber, locationID, req.CustomerID, subtotal, totalTax, req.DiscountAmount,
+                INSERT INTO sales (sale_number, location_id, customer_id, sale_date, sale_time,
+                                                  subtotal, tax_amount, discount_amount, total_amount, paid_amount,
+                                                  payment_method_id, status, pos_status, is_quick_sale, notes, created_by, updated_by)
+                VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIME, $4, $5, $6, $7, $7, $8, 'COMPLETED', 'COMPLETED', FALSE, $9, $10, $10)
+                RETURNING sale_id
+        `, saleNumber, locationID, req.CustomerID, subtotal, totalTax, req.DiscountAmount,
 		totalAmount, req.PaymentMethodID, req.Notes, userID).Scan(&saleID)
 
 	if err != nil {
@@ -456,7 +456,7 @@ func (s *SalesService) validateCustomerInCompany(customerID, companyID int) erro
 	return nil
 }
 
-func (s *SalesService) UpdateSale(saleID, companyID int, req *models.UpdateSaleRequest) error {
+func (s *SalesService) UpdateSale(saleID, companyID, userID int, req *models.UpdateSaleRequest) error {
 	// Verify sale exists and belongs to company
 	err := s.verifySaleInCompany(saleID, companyID)
 	if err != nil {
@@ -488,6 +488,10 @@ func (s *SalesService) UpdateSale(saleID, companyID int, req *models.UpdateSaleR
 	}
 
 	argCount++
+	setParts = append(setParts, fmt.Sprintf("updated_by = $%d", argCount))
+	args = append(args, userID)
+
+	argCount++
 	setParts = append(setParts, "updated_at = CURRENT_TIMESTAMP")
 
 	query := fmt.Sprintf("UPDATE sales SET %s WHERE sale_id = $%d",
@@ -511,7 +515,7 @@ func (s *SalesService) UpdateSale(saleID, companyID int, req *models.UpdateSaleR
 	return nil
 }
 
-func (s *SalesService) DeleteSale(saleID, companyID int) error {
+func (s *SalesService) DeleteSale(saleID, companyID, userID int) error {
 	// Verify sale exists and belongs to company
 	err := s.verifySaleInCompany(saleID, companyID)
 	if err != nil {
@@ -529,9 +533,9 @@ func (s *SalesService) DeleteSale(saleID, companyID int) error {
 		return fmt.Errorf("completed sales cannot be deleted")
 	}
 
-	query := `UPDATE sales SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE sale_id = $1`
+	query := `UPDATE sales SET is_deleted = TRUE, updated_by = $2, updated_at = CURRENT_TIMESTAMP WHERE sale_id = $1`
 
-	result, err := s.db.Exec(query, saleID)
+	result, err := s.db.Exec(query, saleID, userID)
 	if err != nil {
 		return fmt.Errorf("failed to delete sale: %w", err)
 	}
@@ -548,15 +552,15 @@ func (s *SalesService) DeleteSale(saleID, companyID int) error {
 	return nil
 }
 
-func (s *SalesService) HoldSale(saleID, companyID int) error {
+func (s *SalesService) HoldSale(saleID, companyID, userID int) error {
 	err := s.verifySaleInCompany(saleID, companyID)
 	if err != nil {
 		return err
 	}
 
-	query := `UPDATE sales SET pos_status = 'HOLD', updated_at = CURRENT_TIMESTAMP WHERE sale_id = $1`
+	query := `UPDATE sales SET pos_status = 'HOLD', updated_by = $2, updated_at = CURRENT_TIMESTAMP WHERE sale_id = $1`
 
-	result, err := s.db.Exec(query, saleID)
+	result, err := s.db.Exec(query, saleID, userID)
 	if err != nil {
 		return fmt.Errorf("failed to hold sale: %w", err)
 	}
@@ -573,15 +577,15 @@ func (s *SalesService) HoldSale(saleID, companyID int) error {
 	return nil
 }
 
-func (s *SalesService) ResumeSale(saleID, companyID int) error {
+func (s *SalesService) ResumeSale(saleID, companyID, userID int) error {
 	err := s.verifySaleInCompany(saleID, companyID)
 	if err != nil {
 		return err
 	}
 
-	query := `UPDATE sales SET pos_status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP WHERE sale_id = $1`
+	query := `UPDATE sales SET pos_status = 'ACTIVE', updated_by = $2, updated_at = CURRENT_TIMESTAMP WHERE sale_id = $1`
 
-	result, err := s.db.Exec(query, saleID)
+	result, err := s.db.Exec(query, saleID, userID)
 	if err != nil {
 		return fmt.Errorf("failed to resume sale: %w", err)
 	}

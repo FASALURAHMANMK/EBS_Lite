@@ -146,6 +146,7 @@ func (h *SalesHandler) CreateSale(c *gin.Context) {
 // PUT /sales/:id
 func (h *SalesHandler) UpdateSale(c *gin.Context) {
 	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
 	if companyID == 0 {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
@@ -170,7 +171,7 @@ func (h *SalesHandler) UpdateSale(c *gin.Context) {
 		return
 	}
 
-	err = h.salesService.UpdateSale(saleID, companyID, &req)
+	err = h.salesService.UpdateSale(saleID, companyID, userID, &req)
 	if err != nil {
 		if err.Error() == "sale not found" {
 			utils.NotFoundResponse(c, "Sale not found")
@@ -186,6 +187,7 @@ func (h *SalesHandler) UpdateSale(c *gin.Context) {
 // DELETE /sales/:id
 func (h *SalesHandler) DeleteSale(c *gin.Context) {
 	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
 	if companyID == 0 {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
@@ -197,7 +199,7 @@ func (h *SalesHandler) DeleteSale(c *gin.Context) {
 		return
 	}
 
-	err = h.salesService.DeleteSale(saleID, companyID)
+	err = h.salesService.DeleteSale(saleID, companyID, userID)
 	if err != nil {
 		if err.Error() == "sale not found" {
 			utils.NotFoundResponse(c, "Sale not found")
@@ -217,6 +219,7 @@ func (h *SalesHandler) DeleteSale(c *gin.Context) {
 // POST /sales/:id/hold
 func (h *SalesHandler) HoldSale(c *gin.Context) {
 	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
 	if companyID == 0 {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
@@ -228,7 +231,7 @@ func (h *SalesHandler) HoldSale(c *gin.Context) {
 		return
 	}
 
-	err = h.salesService.HoldSale(saleID, companyID)
+	err = h.salesService.HoldSale(saleID, companyID, userID)
 	if err != nil {
 		if err.Error() == "sale not found" {
 			utils.NotFoundResponse(c, "Sale not found")
@@ -244,6 +247,7 @@ func (h *SalesHandler) HoldSale(c *gin.Context) {
 // POST /sales/:id/resume
 func (h *SalesHandler) ResumeSale(c *gin.Context) {
 	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
 	if companyID == 0 {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
@@ -255,7 +259,7 @@ func (h *SalesHandler) ResumeSale(c *gin.Context) {
 		return
 	}
 
-	err = h.salesService.ResumeSale(saleID, companyID)
+	err = h.salesService.ResumeSale(saleID, companyID, userID)
 	if err != nil {
 		if err.Error() == "sale not found" {
 			utils.NotFoundResponse(c, "Sale not found")

@@ -126,6 +126,7 @@ func (h *ReturnsHandler) CreateSaleReturn(c *gin.Context) {
 // PUT /sale-returns/:id
 func (h *ReturnsHandler) UpdateSaleReturn(c *gin.Context) {
 	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
 	if companyID == 0 {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
@@ -143,7 +144,7 @@ func (h *ReturnsHandler) UpdateSaleReturn(c *gin.Context) {
 		return
 	}
 
-	err = h.returnsService.UpdateSaleReturn(returnID, companyID, updates)
+	err = h.returnsService.UpdateSaleReturn(returnID, companyID, userID, updates)
 	if err != nil {
 		if err.Error() == "return not found" {
 			utils.NotFoundResponse(c, "Sale return not found")
@@ -163,6 +164,7 @@ func (h *ReturnsHandler) UpdateSaleReturn(c *gin.Context) {
 // DELETE /sale-returns/:id
 func (h *ReturnsHandler) DeleteSaleReturn(c *gin.Context) {
 	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
 	if companyID == 0 {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
@@ -174,7 +176,7 @@ func (h *ReturnsHandler) DeleteSaleReturn(c *gin.Context) {
 		return
 	}
 
-	err = h.returnsService.DeleteSaleReturn(returnID, companyID)
+	err = h.returnsService.DeleteSaleReturn(returnID, companyID, userID)
 	if err != nil {
 		if err.Error() == "return not found" {
 			utils.NotFoundResponse(c, "Sale return not found")

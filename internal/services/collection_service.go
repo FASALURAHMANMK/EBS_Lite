@@ -122,13 +122,13 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 	var col models.Collection
 	insert := `
                 INSERT INTO collections (collection_number, customer_id, location_id, amount,
-                                         collection_date, payment_method_id, reference_number, notes, created_by)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+                                         collection_date, payment_method_id, reference_number, notes, created_by, updated_by)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
                 RETURNING collection_id, collection_number, collection_date, created_at, updated_at`
 
 	err = tx.QueryRow(insert,
 		number, req.CustomerID, locationID, req.Amount, collectionDate, req.PaymentMethodID,
-		req.ReferenceNumber, req.Notes, userID,
+		req.ReferenceNumber, req.Notes, userID, userID,
 	).Scan(&col.CollectionID, &col.CollectionNumber, &col.CollectionDate, &col.CreatedAt, &col.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert collection: %w", err)

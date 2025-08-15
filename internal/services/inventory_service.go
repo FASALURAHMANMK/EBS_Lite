@@ -171,10 +171,10 @@ func (s *InventoryService) CreateStockTransfer(companyID, fromLocationID, userID
 	// Create transfer
 	var transferID int
 	err = tx.QueryRow(`
-		INSERT INTO stock_transfers (transfer_number, from_location_id, to_location_id, transfer_date, notes, created_by)
-		VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5)
-		RETURNING transfer_id
-	`, transferNumber, fromLocationID, req.ToLocationID, req.Notes, userID).Scan(&transferID)
+                INSERT INTO stock_transfers (transfer_number, from_location_id, to_location_id, transfer_date, notes, created_by, updated_by)
+                VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5, $5)
+                RETURNING transfer_id
+        `, transferNumber, fromLocationID, req.ToLocationID, req.Notes, userID).Scan(&transferID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transfer: %w", err)
@@ -333,10 +333,10 @@ func (s *InventoryService) CompleteStockTransfer(transferID, companyID, userID i
 
 	// Mark transfer as completed
 	_, err = tx.Exec(`
-		UPDATE stock_transfers 
-		SET status = 'COMPLETED', approved_by = $1, updated_at = CURRENT_TIMESTAMP
-		WHERE transfer_id = $2
-	`, userID, transferID)
+                UPDATE stock_transfers
+                SET status = 'COMPLETED', approved_by = $1, updated_by = $1, updated_at = CURRENT_TIMESTAMP
+                WHERE transfer_id = $2
+        `, userID, transferID)
 	if err != nil {
 		return fmt.Errorf("failed to complete transfer: %w", err)
 	}
@@ -524,10 +524,10 @@ func (s *InventoryService) CancelStockTransfer(transferID, companyID, userID int
 
 	// Update transfer status to CANCELLED
 	_, err = tx.Exec(`
-		UPDATE stock_transfers 
-		SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP
-		WHERE transfer_id = $1
-	`, transferID)
+                UPDATE stock_transfers
+                SET status = 'CANCELLED', updated_by = $2, updated_at = CURRENT_TIMESTAMP
+                WHERE transfer_id = $1
+        `, transferID, userID)
 	if err != nil {
 		return fmt.Errorf("failed to cancel transfer: %w", err)
 	}
