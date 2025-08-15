@@ -22,6 +22,19 @@ type Quote struct {
 	SyncModel
 }
 
+type QuoteDetail struct {
+	QuoteDetailID   int     `json:"quote_detail_id" db:"quote_detail_id"`
+	QuoteID         int     `json:"quote_id" db:"quote_id"`
+	ProductID       *int    `json:"product_id,omitempty" db:"product_id"`
+	ProductName     *string `json:"product_name,omitempty" db:"product_name"`
+	Quantity        float64 `json:"quantity" db:"quantity"`
+	UnitPrice       float64 `json:"unit_price" db:"unit_price"`
+	DiscountPercent float64 `json:"discount_percentage" db:"discount_percentage"`
+	TaxID           *int    `json:"tax_id,omitempty" db:"tax_id"`
+	TaxAmount       float64 `json:"tax_amount" db:"tax_amount"`
+	LineTotal       float64 `json:"line_total" db:"line_total"`
+}
+
 type QuoteItem struct {
 	QuoteItemID     int      `json:"quote_item_id" db:"quote_item_id"`
 	QuoteID         int      `json:"quote_id" db:"quote_id"`
@@ -62,4 +75,8 @@ type UpdateQuoteRequest struct {
 	Status     *string    `json:"status,omitempty"`
 	Notes      *string    `json:"notes,omitempty"`
 	ValidUntil *time.Time `json:"valid_until,omitempty"`
+}
+
+type ShareQuoteRequest struct {
+	Email string `json:"email" validate:"required,email"`
 }

@@ -833,7 +833,7 @@ func (s *SalesService) CreateQuote(companyID, locationID, userID int, req *model
 		CustomerID:  req.CustomerID,
 		QuoteDate:   time.Now(),
 		Status:      "draft",
-		Items:       []models.QuoteDetail{},
+		Items:       []models.QuoteItem{},
 		CreatedBy:   userID,
 	}
 	return quote, nil

@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-type Holiday struct {
+type HolidayDetail struct {
 	HolidayID   int       `json:"holiday_id" db:"holiday_id"`
 	CompanyID   int       `json:"company_id" db:"company_id"`
 	Date        time.Time `json:"date" db:"date"`

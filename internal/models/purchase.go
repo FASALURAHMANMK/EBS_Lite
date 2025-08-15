@@ -192,10 +192,9 @@ type GoodsReceiptItem struct {
 	UnitPrice           float64  `json:"unit_price" db:"unit_price"`
 	LineTotal           float64  `json:"line_total" db:"line_total"`
 	Product             *Product `json:"product,omitempty"`
-	ReceiptItemID    int     `json:"receipt_item_id" db:"receipt_item_id"`
-	ReceiptID        int     `json:"receipt_id" db:"receipt_id"`
-	PurchaseDetailID int     `json:"purchase_detail_id" db:"purchase_detail_id"`
-	ReceivedQuantity float64 `json:"received_quantity" db:"received_quantity"`
+	ReceiptItemID       int      `json:"receipt_item_id" db:"receipt_item_id"`
+	ReceiptID           int      `json:"receipt_id" db:"receipt_id"`
+	PurchaseDetailID    int      `json:"purchase_detail_id" db:"purchase_detail_id"`
 }
 
 type RecordGoodsReceiptRequest struct {
