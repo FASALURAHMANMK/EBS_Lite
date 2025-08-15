@@ -480,6 +480,38 @@ func (s *ReturnsService) getSaleReturnItems(returnID int) ([]models.SaleReturnDe
 	return items, nil
 }
 
+func (s *ReturnsService) GetReturnedQuantitiesBySaleDetail(saleID int) (map[int]float64, error) {
+	query := `
+                SELECT srd.sale_detail_id, COALESCE(SUM(srd.quantity), 0) as returned_quantity
+                FROM sale_return_details srd
+                JOIN sale_returns sr ON srd.return_id = sr.return_id
+                WHERE sr.sale_id = $1 AND sr.status = 'COMPLETED' AND srd.sale_detail_id IS NOT NULL
+                GROUP BY srd.sale_detail_id
+        `
+
+	rows, err := s.db.Query(query, saleID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get returned quantities: %w", err)
+	}
+	defer rows.Close()
+
+	results := make(map[int]float64)
+	for rows.Next() {
+		var saleDetailID int
+		var quantity float64
+		if err := rows.Scan(&saleDetailID, &quantity); err != nil {
+			return nil, fmt.Errorf("failed to scan returned quantity: %w", err)
+		}
+		results[saleDetailID] = quantity
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate returned quantities: %w", err)
+	}
+
+	return results, nil
+}
+
 func (s *ReturnsService) validateReturnItem(saleID, productID int, returnQuantity float64) (bool, error) {
 	// Get original sale quantity
 	var originalQuantity float64
