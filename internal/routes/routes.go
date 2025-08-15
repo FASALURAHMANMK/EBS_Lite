@@ -56,6 +56,8 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 	languageHandler := handlers.NewLanguageHandler()
 	translationHandler := handlers.NewTranslationHandler()
 	printHandler := handlers.NewPrintHandler()
+	numberingSequenceHandler := handlers.NewNumberingSequenceHandler()
+	invoiceTemplateHandler := handlers.NewInvoiceTemplateHandler()
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -527,6 +529,28 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 			{
 				translations.GET("", middleware.RequirePermission("VIEW_TRANSLATIONS"), translationHandler.GetTranslations)
 				translations.PUT("", middleware.RequirePermission("MANAGE_TRANSLATIONS"), translationHandler.UpdateTranslations)
+			}
+
+			// Numbering sequence routes
+			numberingSequences := protected.Group("/numbering-sequences")
+			numberingSequences.Use(middleware.RequireCompanyAccess())
+			{
+				numberingSequences.GET("", middleware.RequirePermission("VIEW_SETTINGS"), numberingSequenceHandler.GetNumberingSequences)
+				numberingSequences.GET("/:id", middleware.RequirePermission("VIEW_SETTINGS"), numberingSequenceHandler.GetNumberingSequence)
+				numberingSequences.POST("", middleware.RequirePermission("MANAGE_SETTINGS"), numberingSequenceHandler.CreateNumberingSequence)
+				numberingSequences.PUT("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), numberingSequenceHandler.UpdateNumberingSequence)
+				numberingSequences.DELETE("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), numberingSequenceHandler.DeleteNumberingSequence)
+			}
+
+			// Invoice template routes
+			invoiceTemplates := protected.Group("/invoice-templates")
+			invoiceTemplates.Use(middleware.RequireCompanyAccess())
+			{
+				invoiceTemplates.GET("", middleware.RequirePermission("VIEW_SETTINGS"), invoiceTemplateHandler.GetInvoiceTemplates)
+				invoiceTemplates.GET("/:id", middleware.RequirePermission("VIEW_SETTINGS"), invoiceTemplateHandler.GetInvoiceTemplate)
+				invoiceTemplates.POST("", middleware.RequirePermission("MANAGE_SETTINGS"), invoiceTemplateHandler.CreateInvoiceTemplate)
+				invoiceTemplates.PUT("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), invoiceTemplateHandler.UpdateInvoiceTemplate)
+				invoiceTemplates.DELETE("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), invoiceTemplateHandler.DeleteInvoiceTemplate)
 			}
 
 			// Printing routes
