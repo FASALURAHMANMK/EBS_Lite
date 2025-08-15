@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
@@ -199,11 +200,10 @@ func (s *CompanyService) UpdateCompany(companyID int, req *models.UpdateCompanyR
 		return fmt.Errorf("no fields to update")
 	}
 
-	argCount++
 	setParts = append(setParts, "updated_at = CURRENT_TIMESTAMP")
 
 	query := fmt.Sprintf("UPDATE companies SET %s WHERE company_id = $%d",
-		fmt.Sprintf("%s", setParts), argCount)
+		strings.Join(setParts, ", "), argCount+1)
 	args = append(args, companyID)
 
 	result, err := s.db.Exec(query, args...)

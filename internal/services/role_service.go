@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
@@ -142,7 +143,7 @@ func (s *RoleService) UpdateRole(roleID int, req *models.UpdateRoleRequest) erro
 
 	argCount++
 	query := fmt.Sprintf("UPDATE roles SET %s WHERE role_id = $%d",
-		fmt.Sprintf("%s", setParts), argCount)
+		strings.Join(setParts, ", "), argCount)
 	args = append(args, roleID)
 
 	result, err := s.db.Exec(query, args...)
