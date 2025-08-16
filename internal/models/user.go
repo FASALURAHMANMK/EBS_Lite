@@ -25,21 +25,22 @@ type User struct {
 }
 
 type UserResponse struct {
-	UserID            int        `json:"user_id"`
-	Username          string     `json:"username"`
-	Email             string     `json:"email"`
-	FirstName         *string    `json:"first_name,omitempty"`
-	LastName          *string    `json:"last_name,omitempty"`
-	Phone             *string    `json:"phone,omitempty"`
-	RoleID            *int       `json:"role_id,omitempty"` // CHANGE: int -> *int
-	LocationID        *int       `json:"location_id,omitempty"`
-	CompanyID         *int       `json:"company_id,omitempty"` // CHANGE: int -> *int
-	IsActive          bool       `json:"is_active"`
-	IsLocked          bool       `json:"is_locked"`
-	PreferredLanguage *string    `json:"preferred_language,omitempty"`
-	SecondaryLanguage *string    `json:"secondary_language,omitempty"`
-	LastLogin         *time.Time `json:"last_login,omitempty"`
-	Permissions       []string   `json:"permissions,omitempty"`
+	UserID            int               `json:"user_id"`
+	Username          string            `json:"username"`
+	Email             string            `json:"email"`
+	FirstName         *string           `json:"first_name,omitempty"`
+	LastName          *string           `json:"last_name,omitempty"`
+	Phone             *string           `json:"phone,omitempty"`
+	RoleID            *int              `json:"role_id,omitempty"` // CHANGE: int -> *int
+	LocationID        *int              `json:"location_id,omitempty"`
+	CompanyID         *int              `json:"company_id,omitempty"` // CHANGE: int -> *int
+	IsActive          bool              `json:"is_active"`
+	IsLocked          bool              `json:"is_locked"`
+	PreferredLanguage *string           `json:"preferred_language,omitempty"`
+	SecondaryLanguage *string           `json:"secondary_language,omitempty"`
+	LastLogin         *time.Time        `json:"last_login,omitempty"`
+	Permissions       []string          `json:"permissions,omitempty"`
+	Preferences       map[string]string `json:"preferences,omitempty"`
 }
 type CreateUserRequest struct {
 	Username          string  `json:"username" validate:"required,min=3,max=50"`

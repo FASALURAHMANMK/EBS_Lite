@@ -60,6 +60,7 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 	invoiceTemplateHandler := handlers.NewInvoiceTemplateHandler()
 	currencyHandler := handlers.NewCurrencyHandler()
 	taxHandler := handlers.NewTaxHandler()
+	userPreferencesHandler := handlers.NewUserPreferencesHandler()
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -557,6 +558,15 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 			{
 				translations.GET("", middleware.RequirePermission("VIEW_TRANSLATIONS"), translationHandler.GetTranslations)
 				translations.PUT("", middleware.RequirePermission("MANAGE_TRANSLATIONS"), translationHandler.UpdateTranslations)
+			}
+
+			// User preferences routes
+			userPrefs := protected.Group("/user-preferences")
+			{
+				userPrefs.GET("", userPreferencesHandler.GetPreferences)
+				userPrefs.PUT("", userPreferencesHandler.UpsertPreference)
+				userPrefs.PATCH("", userPreferencesHandler.UpsertPreference)
+				userPrefs.DELETE("/:key", userPreferencesHandler.DeletePreference)
 			}
 
 			// Numbering sequence routes
