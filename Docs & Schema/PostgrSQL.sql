@@ -1182,7 +1182,9 @@ CREATE POLICY collections_rls ON collections FOR ALL TO authenticated
 CREATE TABLE workflow_templates (
     workflow_id SERIAL PRIMARY KEY,
     name VARCHAR(100),
-    description TEXT
+    description TEXT,
+    created_by INT NOT NULL REFERENCES users(user_id),
+    updated_by INT REFERENCES users(user_id)
 );
 
 CREATE TABLE workflow_states (
@@ -1190,7 +1192,9 @@ CREATE TABLE workflow_states (
     workflow_id INT REFERENCES workflow_templates(workflow_id),
     state_name VARCHAR(100),
     sequence INT,
-    is_final BOOLEAN DEFAULT FALSE
+    is_final BOOLEAN DEFAULT FALSE,
+    created_by INT NOT NULL REFERENCES users(user_id),
+    updated_by INT REFERENCES users(user_id)
 );
 
 CREATE TABLE workflow_approvals (
@@ -1199,7 +1203,9 @@ CREATE TABLE workflow_approvals (
     approver_role_id INT REFERENCES roles(role_id),
     status VARCHAR(50),
     remarks TEXT,
-    approved_at TIMESTAMP
+    approved_at TIMESTAMP,
+    created_by INT NOT NULL REFERENCES users(user_id),
+    updated_by INT REFERENCES users(user_id)
 );
 
 ALTER TABLE workflow_templates ENABLE ROW LEVEL SECURITY;

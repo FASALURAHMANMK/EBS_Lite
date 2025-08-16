@@ -11,6 +11,8 @@ type WorkflowRequest struct {
 	Status         string     `json:"status" db:"status"`
 	Remarks        *string    `json:"remarks,omitempty" db:"remarks"`
 	ApprovedAt     *time.Time `json:"approved_at,omitempty" db:"approved_at"`
+	CreatedBy      int        `json:"created_by" db:"created_by"`
+	UpdatedBy      *int       `json:"updated_by,omitempty" db:"updated_by"`
 }
 
 // CreateWorkflowRequest is used to submit a new workflow approval request
