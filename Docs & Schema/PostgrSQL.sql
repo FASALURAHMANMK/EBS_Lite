@@ -1141,46 +1141,220 @@ CREATE POLICY products_rls ON products FOR ALL TO authenticated
   WITH CHECK (company_id = current_setting('app.current_company_id')::int);
 
 CREATE POLICY sales_rls ON sales FOR ALL TO authenticated
-  USING (location_id = current_setting('app.current_location_id')::int)
-  WITH CHECK (location_id = current_setting('app.current_location_id')::int);
+  USING (
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id = sales.location_id
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id = sales.location_id
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  );
 
 CREATE POLICY quotes_rls ON quotes FOR ALL TO authenticated
-  USING (location_id = current_setting('app.current_location_id')::int)
-  WITH CHECK (location_id = current_setting('app.current_location_id')::int);
+  USING (
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id = quotes.location_id
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id = quotes.location_id
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  );
 
 CREATE POLICY purchases_rls ON purchases FOR ALL TO authenticated
-  USING (location_id = current_setting('app.current_location_id')::int)
-  WITH CHECK (location_id = current_setting('app.current_location_id')::int);
+  USING (
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id = purchases.location_id
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id = purchases.location_id
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  );
 
 CREATE POLICY sale_returns_rls ON sale_returns FOR ALL TO authenticated
-  USING (location_id = current_setting('app.current_location_id')::int)
-  WITH CHECK (location_id = current_setting('app.current_location_id')::int);
+  USING (
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id = sale_returns.location_id
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id = sale_returns.location_id
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  );
 
 CREATE POLICY purchase_orders_rls ON purchase_orders FOR ALL TO authenticated
-  USING (location_id = current_setting('app.current_location_id')::int)
-  WITH CHECK (location_id = current_setting('app.current_location_id')::int);
+  USING (
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id = purchase_orders.location_id
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id = purchase_orders.location_id
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  );
 
 CREATE POLICY purchase_returns_rls ON purchase_returns FOR ALL TO authenticated
-  USING (location_id = current_setting('app.current_location_id')::int)
-  WITH CHECK (location_id = current_setting('app.current_location_id')::int);
+  USING (
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id = purchase_returns.location_id
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id = purchase_returns.location_id
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  );
 
 CREATE POLICY goods_receipts_rls ON goods_receipts FOR ALL TO authenticated
-  USING (location_id = current_setting('app.current_location_id')::int)
-  WITH CHECK (location_id = current_setting('app.current_location_id')::int);
+  USING (
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id = goods_receipts.location_id
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id = goods_receipts.location_id
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  );
 
 CREATE POLICY stock_transfers_rls ON stock_transfers FOR ALL TO authenticated
   USING (
-    from_location_id = current_setting('app.current_location_id')::int OR
-    to_location_id   = current_setting('app.current_location_id')::int
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id IN (stock_transfers.from_location_id, stock_transfers.to_location_id)
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
   )
   WITH CHECK (
-    from_location_id = current_setting('app.current_location_id')::int OR
-    to_location_id   = current_setting('app.current_location_id')::int
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id IN (stock_transfers.from_location_id, stock_transfers.to_location_id)
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
   );
 
 CREATE POLICY collections_rls ON collections FOR ALL TO authenticated
-  USING (location_id = current_setting('app.current_location_id')::int)
-  WITH CHECK (location_id = current_setting('app.current_location_id')::int);
+  USING (
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id = collections.location_id
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM locations l
+      WHERE l.location_id = collections.location_id
+        AND l.company_id = current_setting('app.current_company_id')::int
+        AND (
+          l.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  );
 
 CREATE TABLE workflow_templates (
     workflow_id SERIAL PRIMARY KEY,
@@ -1216,16 +1390,82 @@ ALTER TABLE workflow_states ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workflow_approvals ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY workflow_templates_rls ON workflow_templates FOR ALL TO authenticated
-  USING (true)
-  WITH CHECK (true);
+  USING (
+    EXISTS (
+      SELECT 1 FROM users u
+      WHERE u.user_id = workflow_templates.created_by
+        AND u.company_id = current_setting('app.current_company_id')::int
+        AND (
+          u.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users u
+      WHERE u.user_id = workflow_templates.created_by
+        AND u.company_id = current_setting('app.current_company_id')::int
+        AND (
+          u.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  );
 
 CREATE POLICY workflow_states_rls ON workflow_states FOR ALL TO authenticated
-  USING (true)
-  WITH CHECK (true);
+  USING (
+    EXISTS (
+      SELECT 1 FROM workflow_templates wt
+      JOIN users u ON u.user_id = wt.created_by
+      WHERE wt.workflow_id = workflow_states.workflow_id
+        AND u.company_id = current_setting('app.current_company_id')::int
+        AND (
+          u.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM workflow_templates wt
+      JOIN users u ON u.user_id = wt.created_by
+      WHERE wt.workflow_id = workflow_states.workflow_id
+        AND u.company_id = current_setting('app.current_company_id')::int
+        AND (
+          u.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  );
 
 CREATE POLICY workflow_approvals_rls ON workflow_approvals FOR ALL TO authenticated
-  USING (true)
-  WITH CHECK (true);
+  USING (
+    EXISTS (
+      SELECT 1 FROM workflow_states ws
+      JOIN workflow_templates wt ON wt.workflow_id = ws.workflow_id
+      JOIN users u ON u.user_id = wt.created_by
+      WHERE ws.state_id = workflow_approvals.state_id
+        AND u.company_id = current_setting('app.current_company_id')::int
+        AND (
+          u.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM workflow_states ws
+      JOIN workflow_templates wt ON wt.workflow_id = ws.workflow_id
+      JOIN users u ON u.user_id = wt.created_by
+      WHERE ws.state_id = workflow_approvals.state_id
+        AND u.company_id = current_setting('app.current_company_id')::int
+        AND (
+          u.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  );
 
 ALTER TABLE stock_transfers ADD COLUMN workflow_state_id INT REFERENCES workflow_states(state_id);
 
