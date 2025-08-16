@@ -823,6 +823,9 @@ CREATE TABLE settings (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Example: limit active device sessions per user
+-- INSERT INTO settings (company_id, key, value, data_type) VALUES (1, 'max_sessions', '{"value":5}', 'INT');
+
 -- Translations Table
 CREATE TABLE translations (
     translation_id SERIAL PRIMARY KEY,

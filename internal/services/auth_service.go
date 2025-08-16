@@ -45,6 +45,25 @@ func (s *AuthService) Login(req *models.LoginRequest) (*models.LoginResponse, er
 		return nil, fmt.Errorf("invalid credentials")
 	}
 
+	// Enforce session limit
+	if user.CompanyID != nil {
+		settingsSvc := NewSettingsService()
+		maxSessions, err := settingsSvc.GetMaxSessions(*user.CompanyID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get session limit: %w", err)
+		}
+		if maxSessions > 0 {
+			var active int
+			err = s.db.QueryRow(`SELECT COUNT(*) FROM device_sessions WHERE user_id=$1 AND is_active=TRUE`, user.UserID).Scan(&active)
+			if err != nil {
+				return nil, fmt.Errorf("failed to count active sessions: %w", err)
+			}
+			if active >= maxSessions {
+				return nil, fmt.Errorf("maximum active sessions reached")
+			}
+		}
+	}
+
 	// Generate tokens
 	accessToken, err := utils.GenerateAccessToken(user, 24*time.Hour)
 	if err != nil {
@@ -61,6 +80,12 @@ func (s *AuthService) Login(req *models.LoginRequest) (*models.LoginResponse, er
 	if err != nil {
 		// Log error but don't fail the login
 		fmt.Printf("Failed to update last login: %v\n", err)
+	}
+
+	// Create device session
+	_, err = s.db.Exec(`INSERT INTO device_sessions (user_id, device_id) VALUES ($1,$2)`, user.UserID, uuid.NewString())
+	if err != nil {
+		fmt.Printf("Failed to create device session: %v\n", err)
 	}
 
 	// Get user permissions

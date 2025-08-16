@@ -195,6 +195,56 @@ func (h *SettingsHandler) UpdateDeviceControlSettings(c *gin.Context) {
 	utils.SuccessResponse(c, "Device control settings updated successfully", nil)
 }
 
+// Session limit settings
+func (h *SettingsHandler) GetSessionLimit(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	max, err := h.service.GetMaxSessions(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get session limit", err)
+		return
+	}
+	utils.SuccessResponse(c, "Session limit retrieved successfully", gin.H{"max_sessions": max})
+}
+
+func (h *SettingsHandler) SetSessionLimit(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	var req models.SessionLimitRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+	if err := h.service.SetMaxSessions(companyID, req.MaxSessions); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update session limit", err)
+		return
+	}
+	utils.SuccessResponse(c, "Session limit updated successfully", nil)
+}
+
+func (h *SettingsHandler) DeleteSessionLimit(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	if err := h.service.DeleteMaxSessions(companyID); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to delete session limit", err)
+		return
+	}
+	utils.SuccessResponse(c, "Session limit deleted successfully", nil)
+}
+
 // Payment methods CRUD
 func (h *SettingsHandler) GetPaymentMethods(c *gin.Context) {
 	companyID := c.GetInt("company_id")

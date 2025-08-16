@@ -102,6 +102,40 @@ func (s *SettingsService) updateJSONSetting(companyID int, key string, cfg inter
 	return s.UpdateSettings(companyID, map[string]models.JSONB{key: value})
 }
 
+// Session limit settings
+func (s *SettingsService) GetMaxSessions(companyID int) (int, error) {
+	var value models.JSONB
+	err := s.db.QueryRow(`SELECT value FROM settings WHERE company_id=$1 AND key='max_sessions'`, companyID).Scan(&value)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to get max sessions: %w", err)
+	}
+	if v, ok := value["value"]; ok {
+		switch num := v.(type) {
+		case float64:
+			return int(num), nil
+		case int:
+			return num, nil
+		}
+	}
+	return 0, nil
+}
+
+func (s *SettingsService) SetMaxSessions(companyID, max int) error {
+	value := models.JSONB{"value": max}
+	return s.UpdateSettings(companyID, map[string]models.JSONB{"max_sessions": value})
+}
+
+func (s *SettingsService) DeleteMaxSessions(companyID int) error {
+	_, err := s.db.Exec(`DELETE FROM settings WHERE company_id=$1 AND key='max_sessions'`, companyID)
+	if err != nil {
+		return fmt.Errorf("failed to delete max sessions: %w", err)
+	}
+	return nil
+}
+
 // Company settings
 func (s *SettingsService) GetCompanySettings(companyID int) (*models.CompanySettings, error) {
 	var cfg models.CompanySettings

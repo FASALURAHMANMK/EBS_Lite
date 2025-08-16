@@ -69,3 +69,8 @@ type PaymentMethodRequest struct {
 	ExternalIntegration *JSONB `json:"external_integration,omitempty"`
 	IsActive            bool   `json:"is_active"`
 }
+
+// SessionLimitRequest is used to create or update maximum session limits
+type SessionLimitRequest struct {
+	MaxSessions int `json:"max_sessions" validate:"required"`
+}
