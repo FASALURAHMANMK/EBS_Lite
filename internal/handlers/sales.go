@@ -130,8 +130,19 @@ func (h *SalesHandler) CreateSale(c *gin.Context) {
 		return
 	}
 
+	// Calculate totals to validate paid amount
+	_, _, totalAmount, err := h.salesService.CalculateTotals(&req)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to calculate totals", err)
+		return
+	}
+
 	if req.PaidAmount < 0 {
 		utils.ValidationErrorResponse(c, map[string]string{"paid_amount": "must be non-negative"})
+		return
+	}
+	if req.PaidAmount > totalAmount {
+		utils.ValidationErrorResponse(c, map[string]string{"paid_amount": "cannot exceed total_amount"})
 		return
 	}
 
@@ -143,6 +154,10 @@ func (h *SalesHandler) CreateSale(c *gin.Context) {
 		}
 		if err.Error() == "paid amount cannot exceed total amount" {
 			utils.ValidationErrorResponse(c, map[string]string{"paid_amount": "cannot exceed total_amount"})
+			return
+		}
+		if err.Error() == "paid amount cannot be negative" {
+			utils.ValidationErrorResponse(c, map[string]string{"paid_amount": "must be non-negative"})
 			return
 		}
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create sale", err)

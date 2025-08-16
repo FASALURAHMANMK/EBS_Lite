@@ -22,6 +22,33 @@ func NewSalesService() *SalesService {
 	}
 }
 
+// CalculateTotals computes the subtotal, total tax, and final total for a sale
+// request. It is used by handlers for validation and internally by the service
+// before persisting a sale.
+func (s *SalesService) CalculateTotals(req *models.CreateSaleRequest) (float64, float64, float64, error) {
+	subtotal := float64(0)
+	totalTax := float64(0)
+
+	for _, item := range req.Items {
+		lineTotal := item.Quantity * item.UnitPrice
+		discountAmount := lineTotal * (item.DiscountPercent / 100)
+		lineTotal -= discountAmount
+		subtotal += lineTotal
+
+		if item.TaxID != nil {
+			taxAmount, err := s.calculateTax(lineTotal, *item.TaxID)
+			if err != nil {
+				return 0, 0, 0, fmt.Errorf("failed to calculate tax: %w", err)
+			}
+			totalTax += taxAmount
+		}
+	}
+
+	totalAmount := subtotal + totalTax - req.DiscountAmount
+
+	return subtotal, totalTax, totalAmount, nil
+}
+
 func (s *SalesService) GetSales(companyID, locationID int, filters map[string]string) ([]models.Sale, error) {
 	query := `
 		SELECT s.sale_id, s.sale_number, s.location_id, s.customer_id, s.sale_date, s.sale_time,
@@ -355,29 +382,14 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 	// Add promotion discount to existing discount
 	req.DiscountAmount += totalDiscount
 
-	// Calculate totals
-	subtotal := float64(0)
-	totalTax := float64(0)
-
-	for _, item := range req.Items {
-		lineTotal := item.Quantity * item.UnitPrice
-		discountAmount := lineTotal * (item.DiscountPercent / 100)
-		lineTotal -= discountAmount
-		subtotal += lineTotal
-
-		// Calculate tax if tax_id is provided
-		if item.TaxID != nil {
-			taxAmount, err := s.calculateTax(lineTotal, *item.TaxID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to calculate tax: %w", err)
-			}
-			totalTax += taxAmount
-		}
+	subtotal, totalTax, totalAmount, err := s.CalculateTotals(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate totals: %w", err)
 	}
 
-	totalAmount := subtotal + totalTax - req.DiscountAmount
-
-	// Validate paid amount does not exceed total amount
+	if req.PaidAmount < 0 {
+		return nil, fmt.Errorf("paid amount cannot be negative")
+	}
 	if req.PaidAmount > totalAmount {
 		return nil, fmt.Errorf("paid amount cannot exceed total amount")
 	}
