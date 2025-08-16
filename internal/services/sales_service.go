@@ -377,6 +377,11 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 
 	totalAmount := subtotal + totalTax - req.DiscountAmount
 
+	// Validate paid amount does not exceed total amount
+	if req.PaidAmount > totalAmount {
+		return nil, fmt.Errorf("paid amount cannot exceed total amount")
+	}
+
 	// Start transaction
 	tx, err := s.db.Begin()
 	if err != nil {
