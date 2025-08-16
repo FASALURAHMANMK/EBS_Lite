@@ -43,7 +43,8 @@ func (h *WorkflowHandler) CreateWorkflowRequest(c *gin.Context) {
 		return
 	}
 
-	request, err := h.service.CreateRequest(&req)
+	userID := c.GetInt("user_id")
+	request, err := h.service.CreateRequest(userID, &req)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create workflow request", err)
 		return
@@ -65,7 +66,8 @@ func (h *WorkflowHandler) ApproveWorkflowRequest(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.ApproveRequest(id, req.Remarks); err != nil {
+	userID := c.GetInt("user_id")
+	if err := h.service.ApproveRequest(id, userID, req.Remarks); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to approve workflow request", err)
 		return
 	}
@@ -86,7 +88,8 @@ func (h *WorkflowHandler) RejectWorkflowRequest(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.RejectRequest(id, req.Remarks); err != nil {
+	userID := c.GetInt("user_id")
+	if err := h.service.RejectRequest(id, userID, req.Remarks); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to reject workflow request", err)
 		return
 	}
