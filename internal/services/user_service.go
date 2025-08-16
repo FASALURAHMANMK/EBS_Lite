@@ -125,54 +125,70 @@ func (s *UserService) CreateUser(req *models.CreateUserRequest) (*models.UserRes
 }
 
 func (s *UserService) UpdateUser(userID int, req *models.UpdateUserRequest) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
 	setParts := []string{}
 	args := []interface{}{}
 	argCount := 0
+	changes := models.JSONB{}
 
 	if req.FirstName != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("first_name = $%d", argCount))
 		args = append(args, *req.FirstName)
+		changes["first_name"] = *req.FirstName
 	}
 	if req.LastName != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("last_name = $%d", argCount))
 		args = append(args, *req.LastName)
+		changes["last_name"] = *req.LastName
 	}
 	if req.Phone != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("phone = $%d", argCount))
 		args = append(args, *req.Phone)
+		changes["phone"] = *req.Phone
 	}
 	if req.IsActive != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("is_active = $%d", argCount))
 		args = append(args, *req.IsActive)
+		changes["is_active"] = *req.IsActive
 	}
 	if req.IsLocked != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("is_locked = $%d", argCount))
 		args = append(args, *req.IsLocked)
+		changes["is_locked"] = *req.IsLocked
 	}
 	if req.RoleID != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("role_id = $%d", argCount))
 		args = append(args, *req.RoleID)
+		changes["role_id"] = *req.RoleID
 	}
 	if req.LocationID != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("location_id = $%d", argCount))
 		args = append(args, *req.LocationID)
+		changes["location_id"] = *req.LocationID
 	}
 	if req.PreferredLanguage != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("preferred_language = $%d", argCount))
 		args = append(args, *req.PreferredLanguage)
+		changes["preferred_language"] = *req.PreferredLanguage
 	}
 	if req.SecondaryLanguage != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("secondary_language = $%d", argCount))
 		args = append(args, *req.SecondaryLanguage)
+		changes["secondary_language"] = *req.SecondaryLanguage
 	}
 
 	if len(setParts) == 0 {
@@ -185,7 +201,7 @@ func (s *UserService) UpdateUser(userID int, req *models.UpdateUserRequest) erro
 		strings.Join(setParts, ", "), argCount+1)
 	args = append(args, userID)
 
-	result, err := s.db.Exec(query, args...)
+	result, err := tx.Exec(query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update user: %w", err)
 	}
@@ -199,7 +215,14 @@ func (s *UserService) UpdateUser(userID int, req *models.UpdateUserRequest) erro
 		return fmt.Errorf("user not found")
 	}
 
-	return nil
+	if len(changes) > 0 {
+		recordID := userID
+		if err := LogAudit(tx, "UPDATE", "users", &recordID, nil, nil, nil, &changes, nil, nil); err != nil {
+			return fmt.Errorf("failed to log audit: %w", err)
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (s *UserService) DeleteUser(userID int) error {
