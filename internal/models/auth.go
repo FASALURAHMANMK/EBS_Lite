@@ -3,13 +3,16 @@ package models
 import "time"
 
 type LoginRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required"`
+	Email      string  `json:"email" validate:"required,email"`
+	Password   string  `json:"password" validate:"required"`
+	DeviceID   string  `json:"device_id" validate:"required"`
+	DeviceName *string `json:"device_name,omitempty"`
 }
 
 type LoginResponse struct {
 	AccessToken  string       `json:"access_token"`
 	RefreshToken string       `json:"refresh_token"`
+	SessionID    string       `json:"session_id"`
 	User         UserResponse `json:"user"`
 }
 

@@ -9,6 +9,7 @@ import (
 	"erp-backend/internal/models"
 	"erp-backend/internal/utils"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type AuthService struct {
@@ -21,7 +22,7 @@ func NewAuthService() *AuthService {
 	}
 }
 
-func (s *AuthService) Login(req *models.LoginRequest) (*models.LoginResponse, error) {
+func (s *AuthService) Login(req *models.LoginRequest, ipAddress, userAgent string) (*models.LoginResponse, error) {
 	// Get user by email
 	user, err := s.getUserByEmail(req.Email)
 	if err != nil {
@@ -53,13 +54,27 @@ func (s *AuthService) Login(req *models.LoginRequest) (*models.LoginResponse, er
 			return nil, fmt.Errorf("failed to get session limit: %w", err)
 		}
 		if maxSessions > 0 {
-			var active int
-			err = s.db.QueryRow(`SELECT COUNT(*) FROM device_sessions WHERE user_id=$1 AND is_active=TRUE`, user.UserID).Scan(&active)
+			rows, err := s.db.Query(`SELECT session_id FROM device_sessions WHERE user_id=$1 AND is_active=TRUE ORDER BY last_seen ASC`, user.UserID)
 			if err != nil {
-				return nil, fmt.Errorf("failed to count active sessions: %w", err)
+				return nil, fmt.Errorf("failed to query active sessions: %w", err)
 			}
-			if active >= maxSessions {
-				return nil, fmt.Errorf("maximum active sessions reached")
+			defer rows.Close()
+
+			var sessionIDs []string
+			for rows.Next() {
+				var id string
+				if err := rows.Scan(&id); err != nil {
+					return nil, fmt.Errorf("failed to scan session id: %w", err)
+				}
+				sessionIDs = append(sessionIDs, id)
+			}
+
+			if len(sessionIDs) >= maxSessions {
+				toRevoke := len(sessionIDs) - maxSessions + 1
+				revokeIDs := sessionIDs[:toRevoke]
+				if _, err = s.db.Exec(`UPDATE device_sessions SET is_active=FALSE WHERE session_id = ANY($1)`, pq.Array(revokeIDs)); err != nil {
+					return nil, fmt.Errorf("failed to revoke old sessions: %w", err)
+				}
 			}
 		}
 	}
@@ -83,7 +98,16 @@ func (s *AuthService) Login(req *models.LoginRequest) (*models.LoginResponse, er
 	}
 
 	// Create device session
-	_, err = s.db.Exec(`INSERT INTO device_sessions (user_id, device_id) VALUES ($1,$2)`, user.UserID, uuid.NewString())
+	var sessionID string
+	var ipVal interface{}
+	if ipAddress != "" {
+		ipVal = ipAddress
+	}
+	var uaVal interface{}
+	if userAgent != "" {
+		uaVal = userAgent
+	}
+	err = s.db.QueryRow(`INSERT INTO device_sessions (user_id, device_id, device_name, ip_address, user_agent) VALUES ($1,$2,$3,$4,$5) RETURNING session_id`, user.UserID, req.DeviceID, req.DeviceName, ipVal, uaVal).Scan(&sessionID)
 	if err != nil {
 		fmt.Printf("Failed to create device session: %v\n", err)
 	}
@@ -117,6 +141,7 @@ func (s *AuthService) Login(req *models.LoginRequest) (*models.LoginResponse, er
 	return &models.LoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
+		SessionID:    sessionID,
 		User:         userResponse,
 	}, nil
 }

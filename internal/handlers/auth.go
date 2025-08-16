@@ -35,8 +35,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	ipAddress := c.ClientIP()
+	userAgent := c.GetHeader("User-Agent")
+
 	// Authenticate user
-	response, err := h.authService.Login(&req)
+	response, err := h.authService.Login(&req, ipAddress, userAgent)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusUnauthorized, "Authentication failed", err)
 		return
