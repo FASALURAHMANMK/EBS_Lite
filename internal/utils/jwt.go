@@ -22,9 +22,10 @@ func InitializeJWT(secret string) {
 }
 
 // GenerateAccessToken creates a new access token
-func GenerateAccessToken(user *models.User, expiry time.Duration) (string, error) {
+func GenerateAccessToken(user *models.User, sessionID string, expiry time.Duration) (string, error) {
 	claims := &Claims{
 		JWTClaims: models.JWTClaims{
+			SessionID:  sessionID,
 			UserID:     user.UserID,
 			CompanyID:  user.CompanyID,
 			LocationID: user.LocationID,
@@ -44,9 +45,10 @@ func GenerateAccessToken(user *models.User, expiry time.Duration) (string, error
 }
 
 // GenerateRefreshToken creates a new refresh token
-func GenerateRefreshToken(user *models.User, expiry time.Duration) (string, error) {
+func GenerateRefreshToken(user *models.User, sessionID string, expiry time.Duration) (string, error) {
 	claims := &Claims{
 		JWTClaims: models.JWTClaims{
+			SessionID:  sessionID,
 			UserID:     user.UserID,
 			CompanyID:  user.CompanyID,
 			LocationID: user.LocationID,

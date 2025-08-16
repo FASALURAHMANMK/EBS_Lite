@@ -79,24 +79,6 @@ func (s *AuthService) Login(req *models.LoginRequest, ipAddress, userAgent strin
 		}
 	}
 
-	// Generate tokens
-	accessToken, err := utils.GenerateAccessToken(user, 24*time.Hour)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate access token: %w", err)
-	}
-
-	refreshToken, err := utils.GenerateRefreshToken(user, 7*24*time.Hour)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
-	}
-
-	// Update last login
-	err = s.updateLastLogin(user.UserID)
-	if err != nil {
-		// Log error but don't fail the login
-		fmt.Printf("Failed to update last login: %v\n", err)
-	}
-
 	// Create device session
 	var sessionID string
 	var ipVal interface{}
@@ -110,6 +92,24 @@ func (s *AuthService) Login(req *models.LoginRequest, ipAddress, userAgent strin
 	err = s.db.QueryRow(`INSERT INTO device_sessions (user_id, device_id, device_name, ip_address, user_agent) VALUES ($1,$2,$3,$4,$5) RETURNING session_id`, user.UserID, req.DeviceID, req.DeviceName, ipVal, uaVal).Scan(&sessionID)
 	if err != nil {
 		fmt.Printf("Failed to create device session: %v\n", err)
+	}
+
+	// Generate tokens
+	accessToken, err := utils.GenerateAccessToken(user, sessionID, 24*time.Hour)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate access token: %w", err)
+	}
+
+	refreshToken, err := utils.GenerateRefreshToken(user, sessionID, 7*24*time.Hour)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
+	}
+
+	// Update last login
+	err = s.updateLastLogin(user.UserID)
+	if err != nil {
+		// Log error but don't fail the login
+		fmt.Printf("Failed to update last login: %v\n", err)
 	}
 
 	// Get user permissions
@@ -175,7 +175,7 @@ func (s *AuthService) RefreshToken(req *models.RefreshTokenRequest) (*models.Ref
 	}
 
 	// Generate new access token
-	accessToken, err := utils.GenerateAccessToken(user, 24*time.Hour)
+	accessToken, err := utils.GenerateAccessToken(user, claims.SessionID, 24*time.Hour)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}

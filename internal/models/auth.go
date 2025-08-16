@@ -39,6 +39,7 @@ type ChangePasswordRequest struct {
 }
 
 type JWTClaims struct {
+	SessionID  string `json:"session_id,omitempty"`
 	UserID     int    `json:"user_id"`
 	CompanyID  *int   `json:"company_id,omitempty"` // CHANGE: int -> *int
 	LocationID *int   `json:"location_id,omitempty"`
