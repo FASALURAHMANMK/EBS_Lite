@@ -3,10 +3,11 @@ package models
 import "time"
 
 type LoginRequest struct {
-	Email      string  `json:"email" validate:"required,email"`
-	Password   string  `json:"password" validate:"required"`
-	DeviceID   string  `json:"device_id" validate:"required"`
-	DeviceName *string `json:"device_name,omitempty"`
+	Email              string  `json:"email" validate:"required,email"`
+	Password           string  `json:"password" validate:"required"`
+	DeviceID           string  `json:"device_id" validate:"required"`
+	DeviceName         *string `json:"device_name,omitempty"`
+	IncludePreferences bool    `json:"include_preferences,omitempty"`
 }
 
 type LoginResponse struct {

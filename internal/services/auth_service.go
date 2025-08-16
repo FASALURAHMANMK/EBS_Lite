@@ -120,10 +120,13 @@ func (s *AuthService) Login(req *models.LoginRequest, ipAddress, userAgent strin
 		permissions = []string{}
 	}
 
-	prefsSvc := NewUserPreferencesService()
-	prefs, err := prefsSvc.GetPreferences(user.UserID)
-	if err != nil {
-		prefs = map[string]string{}
+	var prefs map[string]string
+	if req.IncludePreferences {
+		prefsSvc := NewUserPreferencesService()
+		prefs, err = prefsSvc.GetPreferences(user.UserID)
+		if err != nil {
+			prefs = map[string]string{}
+		}
 	}
 
 	userResponse := models.UserResponse{
@@ -269,9 +272,10 @@ func (s *AuthService) GetMe(userID int) (*models.UserResponse, error) {
 		permissions = []string{}
 	}
 
+	// Fetch user preferences to include in response
 	prefsSvc := NewUserPreferencesService()
-	prefs, err := prefsSvc.GetPreferences(userID)
-	if err != nil {
+	prefs, prefsErr := prefsSvc.GetPreferences(userID)
+	if prefsErr != nil {
 		prefs = map[string]string{}
 	}
 
