@@ -1105,6 +1105,12 @@ ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sale_returns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE purchase_returns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE goods_receipts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stock_transfers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE collections ENABLE ROW LEVEL SECURITY;
 
 -- Tenant isolation policies
 CREATE POLICY companies_rls ON companies FOR ALL TO authenticated
@@ -1143,6 +1149,36 @@ CREATE POLICY purchases_rls ON purchases FOR ALL TO authenticated
   USING (location_id = current_setting('app.current_location_id')::int)
   WITH CHECK (location_id = current_setting('app.current_location_id')::int);
 
+CREATE POLICY sale_returns_rls ON sale_returns FOR ALL TO authenticated
+  USING (location_id = current_setting('app.current_location_id')::int)
+  WITH CHECK (location_id = current_setting('app.current_location_id')::int);
+
+CREATE POLICY purchase_orders_rls ON purchase_orders FOR ALL TO authenticated
+  USING (location_id = current_setting('app.current_location_id')::int)
+  WITH CHECK (location_id = current_setting('app.current_location_id')::int);
+
+CREATE POLICY purchase_returns_rls ON purchase_returns FOR ALL TO authenticated
+  USING (location_id = current_setting('app.current_location_id')::int)
+  WITH CHECK (location_id = current_setting('app.current_location_id')::int);
+
+CREATE POLICY goods_receipts_rls ON goods_receipts FOR ALL TO authenticated
+  USING (location_id = current_setting('app.current_location_id')::int)
+  WITH CHECK (location_id = current_setting('app.current_location_id')::int);
+
+CREATE POLICY stock_transfers_rls ON stock_transfers FOR ALL TO authenticated
+  USING (
+    from_location_id = current_setting('app.current_location_id')::int OR
+    to_location_id   = current_setting('app.current_location_id')::int
+  )
+  WITH CHECK (
+    from_location_id = current_setting('app.current_location_id')::int OR
+    to_location_id   = current_setting('app.current_location_id')::int
+  );
+
+CREATE POLICY collections_rls ON collections FOR ALL TO authenticated
+  USING (location_id = current_setting('app.current_location_id')::int)
+  WITH CHECK (location_id = current_setting('app.current_location_id')::int);
+
 CREATE TABLE workflow_templates (
     workflow_id SERIAL PRIMARY KEY,
     name VARCHAR(100),
@@ -1165,6 +1201,22 @@ CREATE TABLE workflow_approvals (
     remarks TEXT,
     approved_at TIMESTAMP
 );
+
+ALTER TABLE workflow_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workflow_states ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workflow_approvals ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY workflow_templates_rls ON workflow_templates FOR ALL TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+CREATE POLICY workflow_states_rls ON workflow_states FOR ALL TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+CREATE POLICY workflow_approvals_rls ON workflow_approvals FOR ALL TO authenticated
+  USING (true)
+  WITH CHECK (true);
 
 ALTER TABLE stock_transfers ADD COLUMN workflow_state_id INT REFERENCES workflow_states(state_id);
 
