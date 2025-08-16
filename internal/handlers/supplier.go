@@ -81,6 +81,7 @@ func (h *SupplierHandler) CreateSupplier(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
+	userID := c.GetInt("user_id")
 
 	var req models.CreateSupplierRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -95,7 +96,7 @@ func (h *SupplierHandler) CreateSupplier(c *gin.Context) {
 		return
 	}
 
-	supplier, err := h.supplierService.CreateSupplier(companyID, &req)
+	supplier, err := h.supplierService.CreateSupplier(companyID, userID, &req)
 	if err != nil {
 		if err.Error() == "supplier with this name already exists" {
 			utils.ConflictResponse(c, "Supplier with this name already exists")
@@ -115,6 +116,7 @@ func (h *SupplierHandler) UpdateSupplier(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
+	userID := c.GetInt("user_id")
 
 	supplierID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -135,7 +137,7 @@ func (h *SupplierHandler) UpdateSupplier(c *gin.Context) {
 		return
 	}
 
-	err = h.supplierService.UpdateSupplier(supplierID, companyID, &req)
+	err = h.supplierService.UpdateSupplier(supplierID, companyID, userID, &req)
 	if err != nil {
 		if err.Error() == "supplier not found" {
 			utils.NotFoundResponse(c, "Supplier not found")
@@ -159,6 +161,7 @@ func (h *SupplierHandler) DeleteSupplier(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
+	userID := c.GetInt("user_id")
 
 	supplierID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -166,7 +169,7 @@ func (h *SupplierHandler) DeleteSupplier(c *gin.Context) {
 		return
 	}
 
-	err = h.supplierService.DeleteSupplier(supplierID, companyID)
+	err = h.supplierService.DeleteSupplier(supplierID, companyID, userID)
 	if err != nil {
 		if err.Error() == "supplier not found" {
 			utils.NotFoundResponse(c, "Supplier not found")

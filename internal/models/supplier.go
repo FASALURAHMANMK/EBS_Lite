@@ -16,6 +16,8 @@ type Supplier struct {
 	PaymentTerms  int     `json:"payment_terms" db:"payment_terms"`
 	CreditLimit   float64 `json:"credit_limit" db:"credit_limit"`
 	IsActive      bool    `json:"is_active" db:"is_active"`
+	CreatedBy     int     `json:"created_by" db:"created_by"`
+	UpdatedBy     *int    `json:"updated_by,omitempty" db:"updated_by"`
 	SyncModel
 }
 

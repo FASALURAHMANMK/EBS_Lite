@@ -138,6 +138,8 @@ CREATE TABLE categories (
     description TEXT,
     parent_id INTEGER REFERENCES categories(category_id),
     is_active BOOLEAN DEFAULT TRUE,
+    created_by INT NOT NULL REFERENCES users(user_id),
+    updated_by INT REFERENCES users(user_id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -149,6 +151,8 @@ CREATE TABLE brands (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     is_active BOOLEAN DEFAULT TRUE,
+    created_by INT NOT NULL REFERENCES users(user_id),
+    updated_by INT REFERENCES users(user_id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -190,6 +194,8 @@ CREATE TABLE products (
     dimensions VARCHAR(100),
     is_serialized BOOLEAN DEFAULT FALSE,
     is_active BOOLEAN DEFAULT TRUE,
+    created_by INT NOT NULL REFERENCES users(user_id),
+    updated_by INT REFERENCES users(user_id),
     sync_status VARCHAR(20) DEFAULT 'synced',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -217,6 +223,8 @@ CREATE TABLE suppliers (
     payment_terms INTEGER DEFAULT 0, -- Days
     credit_limit NUMERIC(12,2) DEFAULT 0,
     is_active BOOLEAN DEFAULT TRUE,
+    created_by INT NOT NULL REFERENCES users(user_id),
+    updated_by INT REFERENCES users(user_id),
     sync_status VARCHAR(20) DEFAULT 'synced',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -234,6 +242,8 @@ CREATE TABLE customers (
     credit_limit NUMERIC(12,2) DEFAULT 0,
     payment_terms INTEGER DEFAULT 0, -- Days
     is_active BOOLEAN DEFAULT TRUE,
+    created_by INT NOT NULL REFERENCES users(user_id),
+    updated_by INT REFERENCES users(user_id),
     sync_status VARCHAR(20) DEFAULT 'synced',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

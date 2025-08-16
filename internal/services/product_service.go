@@ -21,12 +21,12 @@ func NewProductService() *ProductService {
 
 func (s *ProductService) GetProducts(companyID int, filters map[string]string) ([]models.Product, error) {
 	query := `
-		SELECT product_id, company_id, category_id, brand_id, unit_id, name, sku, barcode,
-			   description, cost_price, selling_price, reorder_level, weight, dimensions,
-			   is_serialized, is_active, sync_status, created_at, updated_at, is_deleted
-		FROM products 
-		WHERE company_id = $1 AND is_deleted = FALSE
-	`
+                SELECT product_id, company_id, category_id, brand_id, unit_id, name, sku, barcode,
+                           description, cost_price, selling_price, reorder_level, weight, dimensions,
+                           is_serialized, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted
+                FROM products
+                WHERE company_id = $1 AND is_deleted = FALSE
+        `
 
 	args := []interface{}{companyID}
 	argCount := 1
@@ -65,8 +65,8 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 			&product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
 			&product.UnitID, &product.Name, &product.SKU, &product.Barcode, &product.Description,
 			&product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
-			&product.Dimensions, &product.IsSerialized, &product.IsActive, &product.SyncStatus,
-			&product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
+			&product.Dimensions, &product.IsSerialized, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
+			&product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan product: %w", err)
@@ -79,20 +79,20 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 
 func (s *ProductService) GetProductByID(productID, companyID int) (*models.Product, error) {
 	query := `
-		SELECT product_id, company_id, category_id, brand_id, unit_id, name, sku, barcode,
-			   description, cost_price, selling_price, reorder_level, weight, dimensions,
-			   is_serialized, is_active, sync_status, created_at, updated_at, is_deleted
-		FROM products 
-		WHERE product_id = $1 AND company_id = $2 AND is_deleted = FALSE
-	`
+                SELECT product_id, company_id, category_id, brand_id, unit_id, name, sku, barcode,
+                           description, cost_price, selling_price, reorder_level, weight, dimensions,
+                           is_serialized, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted
+                FROM products
+                WHERE product_id = $1 AND company_id = $2 AND is_deleted = FALSE
+        `
 
 	var product models.Product
 	err := s.db.QueryRow(query, productID, companyID).Scan(
 		&product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
 		&product.UnitID, &product.Name, &product.SKU, &product.Barcode, &product.Description,
 		&product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
-		&product.Dimensions, &product.IsSerialized, &product.IsActive, &product.SyncStatus,
-		&product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
+		&product.Dimensions, &product.IsSerialized, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
+		&product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
 	)
 
 	if err == sql.ErrNoRows {
@@ -105,7 +105,7 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
 	return &product, nil
 }
 
-func (s *ProductService) CreateProduct(companyID int, req *models.CreateProductRequest) (*models.Product, error) {
+func (s *ProductService) CreateProduct(companyID, userID int, req *models.CreateProductRequest) (*models.Product, error) {
 	// Check for duplicate SKU or barcode if provided
 	if req.SKU != nil || req.Barcode != nil {
 		exists, err := s.checkProductExists(companyID, req.SKU, req.Barcode, 0)
@@ -118,18 +118,19 @@ func (s *ProductService) CreateProduct(companyID int, req *models.CreateProductR
 	}
 
 	query := `
-		INSERT INTO products (
-			company_id, category_id, brand_id, unit_id, name, sku, barcode, description,
-			cost_price, selling_price, reorder_level, weight, dimensions, is_serialized
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-		RETURNING product_id, created_at
-	`
+                INSERT INTO products (
+                        company_id, category_id, brand_id, unit_id, name, sku, barcode, description,
+                        cost_price, selling_price, reorder_level, weight, dimensions, is_serialized,
+                        created_by, updated_by
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15)
+                RETURNING product_id, created_at
+        `
 
 	var product models.Product
 	err := s.db.QueryRow(query,
 		companyID, req.CategoryID, req.BrandID, req.UnitID, req.Name, req.SKU, req.Barcode,
 		req.Description, req.CostPrice, req.SellingPrice, req.ReorderLevel, req.Weight,
-		req.Dimensions, req.IsSerialized,
+		req.Dimensions, req.IsSerialized, userID,
 	).Scan(&product.ProductID, &product.CreatedAt)
 
 	if err != nil {
@@ -152,11 +153,13 @@ func (s *ProductService) CreateProduct(companyID int, req *models.CreateProductR
 	product.Dimensions = req.Dimensions
 	product.IsSerialized = req.IsSerialized
 	product.IsActive = true
+	product.CreatedBy = userID
+	product.UpdatedBy = &userID
 
 	return &product, nil
 }
 
-func (s *ProductService) UpdateProduct(productID, companyID int, req *models.UpdateProductRequest) error {
+func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *models.UpdateProductRequest) error {
 	// Check for duplicate SKU or barcode if provided
 	if req.SKU != nil || req.Barcode != nil {
 		exists, err := s.checkProductExists(companyID, req.SKU, req.Barcode, productID)
@@ -248,10 +251,12 @@ func (s *ProductService) UpdateProduct(productID, companyID int, req *models.Upd
 	}
 
 	argCount++
+	setParts = append(setParts, fmt.Sprintf("updated_by = $%d", argCount))
+	args = append(args, userID)
 	setParts = append(setParts, "updated_at = CURRENT_TIMESTAMP")
 
 	query := fmt.Sprintf("UPDATE products SET %s WHERE product_id = $%d AND company_id = $%d",
-		strings.Join(setParts, ", "), argCount, argCount+1)
+		strings.Join(setParts, ", "), argCount+1, argCount+2)
 	args = append(args, productID, companyID)
 
 	result, err := s.db.Exec(query, args...)
@@ -271,11 +276,11 @@ func (s *ProductService) UpdateProduct(productID, companyID int, req *models.Upd
 	return nil
 }
 
-func (s *ProductService) DeleteProduct(productID, companyID int) error {
-	query := `UPDATE products SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP 
-			  WHERE product_id = $1 AND company_id = $2`
+func (s *ProductService) DeleteProduct(productID, companyID, userID int) error {
+	query := `UPDATE products SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP, updated_by = $3
+                          WHERE product_id = $1 AND company_id = $2`
 
-	result, err := s.db.Exec(query, productID, companyID)
+	result, err := s.db.Exec(query, productID, companyID, userID)
 	if err != nil {
 		return fmt.Errorf("failed to delete product: %w", err)
 	}
@@ -295,11 +300,11 @@ func (s *ProductService) DeleteProduct(productID, companyID int) error {
 // Categories
 func (s *ProductService) GetCategories(companyID int) ([]models.Category, error) {
 	query := `
-		SELECT category_id, company_id, name, description, parent_id, is_active, created_at, updated_at
-		FROM categories 
-		WHERE company_id = $1 AND is_active = TRUE
-		ORDER BY name
-	`
+                SELECT category_id, company_id, name, description, parent_id, is_active, created_by, updated_by, created_at, updated_at
+                FROM categories
+                WHERE company_id = $1 AND is_active = TRUE
+                ORDER BY name
+        `
 
 	rows, err := s.db.Query(query, companyID)
 	if err != nil {
@@ -312,7 +317,7 @@ func (s *ProductService) GetCategories(companyID int) ([]models.Category, error)
 		var category models.Category
 		err := rows.Scan(
 			&category.CategoryID, &category.CompanyID, &category.Name, &category.Description,
-			&category.ParentID, &category.IsActive, &category.CreatedAt, &category.UpdatedAt,
+			&category.ParentID, &category.IsActive, &category.CreatedBy, &category.UpdatedBy, &category.CreatedAt, &category.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan category: %w", err)
@@ -323,15 +328,15 @@ func (s *ProductService) GetCategories(companyID int) ([]models.Category, error)
 	return categories, nil
 }
 
-func (s *ProductService) CreateCategory(companyID int, req *models.CreateCategoryRequest) (*models.Category, error) {
+func (s *ProductService) CreateCategory(companyID, userID int, req *models.CreateCategoryRequest) (*models.Category, error) {
 	query := `
-		INSERT INTO categories (company_id, name, description, parent_id)
-		VALUES ($1, $2, $3, $4)
-		RETURNING category_id, created_at
-	`
+                INSERT INTO categories (company_id, name, description, parent_id, created_by, updated_by)
+                VALUES ($1, $2, $3, $4, $5, $5)
+                RETURNING category_id, created_at
+        `
 
 	var category models.Category
-	err := s.db.QueryRow(query, companyID, req.Name, req.Description, req.ParentID).Scan(
+	err := s.db.QueryRow(query, companyID, req.Name, req.Description, req.ParentID, userID).Scan(
 		&category.CategoryID, &category.CreatedAt)
 
 	if err != nil {
@@ -343,6 +348,8 @@ func (s *ProductService) CreateCategory(companyID int, req *models.CreateCategor
 	category.Description = req.Description
 	category.ParentID = req.ParentID
 	category.IsActive = true
+	category.CreatedBy = userID
+	category.UpdatedBy = &userID
 
 	return &category, nil
 }
@@ -350,11 +357,11 @@ func (s *ProductService) CreateCategory(companyID int, req *models.CreateCategor
 // Brands
 func (s *ProductService) GetBrands(companyID int) ([]models.Brand, error) {
 	query := `
-		SELECT brand_id, company_id, name, description, is_active, created_at, updated_at
-		FROM brands 
-		WHERE company_id = $1 AND is_active = TRUE
-		ORDER BY name
-	`
+                SELECT brand_id, company_id, name, description, is_active, created_by, updated_by, created_at, updated_at
+                FROM brands
+                WHERE company_id = $1 AND is_active = TRUE
+                ORDER BY name
+        `
 
 	rows, err := s.db.Query(query, companyID)
 	if err != nil {
@@ -367,7 +374,7 @@ func (s *ProductService) GetBrands(companyID int) ([]models.Brand, error) {
 		var brand models.Brand
 		err := rows.Scan(
 			&brand.BrandID, &brand.CompanyID, &brand.Name, &brand.Description,
-			&brand.IsActive, &brand.CreatedAt, &brand.UpdatedAt,
+			&brand.IsActive, &brand.CreatedBy, &brand.UpdatedBy, &brand.CreatedAt, &brand.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan brand: %w", err)
@@ -378,15 +385,15 @@ func (s *ProductService) GetBrands(companyID int) ([]models.Brand, error) {
 	return brands, nil
 }
 
-func (s *ProductService) CreateBrand(companyID int, req *models.CreateBrandRequest) (*models.Brand, error) {
+func (s *ProductService) CreateBrand(companyID, userID int, req *models.CreateBrandRequest) (*models.Brand, error) {
 	query := `
-		INSERT INTO brands (company_id, name, description)
-		VALUES ($1, $2, $3)
-		RETURNING brand_id, created_at
-	`
+                INSERT INTO brands (company_id, name, description, created_by, updated_by)
+                VALUES ($1, $2, $3, $4, $4)
+                RETURNING brand_id, created_at
+        `
 
 	var brand models.Brand
-	err := s.db.QueryRow(query, companyID, req.Name, req.Description).Scan(
+	err := s.db.QueryRow(query, companyID, req.Name, req.Description, userID).Scan(
 		&brand.BrandID, &brand.CreatedAt)
 
 	if err != nil {
@@ -397,6 +404,8 @@ func (s *ProductService) CreateBrand(companyID int, req *models.CreateBrandReque
 	brand.Name = req.Name
 	brand.Description = req.Description
 	brand.IsActive = true
+	brand.CreatedBy = userID
+	brand.UpdatedBy = &userID
 
 	return &brand, nil
 }

@@ -11,6 +11,8 @@ type Customer struct {
 	CreditLimit        float64                    `json:"credit_limit" db:"credit_limit"`
 	PaymentTerms       int                        `json:"payment_terms" db:"payment_terms"` // Days
 	IsActive           bool                       `json:"is_active" db:"is_active"`
+	CreatedBy          int                        `json:"created_by" db:"created_by"`
+	UpdatedBy          *int                       `json:"updated_by,omitempty" db:"updated_by"`
 	OutstandingBalance float64                    `json:"outstanding_balance,omitempty" db:"-"`
 	Invoices           []CustomerInvoiceReference `json:"invoices,omitempty" db:"-"`
 	SyncModel
