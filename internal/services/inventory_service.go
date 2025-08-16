@@ -158,15 +158,19 @@ func (s *InventoryService) CreateStockTransfer(companyID, fromLocationID, userID
 		return nil, err
 	}
 
-	// Generate transfer number
-	transferNumber := fmt.Sprintf("TXF-%d-%d", time.Now().Unix(), fromLocationID)
-
 	// Start transaction
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback()
+
+	// Generate transfer number using numbering sequence
+	ns := NewNumberingSequenceService()
+	transferNumber, err := ns.NextNumber(tx, "stock_transfer", companyID, &fromLocationID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate transfer number: %w", err)
+	}
 
 	// Create transfer
 	var transferID int

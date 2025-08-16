@@ -180,3 +180,40 @@ func (s *NumberingSequenceService) checkLocationBelongsToCompany(companyID, loca
 	}
 	return count > 0, nil
 }
+
+// NextNumber retrieves the next formatted number for the given sequence and
+// persists the incremented value within the provided transaction. It locks the
+// sequence row using FOR UPDATE to ensure atomicity across concurrent calls.
+func (s *NumberingSequenceService) NextNumber(tx *sql.Tx, sequenceName string, companyID int, locationID *int) (string, error) {
+	// Build query to fetch sequence with row-level lock
+	query := `SELECT sequence_id, prefix, sequence_length, current_number
+                 FROM numbering_sequences
+                 WHERE name = $1 AND company_id = $2`
+	args := []interface{}{sequenceName, companyID}
+	if locationID != nil {
+		query += " AND (location_id = $3 OR location_id IS NULL)"
+		args = append(args, *locationID)
+	}
+	query += " FOR UPDATE"
+
+	var seqID, seqLen, current int
+	var prefix sql.NullString
+	if err := tx.QueryRow(query, args...).Scan(&seqID, &prefix, &seqLen, &current); err != nil {
+		if err == sql.ErrNoRows {
+			return "", fmt.Errorf("numbering sequence not found")
+		}
+		return "", fmt.Errorf("failed to get numbering sequence: %w", err)
+	}
+
+	current++
+	if _, err := tx.Exec(`UPDATE numbering_sequences SET current_number = $1, updated_at = CURRENT_TIMESTAMP WHERE sequence_id = $2`, current, seqID); err != nil {
+		return "", fmt.Errorf("failed to update numbering sequence: %w", err)
+	}
+
+	prefixStr := ""
+	if prefix.Valid {
+		prefixStr = prefix.String
+	}
+
+	return fmt.Sprintf("%s%0*d", prefixStr, seqLen, current), nil
+}

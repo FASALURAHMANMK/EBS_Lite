@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"time"
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
@@ -177,9 +176,6 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 		}
 	}
 
-	// Generate return number
-	returnNumber := fmt.Sprintf("RET-%d-%d", time.Now().Unix(), locationID)
-
 	// Calculate total amount
 	totalAmount := float64(0)
 	for _, item := range req.Items {
@@ -193,14 +189,20 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 	}
 	defer tx.Rollback()
 
+	ns := NewNumberingSequenceService()
+	returnNumber, err := ns.NextNumber(tx, "sale_return", companyID, &locationID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate return number: %w", err)
+	}
+
 	// Create return
 	var returnID int
 	err = tx.QueryRow(`
-                INSERT INTO sale_returns (return_number, sale_id, location_id, customer_id, return_date,
-                                                                 total_amount, reason, created_by, updated_by)
-                VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, $6, $7, $8)
-                RETURNING return_id
-        `, returnNumber, req.SaleID, locationID, customerID, totalAmount, req.Reason, userID, userID).Scan(&returnID)
+               INSERT INTO sale_returns (return_number, sale_id, location_id, customer_id, return_date,
+                                                                total_amount, reason, created_by, updated_by)
+               VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, $6, $7, $8)
+               RETURNING return_id
+       `, returnNumber, req.SaleID, locationID, customerID, totalAmount, req.Reason, userID, userID).Scan(&returnID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create return: %w", err)

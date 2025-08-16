@@ -221,8 +221,9 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 		locationID = *req.LocationID
 	}
 
-	// Generate purchase number
-	purchaseNumber, err := s.generatePurchaseNumber(tx, locationID)
+	// Generate purchase number using numbering sequence
+	ns := NewNumberingSequenceService()
+	purchaseNumber, err := ns.NextNumber(tx, "purchase", companyID, &locationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate purchase number: %w", err)
 	}
@@ -773,17 +774,4 @@ func (s *PurchaseService) ApprovePurchaseOrder(purchaseID, companyID, userID int
 func (s *PurchaseService) RecordGoodsReceipt(purchaseID, companyID, userID int, req *models.RecordGoodsReceiptRequest) error {
 	receiveReq := &models.ReceivePurchaseRequest{Items: req.Items}
 	return s.ReceivePurchase(purchaseID, companyID, userID, receiveReq)
-}
-
-func (s *PurchaseService) generatePurchaseNumber(tx *sql.Tx, locationID int) (string, error) {
-	var count int
-	err := tx.QueryRow(`
-		SELECT COUNT(*) FROM purchases 
-		WHERE location_id = $1 AND DATE(created_at) = CURRENT_DATE
-	`, locationID).Scan(&count)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("PUR-%d-%s-%04d", locationID, time.Now().Format("20060102"), count+1), nil
 }

@@ -192,8 +192,9 @@ func (s *PurchaseReturnService) CreatePurchaseReturn(companyID, locationID, user
 		return nil, fmt.Errorf("failed to verify purchase: %w", err)
 	}
 
-	// Generate return number
-	returnNumber, err := s.generateReturnNumber(tx, locationID)
+	// Generate return number using numbering sequence service
+	ns := NewNumberingSequenceService()
+	returnNumber, err := ns.NextNumber(tx, "purchase_return", companyID, &locationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate return number: %w", err)
 	}
@@ -280,17 +281,4 @@ func (s *PurchaseReturnService) CreatePurchaseReturn(companyID, locationID, user
 	returnData.CreatedBy = userID
 
 	return &returnData, nil
-}
-
-func (s *PurchaseReturnService) generateReturnNumber(tx *sql.Tx, locationID int) (string, error) {
-	var count int
-	err := tx.QueryRow(`
-		SELECT COUNT(*) FROM purchase_returns 
-		WHERE location_id = $1 AND DATE(created_at) = CURRENT_DATE
-	`, locationID).Scan(&count)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("PRET-%d-%s-%04d", locationID, time.Now().Format("20060102"), count+1), nil
 }
