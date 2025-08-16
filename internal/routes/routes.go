@@ -498,6 +498,11 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 				settings.GET("/device-control", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetDeviceControlSettings)
 				settings.PUT("/device-control", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.UpdateDeviceControlSettings)
 
+				settings.GET("/session-limit", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetSessionLimit)
+				settings.POST("/session-limit", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.SetSessionLimit)
+				settings.PUT("/session-limit", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.SetSessionLimit)
+				settings.DELETE("/session-limit", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.DeleteSessionLimit)
+
 				settings.GET("/payment-methods", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetPaymentMethods)
 				settings.POST("/payment-methods", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.CreatePaymentMethod)
 				settings.PUT("/payment-methods/:id", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.UpdatePaymentMethod)
