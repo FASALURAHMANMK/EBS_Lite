@@ -71,6 +71,7 @@ func (h *CustomerHandler) CreateCustomer(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
+	userID := c.GetInt("user_id")
 
 	var req models.CreateCustomerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -83,7 +84,7 @@ func (h *CustomerHandler) CreateCustomer(c *gin.Context) {
 		return
 	}
 
-	customer, err := h.customerService.CreateCustomer(companyID, &req)
+	customer, err := h.customerService.CreateCustomer(companyID, userID, &req)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create customer", err)
 		return
@@ -99,6 +100,7 @@ func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
+	userID := c.GetInt("user_id")
 
 	customerID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -117,7 +119,7 @@ func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
 		return
 	}
 
-	if err := h.customerService.UpdateCustomer(customerID, companyID, &req); err != nil {
+	if err := h.customerService.UpdateCustomer(customerID, companyID, userID, &req); err != nil {
 		if err.Error() == "customer not found" {
 			utils.NotFoundResponse(c, "Customer not found")
 			return
@@ -136,6 +138,7 @@ func (h *CustomerHandler) DeleteCustomer(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
+	userID := c.GetInt("user_id")
 
 	customerID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -143,7 +146,7 @@ func (h *CustomerHandler) DeleteCustomer(c *gin.Context) {
 		return
 	}
 
-	if err := h.customerService.DeleteCustomer(customerID, companyID); err != nil {
+	if err := h.customerService.DeleteCustomer(customerID, companyID, userID); err != nil {
 		if err.Error() == "customer not found" {
 			utils.NotFoundResponse(c, "Customer not found")
 			return
@@ -162,6 +165,7 @@ func (h *CustomerHandler) ImportCustomers(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
+	userID := c.GetInt("user_id")
 
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -222,7 +226,7 @@ func (h *CustomerHandler) ImportCustomers(c *gin.Context) {
 			continue
 		}
 
-		if _, err := h.customerService.CreateCustomer(companyID, &req); err == nil {
+		if _, err := h.customerService.CreateCustomer(companyID, userID, &req); err == nil {
 			created++
 		}
 	}

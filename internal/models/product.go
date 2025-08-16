@@ -17,6 +17,8 @@ type Product struct {
 	Dimensions   *string            `json:"dimensions,omitempty" db:"dimensions"`
 	IsSerialized bool               `json:"is_serialized" db:"is_serialized"`
 	IsActive     bool               `json:"is_active" db:"is_active"`
+	CreatedBy    int                `json:"created_by" db:"created_by"`
+	UpdatedBy    *int               `json:"updated_by,omitempty" db:"updated_by"`
 	Attributes   []ProductAttribute `json:"attributes,omitempty" db:"-"`
 	SyncModel
 }
@@ -61,6 +63,8 @@ type Category struct {
 	Description *string `json:"description,omitempty" db:"description"`
 	ParentID    *int    `json:"parent_id,omitempty" db:"parent_id"`
 	IsActive    bool    `json:"is_active" db:"is_active"`
+	CreatedBy   int     `json:"created_by" db:"created_by"`
+	UpdatedBy   *int    `json:"updated_by,omitempty" db:"updated_by"`
 	BaseModel
 }
 
@@ -83,6 +87,8 @@ type Brand struct {
 	Name        string  `json:"name" db:"name" validate:"required,min=2,max=255"`
 	Description *string `json:"description,omitempty" db:"description"`
 	IsActive    bool    `json:"is_active" db:"is_active"`
+	CreatedBy   int     `json:"created_by" db:"created_by"`
+	UpdatedBy   *int    `json:"updated_by,omitempty" db:"updated_by"`
 	BaseModel
 }
 

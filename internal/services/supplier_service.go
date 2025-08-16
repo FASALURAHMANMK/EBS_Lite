@@ -22,12 +22,12 @@ func NewSupplierService() *SupplierService {
 
 func (s *SupplierService) GetSuppliers(companyID int, filters map[string]string) ([]models.SupplierWithStats, error) {
 	query := `
-		SELECT s.supplier_id, s.company_id, s.name, s.contact_person, s.phone, s.email,
-			   s.address, s.tax_number, s.payment_terms, s.credit_limit, s.is_active,
-			   s.sync_status, s.created_at, s.updated_at,
-			   COALESCE(stats.total_purchases, 0) as total_purchases,
-			   COALESCE(stats.total_returns, 0) as total_returns,
-			   COALESCE(stats.outstanding_amount, 0) as outstanding_amount,
+                SELECT s.supplier_id, s.company_id, s.name, s.contact_person, s.phone, s.email,
+                          s.address, s.tax_number, s.payment_terms, s.credit_limit, s.is_active,
+                          s.created_by, s.updated_by, s.sync_status, s.created_at, s.updated_at,
+                          COALESCE(stats.total_purchases, 0) as total_purchases,
+                          COALESCE(stats.total_returns, 0) as total_returns,
+                          COALESCE(stats.outstanding_amount, 0) as outstanding_amount,
 			   stats.last_purchase_date
 		FROM suppliers s
 		LEFT JOIN (
@@ -78,7 +78,7 @@ func (s *SupplierService) GetSuppliers(companyID int, filters map[string]string)
 			&supplier.SupplierID, &supplier.CompanyID, &supplier.Name, &supplier.ContactPerson,
 			&supplier.Phone, &supplier.Email, &supplier.Address, &supplier.TaxNumber,
 			&supplier.PaymentTerms, &supplier.CreditLimit, &supplier.IsActive,
-			&supplier.SyncStatus, &supplier.CreatedAt, &supplier.UpdatedAt,
+			&supplier.CreatedBy, &supplier.UpdatedBy, &supplier.SyncStatus, &supplier.CreatedAt, &supplier.UpdatedAt,
 			&supplier.TotalPurchases, &supplier.TotalReturns, &supplier.OutstandingAmount,
 			&supplier.LastPurchaseDate,
 		)
@@ -94,12 +94,12 @@ func (s *SupplierService) GetSuppliers(companyID int, filters map[string]string)
 
 func (s *SupplierService) GetSupplierByID(supplierID, companyID int) (*models.SupplierWithStats, error) {
 	query := `
-		SELECT s.supplier_id, s.company_id, s.name, s.contact_person, s.phone, s.email,
-			   s.address, s.tax_number, s.payment_terms, s.credit_limit, s.is_active,
-			   s.sync_status, s.created_at, s.updated_at,
-			   COALESCE(stats.total_purchases, 0) as total_purchases,
-			   COALESCE(stats.total_returns, 0) as total_returns,
-			   COALESCE(stats.outstanding_amount, 0) as outstanding_amount,
+                SELECT s.supplier_id, s.company_id, s.name, s.contact_person, s.phone, s.email,
+                          s.address, s.tax_number, s.payment_terms, s.credit_limit, s.is_active,
+                          s.created_by, s.updated_by, s.sync_status, s.created_at, s.updated_at,
+                          COALESCE(stats.total_purchases, 0) as total_purchases,
+                          COALESCE(stats.total_returns, 0) as total_returns,
+                          COALESCE(stats.outstanding_amount, 0) as outstanding_amount,
 			   stats.last_purchase_date
 		FROM suppliers s
 		LEFT JOIN (
@@ -121,7 +121,7 @@ func (s *SupplierService) GetSupplierByID(supplierID, companyID int) (*models.Su
 		&supplier.SupplierID, &supplier.CompanyID, &supplier.Name, &supplier.ContactPerson,
 		&supplier.Phone, &supplier.Email, &supplier.Address, &supplier.TaxNumber,
 		&supplier.PaymentTerms, &supplier.CreditLimit, &supplier.IsActive,
-		&supplier.SyncStatus, &supplier.CreatedAt, &supplier.UpdatedAt,
+		&supplier.CreatedBy, &supplier.UpdatedBy, &supplier.SyncStatus, &supplier.CreatedAt, &supplier.UpdatedAt,
 		&supplier.TotalPurchases, &supplier.TotalReturns, &supplier.OutstandingAmount,
 		&supplier.LastPurchaseDate,
 	)
@@ -135,7 +135,7 @@ func (s *SupplierService) GetSupplierByID(supplierID, companyID int) (*models.Su
 	return &supplier, nil
 }
 
-func (s *SupplierService) CreateSupplier(companyID int, req *models.CreateSupplierRequest) (*models.Supplier, error) {
+func (s *SupplierService) CreateSupplier(companyID, userID int, req *models.CreateSupplierRequest) (*models.Supplier, error) {
 	// Check if supplier with same name already exists
 	var existingID int
 	err := s.db.QueryRow(`
@@ -161,16 +161,16 @@ func (s *SupplierService) CreateSupplier(companyID int, req *models.CreateSuppli
 
 	// Insert supplier
 	insertQuery := `
-		INSERT INTO suppliers (company_id, name, contact_person, phone, email, address,
-							  tax_number, payment_terms, credit_limit, is_active)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		RETURNING supplier_id, created_at
-	`
+                INSERT INTO suppliers (company_id, name, contact_person, phone, email, address,
+                                                          tax_number, payment_terms, credit_limit, is_active, created_by, updated_by)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
+                RETURNING supplier_id, created_at
+        `
 
 	var supplier models.Supplier
 	err = s.db.QueryRow(insertQuery,
 		companyID, req.Name, req.ContactPerson, req.Phone, req.Email, req.Address,
-		req.TaxNumber, paymentTerms, creditLimit, true,
+		req.TaxNumber, paymentTerms, creditLimit, true, userID,
 	).Scan(&supplier.SupplierID, &supplier.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert supplier: %w", err)
@@ -187,11 +187,13 @@ func (s *SupplierService) CreateSupplier(companyID int, req *models.CreateSuppli
 	supplier.PaymentTerms = paymentTerms
 	supplier.CreditLimit = creditLimit
 	supplier.IsActive = true
+	supplier.CreatedBy = userID
+	supplier.UpdatedBy = &userID
 
 	return &supplier, nil
 }
 
-func (s *SupplierService) UpdateSupplier(supplierID, companyID int, req *models.UpdateSupplierRequest) error {
+func (s *SupplierService) UpdateSupplier(supplierID, companyID, userID int, req *models.UpdateSupplierRequest) error {
 	// Verify supplier exists and belongs to company
 	var exists bool
 	err := s.db.QueryRow("SELECT TRUE FROM suppliers WHERE supplier_id = $1 AND company_id = $2",
@@ -280,10 +282,13 @@ func (s *SupplierService) UpdateSupplier(supplierID, companyID int, req *models.
 		return nil // No updates requested
 	}
 
-	// Add updated_at
+	// Add updated_at and updated_by
 	argCount++
 	updates = append(updates, fmt.Sprintf("updated_at = $%d", argCount))
 	args = append(args, time.Now())
+	argCount++
+	updates = append(updates, fmt.Sprintf("updated_by = $%d", argCount))
+	args = append(args, userID)
 
 	// Add WHERE clause
 	argCount++
@@ -299,7 +304,7 @@ func (s *SupplierService) UpdateSupplier(supplierID, companyID int, req *models.
 	return nil
 }
 
-func (s *SupplierService) DeleteSupplier(supplierID, companyID int) error {
+func (s *SupplierService) DeleteSupplier(supplierID, companyID, userID int) error {
 	// Check if supplier has any purchases
 	var purchaseCount int
 	err := s.db.QueryRow(`
@@ -327,9 +332,9 @@ func (s *SupplierService) DeleteSupplier(supplierID, companyID int) error {
 
 	// Soft delete by deactivating
 	_, err = s.db.Exec(`
-		UPDATE suppliers SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP
-		WHERE supplier_id = $1
-	`, supplierID)
+                UPDATE suppliers SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP, updated_by = $2
+                WHERE supplier_id = $1
+        `, supplierID, userID)
 	if err != nil {
 		return fmt.Errorf("failed to delete supplier: %w", err)
 	}

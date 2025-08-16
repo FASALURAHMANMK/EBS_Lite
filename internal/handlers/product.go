@@ -86,6 +86,7 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
+	userID := c.GetInt("user_id")
 
 	var req models.CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -100,7 +101,7 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 		return
 	}
 
-	product, err := h.productService.CreateProduct(companyID, &req)
+	product, err := h.productService.CreateProduct(companyID, userID, &req)
 	if err != nil {
 		if err.Error() == "product with this SKU or barcode already exists" {
 			utils.ConflictResponse(c, "Product with this SKU or barcode already exists")
@@ -120,6 +121,7 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
+	userID := c.GetInt("user_id")
 
 	productID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -140,7 +142,7 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 		return
 	}
 
-	err = h.productService.UpdateProduct(productID, companyID, &req)
+	err = h.productService.UpdateProduct(productID, companyID, userID, &req)
 	if err != nil {
 		if err.Error() == "product not found" {
 			utils.NotFoundResponse(c, "Product not found")
@@ -164,6 +166,7 @@ func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
+	userID := c.GetInt("user_id")
 
 	productID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -171,7 +174,7 @@ func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 		return
 	}
 
-	err = h.productService.DeleteProduct(productID, companyID)
+	err = h.productService.DeleteProduct(productID, companyID, userID)
 	if err != nil {
 		if err.Error() == "product not found" {
 			utils.NotFoundResponse(c, "Product not found")
@@ -228,6 +231,7 @@ func (h *ProductHandler) CreateCategory(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
+	userID := c.GetInt("user_id")
 
 	var req models.CreateCategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -242,7 +246,7 @@ func (h *ProductHandler) CreateCategory(c *gin.Context) {
 		return
 	}
 
-	category, err := h.productService.CreateCategory(companyID, &req)
+	category, err := h.productService.CreateCategory(companyID, userID, &req)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create category", err)
 		return
@@ -275,6 +279,7 @@ func (h *ProductHandler) CreateBrand(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
+	userID := c.GetInt("user_id")
 
 	var req models.CreateBrandRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -289,7 +294,7 @@ func (h *ProductHandler) CreateBrand(c *gin.Context) {
 		return
 	}
 
-	brand, err := h.productService.CreateBrand(companyID, &req)
+	brand, err := h.productService.CreateBrand(companyID, userID, &req)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create brand", err)
 		return
