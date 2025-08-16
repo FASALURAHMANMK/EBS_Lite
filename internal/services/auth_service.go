@@ -120,6 +120,12 @@ func (s *AuthService) Login(req *models.LoginRequest, ipAddress, userAgent strin
 		permissions = []string{}
 	}
 
+	prefsSvc := NewUserPreferencesService()
+	prefs, err := prefsSvc.GetPreferences(user.UserID)
+	if err != nil {
+		prefs = map[string]string{}
+	}
+
 	userResponse := models.UserResponse{
 		UserID:            user.UserID,
 		Username:          user.Username,
@@ -136,6 +142,7 @@ func (s *AuthService) Login(req *models.LoginRequest, ipAddress, userAgent strin
 		SecondaryLanguage: user.SecondaryLanguage,
 		LastLogin:         user.LastLogin,
 		Permissions:       permissions,
+		Preferences:       prefs,
 	}
 
 	return &models.LoginResponse{
@@ -262,6 +269,12 @@ func (s *AuthService) GetMe(userID int) (*models.UserResponse, error) {
 		permissions = []string{}
 	}
 
+	prefsSvc := NewUserPreferencesService()
+	prefs, err := prefsSvc.GetPreferences(userID)
+	if err != nil {
+		prefs = map[string]string{}
+	}
+
 	return &models.UserResponse{
 		UserID:            user.UserID,
 		Username:          user.Username,
@@ -278,6 +291,7 @@ func (s *AuthService) GetMe(userID int) (*models.UserResponse, error) {
 		SecondaryLanguage: user.SecondaryLanguage,
 		LastLogin:         user.LastLogin,
 		Permissions:       permissions,
+		Preferences:       prefs,
 	}, nil
 }
 
