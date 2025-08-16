@@ -66,3 +66,25 @@ func (s *AuditLogService) GetAuditLogs(filters map[string]string) ([]models.Audi
 	}
 	return logs, nil
 }
+
+// LogAudit inserts an entry into the audit_log table within the provided transaction.
+// It captures the action performed, the table affected, and optionally the record ID,
+// acting user, and JSON representations of values or field changes along with client
+// metadata such as IP address and user agent. The operation runs inside the given
+// transaction to ensure atomicity with the calling service's changes.
+func LogAudit(tx *sql.Tx, action, table string, recordID, userID *int,
+	oldValue, newValue, fieldChanges *models.JSONB, ip, ua *string) error {
+	if tx == nil {
+		return fmt.Errorf("transaction is nil")
+	}
+
+	query := `INSERT INTO audit_log
+                (user_id, action, table_name, record_id, old_value, new_value,
+                 field_changes, ip_address, user_agent)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+
+	if _, err := tx.Exec(query, userID, action, table, recordID, oldValue, newValue, fieldChanges, ip, ua); err != nil {
+		return fmt.Errorf("failed to insert audit log: %w", err)
+	}
+	return nil
+}

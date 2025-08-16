@@ -525,24 +525,34 @@ func (s *SalesService) UpdateSale(saleID, companyID, userID int, req *models.Upd
 		return err
 	}
 
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
 	setParts := []string{}
 	args := []interface{}{}
 	argCount := 0
+	changes := models.JSONB{}
 
 	if req.PaymentMethodID != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("payment_method_id = $%d", argCount))
 		args = append(args, *req.PaymentMethodID)
+		changes["payment_method_id"] = *req.PaymentMethodID
 	}
 	if req.Notes != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("notes = $%d", argCount))
 		args = append(args, *req.Notes)
+		changes["notes"] = *req.Notes
 	}
 	if req.Status != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("status = $%d", argCount))
 		args = append(args, *req.Status)
+		changes["status"] = *req.Status
 	}
 
 	if len(setParts) == 0 {
@@ -560,7 +570,7 @@ func (s *SalesService) UpdateSale(saleID, companyID, userID int, req *models.Upd
 		strings.Join(setParts, ", "), argCount)
 	args = append(args, saleID)
 
-	result, err := s.db.Exec(query, args...)
+	result, err := tx.Exec(query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update sale: %w", err)
 	}
@@ -574,7 +584,15 @@ func (s *SalesService) UpdateSale(saleID, companyID, userID int, req *models.Upd
 		return fmt.Errorf("sale not found")
 	}
 
-	return nil
+	if len(changes) > 0 {
+		recordID := saleID
+		actorID := userID
+		if err := LogAudit(tx, "UPDATE", "sales", &recordID, &actorID, nil, nil, &changes, nil, nil); err != nil {
+			return fmt.Errorf("failed to log audit: %w", err)
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (s *SalesService) DeleteSale(saleID, companyID, userID int) error {

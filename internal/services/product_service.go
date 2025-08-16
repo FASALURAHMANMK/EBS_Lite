@@ -171,79 +171,100 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 		}
 	}
 
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
 	setParts := []string{}
 	args := []interface{}{}
 	argCount := 0
+	changes := models.JSONB{}
 
 	if req.CategoryID != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("category_id = $%d", argCount))
 		args = append(args, *req.CategoryID)
+		changes["category_id"] = *req.CategoryID
 	}
 	if req.BrandID != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("brand_id = $%d", argCount))
 		args = append(args, *req.BrandID)
+		changes["brand_id"] = *req.BrandID
 	}
 	if req.UnitID != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("unit_id = $%d", argCount))
 		args = append(args, *req.UnitID)
+		changes["unit_id"] = *req.UnitID
 	}
 	if req.Name != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("name = $%d", argCount))
 		args = append(args, *req.Name)
+		changes["name"] = *req.Name
 	}
 	if req.SKU != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("sku = $%d", argCount))
 		args = append(args, *req.SKU)
+		changes["sku"] = *req.SKU
 	}
 	if req.Barcode != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("barcode = $%d", argCount))
 		args = append(args, *req.Barcode)
+		changes["barcode"] = *req.Barcode
 	}
 	if req.Description != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("description = $%d", argCount))
 		args = append(args, *req.Description)
+		changes["description"] = *req.Description
 	}
 	if req.CostPrice != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("cost_price = $%d", argCount))
 		args = append(args, *req.CostPrice)
+		changes["cost_price"] = *req.CostPrice
 	}
 	if req.SellingPrice != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("selling_price = $%d", argCount))
 		args = append(args, *req.SellingPrice)
+		changes["selling_price"] = *req.SellingPrice
 	}
 	if req.ReorderLevel != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("reorder_level = $%d", argCount))
 		args = append(args, *req.ReorderLevel)
+		changes["reorder_level"] = *req.ReorderLevel
 	}
 	if req.Weight != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("weight = $%d", argCount))
 		args = append(args, *req.Weight)
+		changes["weight"] = *req.Weight
 	}
 	if req.Dimensions != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("dimensions = $%d", argCount))
 		args = append(args, *req.Dimensions)
+		changes["dimensions"] = *req.Dimensions
 	}
 	if req.IsSerialized != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("is_serialized = $%d", argCount))
 		args = append(args, *req.IsSerialized)
+		changes["is_serialized"] = *req.IsSerialized
 	}
 	if req.IsActive != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("is_active = $%d", argCount))
 		args = append(args, *req.IsActive)
+		changes["is_active"] = *req.IsActive
 	}
 
 	if len(setParts) == 0 {
@@ -259,7 +280,7 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 		strings.Join(setParts, ", "), argCount+1, argCount+2)
 	args = append(args, productID, companyID)
 
-	result, err := s.db.Exec(query, args...)
+	result, err := tx.Exec(query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update product: %w", err)
 	}
@@ -273,7 +294,15 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 		return fmt.Errorf("product not found")
 	}
 
-	return nil
+	if len(changes) > 0 {
+		recordID := productID
+		actorID := userID
+		if err := LogAudit(tx, "UPDATE", "products", &recordID, &actorID, nil, nil, &changes, nil, nil); err != nil {
+			return fmt.Errorf("failed to log audit: %w", err)
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (s *ProductService) DeleteProduct(productID, companyID, userID int) error {
