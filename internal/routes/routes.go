@@ -58,6 +58,7 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 	printHandler := handlers.NewPrintHandler()
 	numberingSequenceHandler := handlers.NewNumberingSequenceHandler()
 	invoiceTemplateHandler := handlers.NewInvoiceTemplateHandler()
+	currencyHandler := handlers.NewCurrencyHandler()
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -477,6 +478,17 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 				suppliers.POST("", middleware.RequirePermission("CREATE_SUPPLIERS"), supplierHandler.CreateSupplier)
 				suppliers.PUT("/:id", middleware.RequirePermission("UPDATE_SUPPLIERS"), supplierHandler.UpdateSupplier)
 				suppliers.DELETE("/:id", middleware.RequirePermission("DELETE_SUPPLIERS"), supplierHandler.DeleteSupplier)
+			}
+
+			// Currency routes
+			currencies := protected.Group("/currencies")
+			currencies.Use(middleware.RequireCompanyAccess())
+			{
+				currencies.GET("", middleware.RequirePermission("VIEW_SETTINGS"), currencyHandler.GetCurrencies)
+				currencies.POST("", middleware.RequirePermission("MANAGE_SETTINGS"), currencyHandler.CreateCurrency)
+				currencies.PUT("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), currencyHandler.UpdateCurrency)
+				currencies.PATCH("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), currencyHandler.UpdateCurrency)
+				currencies.DELETE("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), currencyHandler.DeleteCurrency)
 			}
 
 			// Settings routes
