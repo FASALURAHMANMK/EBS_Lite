@@ -355,9 +355,6 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 	// Add promotion discount to existing discount
 	req.DiscountAmount += totalDiscount
 
-	// Generate sale number
-	saleNumber := fmt.Sprintf("SALE-%d-%d", time.Now().Unix(), locationID)
-
 	// Calculate totals
 	subtotal := float64(0)
 	totalTax := float64(0)
@@ -386,6 +383,13 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback()
+
+	// Generate sale number using numbering sequence service
+	ns := NewNumberingSequenceService()
+	saleNumber, err := ns.NextNumber(tx, "sale", companyID, &locationID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate sale number: %w", err)
+	}
 
 	// Create sale
 	var saleID int
@@ -872,9 +876,25 @@ func (s *SalesService) GetQuoteByID(quoteID, companyID int) (*models.Quote, erro
 // CreateQuote creates a new quote. Currently this is an in-memory placeholder
 // without persistence.
 func (s *SalesService) CreateQuote(companyID, locationID, userID int, req *models.CreateQuoteRequest) (*models.Quote, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	ns := NewNumberingSequenceService()
+	quoteNumber, err := ns.NextNumber(tx, "quote", companyID, &locationID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate quote number: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
 	quote := &models.Quote{
 		QuoteID:     0,
-		QuoteNumber: fmt.Sprintf("QUO-%d", time.Now().Unix()),
+		QuoteNumber: quoteNumber,
 		LocationID:  locationID,
 		CustomerID:  req.CustomerID,
 		QuoteDate:   time.Now(),

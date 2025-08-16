@@ -105,8 +105,9 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 	}
 	defer tx.Rollback()
 
-	// Generate collection number
-	number, err := s.generateCollectionNumber(tx, locationID)
+	// Generate collection number using numbering sequence
+	ns := NewNumberingSequenceService()
+	number, err := ns.NextNumber(tx, "collection", companyID, &locationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate collection number: %w", err)
 	}
@@ -184,17 +185,6 @@ func (s *CollectionService) DeleteCollection(collectionID, companyID int) error 
 		return fmt.Errorf("collection not found")
 	}
 	return nil
-}
-
-func (s *CollectionService) generateCollectionNumber(tx *sql.Tx, locationID int) (string, error) {
-	var count int
-	err := tx.QueryRow(`
-                SELECT COUNT(*) FROM collections
-                WHERE location_id = $1 AND DATE(created_at) = CURRENT_DATE`, locationID).Scan(&count)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("COL-%d-%s-%04d", locationID, time.Now().Format("20060102"), count+1), nil
 }
 
 // GetCollectionByID retrieves a single collection with invoice references
