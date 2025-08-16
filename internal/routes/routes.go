@@ -59,6 +59,7 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 	numberingSequenceHandler := handlers.NewNumberingSequenceHandler()
 	invoiceTemplateHandler := handlers.NewInvoiceTemplateHandler()
 	currencyHandler := handlers.NewCurrencyHandler()
+	taxHandler := handlers.NewTaxHandler()
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -489,6 +490,16 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 				currencies.PUT("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), currencyHandler.UpdateCurrency)
 				currencies.PATCH("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), currencyHandler.UpdateCurrency)
 				currencies.DELETE("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), currencyHandler.DeleteCurrency)
+			}
+
+			// Tax routes
+			taxes := protected.Group("/taxes")
+			taxes.Use(middleware.RequireCompanyAccess())
+			{
+				taxes.GET("", middleware.RequirePermission("MANAGE_SETTINGS"), taxHandler.GetTaxes)
+				taxes.POST("", middleware.RequirePermission("MANAGE_SETTINGS"), taxHandler.CreateTax)
+				taxes.PUT("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), taxHandler.UpdateTax)
+				taxes.DELETE("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), taxHandler.DeleteTax)
 			}
 
 			// Settings routes
