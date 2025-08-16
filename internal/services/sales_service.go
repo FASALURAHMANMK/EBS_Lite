@@ -390,13 +390,13 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 	// Create sale
 	var saleID int
 	err = tx.QueryRow(`
-                INSERT INTO sales (sale_number, location_id, customer_id, sale_date, sale_time,
-                                                  subtotal, tax_amount, discount_amount, total_amount, paid_amount,
-                                                  payment_method_id, status, pos_status, is_quick_sale, notes, created_by, updated_by)
-                VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIME, $4, $5, $6, $7, $7, $8, 'COMPLETED', 'COMPLETED', FALSE, $9, $10, $10)
-                RETURNING sale_id
-        `, saleNumber, locationID, req.CustomerID, subtotal, totalTax, req.DiscountAmount,
-		totalAmount, req.PaymentMethodID, req.Notes, userID).Scan(&saleID)
+               INSERT INTO sales (sale_number, location_id, customer_id, sale_date, sale_time,
+                                                 subtotal, tax_amount, discount_amount, total_amount, paid_amount,
+                                                 payment_method_id, status, pos_status, is_quick_sale, notes, created_by, updated_by)
+               VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIME, $4, $5, $6, $7, $8, $9, 'COMPLETED', 'COMPLETED', FALSE, $10, $11, $11)
+               RETURNING sale_id
+       `, saleNumber, locationID, req.CustomerID, subtotal, totalTax, req.DiscountAmount,
+		totalAmount, req.PaidAmount, req.PaymentMethodID, req.Notes, userID).Scan(&saleID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sale: %w", err)
@@ -654,13 +654,14 @@ func (s *SalesService) CreateQuickSale(companyID, locationID, userID int, req *m
 		return nil, err
 	}
 
-	// Update to mark as quick sale
-	_, err = s.db.Exec("UPDATE sales SET is_quick_sale = TRUE WHERE sale_id = $1", sale.SaleID)
+	// Ensure quick sales are fully paid
+	_, err = s.db.Exec("UPDATE sales SET paid_amount = total_amount, is_quick_sale = TRUE WHERE sale_id = $1", sale.SaleID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to mark as quick sale: %w", err)
 	}
 
 	sale.IsQuickSale = true
+	sale.PaidAmount = sale.TotalAmount
 	return sale, nil
 }
 

@@ -105,6 +105,7 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 		Items:           req.Items,
 		PaymentMethodID: req.PaymentMethodID,
 		DiscountAmount:  req.DiscountAmount,
+		PaidAmount:      req.PaidAmount,
 	}
 
 	// Create the sale
@@ -257,15 +258,16 @@ func (s *POSService) GetPaymentMethods(companyID int) ([]models.PaymentMethod, e
 
 func (s *POSService) GetSalesSummary(companyID, locationID int, dateFrom, dateTo string) (*models.SalesSummaryResponse, error) {
 	query := `
-		SELECT 
-			COALESCE(SUM(total_amount), 0) as total_sales,
-			COUNT(*) as total_transactions,
-			COALESCE(AVG(total_amount), 0) as average_ticket
-		FROM sales s
-		JOIN locations l ON s.location_id = l.location_id
-		WHERE l.company_id = $1 AND s.location_id = $2 AND s.is_deleted = FALSE
-		AND s.status = 'COMPLETED'
-	`
+                SELECT
+                        COALESCE(SUM(total_amount), 0) as total_sales,
+                       COUNT(*) as total_transactions,
+                       COALESCE(AVG(total_amount), 0) as average_ticket,
+                       COALESCE(SUM(total_amount - paid_amount), 0) as outstanding_amount
+                FROM sales s
+                JOIN locations l ON s.location_id = l.location_id
+                WHERE l.company_id = $1 AND s.location_id = $2 AND s.is_deleted = FALSE
+                AND s.status = 'COMPLETED'
+        `
 
 	args := []interface{}{companyID, locationID}
 	argCount := 2
@@ -284,7 +286,7 @@ func (s *POSService) GetSalesSummary(companyID, locationID int, dateFrom, dateTo
 
 	var summary models.SalesSummaryResponse
 	err := s.db.QueryRow(query, args...).Scan(
-		&summary.TotalSales, &summary.TotalTransactions, &summary.AverageTicket,
+		&summary.TotalSales, &summary.TotalTransactions, &summary.AverageTicket, &summary.OutstandingAmount,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sales summary: %w", err)

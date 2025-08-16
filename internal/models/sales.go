@@ -85,6 +85,7 @@ type CreateSaleRequest struct {
 	CustomerID      *int                      `json:"customer_id,omitempty"`
 	Items           []CreateSaleDetailRequest `json:"items" validate:"required,min=1"`
 	PaymentMethodID *int                      `json:"payment_method_id,omitempty"`
+	PaidAmount      float64                   `json:"paid_amount" validate:"gte=0"`
 	DiscountAmount  float64                   `json:"discount_amount"`
 	Notes           *string                   `json:"notes,omitempty"`
 }
@@ -127,6 +128,7 @@ type POSCheckoutRequest struct {
 	Items           []CreateSaleDetailRequest `json:"items" validate:"required,min=1"`
 	PaymentMethodID *int                      `json:"payment_method_id,omitempty"`
 	DiscountAmount  float64                   `json:"discount_amount"`
+	PaidAmount      float64                   `json:"paid_amount" validate:"gte=0"`
 }
 
 type POSPrintRequest struct {
@@ -153,6 +155,7 @@ type SalesSummaryResponse struct {
 	TotalSales        float64 `json:"total_sales"`
 	TotalTransactions int     `json:"total_transactions"`
 	AverageTicket     float64 `json:"average_ticket"`
+	OutstandingAmount float64 `json:"outstanding_amount"`
 	TopProducts       []struct {
 		ProductID   int     `json:"product_id"`
 		ProductName string  `json:"product_name"`

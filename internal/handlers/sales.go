@@ -130,6 +130,11 @@ func (h *SalesHandler) CreateSale(c *gin.Context) {
 		return
 	}
 
+	if req.PaidAmount < 0 {
+		utils.ValidationErrorResponse(c, map[string]string{"paid_amount": "must be non-negative"})
+		return
+	}
+
 	sale, err := h.salesService.CreateSale(companyID, locationID, userID, &req)
 	if err != nil {
 		if err.Error() == "customer not found" {

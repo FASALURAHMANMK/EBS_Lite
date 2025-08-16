@@ -36,13 +36,14 @@ func (s *ReportsService) GetSalesSummary(companyID int, fromDate, toDate, groupB
 	}
 
 	query := fmt.Sprintf(`
-        SELECT TO_CHAR(s.sale_date, '%s') AS period,
-               SUM(s.total_amount) AS total_sales,
-               COUNT(*) AS transactions
-        FROM sales s
-        JOIN locations l ON s.location_id = l.location_id
-        WHERE l.company_id = $1 AND s.is_deleted = FALSE
-    `, dateFormat)
+       SELECT TO_CHAR(s.sale_date, '%s') AS period,
+              SUM(s.total_amount) AS total_sales,
+              COUNT(*) AS transactions,
+              SUM(s.total_amount - s.paid_amount) AS outstanding
+       FROM sales s
+       JOIN locations l ON s.location_id = l.location_id
+       WHERE l.company_id = $1 AND s.is_deleted = FALSE
+   `, dateFormat)
 
 	args := []interface{}{companyID}
 	idx := 2
@@ -68,7 +69,7 @@ func (s *ReportsService) GetSalesSummary(companyID int, fromDate, toDate, groupB
 	var summaries []models.SalesSummary
 	for rows.Next() {
 		var summary models.SalesSummary
-		if err := rows.Scan(&summary.Period, &summary.TotalSales, &summary.Transactions); err != nil {
+		if err := rows.Scan(&summary.Period, &summary.TotalSales, &summary.Transactions, &summary.Outstanding); err != nil {
 			return nil, fmt.Errorf("failed to scan sales summary: %w", err)
 		}
 		summaries = append(summaries, summary)

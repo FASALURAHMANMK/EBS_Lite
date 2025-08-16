@@ -7,6 +7,7 @@ type SalesSummary struct {
 	Period       string  `json:"period"`
 	TotalSales   float64 `json:"total_sales"`
 	Transactions int     `json:"transactions"`
+	Outstanding  float64 `json:"outstanding"`
 }
 
 // StockSummary represents stock levels and values per product/location
