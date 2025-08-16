@@ -328,7 +328,7 @@ CREATE TABLE sales (
     tax_amount NUMERIC(12,2) DEFAULT 0,
     discount_amount NUMERIC(12,2) DEFAULT 0,
     total_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
-    paid_amount NUMERIC(12,2) DEFAULT 0,
+    paid_amount NUMERIC(12,2) DEFAULT 0 CHECK (paid_amount <= total_amount),
     payment_method_id INTEGER REFERENCES payment_methods(method_id),
     status VARCHAR(50) DEFAULT 'COMPLETED' CHECK (status IN ('DRAFT', 'COMPLETED', 'VOID', 'RETURNED')),
     pos_status VARCHAR(20) DEFAULT 'COMPLETED' CHECK (pos_status IN ('HOLD', 'ACTIVE', 'COMPLETED')),

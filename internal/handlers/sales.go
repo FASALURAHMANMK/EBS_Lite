@@ -141,6 +141,10 @@ func (h *SalesHandler) CreateSale(c *gin.Context) {
 			utils.NotFoundResponse(c, "Customer not found")
 			return
 		}
+		if err.Error() == "paid amount cannot exceed total amount" {
+			utils.ValidationErrorResponse(c, map[string]string{"paid_amount": "cannot exceed total_amount"})
+			return
+		}
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create sale", err)
 		return
 	}
