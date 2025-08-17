@@ -30,7 +30,7 @@ func (s *ExpenseService) CreateExpense(companyID, locationID, userID int, req *m
 }
 
 func (s *ExpenseService) GetCategories(companyID int) ([]models.ExpenseCategory, error) {
-	rows, err := s.db.Query(`SELECT category_id, name FROM expense_categories WHERE company_id=$1 AND is_deleted=FALSE`, companyID)
+	rows, err := s.db.Query(`SELECT category_id, name, created_by, updated_by FROM expense_categories WHERE company_id=$1 AND is_deleted=FALSE`, companyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get categories: %w", err)
 	}
@@ -38,7 +38,7 @@ func (s *ExpenseService) GetCategories(companyID int) ([]models.ExpenseCategory,
 	var cats []models.ExpenseCategory
 	for rows.Next() {
 		var c models.ExpenseCategory
-		if err := rows.Scan(&c.CategoryID, &c.Name); err != nil {
+		if err := rows.Scan(&c.CategoryID, &c.Name, &c.CreatedBy, &c.UpdatedBy); err != nil {
 			return nil, fmt.Errorf("failed to scan category: %w", err)
 		}
 		cats = append(cats, c)
@@ -46,9 +46,9 @@ func (s *ExpenseService) GetCategories(companyID int) ([]models.ExpenseCategory,
 	return cats, nil
 }
 
-func (s *ExpenseService) CreateCategory(companyID int, name string) (int, error) {
+func (s *ExpenseService) CreateCategory(companyID, userID int, name string) (int, error) {
 	var id int
-	err := s.db.QueryRow(`INSERT INTO expense_categories (company_id, name) VALUES ($1,$2) RETURNING category_id`, companyID, name).Scan(&id)
+	err := s.db.QueryRow(`INSERT INTO expense_categories (company_id, name, created_by, updated_by) VALUES ($1,$2,$3,$3) RETURNING category_id`, companyID, name, userID).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create category: %w", err)
 	}
