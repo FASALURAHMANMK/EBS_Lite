@@ -433,6 +433,8 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 			vouchers := protected.Group("/vouchers")
 			vouchers.Use(middleware.RequireCompanyAccess())
 			{
+				vouchers.GET("", middleware.RequirePermission("VIEW_VOUCHERS"), voucherHandler.ListVouchers)
+				vouchers.GET("/:id", middleware.RequirePermission("VIEW_VOUCHERS"), voucherHandler.GetVoucher)
 				vouchers.POST("/:type", middleware.RequirePermission("MANAGE_VOUCHERS"), voucherHandler.CreateVoucher)
 			}
 
