@@ -227,6 +227,7 @@ func Initialize(router *gin.Engine) {
 				inventory.GET("/transfers", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockTransfers)
 				inventory.GET("/transfers/:id", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockTransfer)
 				inventory.POST("/transfers", middleware.RequirePermission("CREATE_TRANSFERS"), inventoryHandler.CreateStockTransfer)
+				inventory.PUT("/transfers/:id/approve", middleware.RequirePermission("APPROVE_TRANSFERS"), inventoryHandler.ApproveStockTransfer)
 				inventory.PUT("/transfers/:id/complete", middleware.RequirePermission("APPROVE_TRANSFERS"), inventoryHandler.CompleteStockTransfer)
 				inventory.DELETE("/transfers/:id", middleware.RequirePermission("CREATE_TRANSFERS"), inventoryHandler.CancelStockTransfer)
 			}
