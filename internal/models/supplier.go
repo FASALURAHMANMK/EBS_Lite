@@ -29,6 +29,15 @@ type SupplierWithStats struct {
 	LastPurchaseDate  *time.Time `json:"last_purchase_date,omitempty"`
 }
 
+type SupplierSummary struct {
+	SupplierID         int     `json:"supplier_id"`
+	CompanyID          int     `json:"company_id"`
+	TotalPurchases     float64 `json:"total_purchases"`
+	TotalPayments      float64 `json:"total_payments"`
+	TotalReturns       float64 `json:"total_returns"`
+	OutstandingBalance float64 `json:"outstanding_balance"`
+}
+
 // Request Models
 type CreateSupplierRequest struct {
 	Name          string   `json:"name" validate:"required,min=2,max=255"`

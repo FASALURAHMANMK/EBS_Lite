@@ -341,3 +341,47 @@ func (s *SupplierService) DeleteSupplier(supplierID, companyID, userID int) erro
 
 	return nil
 }
+
+// GetSupplierSummary retrieves aggregated purchase, payment and return totals for a supplier
+func (s *SupplierService) GetSupplierSummary(supplierID, companyID int) (*models.SupplierSummary, error) {
+	summary := &models.SupplierSummary{}
+	err := s.db.QueryRow(`
+                SELECT supplier_id, company_id, total_purchases, total_payments, total_returns, outstanding_balance
+                FROM supplier_summary
+                WHERE supplier_id = $1 AND company_id = $2
+        `, supplierID, companyID).Scan(
+		&summary.SupplierID, &summary.CompanyID, &summary.TotalPurchases,
+		&summary.TotalPayments, &summary.TotalReturns, &summary.OutstandingBalance,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("supplier not found")
+		}
+		return nil, fmt.Errorf("failed to get supplier summary: %w", err)
+	}
+	return summary, nil
+}
+
+// GetSupplierSummaries returns summary information for all suppliers in a company
+func (s *SupplierService) GetSupplierSummaries(companyID int) ([]models.SupplierSummary, error) {
+	rows, err := s.db.Query(`
+                SELECT supplier_id, company_id, total_purchases, total_payments, total_returns, outstanding_balance
+                FROM supplier_summary
+                WHERE company_id = $1
+                ORDER BY supplier_id
+        `, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get supplier summaries: %w", err)
+	}
+	defer rows.Close()
+
+	var summaries []models.SupplierSummary
+	for rows.Next() {
+		var ssum models.SupplierSummary
+		if err := rows.Scan(&ssum.SupplierID, &ssum.CompanyID, &ssum.TotalPurchases, &ssum.TotalPayments, &ssum.TotalReturns, &ssum.OutstandingBalance); err != nil {
+			return nil, fmt.Errorf("failed to scan supplier summary: %w", err)
+		}
+		summaries = append(summaries, ssum)
+	}
+	return summaries, nil
+}

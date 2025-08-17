@@ -74,6 +74,29 @@ func (h *SupplierHandler) GetSupplier(c *gin.Context) {
 	utils.SuccessResponse(c, "Supplier retrieved successfully", supplier)
 }
 
+// GET /suppliers/:id/summary
+func (h *SupplierHandler) GetSupplierSummary(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	supplierID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid supplier ID", err)
+		return
+	}
+
+	summary, err := h.supplierService.GetSupplierSummary(supplierID, companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get supplier summary", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Supplier summary retrieved successfully", summary)
+}
+
 // POST /suppliers
 func (h *SupplierHandler) CreateSupplier(c *gin.Context) {
 	companyID := c.GetInt("company_id")
