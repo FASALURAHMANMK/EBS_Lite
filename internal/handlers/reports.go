@@ -22,14 +22,27 @@ func NewReportsHandler() *ReportsHandler {
 	}
 }
 
-// handleReportResponse sends the report data or returns a not implemented
-// error if export to Excel or PDF is requested. Actual export logic will be
-// implemented in future iterations.
+// handleReportResponse streams report data or exports it to Excel/PDF based on
+// the requested format.
 func (h *ReportsHandler) handleReportResponse(c *gin.Context, message string, data interface{}) {
 	format := c.Query("format")
 	switch format {
-	case "excel", "pdf":
-		utils.ErrorResponse(c, http.StatusNotImplemented, "Export to "+format+" not implemented", nil)
+	case "excel":
+		content, err := utils.GenerateExcel(data)
+		if err != nil {
+			utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate Excel", err)
+			return
+		}
+		c.Header("Content-Disposition", "attachment; filename=report.xlsx")
+		c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", content)
+	case "pdf":
+		content, err := utils.GeneratePDF(data)
+		if err != nil {
+			utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate PDF", err)
+			return
+		}
+		c.Header("Content-Disposition", "attachment; filename=report.pdf")
+		c.Data(http.StatusOK, "application/pdf", content)
 	default:
 		utils.SuccessResponse(c, message, data)
 	}
