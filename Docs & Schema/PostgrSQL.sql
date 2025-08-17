@@ -993,6 +993,7 @@ CREATE INDEX idx_sale_returns_sale ON sale_returns(sale_id);
 CREATE INDEX idx_sale_returns_date ON sale_returns(return_date);
 CREATE INDEX idx_purchase_returns_purchase ON purchase_returns(purchase_id);
 CREATE INDEX idx_purchase_returns_date ON purchase_returns(return_date);
+CREATE INDEX idx_purchase_returns_supplier ON purchase_returns(supplier_id);
 
 -- Customers and Suppliers
 CREATE INDEX idx_customers_company ON customers(company_id);
@@ -1003,6 +1004,7 @@ CREATE INDEX idx_suppliers_phone ON suppliers(phone);
 CREATE INDEX idx_suppliers_email ON suppliers(email);
 
 -- Financial
+CREATE INDEX idx_payments_supplier ON payments(supplier_id);
 CREATE INDEX idx_collections_customer ON collections(customer_id);
 CREATE INDEX idx_collections_date ON collections(collection_date);
 CREATE INDEX idx_expenses_location ON expenses(location_id);
@@ -1869,6 +1871,20 @@ FROM sale_returns sr
 JOIN locations l ON sr.location_id = l.location_id
 WHERE sr.is_deleted = FALSE
 GROUP BY l.company_id, DATE_TRUNC('month', sr.return_date);
+
+CREATE OR REPLACE VIEW supplier_summary AS
+SELECT
+    s.supplier_id,
+    s.company_id,
+    COALESCE(SUM(p.total_amount), 0) AS total_purchases,
+    COALESCE(SUM(pay.amount), 0) AS total_payments,
+    COALESCE(SUM(pr.total_amount), 0) AS total_returns,
+    COALESCE(SUM(p.total_amount), 0) - COALESCE(SUM(pay.amount), 0) - COALESCE(SUM(pr.total_amount), 0) AS outstanding_balance
+FROM suppliers s
+LEFT JOIN purchases p ON p.supplier_id = s.supplier_id AND p.is_deleted = FALSE
+LEFT JOIN payments pay ON pay.supplier_id = s.supplier_id AND pay.is_deleted = FALSE
+LEFT JOIN purchase_returns pr ON pr.supplier_id = s.supplier_id AND pr.is_deleted = FALSE
+GROUP BY s.supplier_id, s.company_id;
 
 -- Create missing tables for loyalty and promotions functionality
 
