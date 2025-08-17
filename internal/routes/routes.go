@@ -420,6 +420,8 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 			expenses := protected.Group("/expenses")
 			expenses.Use(middleware.RequireCompanyAccess())
 			{
+				expenses.GET("", middleware.RequirePermission("VIEW_EXPENSES"), expenseHandler.GetExpenses)
+				expenses.GET("/:id", middleware.RequirePermission("VIEW_EXPENSES"), expenseHandler.GetExpense)
 				expenses.POST("", middleware.RequirePermission("CREATE_EXPENSES"), expenseHandler.CreateExpense)
 				categories := expenses.Group("/categories")
 				{

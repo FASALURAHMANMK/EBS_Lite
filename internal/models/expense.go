@@ -13,6 +13,14 @@ type Expense struct {
 	SyncModel
 }
 
+// ExpenseWithDetails includes related information for an expense
+type ExpenseWithDetails struct {
+	Expense
+	Category *ExpenseCategory `json:"category,omitempty"`
+	Location *Location        `json:"location,omitempty"`
+	Voucher  *Voucher         `json:"voucher,omitempty"`
+}
+
 type ExpenseCategory struct {
 	CategoryID int    `json:"category_id" db:"category_id"`
 	Name       string `json:"name" db:"name"`
