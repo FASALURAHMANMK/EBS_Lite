@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"io"
 	"net/http"
 	"strconv"
 
@@ -260,12 +259,7 @@ func (h *InventoryHandler) ImportInventory(c *gin.Context) {
 		return
 	}
 	defer f.Close()
-	data, err := io.ReadAll(f)
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to read file", err)
-		return
-	}
-	if err := h.inventoryService.ImportInventory(companyID, data); err != nil {
+	if err := h.inventoryService.ImportInventory(companyID, f); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to import inventory", err)
 		return
 	}
