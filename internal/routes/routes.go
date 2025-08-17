@@ -476,9 +476,10 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 			suppliers.Use(middleware.RequireCompanyAccess())
 			{
 				suppliers.GET("", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.GetSuppliers)
-				suppliers.GET("/:id", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.GetSupplier)
-
+				suppliers.POST("/import", middleware.RequirePermission("CREATE_SUPPLIERS"), supplierHandler.ImportSuppliers)
+				suppliers.GET("/export", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.ExportSuppliers)
 				suppliers.GET("/:id/summary", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.GetSupplierSummary)
+				suppliers.GET("/:id", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.GetSupplier)
 				suppliers.POST("", middleware.RequirePermission("CREATE_SUPPLIERS"), supplierHandler.CreateSupplier)
 				suppliers.PUT("/:id", middleware.RequirePermission("UPDATE_SUPPLIERS"), supplierHandler.UpdateSupplier)
 				suppliers.DELETE("/:id", middleware.RequirePermission("DELETE_SUPPLIERS"), supplierHandler.DeleteSupplier)

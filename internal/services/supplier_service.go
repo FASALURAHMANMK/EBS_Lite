@@ -1,13 +1,17 @@
 package services
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
+
+	"github.com/xuri/excelize/v2"
 )
 
 type SupplierService struct {
@@ -342,23 +346,155 @@ func (s *SupplierService) DeleteSupplier(supplierID, companyID, userID int) erro
 	return nil
 }
 
-// GetSupplierSummary retrieves aggregated purchase, payment and return totals for a supplier
+// ImportSuppliers processes supplier data from an uploaded Excel file
+func (s *SupplierService) ImportSuppliers(companyID, userID int, data []byte) (int, error) {
+	xl, err := excelize.OpenReader(bytes.NewReader(data))
+	if err != nil {
+		return 0, fmt.Errorf("invalid Excel file: %w", err)
+	}
+
+	sheetName := xl.GetSheetName(0)
+	rows, err := xl.GetRows(sheetName)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read sheet: %w", err)
+	}
+
+	created := 0
+	for i, row := range rows {
+		if i == 0 || len(row) == 0 {
+			continue
+		}
+		req := models.CreateSupplierRequest{Name: row[0]}
+		if len(row) > 1 && row[1] != "" {
+			req.ContactPerson = &row[1]
+		}
+		if len(row) > 2 && row[2] != "" {
+			req.Phone = &row[2]
+		}
+		if len(row) > 3 && row[3] != "" {
+			req.Email = &row[3]
+		}
+		if len(row) > 4 && row[4] != "" {
+			req.Address = &row[4]
+		}
+		if len(row) > 5 && row[5] != "" {
+			req.TaxNumber = &row[5]
+		}
+		if len(row) > 6 && row[6] != "" {
+			if v, err := strconv.Atoi(row[6]); err == nil {
+				req.PaymentTerms = &v
+			}
+		}
+		if len(row) > 7 && row[7] != "" {
+			if v, err := strconv.ParseFloat(row[7], 64); err == nil {
+				req.CreditLimit = &v
+			}
+		}
+		if req.Name == "" {
+			continue
+		}
+		if _, err := s.CreateSupplier(companyID, userID, &req); err == nil {
+			created++
+		}
+	}
+
+	return created, nil
+}
+
+// ExportSuppliers returns supplier data as an Excel file
+func (s *SupplierService) ExportSuppliers(companyID int) ([]byte, error) {
+	suppliers, err := s.GetSuppliers(companyID, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get suppliers: %w", err)
+	}
+
+	f := excelize.NewFile()
+	sheet := "Suppliers"
+	f.SetSheetName("Sheet1", sheet)
+
+	headers := []string{"Name", "Contact Person", "Phone", "Email", "Address", "Tax Number", "Payment Terms", "Credit Limit"}
+	for i, h := range headers {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+		f.SetCellValue(sheet, cell, h)
+	}
+
+	for idx, sup := range suppliers {
+		row := idx + 2
+		cell, _ := excelize.CoordinatesToCellName(1, row)
+		f.SetCellValue(sheet, cell, sup.Name)
+		if sup.ContactPerson != nil {
+			cell, _ = excelize.CoordinatesToCellName(2, row)
+			f.SetCellValue(sheet, cell, *sup.ContactPerson)
+		}
+		if sup.Phone != nil {
+			cell, _ = excelize.CoordinatesToCellName(3, row)
+			f.SetCellValue(sheet, cell, *sup.Phone)
+		}
+		if sup.Email != nil {
+			cell, _ = excelize.CoordinatesToCellName(4, row)
+			f.SetCellValue(sheet, cell, *sup.Email)
+		}
+		if sup.Address != nil {
+			cell, _ = excelize.CoordinatesToCellName(5, row)
+			f.SetCellValue(sheet, cell, *sup.Address)
+		}
+		if sup.TaxNumber != nil {
+			cell, _ = excelize.CoordinatesToCellName(6, row)
+			f.SetCellValue(sheet, cell, *sup.TaxNumber)
+		}
+		cell, _ = excelize.CoordinatesToCellName(7, row)
+		f.SetCellValue(sheet, cell, sup.PaymentTerms)
+		cell, _ = excelize.CoordinatesToCellName(8, row)
+		f.SetCellValue(sheet, cell, sup.CreditLimit)
+	}
+
+	buf, err := f.WriteToBuffer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate file: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+// GetSupplierSummary aggregates purchases, payments, and returns for a supplier
 func (s *SupplierService) GetSupplierSummary(supplierID, companyID int) (*models.SupplierSummary, error) {
-	summary := &models.SupplierSummary{}
-	err := s.db.QueryRow(`
-                SELECT supplier_id, company_id, total_purchases, total_payments, total_returns, outstanding_balance
-                FROM supplier_summary
-                WHERE supplier_id = $1 AND company_id = $2
-        `, supplierID, companyID).Scan(
-		&summary.SupplierID, &summary.CompanyID, &summary.TotalPurchases,
-		&summary.TotalPayments, &summary.TotalReturns, &summary.OutstandingBalance,
-	)
+	var exists int
+	err := s.db.QueryRow(
+		"SELECT 1 FROM suppliers WHERE supplier_id = $1 AND company_id = $2 AND is_active = TRUE",
+		supplierID, companyID,
+	).Scan(&exists)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("supplier not found")
 		}
-		return nil, fmt.Errorf("failed to get supplier summary: %w", err)
+		return nil, fmt.Errorf("failed to verify supplier: %w", err)
 	}
+
+	summary := &models.SupplierSummary{SupplierID: supplierID, CompanyID: companyID}
+
+	if err := s.db.QueryRow(
+		"SELECT COALESCE(SUM(total_amount),0) FROM purchases WHERE supplier_id = $1 AND is_deleted = FALSE",
+		supplierID,
+	).Scan(&summary.TotalPurchases); err != nil {
+		return nil, fmt.Errorf("failed to get purchases total: %w", err)
+	}
+
+	if err := s.db.QueryRow(
+		"SELECT COALESCE(SUM(amount),0) FROM payments WHERE supplier_id = $1 AND is_deleted = FALSE",
+		supplierID,
+	).Scan(&summary.TotalPayments); err != nil {
+		return nil, fmt.Errorf("failed to get payments total: %w", err)
+	}
+
+	if err := s.db.QueryRow(
+		"SELECT COALESCE(SUM(total_amount),0) FROM purchase_returns WHERE supplier_id = $1 AND is_deleted = FALSE",
+		supplierID,
+	).Scan(&summary.TotalReturns); err != nil {
+		return nil, fmt.Errorf("failed to get returns total: %w", err)
+	}
+
+	summary.OutstandingBalance = summary.TotalPurchases - summary.TotalPayments - summary.TotalReturns
+
 	return summary, nil
 }
 
