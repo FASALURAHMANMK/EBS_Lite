@@ -425,6 +425,76 @@ func (h *PurchaseHandler) CreatePurchaseReturn(c *gin.Context) {
 	utils.CreatedResponse(c, "Purchase return created successfully", returnData)
 }
 
+// PUT /purchase-returns/:id
+func (h *PurchaseHandler) UpdatePurchaseReturn(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	returnID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid return ID", err)
+		return
+	}
+
+	var updates map[string]interface{}
+	if err := c.ShouldBindJSON(&updates); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	err = h.purchaseReturnService.UpdatePurchaseReturn(returnID, companyID, userID, updates)
+	if err != nil {
+		if err.Error() == "return not found" {
+			utils.NotFoundResponse(c, "Purchase return not found")
+			return
+		}
+		if err.Error() == "completed returns cannot be updated" {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Completed returns cannot be updated", err)
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update purchase return", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Purchase return updated successfully", nil)
+}
+
+// DELETE /purchase-returns/:id
+func (h *PurchaseHandler) DeletePurchaseReturn(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	returnID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid return ID", err)
+		return
+	}
+
+	err = h.purchaseReturnService.DeletePurchaseReturn(returnID, companyID, userID)
+	if err != nil {
+		if err.Error() == "return not found" {
+			utils.NotFoundResponse(c, "Purchase return not found")
+			return
+		}
+		if err.Error() == "completed returns cannot be deleted" {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Completed returns cannot be deleted", err)
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to delete purchase return", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Purchase return deleted successfully", nil)
+}
+
 // PUT /purchases/:id/receive
 func (h *PurchaseHandler) ReceivePurchase(c *gin.Context) {
 	companyID := c.GetInt("company_id")
