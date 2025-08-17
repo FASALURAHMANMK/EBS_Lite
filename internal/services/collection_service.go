@@ -226,3 +226,48 @@ func (s *CollectionService) GetCollectionByID(collectionID, companyID int) (*mod
 
 	return &col, nil
 }
+
+// GetOutstanding returns customers with outstanding balances
+func (s *CollectionService) GetOutstanding(companyID int) ([]models.Customer, error) {
+	query := `
+               SELECT c.customer_id, c.name,
+                      COALESCE(SUM(s.total_amount - s.paid_amount),0) AS outstanding_balance
+               FROM customers c
+               JOIN sales s ON c.customer_id = s.customer_id
+               WHERE c.company_id = $1 AND c.is_deleted = FALSE AND s.is_deleted = FALSE
+               GROUP BY c.customer_id, c.name
+               HAVING COALESCE(SUM(s.total_amount - s.paid_amount),0) > 0
+               ORDER BY c.name`
+
+	rows, err := s.db.Query(query, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get outstanding balances: %w", err)
+	}
+	defer rows.Close()
+
+	var customers []models.Customer
+	for rows.Next() {
+		var cust models.Customer
+		if err := rows.Scan(&cust.CustomerID, &cust.Name, &cust.OutstandingBalance); err != nil {
+			return nil, fmt.Errorf("failed to scan customer: %w", err)
+		}
+
+		invRows, err := s.db.Query(`
+                       SELECT sale_id, sale_number, (total_amount - paid_amount) AS amount_due
+                       FROM sales
+                       WHERE customer_id = $1 AND is_deleted = FALSE AND (total_amount - paid_amount) > 0`, cust.CustomerID)
+		if err == nil {
+			for invRows.Next() {
+				var ref models.CustomerInvoiceReference
+				if err := invRows.Scan(&ref.SaleID, &ref.SaleNumber, &ref.AmountDue); err == nil {
+					cust.Invoices = append(cust.Invoices, ref)
+				}
+			}
+			invRows.Close()
+		}
+
+		customers = append(customers, cust)
+	}
+
+	return customers, nil
+}

@@ -48,6 +48,23 @@ func (h *CollectionHandler) GetCollections(c *gin.Context) {
 	utils.SuccessResponse(c, "Collections retrieved successfully", collections)
 }
 
+// GET /collections/outstanding
+func (h *CollectionHandler) GetOutstanding(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	customers, err := h.collectionService.GetOutstanding(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get outstanding balances", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Outstanding balances retrieved successfully", customers)
+}
+
 // POST /collections
 func (h *CollectionHandler) CreateCollection(c *gin.Context) {
 	companyID := c.GetInt("company_id")
