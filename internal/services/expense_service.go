@@ -55,6 +55,36 @@ func (s *ExpenseService) CreateCategory(companyID, userID int, name string) (int
 	return id, nil
 }
 
+func (s *ExpenseService) UpdateCategory(companyID, categoryID, userID int, name string) error {
+	res, err := s.db.Exec(`UPDATE expense_categories SET name=$1, updated_by=$2, updated_at=CURRENT_TIMESTAMP WHERE category_id=$3 AND company_id=$4 AND is_deleted=FALSE`, name, userID, categoryID, companyID)
+	if err != nil {
+		return fmt.Errorf("failed to update category: %w", err)
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("category not found")
+	}
+	return nil
+}
+
+func (s *ExpenseService) DeleteCategory(companyID, categoryID, userID int) error {
+	res, err := s.db.Exec(`UPDATE expense_categories SET is_deleted=TRUE, updated_by=$1, updated_at=CURRENT_TIMESTAMP WHERE category_id=$2 AND company_id=$3 AND is_deleted=FALSE`, userID, categoryID, companyID)
+	if err != nil {
+		return fmt.Errorf("failed to delete category: %w", err)
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("category not found")
+	}
+	return nil
+}
+
 // ListExpenses retrieves expenses with optional filters for category, date range and location.
 func (s *ExpenseService) ListExpenses(companyID int, filters map[string]string) ([]models.ExpenseWithDetails, error) {
 	query := `

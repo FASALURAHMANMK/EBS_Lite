@@ -122,3 +122,57 @@ func (h *ExpenseHandler) CreateCategory(c *gin.Context) {
 	}
 	utils.CreatedResponse(c, "Category created", gin.H{"category_id": id})
 }
+
+// PUT /expenses/categories/:id
+func (h *ExpenseHandler) UpdateCategory(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid category ID", err)
+		return
+	}
+
+	var req struct {
+		Name string `json:"name" validate:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+
+	if err := h.service.UpdateCategory(companyID, id, userID, req.Name); err != nil {
+		if err.Error() == "category not found" {
+			utils.NotFoundResponse(c, "Category not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to update category", err)
+		return
+	}
+	utils.SuccessResponse(c, "Category updated", nil)
+}
+
+// DELETE /expenses/categories/:id
+func (h *ExpenseHandler) DeleteCategory(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid category ID", err)
+		return
+	}
+
+	if err := h.service.DeleteCategory(companyID, id, userID); err != nil {
+		if err.Error() == "category not found" {
+			utils.NotFoundResponse(c, "Category not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to delete category", err)
+		return
+	}
+	utils.SuccessResponse(c, "Category deleted", nil)
+}
