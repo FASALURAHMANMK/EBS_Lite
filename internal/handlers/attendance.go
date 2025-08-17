@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
+	"time"
 
 	"erp-backend/internal/models"
 	"erp-backend/internal/services"
@@ -111,4 +113,48 @@ func (h *AttendanceHandler) GetHolidays(c *gin.Context) {
 		return
 	}
 	utils.SuccessResponse(c, "Holidays retrieved", holidays)
+}
+
+// GET /attendance/records
+func (h *AttendanceHandler) GetAttendanceRecords(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	var employeeID *int
+	if idStr := c.Query("employee_id"); idStr != "" {
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Invalid employee_id", err)
+			return
+		}
+		employeeID = &id
+	}
+
+	var startDate, endDate *time.Time
+	if sdStr := c.Query("start_date"); sdStr != "" {
+		sd, err := time.Parse("2006-01-02", sdStr)
+		if err != nil {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Invalid start_date", err)
+			return
+		}
+		startDate = &sd
+	}
+	if edStr := c.Query("end_date"); edStr != "" {
+		ed, err := time.Parse("2006-01-02", edStr)
+		if err != nil {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Invalid end_date", err)
+			return
+		}
+		endDate = &ed
+	}
+
+	records, err := h.attendanceService.GetAttendanceRecords(companyID, employeeID, startDate, endDate)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get attendance records", err)
+		return
+	}
+	utils.SuccessResponse(c, "Attendance records retrieved", records)
 }

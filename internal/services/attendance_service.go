@@ -140,3 +140,44 @@ func (s *AttendanceService) GetHolidays(companyID int) ([]models.Holiday, error)
 	}
 	return holidays, nil
 }
+
+func (s *AttendanceService) GetAttendanceRecords(companyID int, employeeID *int, startDate, endDate *time.Time) ([]models.Attendance, error) {
+	query := `SELECT a.attendance_id, a.employee_id, a.check_in, a.check_out, a.sync_status, a.created_at, a.updated_at, a.is_deleted
+               FROM attendance a
+               JOIN employees e ON a.employee_id = e.employee_id
+               WHERE e.company_id = $1 AND a.is_deleted = FALSE`
+	args := []interface{}{companyID}
+	argPos := 1
+	if employeeID != nil {
+		argPos++
+		query += fmt.Sprintf(" AND a.employee_id = $%d", argPos)
+		args = append(args, *employeeID)
+	}
+	if startDate != nil {
+		argPos++
+		query += fmt.Sprintf(" AND DATE(a.check_in) >= $%d", argPos)
+		args = append(args, *startDate)
+	}
+	if endDate != nil {
+		argPos++
+		query += fmt.Sprintf(" AND DATE(a.check_in) <= $%d", argPos)
+		args = append(args, *endDate)
+	}
+	query += " ORDER BY a.check_in DESC"
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get attendance records: %w", err)
+	}
+	defer rows.Close()
+
+	var records []models.Attendance
+	for rows.Next() {
+		var r models.Attendance
+		if err := rows.Scan(&r.AttendanceID, &r.EmployeeID, &r.CheckIn, &r.CheckOut, &r.SyncStatus, &r.CreatedAt, &r.UpdatedAt, &r.IsDeleted); err != nil {
+			return nil, fmt.Errorf("failed to scan attendance: %w", err)
+		}
+		records = append(records, r)
+	}
+	return records, nil
+}
