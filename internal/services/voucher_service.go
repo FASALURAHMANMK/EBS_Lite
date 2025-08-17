@@ -27,9 +27,9 @@ func (s *VoucherService) CreateVoucher(companyID, userID int, vType string, req 
 	ledger := NewLedgerService()
 	switch vType {
 	case "payment":
-		_ = ledger.RecordExpense(companyID, id, req.Amount)
+		_ = ledger.RecordExpense(companyID, id, req.Amount, userID)
 	case "receipt":
-		_ = ledger.RecordSale(companyID, id, req.Amount)
+		_ = ledger.RecordSale(companyID, id, req.Amount, userID)
 	case "journal":
 		// Placeholder for journal entries
 	}

@@ -362,7 +362,7 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 	}
 
 	ledgerService := NewLedgerService()
-	_ = ledgerService.RecordPurchase(companyID, purchase.PurchaseID, totalAmount)
+	_ = ledgerService.RecordPurchase(companyID, purchase.PurchaseID, totalAmount, userID)
 
 	// Set response data
 	purchase.PurchaseNumber = purchaseNumber

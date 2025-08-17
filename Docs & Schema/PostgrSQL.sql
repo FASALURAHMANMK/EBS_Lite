@@ -673,6 +673,8 @@ CREATE TABLE ledger_entries (
     transaction_type VARCHAR(50),
     transaction_id INTEGER,
     description TEXT,
+    created_by INT NOT NULL REFERENCES users(user_id),
+    updated_by INT REFERENCES users(user_id),
     sync_status VARCHAR(20) DEFAULT 'synced',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

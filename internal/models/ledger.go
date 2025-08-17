@@ -8,6 +8,8 @@ type LedgerEntry struct {
 	Credit      float64 `json:"credit" db:"credit"`
 	Reference   string  `json:"reference" db:"reference"`
 	Description *string `json:"description,omitempty" db:"description"`
+	CreatedBy   int     `json:"created_by" db:"created_by"`
+	UpdatedBy   *int    `json:"updated_by,omitempty" db:"updated_by"`
 	SyncModel
 }
 
