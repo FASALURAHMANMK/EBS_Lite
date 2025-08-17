@@ -430,6 +430,8 @@ func Initialize(router *gin.Engine) {
 				{
 					categories.GET("", middleware.RequirePermission("VIEW_EXPENSES"), expenseHandler.GetCategories)
 					categories.POST("", middleware.RequirePermission("CREATE_EXPENSES"), expenseHandler.CreateCategory)
+					categories.PUT("/:id", middleware.RequirePermission("UPDATE_EXPENSES"), expenseHandler.UpdateCategory)
+					categories.DELETE("/:id", middleware.RequirePermission("DELETE_EXPENSES"), expenseHandler.DeleteCategory)
 				}
 			}
 
