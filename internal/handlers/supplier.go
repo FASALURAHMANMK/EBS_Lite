@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"io"
 	"net/http"
 	"strconv"
 
@@ -207,4 +208,60 @@ func (h *SupplierHandler) DeleteSupplier(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, "Supplier deleted successfully", nil)
+}
+
+// POST /suppliers/import
+func (h *SupplierHandler) ImportSuppliers(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	userID := c.GetInt("user_id")
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "File is required", err)
+		return
+	}
+
+	f, err := file.Open()
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to open file", err)
+		return
+	}
+	defer f.Close()
+
+	data, err := io.ReadAll(f)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to read file", err)
+		return
+	}
+
+	count, err := h.supplierService.ImportSuppliers(companyID, userID, data)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to import suppliers", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Suppliers imported successfully", map[string]int{"count": count})
+}
+
+// GET /suppliers/export
+func (h *SupplierHandler) ExportSuppliers(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	data, err := h.supplierService.ExportSuppliers(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate file", err)
+		return
+	}
+
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", "attachment; filename=suppliers.xlsx")
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }
