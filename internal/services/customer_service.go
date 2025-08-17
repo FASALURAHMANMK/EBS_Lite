@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,20 +19,80 @@ func NewCustomerService() *CustomerService {
 	return &CustomerService{db: database.GetDB()}
 }
 
-// GetCustomers returns all customers for a company with optional search filter
-func (s *CustomerService) GetCustomers(companyID int, search string) ([]models.Customer, error) {
+// GetCustomers returns all customers for a company with optional filters
+func (s *CustomerService) GetCustomers(companyID int, filters map[string]string) ([]models.Customer, error) {
 	query := `
-                SELECT customer_id, company_id, name, phone, email, address, tax_number,
-                       credit_limit, payment_terms, is_active, created_by, updated_by,
-                       sync_status, created_at, updated_at, is_deleted
-                FROM customers
-                WHERE company_id = $1 AND is_deleted = FALSE`
+                SELECT c.customer_id, c.company_id, c.name, c.phone, c.email, c.address, c.tax_number,
+                       c.credit_limit, c.payment_terms, c.is_active, c.created_by, c.updated_by,
+                       c.sync_status, c.created_at, c.updated_at, c.is_deleted,
+                       COALESCE(SUM(s.total_amount - s.paid_amount),0) AS outstanding_balance
+                FROM customers c
+                LEFT JOIN sales s ON c.customer_id = s.customer_id AND s.is_deleted = FALSE
+                WHERE c.company_id = $1 AND c.is_deleted = FALSE`
 
 	args := []interface{}{companyID}
-	if search != "" {
-		query += " AND (name ILIKE $2 OR phone ILIKE $2 OR email ILIKE $2)"
+	argCount := 1
+
+	if search, ok := filters["search"]; ok && search != "" {
+		argCount++
+		query += fmt.Sprintf(" AND (c.name ILIKE $%d OR c.phone ILIKE $%d OR c.email ILIKE $%d)", argCount, argCount, argCount)
 		args = append(args, "%"+search+"%")
 	}
+
+	if phone, ok := filters["phone"]; ok && phone != "" {
+		argCount++
+		query += fmt.Sprintf(" AND c.phone ILIKE $%d", argCount)
+		args = append(args, "%"+phone+"%")
+	}
+
+	if creditMin, ok := filters["credit_min"]; ok && creditMin != "" {
+		val, err := strconv.ParseFloat(creditMin, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid credit_min: %w", err)
+		}
+		argCount++
+		query += fmt.Sprintf(" AND c.credit_limit >= $%d", argCount)
+		args = append(args, val)
+	}
+
+	if creditMax, ok := filters["credit_max"]; ok && creditMax != "" {
+		val, err := strconv.ParseFloat(creditMax, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid credit_max: %w", err)
+		}
+		argCount++
+		query += fmt.Sprintf(" AND c.credit_limit <= $%d", argCount)
+		args = append(args, val)
+	}
+
+	query += " GROUP BY c.customer_id"
+
+	havingClauses := []string{}
+	if balanceMin, ok := filters["balance_min"]; ok && balanceMin != "" {
+		val, err := strconv.ParseFloat(balanceMin, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid balance_min: %w", err)
+		}
+		argCount++
+		havingClauses = append(havingClauses, fmt.Sprintf("COALESCE(SUM(s.total_amount - s.paid_amount),0) >= $%d", argCount))
+		args = append(args, val)
+	}
+
+	if balanceMax, ok := filters["balance_max"]; ok && balanceMax != "" {
+		val, err := strconv.ParseFloat(balanceMax, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid balance_max: %w", err)
+		}
+		argCount++
+		havingClauses = append(havingClauses, fmt.Sprintf("COALESCE(SUM(s.total_amount - s.paid_amount),0) <= $%d", argCount))
+		args = append(args, val)
+	}
+
+	if len(havingClauses) > 0 {
+		query += " HAVING " + strings.Join(havingClauses, " AND ")
+	}
+
+	query += " ORDER BY c.name"
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
@@ -46,6 +107,7 @@ func (s *CustomerService) GetCustomers(companyID int, search string) ([]models.C
 			&c.CustomerID, &c.CompanyID, &c.Name, &c.Phone, &c.Email, &c.Address,
 			&c.TaxNumber, &c.CreditLimit, &c.PaymentTerms, &c.IsActive,
 			&c.CreatedBy, &c.UpdatedBy, &c.SyncStatus, &c.CreatedAt, &c.UpdatedAt, &c.IsDeleted,
+			&c.OutstandingBalance,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan customer: %w", err)
 		}

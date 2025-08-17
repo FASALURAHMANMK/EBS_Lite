@@ -28,8 +28,27 @@ func (h *CustomerHandler) GetCustomers(c *gin.Context) {
 		return
 	}
 
-	search := c.Query("search")
-	customers, err := h.customerService.GetCustomers(companyID, search)
+	filters := make(map[string]string)
+	if search := c.Query("search"); search != "" {
+		filters["search"] = search
+	}
+	if phone := c.Query("phone"); phone != "" {
+		filters["phone"] = phone
+	}
+	if creditMin := c.Query("credit_min"); creditMin != "" {
+		filters["credit_min"] = creditMin
+	}
+	if creditMax := c.Query("credit_max"); creditMax != "" {
+		filters["credit_max"] = creditMax
+	}
+	if balanceMin := c.Query("balance_min"); balanceMin != "" {
+		filters["balance_min"] = balanceMin
+	}
+	if balanceMax := c.Query("balance_max"); balanceMax != "" {
+		filters["balance_max"] = balanceMax
+	}
+
+	customers, err := h.customerService.GetCustomers(companyID, filters)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get customers", err)
 		return
@@ -242,7 +261,7 @@ func (h *CustomerHandler) ExportCustomers(c *gin.Context) {
 		return
 	}
 
-	customers, err := h.customerService.GetCustomers(companyID, "")
+	customers, err := h.customerService.GetCustomers(companyID, nil)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get customers", err)
 		return
