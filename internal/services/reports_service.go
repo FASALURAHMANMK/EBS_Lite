@@ -250,6 +250,51 @@ func (s *ReportsService) GetExpensesSummary(companyID int, groupBy string) ([]mo
 	return summaries, nil
 }
 
+// GetTaxReport aggregates taxable sales and tax amounts by tax
+func (s *ReportsService) GetTaxReport(companyID int, fromDate, toDate string) ([]models.TaxReport, error) {
+	query := `
+        SELECT COALESCE(t.name, 'No Tax') AS tax_name,
+               COALESCE(t.percentage, 0) AS tax_rate,
+               SUM(sd.line_total) AS taxable_amount,
+               SUM(sd.tax_amount) AS tax_amount
+        FROM sale_details sd
+        JOIN sales s ON sd.sale_id = s.sale_id
+        JOIN locations l ON s.location_id = l.location_id
+        LEFT JOIN taxes t ON sd.tax_id = t.tax_id
+        WHERE l.company_id = $1 AND s.is_deleted = FALSE`
+
+	args := []interface{}{companyID}
+	idx := 2
+	if fromDate != "" {
+		query += fmt.Sprintf(" AND s.sale_date >= $%d", idx)
+		args = append(args, fromDate)
+		idx++
+	}
+	if toDate != "" {
+		query += fmt.Sprintf(" AND s.sale_date <= $%d", idx)
+		args = append(args, toDate)
+		idx++
+	}
+
+	query += " GROUP BY tax_name, tax_rate ORDER BY tax_name"
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tax report: %w", err)
+	}
+	defer rows.Close()
+
+	var reports []models.TaxReport
+	for rows.Next() {
+		var tr models.TaxReport
+		if err := rows.Scan(&tr.TaxName, &tr.TaxRate, &tr.TaxableAmount, &tr.TaxAmount); err != nil {
+			return nil, fmt.Errorf("failed to scan tax report: %w", err)
+		}
+		reports = append(reports, tr)
+	}
+	return reports, nil
+}
+
 // The following report methods are placeholders for future implementation.
 // They currently return a not implemented error and will be expanded to
 // query the appropriate tables and support data export in future iterations.

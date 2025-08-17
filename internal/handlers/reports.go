@@ -334,6 +334,25 @@ func (h *ReportsHandler) GetOutstandingReport(c *gin.Context) {
 	h.handleReportResponse(c, "Outstanding report retrieved successfully", data)
 }
 
+// GET /reports/tax
+func (h *ReportsHandler) GetTaxReport(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	fromDate := c.Query("from_date")
+	toDate := c.Query("to_date")
+
+	data, err := h.reportsService.GetTaxReport(companyID, fromDate, toDate)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get tax report", err)
+		return
+	}
+	utils.SuccessResponse(c, "Tax report retrieved successfully", data)
+}
+
 // GET /reports/top-performers
 func (h *ReportsHandler) GetTopPerformers(c *gin.Context) {
 	companyID := c.GetInt("company_id")

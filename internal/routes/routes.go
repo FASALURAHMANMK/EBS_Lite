@@ -472,6 +472,7 @@ func Initialize(router *gin.Engine) {
 				reports.GET("/profit-loss", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetProfitLoss)
 				reports.GET("/balance-sheet", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetBalanceSheet)
 				reports.GET("/outstanding", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetOutstandingReport)
+				reports.GET("/tax", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetTaxReport)
 				reports.GET("/top-performers", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetTopPerformers)
 			}
 
