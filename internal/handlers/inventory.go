@@ -414,6 +414,39 @@ func (h *InventoryHandler) CreateStockTransfer(c *gin.Context) {
 	utils.CreatedResponse(c, "Stock transfer created successfully", transfer)
 }
 
+// PUT /inventory/transfers/:id/approve
+func (h *InventoryHandler) ApproveStockTransfer(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
+
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	transferID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid transfer ID", err)
+		return
+	}
+
+	err = h.inventoryService.ApproveStockTransfer(transferID, companyID, userID)
+	if err != nil {
+		if err.Error() == "transfer not found" {
+			utils.NotFoundResponse(c, "Transfer not found")
+			return
+		}
+		if err.Error() == "only pending transfers can be approved" {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Only pending transfers can be approved", err)
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to approve transfer", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Stock transfer approved successfully", nil)
+}
+
 // PUT /inventory/transfers/:id/complete
 func (h *InventoryHandler) CompleteStockTransfer(c *gin.Context) {
 	companyID := c.GetInt("company_id")
@@ -436,8 +469,8 @@ func (h *InventoryHandler) CompleteStockTransfer(c *gin.Context) {
 			utils.NotFoundResponse(c, "Transfer not found")
 			return
 		}
-		if err.Error() == "transfer is not pending" {
-			utils.ErrorResponse(c, http.StatusBadRequest, "Transfer is not pending", err)
+		if err.Error() == "transfer is not in transit" {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Transfer is not in transit", err)
 			return
 		}
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to complete transfer", err)

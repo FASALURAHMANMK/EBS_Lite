@@ -268,6 +268,46 @@ func (s *InventoryService) GetStockTransfers(companyID, locationID int) ([]model
 	return transfers, nil
 }
 
+// ApproveStockTransfer marks a pending transfer as in transit
+func (s *InventoryService) ApproveStockTransfer(transferID, companyID, userID int) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	var status string
+	err = tx.QueryRow(`
+                SELECT st.status
+                FROM stock_transfers st
+                JOIN locations fl ON st.from_location_id = fl.location_id
+                JOIN locations tl ON st.to_location_id = tl.location_id
+                WHERE st.transfer_id = $1 AND (fl.company_id = $2 OR tl.company_id = $2)
+        `, transferID, companyID).Scan(&status)
+
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("transfer not found")
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get transfer: %w", err)
+	}
+
+	if status != "PENDING" {
+		return fmt.Errorf("only pending transfers can be approved")
+	}
+
+	_, err = tx.Exec(`
+                UPDATE stock_transfers
+                SET status = 'IN_TRANSIT', approved_by = $2, approved_at = CURRENT_TIMESTAMP, updated_by = $2, updated_at = CURRENT_TIMESTAMP
+                WHERE transfer_id = $1
+        `, transferID, userID)
+	if err != nil {
+		return fmt.Errorf("failed to approve transfer: %w", err)
+	}
+
+	return tx.Commit()
+}
+
 func (s *InventoryService) CompleteStockTransfer(transferID, companyID, userID int) error {
 	// Start transaction
 	tx, err := s.db.Begin()
@@ -292,8 +332,8 @@ func (s *InventoryService) CompleteStockTransfer(transferID, companyID, userID i
 		return fmt.Errorf("failed to get transfer: %w", err)
 	}
 
-	if status != "PENDING" {
-		return fmt.Errorf("transfer is not pending")
+	if status != "IN_TRANSIT" {
+		return fmt.Errorf("transfer is not in transit")
 	}
 
 	// Get transfer items and process each
@@ -340,7 +380,7 @@ func (s *InventoryService) CompleteStockTransfer(transferID, companyID, userID i
 	// Mark transfer as completed
 	_, err = tx.Exec(`
                 UPDATE stock_transfers
-                SET status = 'COMPLETED', approved_by = $1, approved_at = CURRENT_TIMESTAMP, updated_by = $1, updated_at = CURRENT_TIMESTAMP
+                SET status = 'COMPLETED', updated_by = $1, updated_at = CURRENT_TIMESTAMP
                 WHERE transfer_id = $2
         `, userID, transferID)
 	if err != nil {
