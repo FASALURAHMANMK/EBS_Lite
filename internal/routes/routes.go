@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"database/sql"
 	"net/http"
 
 	"erp-backend/internal/config"
@@ -12,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Initialize(router *gin.Engine, db *sql.DB) {
+func Initialize(router *gin.Engine) {
 	cfg := config.Load()
 
 	// Initialize JWT utils

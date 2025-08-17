@@ -23,8 +23,7 @@ func main() {
 	cfg := config.Load()
 
 	// Initialize database
-	db, err := database.Initialize(cfg.DatabaseURL)
-	if err != nil {
+	if _, err := database.Initialize(cfg.DatabaseURL); err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
 	defer database.Close()
@@ -43,7 +42,7 @@ func main() {
 	router.Use(middleware.CORS())
 
 	// Initialize routes
-	routes.Initialize(router, db.DB) // assuming db has a field or method named DB of type *sql.DB
+	routes.Initialize(router)
 
 	// Start server
 	port := os.Getenv("PORT")
