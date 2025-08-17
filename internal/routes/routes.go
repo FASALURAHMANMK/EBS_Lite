@@ -442,6 +442,7 @@ func Initialize(router *gin.Engine, db *sql.DB) {
 			ledgers.Use(middleware.RequireCompanyAccess())
 			{
 				ledgers.GET("", middleware.RequirePermission("VIEW_LEDGER"), ledgerHandler.GetBalances)
+				ledgers.GET("/:account_id/entries", middleware.RequirePermission("VIEW_LEDGER_DETAILS"), ledgerHandler.GetEntries)
 			}
 
 			cashRegisters := protected.Group("/cash-registers")
