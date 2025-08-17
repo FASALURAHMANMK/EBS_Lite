@@ -358,6 +358,8 @@ func Initialize(router *gin.Engine) {
 				purchaseReturns.GET("", middleware.RequirePermission("VIEW_PURCHASE_RETURNS"), purchaseHandler.GetPurchaseReturns)
 				purchaseReturns.GET("/:id", middleware.RequirePermission("VIEW_PURCHASE_RETURNS"), purchaseHandler.GetPurchaseReturn)
 				purchaseReturns.POST("", middleware.RequirePermission("CREATE_PURCHASE_RETURNS"), purchaseHandler.CreatePurchaseReturn)
+				purchaseReturns.PUT("/:id", middleware.RequirePermission("UPDATE_PURCHASE_RETURNS"), purchaseHandler.UpdatePurchaseReturn)
+				purchaseReturns.DELETE("/:id", middleware.RequirePermission("DELETE_PURCHASE_RETURNS"), purchaseHandler.DeletePurchaseReturn)
 			}
 
 			// Customer management routes (require company)

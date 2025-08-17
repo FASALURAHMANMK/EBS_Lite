@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"erp-backend/internal/database"
@@ -284,4 +285,120 @@ func (s *PurchaseReturnService) CreatePurchaseReturn(companyID, locationID, user
 	returnData.ApprovedAt = &now
 
 	return &returnData, nil
+}
+
+func (s *PurchaseReturnService) UpdatePurchaseReturn(returnID, companyID, userID int, updates map[string]interface{}) error {
+	if err := s.verifyReturnInCompany(returnID, companyID); err != nil {
+		return err
+	}
+
+	var status string
+	err := s.db.QueryRow("SELECT status FROM purchase_returns WHERE return_id = $1", returnID).Scan(&status)
+	if err != nil {
+		return fmt.Errorf("failed to get return status: %w", err)
+	}
+
+	if status == "COMPLETED" {
+		return fmt.Errorf("completed returns cannot be updated")
+	}
+
+	setParts := []string{}
+	args := []interface{}{}
+	argCount := 0
+
+	for field, value := range updates {
+		switch field {
+		case "reason":
+			argCount++
+			setParts = append(setParts, fmt.Sprintf("reason = $%d", argCount))
+			args = append(args, value)
+		case "status":
+			argCount++
+			setParts = append(setParts, fmt.Sprintf("status = $%d", argCount))
+			args = append(args, value)
+		}
+	}
+
+	if len(setParts) == 0 {
+		return fmt.Errorf("no valid fields to update")
+	}
+
+	argCount++
+	setParts = append(setParts, fmt.Sprintf("updated_by = $%d", argCount))
+	args = append(args, userID)
+
+	argCount++
+	setParts = append(setParts, "updated_at = CURRENT_TIMESTAMP")
+
+	query := fmt.Sprintf("UPDATE purchase_returns SET %s WHERE return_id = $%d", strings.Join(setParts, ", "), argCount)
+	args = append(args, returnID)
+
+	result, err := s.db.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to update purchase return: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("return not found")
+	}
+
+	return nil
+}
+
+func (s *PurchaseReturnService) DeletePurchaseReturn(returnID, companyID, userID int) error {
+	if err := s.verifyReturnInCompany(returnID, companyID); err != nil {
+		return err
+	}
+
+	var status string
+	err := s.db.QueryRow("SELECT status FROM purchase_returns WHERE return_id = $1", returnID).Scan(&status)
+	if err != nil {
+		return fmt.Errorf("failed to get return status: %w", err)
+	}
+
+	if status == "COMPLETED" {
+		return fmt.Errorf("completed returns cannot be deleted")
+	}
+
+	query := `UPDATE purchase_returns SET is_deleted = TRUE, updated_by = $2, updated_at = CURRENT_TIMESTAMP WHERE return_id = $1`
+
+	result, err := s.db.Exec(query, returnID, userID)
+	if err != nil {
+		return fmt.Errorf("failed to delete purchase return: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("return not found")
+	}
+
+	return nil
+}
+
+func (s *PurchaseReturnService) verifyReturnInCompany(returnID, companyID int) error {
+	var count int
+	err := s.db.QueryRow(`
+               SELECT COUNT(*) FROM purchase_returns pr
+               JOIN purchases p ON pr.purchase_id = p.purchase_id
+               JOIN suppliers s ON p.supplier_id = s.supplier_id
+               WHERE pr.return_id = $1 AND s.company_id = $2 AND pr.is_deleted = FALSE
+       `, returnID, companyID).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to verify return: %w", err)
+	}
+
+	if count == 0 {
+		return fmt.Errorf("return not found")
+	}
+
+	return nil
 }
