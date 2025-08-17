@@ -481,7 +481,7 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 
 	// Record ledger entry
 	ledgerService := NewLedgerService()
-	_ = ledgerService.RecordSale(companyID, saleID, totalAmount)
+	_ = ledgerService.RecordSale(companyID, saleID, totalAmount, userID)
 
 	// Award loyalty points if customer is provided (async operation)
 	if req.CustomerID != nil {

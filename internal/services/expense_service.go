@@ -25,7 +25,7 @@ func (s *ExpenseService) CreateExpense(companyID, locationID, userID int, req *m
 		return 0, fmt.Errorf("failed to create expense: %w", err)
 	}
 	ledger := NewLedgerService()
-	_ = ledger.RecordExpense(companyID, id, req.Amount)
+	_ = ledger.RecordExpense(companyID, id, req.Amount, userID)
 	return id, nil
 }
 

@@ -16,21 +16,20 @@ func NewLedgerService() *LedgerService {
 }
 
 // RecordExpense creates ledger entries for an expense
-func (s *LedgerService) RecordExpense(companyID, expenseID int, amount float64) error {
-	// Placeholder implementation
-	_, err := s.db.Exec(`INSERT INTO ledger_entries (company_id, reference, debit) VALUES ($1,$2,$3)`, companyID, expenseID, amount)
+func (s *LedgerService) RecordExpense(companyID, expenseID int, amount float64, userID int) error {
+	_, err := s.db.Exec(`INSERT INTO ledger_entries (company_id, reference, debit, created_by, updated_by) VALUES ($1,$2,$3,$4,$4)`, companyID, expenseID, amount, userID)
 	return err
 }
 
 // RecordSale creates ledger entries for a sale
-func (s *LedgerService) RecordSale(companyID, saleID int, amount float64) error {
-	_, err := s.db.Exec(`INSERT INTO ledger_entries (company_id, reference, credit) VALUES ($1,$2,$3)`, companyID, saleID, amount)
+func (s *LedgerService) RecordSale(companyID, saleID int, amount float64, userID int) error {
+	_, err := s.db.Exec(`INSERT INTO ledger_entries (company_id, reference, credit, created_by, updated_by) VALUES ($1,$2,$3,$4,$4)`, companyID, saleID, amount, userID)
 	return err
 }
 
 // RecordPurchase creates ledger entries for a purchase
-func (s *LedgerService) RecordPurchase(companyID, purchaseID int, amount float64) error {
-	_, err := s.db.Exec(`INSERT INTO ledger_entries (company_id, reference, debit) VALUES ($1,$2,$3)`, companyID, purchaseID, amount)
+func (s *LedgerService) RecordPurchase(companyID, purchaseID int, amount float64, userID int) error {
+	_, err := s.db.Exec(`INSERT INTO ledger_entries (company_id, reference, debit, created_by, updated_by) VALUES ($1,$2,$3,$4,$4)`, companyID, purchaseID, amount, userID)
 	return err
 }
 
