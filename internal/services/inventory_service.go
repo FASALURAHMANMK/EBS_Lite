@@ -2,7 +2,9 @@ package services
 
 import (
 	"database/sql"
+	"encoding/csv"
 	"fmt"
+	"io"
 	"time"
 
 	"erp-backend/internal/database"
@@ -638,9 +640,32 @@ func (s *InventoryService) GetProductSummary(companyID, productID int) (*models.
 	return summary, nil
 }
 
-// ImportInventory processes inventory data from an uploaded file
-func (s *InventoryService) ImportInventory(companyID int, data []byte) error {
-	// Placeholder implementation - in real code this would parse the Excel data
+// ImportInventory processes inventory data from an uploaded file stream
+func (s *InventoryService) ImportInventory(companyID int, r io.Reader) error {
+	reader := csv.NewReader(r)
+
+	// Attempt to read header row; if file is empty just return
+	if _, err := reader.Read(); err != nil {
+		if err == io.EOF {
+			return nil
+		}
+		return fmt.Errorf("failed to read header: %w", err)
+	}
+
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read record: %w", err)
+		}
+
+		// Process each record here. Actual implementation would map
+		// CSV columns to inventory fields and persist them.
+		_ = record
+	}
+
 	return nil
 }
 
