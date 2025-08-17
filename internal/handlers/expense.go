@@ -102,6 +102,7 @@ func (h *ExpenseHandler) GetCategories(c *gin.Context) {
 // POST /expenses/categories
 func (h *ExpenseHandler) CreateCategory(c *gin.Context) {
 	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
 
 	var req models.CreateExpenseCategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -114,7 +115,7 @@ func (h *ExpenseHandler) CreateCategory(c *gin.Context) {
 		return
 	}
 
-	id, err := h.service.CreateCategory(companyID, req.Name)
+	id, err := h.service.CreateCategory(companyID, userID, req.Name)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to create category", err)
 		return

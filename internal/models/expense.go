@@ -24,6 +24,8 @@ type ExpenseWithDetails struct {
 type ExpenseCategory struct {
 	CategoryID int    `json:"category_id" db:"category_id"`
 	Name       string `json:"name" db:"name"`
+	CreatedBy  int    `json:"created_by" db:"created_by"`
+	UpdatedBy  *int   `json:"updated_by,omitempty" db:"updated_by"`
 	SyncModel
 }
 

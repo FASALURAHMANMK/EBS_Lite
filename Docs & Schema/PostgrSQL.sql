@@ -311,7 +311,9 @@ CREATE TABLE expense_categories (
     company_id INTEGER NOT NULL REFERENCES companies(company_id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    is_active BOOLEAN DEFAULT TRUE
+    is_active BOOLEAN DEFAULT TRUE,
+    created_by INTEGER NOT NULL REFERENCES users(user_id),
+    updated_by INTEGER REFERENCES users(user_id)
 );
 
 -- ===============================================
