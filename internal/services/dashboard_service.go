@@ -131,21 +131,51 @@ func (s *DashboardService) GetQuickActionCounts(companyID, locationID int) (*mod
 
 	// Collections today
 	if err := s.db.QueryRow(`
-                SELECT COUNT(*)
-                FROM collections c
-                JOIN customers cu ON c.customer_id = cu.customer_id
-                WHERE cu.company_id = $1 AND c.location_id = $2 AND c.collection_date = $3`,
+               SELECT COUNT(*)
+               FROM collections c
+               JOIN customers cu ON c.customer_id = cu.customer_id
+               WHERE cu.company_id = $1 AND c.location_id = $2 AND c.collection_date = $3`,
 		companyID, locationID, today).Scan(&counts.CollectionsToday); err != nil {
 		return nil, fmt.Errorf("failed to get collections count: %w", err)
 	}
 
+	// Payments today
+	if err := s.db.QueryRow(`
+               SELECT COUNT(*)
+               FROM vouchers v
+               JOIN locations l ON v.location_id = l.location_id
+               WHERE l.company_id = $1 AND v.location_id = $2 AND v.date = $3 AND v.type = 'PAYMENT' AND v.is_deleted = FALSE`,
+		companyID, locationID, today).Scan(&counts.PaymentsToday); err != nil {
+		return nil, fmt.Errorf("failed to get payments count: %w", err)
+	}
+
+	// Receipts today
+	if err := s.db.QueryRow(`
+               SELECT COUNT(*)
+               FROM vouchers v
+               JOIN locations l ON v.location_id = l.location_id
+               WHERE l.company_id = $1 AND v.location_id = $2 AND v.date = $3 AND v.type = 'RECEIPT' AND v.is_deleted = FALSE`,
+		companyID, locationID, today).Scan(&counts.ReceiptsToday); err != nil {
+		return nil, fmt.Errorf("failed to get receipts count: %w", err)
+	}
+
+	// Journals today
+	if err := s.db.QueryRow(`
+               SELECT COUNT(*)
+               FROM vouchers v
+               JOIN locations l ON v.location_id = l.location_id
+               WHERE l.company_id = $1 AND v.location_id = $2 AND v.date = $3 AND v.type = 'JOURNAL' AND v.is_deleted = FALSE`,
+		companyID, locationID, today).Scan(&counts.JournalsToday); err != nil {
+		return nil, fmt.Errorf("failed to get journals count: %w", err)
+	}
+
 	// Low stock items
 	if err := s.db.QueryRow(`
-                SELECT COUNT(*)
-                FROM stock st
-                JOIN locations l ON st.location_id = l.location_id
-                JOIN products p ON st.product_id = p.product_id
-                WHERE l.company_id = $1 AND st.location_id = $2 AND st.quantity <= p.reorder_level`,
+               SELECT COUNT(*)
+               FROM stock st
+               JOIN locations l ON st.location_id = l.location_id
+               JOIN products p ON st.product_id = p.product_id
+               WHERE l.company_id = $1 AND st.location_id = $2 AND st.quantity <= p.reorder_level`,
 		companyID, locationID).Scan(&counts.LowStockItems); err != nil {
 		return nil, fmt.Errorf("failed to get low stock count: %w", err)
 	}

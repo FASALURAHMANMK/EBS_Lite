@@ -18,5 +18,8 @@ type QuickActionCounts struct {
 	SalesToday       int `json:"sales_today"`
 	PurchasesToday   int `json:"purchases_today"`
 	CollectionsToday int `json:"collections_today"`
+	PaymentsToday    int `json:"payments_today"`
+	ReceiptsToday    int `json:"receipts_today"`
+	JournalsToday    int `json:"journals_today"`
 	LowStockItems    int `json:"low_stock_items"`
 }

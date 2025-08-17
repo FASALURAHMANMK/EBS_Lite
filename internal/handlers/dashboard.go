@@ -53,7 +53,8 @@ func (h *DashboardHandler) GetMetrics(c *gin.Context) {
 	utils.SuccessResponse(c, "Dashboard metrics retrieved successfully", metrics)
 }
 
-// GET /dashboard/quick-actions
+// GET /dashboard/quick-actions returns quick action counts including
+// today's sales, purchases, collections, vouchers and low stock items
 func (h *DashboardHandler) GetQuickActions(c *gin.Context) {
 	companyID := c.GetInt("company_id")
 	locationID := c.GetInt("location_id")
