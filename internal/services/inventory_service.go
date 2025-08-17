@@ -234,13 +234,13 @@ func (s *InventoryService) CreateStockTransfer(companyID, fromLocationID, userID
 
 func (s *InventoryService) GetStockTransfers(companyID, locationID int) ([]models.StockTransfer, error) {
 	query := `
-		SELECT transfer_id, transfer_number, from_location_id, to_location_id, 
-			   transfer_date, status, notes, created_by, approved_by, 
-			   sync_status, created_at, updated_at
-		FROM stock_transfers
-		WHERE (from_location_id = $1 OR to_location_id = $1)
-		ORDER BY created_at DESC
-	`
+                SELECT transfer_id, transfer_number, from_location_id, to_location_id,
+                           transfer_date, status, notes, created_by, approved_by, approved_at,
+                           sync_status, created_at, updated_at
+                FROM stock_transfers
+                WHERE (from_location_id = $1 OR to_location_id = $1)
+                ORDER BY created_at DESC
+        `
 
 	rows, err := s.db.Query(query, locationID)
 	if err != nil {
@@ -254,7 +254,7 @@ func (s *InventoryService) GetStockTransfers(companyID, locationID int) ([]model
 		err := rows.Scan(
 			&transfer.TransferID, &transfer.TransferNumber, &transfer.FromLocationID,
 			&transfer.ToLocationID, &transfer.TransferDate, &transfer.Status,
-			&transfer.Notes, &transfer.CreatedBy, &transfer.ApprovedBy,
+			&transfer.Notes, &transfer.CreatedBy, &transfer.ApprovedBy, &transfer.ApprovedAt,
 			&transfer.SyncStatus, &transfer.CreatedAt, &transfer.UpdatedAt,
 		)
 		if err != nil {
@@ -338,7 +338,7 @@ func (s *InventoryService) CompleteStockTransfer(transferID, companyID, userID i
 	// Mark transfer as completed
 	_, err = tx.Exec(`
                 UPDATE stock_transfers
-                SET status = 'COMPLETED', approved_by = $1, updated_by = $1, updated_at = CURRENT_TIMESTAMP
+                SET status = 'COMPLETED', approved_by = $1, approved_at = CURRENT_TIMESTAMP, updated_by = $1, updated_at = CURRENT_TIMESTAMP
                 WHERE transfer_id = $2
         `, userID, transferID)
 	if err != nil {
@@ -355,12 +355,12 @@ func (s *InventoryService) GetStockTransfer(transferID, companyID int) (*models.
 	// First get the transfer details
 	var transfer models.StockTransferWithDetails
 	query := `
-		SELECT st.transfer_id, st.transfer_number, st.from_location_id, st.to_location_id, 
-			   st.transfer_date, st.status, st.notes, st.created_by, st.approved_by, 
-			   st.sync_status, st.created_at, st.updated_at,
-			   fl.name as from_location_name, tl.name as to_location_name,
-			   cu.username as created_by_name, au.username as approved_by_name
-		FROM stock_transfers st
+                SELECT st.transfer_id, st.transfer_number, st.from_location_id, st.to_location_id,
+                           st.transfer_date, st.status, st.notes, st.created_by, st.approved_by, st.approved_at,
+                           st.sync_status, st.created_at, st.updated_at,
+                           fl.name as from_location_name, tl.name as to_location_name,
+                           cu.username as created_by_name, au.username as approved_by_name
+                FROM stock_transfers st
 		JOIN locations fl ON st.from_location_id = fl.location_id
 		JOIN locations tl ON st.to_location_id = tl.location_id
 		JOIN users cu ON st.created_by = cu.user_id
@@ -372,7 +372,7 @@ func (s *InventoryService) GetStockTransfer(transferID, companyID int) (*models.
 	err := s.db.QueryRow(query, transferID, companyID).Scan(
 		&transfer.TransferID, &transfer.TransferNumber, &transfer.FromLocationID,
 		&transfer.ToLocationID, &transfer.TransferDate, &transfer.Status,
-		&transfer.Notes, &transfer.CreatedBy, &transfer.ApprovedBy,
+		&transfer.Notes, &transfer.CreatedBy, &transfer.ApprovedBy, &transfer.ApprovedAt,
 		&transfer.SyncStatus, &transfer.CreatedAt, &transfer.UpdatedAt,
 		&transfer.FromLocationName, &transfer.ToLocationName,
 		&transfer.CreatedByName, &transfer.ApprovedByName,
@@ -422,12 +422,12 @@ func (s *InventoryService) GetStockTransfer(transferID, companyID int) (*models.
 // GetStockTransfersWithFilters retrieves transfers with enhanced filtering
 func (s *InventoryService) GetStockTransfersWithFilters(filters *models.StockTransferFilters) ([]models.StockTransferWithItems, error) {
 	query := `
-		SELECT st.transfer_id, st.transfer_number, st.from_location_id, st.to_location_id, 
-			   st.transfer_date, st.status, st.notes, st.created_by, st.approved_by, 
-			   st.sync_status, st.created_at, st.updated_at,
-			   fl.name as from_location_name, tl.name as to_location_name
-		FROM stock_transfers st
-		JOIN locations fl ON st.from_location_id = fl.location_id
+                SELECT st.transfer_id, st.transfer_number, st.from_location_id, st.to_location_id,
+                           st.transfer_date, st.status, st.notes, st.created_by, st.approved_by, st.approved_at,
+                           st.sync_status, st.created_at, st.updated_at,
+                           fl.name as from_location_name, tl.name as to_location_name
+                FROM stock_transfers st
+                JOIN locations fl ON st.from_location_id = fl.location_id
 		JOIN locations tl ON st.to_location_id = tl.location_id
 		WHERE (fl.company_id = $1 OR tl.company_id = $1)
 	`
@@ -474,7 +474,7 @@ func (s *InventoryService) GetStockTransfersWithFilters(filters *models.StockTra
 		err := rows.Scan(
 			&transfer.TransferID, &transfer.TransferNumber, &transfer.FromLocationID,
 			&transfer.ToLocationID, &transfer.TransferDate, &transfer.Status,
-			&transfer.Notes, &transfer.CreatedBy, &transfer.ApprovedBy,
+			&transfer.Notes, &transfer.CreatedBy, &transfer.ApprovedBy, &transfer.ApprovedAt,
 			&transfer.SyncStatus, &transfer.CreatedAt, &transfer.UpdatedAt,
 			&transfer.FromLocationName, &transfer.ToLocationName,
 		)
