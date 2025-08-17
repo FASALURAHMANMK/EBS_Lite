@@ -391,6 +391,7 @@ func Initialize(router *gin.Engine) {
 				attendance.POST("/check-out", middleware.RequirePermission("MANAGE_ATTENDANCE"), attendanceHandler.CheckOut)
 				attendance.POST("/leave", middleware.RequirePermission("MANAGE_ATTENDANCE"), attendanceHandler.ApplyLeave)
 				attendance.GET("/holidays", middleware.RequirePermission("VIEW_ATTENDANCE"), attendanceHandler.GetHolidays)
+				attendance.GET("/records", middleware.RequirePermission("VIEW_ATTENDANCE"), attendanceHandler.GetAttendanceRecords)
 			}
 
 			// Payroll routes (require company)
