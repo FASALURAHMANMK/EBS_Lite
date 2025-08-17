@@ -58,9 +58,7 @@ func (h *EmployeeHandler) CreateEmployee(c *gin.Context) {
 		return
 	}
 	userID := c.GetInt("user_id")
-	// userID not used in creation? We don't use but we keep for consistency? but we don't need.
-	_ = userID
-	employee, err := h.employeeService.CreateEmployee(companyID, &req)
+	employee, err := h.employeeService.CreateEmployee(companyID, userID, &req)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create employee", err)
 		return
@@ -89,7 +87,8 @@ func (h *EmployeeHandler) UpdateEmployee(c *gin.Context) {
 		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
 		return
 	}
-	if err := h.employeeService.UpdateEmployee(employeeID, companyID, &req); err != nil {
+	userID := c.GetInt("user_id")
+	if err := h.employeeService.UpdateEmployee(employeeID, companyID, userID, &req); err != nil {
 		if err.Error() == "employee not found" {
 			utils.NotFoundResponse(c, "Employee not found")
 			return
