@@ -412,6 +412,7 @@ func Initialize(router *gin.Engine) {
 			{
 				collections.GET("", middleware.RequirePermission("VIEW_COLLECTIONS"), collectionHandler.GetCollections)
 				collections.POST("", middleware.RequirePermission("CREATE_COLLECTIONS"), collectionHandler.CreateCollection)
+				collections.GET("/outstanding", middleware.RequirePermission("VIEW_COLLECTIONS"), collectionHandler.GetOutstanding)
 				collections.GET("/:id/receipt", middleware.RequirePermission("VIEW_COLLECTIONS"), collectionHandler.GetCollectionReceipt)
 				collections.DELETE("/:id", middleware.RequirePermission("DELETE_COLLECTIONS"), collectionHandler.DeleteCollection)
 			}
