@@ -43,3 +43,12 @@ type ExpensesSummary struct {
 	TotalAmount float64 `json:"total_amount"`
 	Period      *string `json:"period,omitempty"`
 }
+
+// TaxReport represents aggregated tax information
+// Used by GET /reports/tax endpoint
+type TaxReport struct {
+	TaxName       string  `json:"tax_name"`
+	TaxRate       float64 `json:"tax_rate"`
+	TaxableAmount float64 `json:"taxable_amount"`
+	TaxAmount     float64 `json:"tax_amount"`
+}
