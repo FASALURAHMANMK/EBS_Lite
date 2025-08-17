@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"erp-backend/internal/models"
 	"erp-backend/internal/services"
@@ -16,6 +17,49 @@ type ExpenseHandler struct {
 
 func NewExpenseHandler() *ExpenseHandler {
 	return &ExpenseHandler{service: services.NewExpenseService()}
+}
+
+// GET /expenses
+func (h *ExpenseHandler) GetExpenses(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+
+	filters := map[string]string{}
+	if v := c.Query("category_id"); v != "" {
+		filters["category_id"] = v
+	}
+	if v := c.Query("location_id"); v != "" {
+		filters["location_id"] = v
+	}
+	if v := c.Query("date_from"); v != "" {
+		filters["date_from"] = v
+	}
+	if v := c.Query("date_to"); v != "" {
+		filters["date_to"] = v
+	}
+
+	expenses, err := h.service.ListExpenses(companyID, filters)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get expenses", err)
+		return
+	}
+	utils.SuccessResponse(c, "Expenses retrieved", expenses)
+}
+
+// GET /expenses/:id
+func (h *ExpenseHandler) GetExpense(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid expense ID", err)
+		return
+	}
+
+	expense, err := h.service.GetExpense(companyID, id)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusNotFound, "Expense not found", err)
+		return
+	}
+	utils.SuccessResponse(c, "Expense retrieved", expense)
 }
 
 // POST /expenses
