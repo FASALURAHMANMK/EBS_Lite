@@ -50,6 +50,7 @@ type StockTransfer struct {
 	Notes          *string               `json:"notes,omitempty" db:"notes"`
 	CreatedBy      int                   `json:"created_by" db:"created_by"`
 	ApprovedBy     *int                  `json:"approved_by,omitempty" db:"approved_by"`
+	ApprovedAt     *time.Time            `json:"approved_at,omitempty" db:"approved_at"`
 	Items          []StockTransferDetail `json:"items,omitempty"`
 	SyncModel
 }
@@ -95,6 +96,7 @@ type StockTransferWithItems struct {
 	Notes            *string                    `json:"notes,omitempty" db:"notes"`
 	CreatedBy        int                        `json:"created_by" db:"created_by"`
 	ApprovedBy       *int                       `json:"approved_by,omitempty" db:"approved_by"`
+	ApprovedAt       *time.Time                 `json:"approved_at,omitempty" db:"approved_at"`
 	Items            []StockTransferItemSummary `json:"items"`
 	SyncModel
 }
@@ -113,6 +115,7 @@ type StockTransferWithDetails struct {
 	CreatedBy        int                              `json:"created_by" db:"created_by"`
 	CreatedByName    string                           `json:"created_by_name"`
 	ApprovedBy       *int                             `json:"approved_by,omitempty" db:"approved_by"`
+	ApprovedAt       *time.Time                       `json:"approved_at,omitempty" db:"approved_at"`
 	ApprovedByName   *string                          `json:"approved_by_name,omitempty"`
 	Items            []StockTransferDetailWithProduct `json:"items"`
 	TotalItems       int                              `json:"total_items"`
