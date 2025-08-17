@@ -66,6 +66,8 @@ type PurchaseReturn struct {
 	Reason       *string                `json:"reason,omitempty" db:"reason"`
 	Status       string                 `json:"status" db:"status"`
 	CreatedBy    int                    `json:"created_by" db:"created_by"`
+	ApprovedBy   *int                   `json:"approved_by,omitempty" db:"approved_by"`
+	ApprovedAt   *time.Time             `json:"approved_at,omitempty" db:"approved_at"`
 	Items        []PurchaseReturnDetail `json:"items,omitempty"`
 	Purchase     *Purchase              `json:"purchase,omitempty"`
 	Supplier     *Supplier              `json:"supplier,omitempty"`

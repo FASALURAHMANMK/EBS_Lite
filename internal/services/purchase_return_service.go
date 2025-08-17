@@ -21,15 +21,15 @@ func NewPurchaseReturnService() *PurchaseReturnService {
 
 func (s *PurchaseReturnService) GetPurchaseReturns(companyID, locationID int, filters map[string]string) ([]models.PurchaseReturn, error) {
 	query := `
-		SELECT pr.return_id, pr.return_number, pr.purchase_id, pr.location_id, pr.supplier_id,
-			   pr.return_date, pr.total_amount, pr.reason, pr.status, pr.created_by,
-			   pr.sync_status, pr.created_at, pr.updated_at,
-			   p.purchase_number, s.name as supplier_name
-		FROM purchase_returns pr
-		JOIN purchases p ON pr.purchase_id = p.purchase_id
-		JOIN suppliers s ON pr.supplier_id = s.supplier_id
-		WHERE s.company_id = $1 AND pr.location_id = $2 AND pr.is_deleted = FALSE
-	`
+               SELECT pr.return_id, pr.return_number, pr.purchase_id, pr.location_id, pr.supplier_id,
+                          pr.return_date, pr.total_amount, pr.reason, pr.status, pr.created_by, pr.approved_by, pr.approved_at,
+                          pr.sync_status, pr.created_at, pr.updated_at,
+                          p.purchase_number, s.name as supplier_name
+               FROM purchase_returns pr
+               JOIN purchases p ON pr.purchase_id = p.purchase_id
+               JOIN suppliers s ON pr.supplier_id = s.supplier_id
+               WHERE s.company_id = $1 AND pr.location_id = $2 AND pr.is_deleted = FALSE
+       `
 
 	args := []interface{}{companyID, locationID}
 	argCount := 2
@@ -74,7 +74,7 @@ func (s *PurchaseReturnService) GetPurchaseReturns(companyID, locationID int, fi
 
 		err := rows.Scan(
 			&pr.ReturnID, &pr.ReturnNumber, &pr.PurchaseID, &pr.LocationID, &pr.SupplierID,
-			&pr.ReturnDate, &pr.TotalAmount, &pr.Reason, &pr.Status, &pr.CreatedBy,
+			&pr.ReturnDate, &pr.TotalAmount, &pr.Reason, &pr.Status, &pr.CreatedBy, &pr.ApprovedBy, &pr.ApprovedAt,
 			&pr.SyncStatus, &pr.CreatedAt, &pr.UpdatedAt,
 			&purchaseNumber, &supplierName,
 		)
@@ -95,22 +95,22 @@ func (s *PurchaseReturnService) GetPurchaseReturns(companyID, locationID int, fi
 func (s *PurchaseReturnService) GetPurchaseReturnByID(returnID, companyID int) (*models.PurchaseReturn, error) {
 	// Get return header
 	query := `
-		SELECT pr.return_id, pr.return_number, pr.purchase_id, pr.location_id, pr.supplier_id,
-			   pr.return_date, pr.total_amount, pr.reason, pr.status, pr.created_by,
-			   pr.sync_status, pr.created_at, pr.updated_at,
-			   p.purchase_number, s.name as supplier_name
-		FROM purchase_returns pr
-		JOIN purchases p ON pr.purchase_id = p.purchase_id
-		JOIN suppliers s ON pr.supplier_id = s.supplier_id
-		WHERE pr.return_id = $1 AND s.company_id = $2 AND pr.is_deleted = FALSE
-	`
+               SELECT pr.return_id, pr.return_number, pr.purchase_id, pr.location_id, pr.supplier_id,
+                          pr.return_date, pr.total_amount, pr.reason, pr.status, pr.created_by, pr.approved_by, pr.approved_at,
+                          pr.sync_status, pr.created_at, pr.updated_at,
+                          p.purchase_number, s.name as supplier_name
+               FROM purchase_returns pr
+               JOIN purchases p ON pr.purchase_id = p.purchase_id
+               JOIN suppliers s ON pr.supplier_id = s.supplier_id
+               WHERE pr.return_id = $1 AND s.company_id = $2 AND pr.is_deleted = FALSE
+       `
 
 	var returnData models.PurchaseReturn
 	var purchaseNumber, supplierName string
 
 	err := s.db.QueryRow(query, returnID, companyID).Scan(
 		&returnData.ReturnID, &returnData.ReturnNumber, &returnData.PurchaseID, &returnData.LocationID, &returnData.SupplierID,
-		&returnData.ReturnDate, &returnData.TotalAmount, &returnData.Reason, &returnData.Status, &returnData.CreatedBy,
+		&returnData.ReturnDate, &returnData.TotalAmount, &returnData.Reason, &returnData.Status, &returnData.CreatedBy, &returnData.ApprovedBy, &returnData.ApprovedAt,
 		&returnData.SyncStatus, &returnData.CreatedAt, &returnData.UpdatedAt,
 		&purchaseNumber, &supplierName,
 	)
@@ -223,16 +223,17 @@ func (s *PurchaseReturnService) CreatePurchaseReturn(companyID, locationID, user
 
 	// Insert purchase return
 	insertQuery := `
-                INSERT INTO purchase_returns (return_number, purchase_id, location_id, supplier_id,
-                                                                         return_date, total_amount, reason, status, created_by, updated_by)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                RETURNING return_id, created_at
-        `
+               INSERT INTO purchase_returns (return_number, purchase_id, location_id, supplier_id,
+                                                                        return_date, total_amount, reason, status, created_by, updated_by, approved_by, approved_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+               RETURNING return_id, created_at
+       `
 
 	var returnData models.PurchaseReturn
+	now := time.Now()
 	err = tx.QueryRow(insertQuery,
 		returnNumber, req.PurchaseID, locationID, supplierID,
-		time.Now(), totalAmount, req.Reason, "COMPLETED", userID, userID,
+		now, totalAmount, req.Reason, "COMPLETED", userID, userID, userID, now,
 	).Scan(&returnData.ReturnID, &returnData.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert purchase return: %w", err)
@@ -274,11 +275,13 @@ func (s *PurchaseReturnService) CreatePurchaseReturn(companyID, locationID, user
 	returnData.PurchaseID = req.PurchaseID
 	returnData.LocationID = locationID
 	returnData.SupplierID = supplierID
-	returnData.ReturnDate = time.Now()
+	returnData.ReturnDate = now
 	returnData.TotalAmount = totalAmount
 	returnData.Reason = req.Reason
 	returnData.Status = "COMPLETED"
 	returnData.CreatedBy = userID
+	returnData.ApprovedBy = &userID
+	returnData.ApprovedAt = &now
 
 	return &returnData, nil
 }

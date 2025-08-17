@@ -482,6 +482,8 @@ CREATE TABLE purchase_returns (
     reason TEXT,
     status VARCHAR(50) DEFAULT 'COMPLETED',
     created_by INTEGER NOT NULL REFERENCES users(user_id),
+    approved_by INTEGER REFERENCES users(user_id),
+    approved_at TIMESTAMP,
     updated_by INTEGER NOT NULL REFERENCES users(user_id),
     sync_status VARCHAR(20) DEFAULT 'synced',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
