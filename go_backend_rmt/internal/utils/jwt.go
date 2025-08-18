@@ -2,6 +2,7 @@ package utils
 
 import (
 	"errors"
+	"strconv"
 	"time"
 
 	"erp-backend/internal/models"
@@ -36,7 +37,7 @@ func GenerateAccessToken(user *models.User, sessionID string, expiry time.Durati
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Subject:   string(rune(user.UserID)),
+			Subject:   strconv.Itoa(user.UserID),
 		},
 	}
 
@@ -59,7 +60,7 @@ func GenerateRefreshToken(user *models.User, sessionID string, expiry time.Durat
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Subject:   string(rune(user.UserID)),
+			Subject:   strconv.Itoa(user.UserID),
 		},
 	}
 
