@@ -10,8 +10,7 @@
         "electron": "electron .",
         "electron-dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
         "electron-pack": "next build && electron-builder",
-        "preelectron-pack": "npm run build",
-        "db-reset": "node -e \"require('./utils/dbTest').initializeDatabaseWithSampleData()\""
+        "preelectron-pack": "npm run build"
     },
     "main": "electron/main.js",
     "homepage": "./",
@@ -22,9 +21,6 @@
         "electron-is-dev": "^3.0.1",
         "lucide-react": "^0.294.0",
         "next": "14.0.0",
-        "pouchdb": "^9.0.0",
-        "pouchdb-find": "^9.0.0",
-        "pouchdb-replication": "^9.0.0",
         "react": "18.2.0",
         "react-dom": "18.2.0",
         "typescript": "5.2.2"
