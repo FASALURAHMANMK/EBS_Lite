@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../../context/MainContext';
+import { useAppState, useAppActions, useAppDispatch } from '../../context/MainContext';
 import { useAuth } from '../../context/AuthContext';
 import ErrorDisplay from '../Misc/ErrorDisplay';
 import { 
@@ -70,7 +70,9 @@ const QuickActionButton: React.FC<QuickActionButtonProps> = ({
 };
 
 const Dashboard: React.FC = () => {
-  const { state, dispatch, getDashboardStats } = useApp();
+  const state = useAppState(s => s);
+  const dispatch = useAppDispatch();
+  const { getDashboardStats } = useAppActions();
   const { state: authState } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);

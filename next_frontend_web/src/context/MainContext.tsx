@@ -203,6 +203,27 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const updateCategory = async (id: string, payload: Partial<Category>) => {
+    try {
+      const data = await categories.updateCategory(id, payload);
+      await loadCategories();
+      return data;
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
+  const deleteCategory = async (id: string) => {
+    try {
+      await categories.deleteCategory(id);
+      await loadCategories();
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
   const createCustomer = async (payload: Partial<Customer>) => {
     try {
       const data = await customers.createCustomer(payload);
@@ -316,6 +337,8 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
         updateProduct,
         deleteProduct,
         createCategory,
+        updateCategory,
+        deleteCategory,
         createCustomer,
         updateCustomer,
         deleteCustomer,
@@ -335,4 +358,61 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
 };
 
 export const useApp = () => useContext(MainContext);
+
+export const useAppState = <T,>(selector: (state: AppState) => T): T => {
+  const { state } = useContext(MainContext);
+  return selector(state);
+};
+
+export const useAppDispatch = () => useContext(MainContext).dispatch;
+
+export const useAppActions = () => {
+  const {
+    loadAllData,
+    loadProducts,
+    loadCustomers,
+    loadSales,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    createCustomer,
+    updateCustomer,
+    deleteCustomer,
+    updateCustomerCredit,
+    getCustomerCreditHistory,
+    searchProducts,
+    searchCustomers,
+    getProductsByCategory,
+    createSale,
+    setCurrentLocation,
+    getDashboardStats,
+  } = useContext(MainContext);
+
+  return {
+    loadAllData,
+    loadProducts,
+    loadCustomers,
+    loadSales,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    createCustomer,
+    updateCustomer,
+    deleteCustomer,
+    updateCustomerCredit,
+    getCustomerCreditHistory,
+    searchProducts,
+    searchCustomers,
+    getProductsByCategory,
+    createSale,
+    setCurrentLocation,
+    getDashboardStats,
+  };
+};
 

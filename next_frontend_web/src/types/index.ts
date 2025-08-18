@@ -26,7 +26,6 @@ export interface Location {
   };
   createdAt: string;
   updatedAt: string;
-  _rev?: string;
 }
 
 export interface Company {
@@ -72,7 +71,6 @@ export interface Product {
   maxStock?: number;
   createdAt: string;
   updatedAt: string;
-  _rev?: string;
 }
 
 export interface Category {
@@ -84,7 +82,6 @@ export interface Category {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  _rev?: string;
 }
 
 export interface Customer {
@@ -102,7 +99,6 @@ export interface Customer {
   notes?: string;
   createdAt: string;
   updatedAt: string;
-  _rev?: string;
 }
 
 export interface CreditTransaction {
@@ -118,7 +114,6 @@ export interface CreditTransaction {
   userId: string;
   createdAt: string;
   updatedAt: string;
-  _rev?: string;
 }
 
 export interface CartItem {
@@ -154,7 +149,6 @@ export interface Sale {
   date: string;
   createdAt: string;
   updatedAt: string;
-  _rev?: string;
 }
 
 export interface Supplier {
@@ -169,7 +163,6 @@ export interface Supplier {
   notes?: string;
   createdAt: string;
   updatedAt: string;
-  _rev?: string;
 }
 
 export interface AppState {

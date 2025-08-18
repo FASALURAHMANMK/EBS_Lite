@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../../../context/MainContext';
+import { useAppState, useAppDispatch, useAppActions } from '../../../context/MainContext';
 import { ShoppingCart, Plus, Minus, Trash2, X, CreditCard, Banknote, Search, User, Check } from 'lucide-react';
 
 // Modal Component
@@ -49,12 +49,7 @@ const CustomerAddDialog: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const newCustomer = {
-      id: Date.now().toString(),
-      ...formData,
-      loyaltyPoints: 0
-    };
-    onSave(newCustomer);
+    onSave(formData);
     setFormData({ name: '', phone: '', address: '', creditBalance: 0 });
     onClose();
   };
@@ -130,7 +125,9 @@ const CustomerAddDialog: React.FC<{
 };
 
 const Cart: React.FC = () => {
-  const { state, dispatch } = useApp();
+  const state = useAppState(s => s);
+  const dispatch = useAppDispatch();
+  const { createCustomer } = useAppActions();
   const [customerSearch, setCustomerSearch] = useState('');
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [filteredCustomers, setFilteredCustomers] = useState(state.customers);
@@ -183,9 +180,19 @@ const Cart: React.FC = () => {
     setShowCustomerDropdown(false);
   };
 
-  const handleSaveCustomer = (customer: any) => {
-    dispatch({ type: 'ADD_CUSTOMER', payload: customer });
-    handleCustomerSelect(customer);
+  const handleSaveCustomer = async (customer: any) => {
+    try {
+      const created = await createCustomer({
+        ...customer,
+        creditLimit: 0,
+        loyaltyPoints: 0,
+        isActive: true,
+        locationId: state.currentLocationId || ''
+      });
+      handleCustomerSelect(created);
+    } catch (error) {
+      console.error('Error adding customer:', error);
+    }
   };
 
   const handleCheckout = () => {

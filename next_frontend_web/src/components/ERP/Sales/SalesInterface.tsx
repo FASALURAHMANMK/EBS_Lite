@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApp} from '../../../context/MainContext';
+import { useAppState, useAppActions, useAppDispatch } from '../../../context/MainContext';
 import { useAuth } from '../../../context/AuthContext';
 import { Product,Customer } from '../../../types';
 import { 
@@ -22,15 +22,15 @@ import {
 } from 'lucide-react';
 
 const SalesInterface: React.FC = () => {
-  const { 
-    state, 
-    dispatch,
+  const state = useAppState(s => s);
+  const dispatch = useAppDispatch();
+  const {
     createSale,
     searchProducts,
     searchCustomers,
     createCustomer,
     getProductsByCategory
-  } = useApp();
+  } = useAppActions();
 
   const [productSearchTerm, setProductSearchTerm] = useState('');
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');

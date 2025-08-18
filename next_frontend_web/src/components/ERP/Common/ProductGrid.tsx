@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../../../context/MainContext';
+import { useAppState, useAppDispatch, useAppActions } from '../../../context/MainContext';
 import { useAuth } from '../../../context/AuthContext';
 import { Search, ScanLine, Package, AlertTriangle, Plus, X } from 'lucide-react';
 
@@ -37,20 +37,22 @@ const ProductAddDialog: React.FC<{
   initialName: string;
   onSave: (product: any) => void;
 }> = ({ isOpen, onClose, initialName, onSave }) => {
-  const { state } = useApp();
+  const categories = useAppState(s => s.categories);
+  const selectedCategory = useAppState(s => s.selectedCategory);
+  const currentLocationId = useAppState(s => s.currentLocationId);
   const { state: authState } = useAuth();
- const [formData, setFormData] = useState({
-  name: initialName,
-  price: 0,
-  stock: 0,
-  category: state.selectedCategory === 'All' ? state.categories[1] : state.selectedCategory,
-  locationId: state.currentLocationId || '', // Add this
-  brand: '',
-  model: '',
-  sku: '',
-  warranty: '',
-  description: ''
-});
+  const [formData, setFormData] = useState({
+    name: initialName,
+    price: 0,
+    stock: 0,
+    category: selectedCategory === 'All' ? categories[1] : selectedCategory,
+    locationId: currentLocationId || '',
+    brand: '',
+    model: '',
+    sku: '',
+    warranty: '',
+    description: ''
+  });
 
   useEffect(() => {
     setFormData(prev => ({ ...prev, name: initialName }));
@@ -58,17 +60,13 @@ const ProductAddDialog: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const newProduct = {
-      id: Date.now().toString(),
-      ...formData,
-    };
-    onSave(newProduct);
+    onSave(formData);
     setFormData({
       name: '',
       price: 0,
       stock: 0,
-      category: state.selectedCategory === 'All' ? state.categories[1] : state.selectedCategory,
-      locationId: state.currentLocationId || '',
+      category: selectedCategory === 'All' ? categories[1] : selectedCategory,
+      locationId: currentLocationId || '',
       brand: '',
       model: '',
       sku: '',
@@ -242,7 +240,9 @@ const ProductAddDialog: React.FC<{
 };
 
 const ProductGrid: React.FC = () => {
-  const { state, dispatch, createProduct } = useApp();
+  const state = useAppState(s => s);
+  const dispatch = useAppDispatch();
+  const { createProduct } = useAppActions();
   const [searchTerm, setSearchTerm] = useState('');
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [showProductDropdown, setShowProductDropdown] = useState(false);
