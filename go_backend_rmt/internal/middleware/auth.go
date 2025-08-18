@@ -12,62 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RequireAuth middleware validates JWT token and sets user context
-// func RequireAuth() gin.HandlerFunc {
-// 	return func(c *gin.Context) {
-// 		authHeader := c.GetHeader("Authorization")
-// 		if authHeader == "" {
-// 			utils.UnauthorizedResponse(c, "Authorization header required")
-// 			c.Abort()
-// 			return
-// 		}
-
-// 		tokenString := utils.ExtractTokenFromHeader(authHeader)
-// 		if tokenString == "" {
-// 			utils.UnauthorizedResponse(c, "Invalid authorization header format")
-// 			c.Abort()
-// 			return
-// 		}
-
-// 		claims, err := utils.ValidateToken(tokenString)
-// 		if err != nil {
-// 			utils.UnauthorizedResponse(c, "Invalid or expired token")
-// 			c.Abort()
-// 			return
-// 		}
-
-// 		// Check if token type is access
-// 		if claims.Type != "access" {
-// 			utils.UnauthorizedResponse(c, "Invalid token type")
-// 			c.Abort()
-// 			return
-// 		}
-
-// 		// Verify user still exists and is active
-// 		user, err := getUserByID(claims.UserID)
-// 		if err != nil {
-// 			utils.UnauthorizedResponse(c, "User not found")
-// 			c.Abort()
-// 			return
-// 		}
-
-// 		if !user.IsActive || user.IsLocked {
-// 			utils.UnauthorizedResponse(c, "User account is inactive or locked")
-// 			c.Abort()
-// 			return
-// 		}
-
-// 		// Set user context
-// 		c.Set("user_id", claims.UserID)
-// 		c.Set("company_id", claims.CompanyID)
-// 		c.Set("location_id", claims.LocationID)
-// 		c.Set("role_id", claims.RoleID)
-// 		c.Set("user", user)
-
-// 		c.Next()
-// 	}
-// }
-
 func RequireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
