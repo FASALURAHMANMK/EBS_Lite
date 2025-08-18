@@ -313,7 +313,11 @@ CREATE TABLE expense_categories (
     description TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     created_by INTEGER NOT NULL REFERENCES users(user_id),
-    updated_by INTEGER REFERENCES users(user_id)
+    updated_by INTEGER REFERENCES users(user_id),
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE
 );
 
 -- ===============================================
