@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+next_frontend_web/node_modules/
+
+# Build outputs
+.next/
+dist/
+build/
+
+# Electron
+*.exe
+*.node
+
+# Other large files
+*.zip
+*.tar.g
