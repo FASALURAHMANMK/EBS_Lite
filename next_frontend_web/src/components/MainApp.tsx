@@ -56,16 +56,6 @@ const MainApp: React.FC = () => {
             >
               Retry
             </button>
-            <button
-              onClick={() => {
-                if (typeof window !== 'undefined' && (window as any).runDatabaseTests) {
-                  (window as any).runDatabaseTests();
-                }
-              }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Run DB Tests
-            </button>
           </div>
         </div>
       </div>
@@ -125,39 +115,6 @@ const MainApp: React.FC = () => {
       <MainLayout>
         <div className="h-full flex flex-col">
           {/* Sync Status Banner */}
-          {state.syncStatus === 'offline' && (
-            <div className="bg-yellow-100 dark:bg-yellow-900/30 border-b border-yellow-200 dark:border-yellow-800 px-4 py-2">
-              <div className="flex items-center justify-center space-x-2">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                <span className="text-yellow-800 dark:text-yellow-300 text-sm">
-                  Working offline - Changes will sync when connection is restored
-                </span>
-              </div>
-            </div>
-          )}
-          
-          {state.syncStatus === 'error' && (
-            <div className="bg-red-100 dark:bg-red-900/30 border-b border-red-200 dark:border-red-800 px-4 py-2">
-              <div className="flex items-center justify-center space-x-2">
-                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                <span className="text-red-800 dark:text-red-300 text-sm">
-                  Sync error - Some changes may not be saved
-                </span>
-              </div>
-            </div>
-          )}
-
-          {state.isSyncing && (
-            <div className="bg-blue-100 dark:bg-blue-900/30 border-b border-blue-200 dark:border-blue-800 px-4 py-2">
-              <div className="flex items-center justify-center space-x-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                <span className="text-blue-800 dark:text-blue-300 text-sm">
-                  Syncing data...
-                </span>
-              </div>
-            </div>
-          )}
-          
           {/* Main Content */}
           <div className="flex-1 overflow-hidden">
             {renderCurrentView()}

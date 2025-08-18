@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
-import { AppState, AppAction } from '../types';
-import { useAuth } from './AuthContext';
+import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
+import { AppState, AppAction, Product, Category, Customer, Sale } from '../types';
+import { products, categories, customers, sales, dashboard } from '../services';
 
 const initialState: AppState = {
   currentView: 'dashboard',
@@ -16,9 +16,6 @@ const initialState: AppState = {
   customers: [],
   suppliers: [],
   recentSales: [],
-  isSyncing: false,
-  lastSyncTime: null,
-  syncStatus: 'offline',
   theme: 'light',
   sidebarCollapsed: false,
   currentPage: 1,
@@ -95,8 +92,6 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
       return { ...state, recentSales: action.payload };
     case 'ADD_SALE':
       return { ...state, recentSales: [action.payload, ...state.recentSales.slice(0, 9)] };
-    case 'SET_SYNC_STATUS':
-      return { ...state, syncStatus: action.payload.status, isSyncing: action.payload.isSyncing, lastSyncTime: action.payload.lastSyncTime || state.lastSyncTime };
     case 'TOGGLE_THEME':
       return { ...state, theme: state.theme === 'light' ? 'dark' : 'light' };
     case 'SET_THEME':
@@ -112,18 +107,232 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
   }
 };
 
-const MainContext = createContext<any>({ state: initialState, dispatch: () => undefined });
+const MainContext = createContext<any>({ state: initialState });
 
 export const MainProvider = ({ children }: { children: ReactNode }) => {
-  const { state: authState } = useAuth();
   const [state, dispatch] = useReducer(appReducer, initialState);
 
+  const loadProducts = async () => {
+    try {
+      const data = await products.getProducts();
+      dispatch({ type: 'SET_PRODUCTS', payload: data });
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+    }
+  };
+
+  const loadCategories = async () => {
+    try {
+      const data = await categories.getCategories();
+      dispatch({ type: 'SET_CATEGORIES', payload: ['All', ...data.map((c: Category) => c.name)] });
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+    }
+  };
+
+  const loadCustomers = async () => {
+    try {
+      const data = await customers.getCustomers();
+      dispatch({ type: 'SET_CUSTOMERS', payload: data });
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+    }
+  };
+
+  const loadSales = async () => {
+    try {
+      const data = await sales.getSales();
+      dispatch({ type: 'SET_RECENT_SALES', payload: data });
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+    }
+  };
+
+  const loadAllData = async () => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    try {
+      await Promise.all([loadProducts(), loadCategories(), loadCustomers(), loadSales()]);
+      dispatch({ type: 'SET_INITIALIZED', payload: true });
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  };
+
+  const createProduct = async (payload: Partial<Product>) => {
+    try {
+      const data = await products.createProduct(payload);
+      dispatch({ type: 'ADD_PRODUCT', payload: data });
+      return data;
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
+  const updateProduct = async (id: string, payload: Partial<Product>) => {
+    try {
+      const data = await products.updateProduct(id, payload);
+      dispatch({ type: 'UPDATE_PRODUCT', payload: data });
+      return data;
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
+  const deleteProduct = async (id: string) => {
+    try {
+      await products.deleteProduct(id);
+      dispatch({ type: 'DELETE_PRODUCT', payload: id });
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
+  const createCategory = async (payload: Partial<Category>) => {
+    try {
+      const data = await categories.createCategory(payload);
+      dispatch({ type: 'ADD_CATEGORY', payload: data.name });
+      return data;
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
+  const createCustomer = async (payload: Partial<Customer>) => {
+    try {
+      const data = await customers.createCustomer(payload);
+      dispatch({ type: 'ADD_CUSTOMER', payload: data });
+      return data;
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
+  const updateCustomer = async (id: string, payload: Partial<Customer>) => {
+    try {
+      const data = await customers.updateCustomer(id, payload);
+      dispatch({ type: 'UPDATE_CUSTOMER', payload: data });
+      return data;
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
+  const deleteCustomer = async (id: string) => {
+    try {
+      await customers.deleteCustomer(id);
+      dispatch({ type: 'DELETE_CUSTOMER', payload: id });
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
+  const updateCustomerCredit = async (id: string, amount: number, type: 'credit' | 'debit', description: string) => {
+    try {
+      const data = await customers.updateCustomerCredit(id, amount, type, description);
+      dispatch({ type: 'UPDATE_CUSTOMER', payload: data });
+      return data;
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
+  const getCustomerCreditHistory = async (id: string) => {
+    try {
+      const data = await customers.getCustomerCreditHistory(id);
+      return data;
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
+  const searchProducts = (term: string) => {
+    return state.products.filter(p =>
+      p.name.toLowerCase().includes(term.toLowerCase()) ||
+      p.sku.toLowerCase().includes(term.toLowerCase())
+    );
+  };
+
+  const searchCustomers = (term: string) => {
+    return state.customers.filter(c =>
+      c.name.toLowerCase().includes(term.toLowerCase()) ||
+      c.phone.includes(term)
+    );
+  };
+
+  const getProductsByCategory = (categoryName: string) => {
+    return state.products.filter(p => p.category === categoryName);
+  };
+
+  const createSale = async (payload: Partial<Sale>) => {
+    try {
+      const data = await sales.createSale(payload);
+      dispatch({ type: 'ADD_SALE', payload: data });
+      return data;
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
+  const setCurrentLocation = async (locationId: string) => {
+    dispatch({ type: 'SET_CURRENT_LOCATION', payload: locationId });
+    await loadAllData();
+  };
+
+  const getDashboardStats = async () => {
+    try {
+      return await dashboard.getStats();
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
+  useEffect(() => {
+    loadAllData();
+  }, []);
+
   return (
-    <MainContext.Provider value={{ state, dispatch }}>
+    <MainContext.Provider
+      value={{
+        state,
+        dispatch,
+        loadAllData,
+        loadProducts,
+        loadCustomers,
+        loadSales,
+        createProduct,
+        updateProduct,
+        deleteProduct,
+        createCategory,
+        createCustomer,
+        updateCustomer,
+        deleteCustomer,
+        updateCustomerCredit,
+        getCustomerCreditHistory,
+        searchProducts,
+        searchCustomers,
+        getProductsByCategory,
+        createSale,
+        setCurrentLocation,
+        getDashboardStats,
+      }}
+    >
       {children}
     </MainContext.Provider>
   );
 };
 
-export const useMain = () => useContext(MainContext);
+export const useApp = () => useContext(MainContext);
 
