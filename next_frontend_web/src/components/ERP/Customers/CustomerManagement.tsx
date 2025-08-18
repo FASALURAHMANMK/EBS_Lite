@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../../../context/MainContext';
+import { useAppState, useAppActions, useAppDispatch } from '../../../context/MainContext';
 import { useAuth } from '../../../context/AuthContext';
 import { CreditTransaction,Customer } from '../../../types';
 import { 
@@ -26,16 +26,17 @@ import {
 } from 'lucide-react';
 
 const CustomerManagement: React.FC = () => {
-  const { 
-    state, 
-    loadCustomers, 
-    createCustomer, 
-    updateCustomer, 
-    deleteCustomer, 
+  const state = useAppState(s => s);
+  const dispatch = useAppDispatch();
+  const {
+    loadCustomers,
+    createCustomer,
+    updateCustomer,
+    deleteCustomer,
     updateCustomerCredit,
     getCustomerCreditHistory,
-    searchCustomers 
-  } = useApp();
+    searchCustomers
+  } = useAppActions();
   const { state: authState } = useAuth();
   
   const [searchTerm, setSearchTerm] = useState('');

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../../../context/MainContext';
+import { useAppState, useAppActions } from '../../../context/MainContext';
 import { useAuth } from '../../../context/AuthContext';
 import { Product,Category } from '../../../types';
 import { 
@@ -27,20 +27,19 @@ import {
 } from 'lucide-react';
 
 const ProductManagement: React.FC = () => {
-  const { 
-    state, 
-    loadProducts, 
-    createProduct, 
-    updateProduct, 
+  const state = useAppState(s => s);
+  const {
+    loadProducts,
+    createProduct,
+    updateProduct,
     deleteProduct,
     loadCategories,
     createCategory,
     updateCategory,
     deleteCategory,
-    loadSuppliers,
     searchProducts,
-    getProductsByCategory 
-  } = useApp();
+    getProductsByCategory
+  } = useAppActions();
 
   const { state: authState } = useAuth();
 
@@ -93,7 +92,6 @@ const ProductManagement: React.FC = () => {
   useEffect(() => {
     loadProducts();
     loadCategories();
-    loadSuppliers();
   }, []);
 
   useEffect(() => {

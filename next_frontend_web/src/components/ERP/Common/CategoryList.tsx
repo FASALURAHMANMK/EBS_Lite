@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../../../context/MainContext';
+import { useAppState, useAppDispatch, useAppActions } from '../../../context/MainContext';
 import { Search, Plus, X, Tag } from 'lucide-react';
 
 // Modal Component
@@ -102,23 +102,27 @@ const CategoryAddDialog: React.FC<{
 };
 
 const CategoryList: React.FC = () => {
-  const { state, dispatch, createCategory } = useApp();
+  const categories = useAppState(s => s.categories);
+  const selectedCategory = useAppState(s => s.selectedCategory);
+  const products = useAppState(s => s.products);
+  const dispatch = useAppDispatch();
+  const { createCategory } = useAppActions();
   const [searchTerm, setSearchTerm] = useState('');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
-  const [filteredCategories, setFilteredCategories] = useState(state.categories);
+  const [filteredCategories, setFilteredCategories] = useState(categories);
 
   // Filter categories based on search term
   useEffect(() => {
     if (searchTerm.trim() === '') {
-      setFilteredCategories(state.categories);
+      setFilteredCategories(categories);
     } else {
-      const filtered = state.categories.filter(category =>
+      const filtered = categories.filter(category =>
         category.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredCategories(filtered);
     }
-  }, [searchTerm, state.categories]);
+  }, [searchTerm, categories]);
 
 
   const handleAddNewCategory = () => {
@@ -127,7 +131,7 @@ const CategoryList: React.FC = () => {
   };
 
   const handleSaveCategory = async (categoryName: string) => {
-    if (!state.categories.includes(categoryName)) {
+    if (!categories.includes(categoryName)) {
       try {
         await createCategory({ name: categoryName });
         dispatch({ type: 'SET_CATEGORY', payload: categoryName });
@@ -138,9 +142,9 @@ const CategoryList: React.FC = () => {
   };
 
   const getProductCountForCategory = (category: string) => {
-    return category === 'All' 
-      ? state.products.length 
-      : state.products.filter(p => p.category === category).length;
+    return category === 'All'
+      ? products.length
+      : products.filter(p => p.category === category).length;
   };
 
   const hasNoResults = searchTerm.trim() && filteredCategories.length === 0;
@@ -150,7 +154,7 @@ const CategoryList: React.FC = () => {
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">Categories</h2>
         <div className="text-sm text-gray-500 dark:text-gray-400">
-          {state.products.length} products available
+          {products.length} products available
         </div>
       </div>
 
@@ -193,7 +197,7 @@ const CategoryList: React.FC = () => {
       {/* Categories List */}
       <div className="space-y-2">
         {filteredCategories.map((category) => {
-          const isSelected = state.selectedCategory === category;
+          const isSelected = selectedCategory === category;
           const productCount = getProductCountForCategory(category);
           
           return (
