@@ -104,18 +104,6 @@
     box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.15);
   }
 
-  /* Status indicators */
-  .status-online {
-    @apply flex items-center space-x-2 text-green-600 dark:text-green-400;
-  }
-
-  .status-offline {
-    @apply flex items-center space-x-2 text-red-600 dark:text-red-400;
-  }
-
-  .status-pending {
-    @apply flex items-center space-x-2 text-yellow-600 dark:text-yellow-400;
-  }
 }
 
 /* Utility classes */

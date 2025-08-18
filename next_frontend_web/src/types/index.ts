@@ -198,12 +198,7 @@ export interface AppState {
   customers: Customer[];
   suppliers: Supplier[];
   recentSales: Sale[];
-  
-  // Sync State
-  isSyncing: boolean;
-  lastSyncTime: string | null;
-  syncStatus: 'online' | 'offline' | 'error';
-  
+
   // UI Preferences
   theme: 'light' | 'dark';
   sidebarCollapsed: boolean;
@@ -212,14 +207,6 @@ export interface AppState {
   currentPage: number;
   itemsPerPage: number;
   totalItems: number;
-}
-
-// Database Configuration
-export interface DatabaseConfig {
-  localDB: string;
-  remoteDB: string;
-  username?: string;
-  password?: string;
 }
 
 // Dashboard Types
@@ -358,15 +345,6 @@ export interface CategoryFormData {
   name: string;
   description: string;
 }
-
-// Sync Event Types
-export interface SyncEvent {
-  type: 'change' | 'error' | 'complete' | 'online' | 'offline';
-  dbName: string;
-  data: any;
-  timestamp: Date;
-}
-
 // Utility Types
 export type EntityId = string;
 export type Timestamp = string;
@@ -402,7 +380,6 @@ type AppAction =
   | { type: 'SET_CUSTOMER'; payload: Partial<AppState['customer']> }
   | { type: 'SET_RECENT_SALES'; payload: Sale[] }
   | { type: 'ADD_SALE'; payload: Sale }
-  | { type: 'SET_SYNC_STATUS'; payload: { status: 'online' | 'offline' | 'error'; isSyncing: boolean; lastSyncTime?: string } }
   | { type: 'TOGGLE_THEME' }
   | { type: 'SET_THEME'; payload: 'light' | 'dark' }
   | { type: 'TOGGLE_SIDEBAR' }

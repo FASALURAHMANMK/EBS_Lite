@@ -242,7 +242,7 @@ const ProductAddDialog: React.FC<{
 };
 
 const ProductGrid: React.FC = () => {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, createProduct } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [showProductDropdown, setShowProductDropdown] = useState(false);
@@ -284,8 +284,12 @@ const ProductGrid: React.FC = () => {
     setShowProductDropdown(false);
   };
 
-  const handleSaveProduct = (product: any) => {
-    dispatch({ type: 'ADD_PRODUCT', payload: product });
+  const handleSaveProduct = async (product: any) => {
+    try {
+      await createProduct(product);
+    } catch (error) {
+      console.error('Error adding product:', error);
+    }
   };
 
   const hasNoResults = searchTerm.trim() && filteredProducts.length === 0;

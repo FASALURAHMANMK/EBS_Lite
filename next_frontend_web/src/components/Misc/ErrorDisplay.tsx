@@ -1,7 +1,5 @@
 import React from 'react';
-import { AlertCircle, RefreshCw, Database, Wifi, WifiOff } from 'lucide-react';
-import { useApp } from '../../context/MainContext';
-import { useAuth } from '../../context/AuthContext';
+import { AlertCircle, RefreshCw, Database, WifiOff } from 'lucide-react';
 
 interface ErrorDisplayProps {
   error: string;
@@ -10,8 +8,6 @@ interface ErrorDisplayProps {
 }
 
 const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ error, onRetry, onClearError }) => {
-  const { state } = useApp();
-  const { state: authState } = useAuth();
 
   const getErrorType = (errorMessage: string) => {
     if (errorMessage.includes('Database')) return 'database';
@@ -24,7 +20,7 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ error, onRetry, onClearErro
   const getErrorIcon = (type: string) => {
     switch (type) {
       case 'database': return Database;
-      case 'network': return state.syncStatus === 'offline' ? WifiOff : Wifi;
+      case 'network': return WifiOff;
       case 'timeout': return RefreshCw;
       default: return AlertCircle;
     }
@@ -59,23 +55,6 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ error, onRetry, onClearErro
             {error}
           </p>
           
-          {/* Status Information */}
-          <div className="text-xs space-y-1 mb-3">
-            <div className="flex items-center space-x-2">
-              <span className={`text-${colorClass}-600 dark:text-${colorClass}-400`}>Sync Status:</span>
-              <span className={
-                state.syncStatus === 'online' ? 'text-green-600' :
-                state.syncStatus === 'offline' ? 'text-yellow-600' : 'text-red-600'
-              }>
-                {state.syncStatus.charAt(0).toUpperCase() + state.syncStatus.slice(1)}
-              </span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className={`text-${colorClass}-600 dark:text-${colorClass}-400`}>Company:</span>
-              <span>{authState.user?.companyId ? 'Connected' : 'Not Connected'}</span>
-            </div>
-          </div>
-
           {/* Action Buttons */}
           <div className="flex space-x-2">
             {onRetry && (

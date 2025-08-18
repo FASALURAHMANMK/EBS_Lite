@@ -102,7 +102,7 @@ const CategoryAddDialog: React.FC<{
 };
 
 const CategoryList: React.FC = () => {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, createCategory } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
@@ -126,10 +126,14 @@ const CategoryList: React.FC = () => {
     setShowCategoryDropdown(false);
   };
 
-  const handleSaveCategory = (categoryName: string) => {
+  const handleSaveCategory = async (categoryName: string) => {
     if (!state.categories.includes(categoryName)) {
-      dispatch({ type: 'ADD_CATEGORY', payload: categoryName });
-      dispatch({ type: 'SET_CATEGORY', payload: categoryName });
+      try {
+        await createCategory({ name: categoryName });
+        dispatch({ type: 'SET_CATEGORY', payload: categoryName });
+      } catch (error) {
+        console.error('Error saving category:', error);
+      }
     }
   };
 

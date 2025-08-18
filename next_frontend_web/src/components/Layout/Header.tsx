@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, Sun, Moon, LogOut, Menu, MapPin, RefreshCw, Wifi, WifiOff, Database, LucideLanguages } from 'lucide-react';
+import { ChevronDown, Sun, Moon, LogOut, Menu, MapPin, RefreshCw, LucideLanguages } from 'lucide-react';
 import { useApp } from '../../context/MainContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -53,34 +53,6 @@ const Header: React.FC = () => {
   }
 }, [showLocationDropdown]);
 
-  const getStatusColor = () => {
-    switch (state.syncStatus) {
-      case 'online': return 'text-green-600 dark:text-green-400';
-      case 'offline': return 'text-yellow-600 dark:text-yellow-400';
-      case 'error': return 'text-red-600 dark:text-red-400';
-      default: return 'text-gray-600 dark:text-gray-400';
-    }
-  };
-
-  const getStatusIcon = () => {
-    switch (state.syncStatus) {
-      case 'online': return Wifi;
-      case 'offline': return Database;
-      case 'error': return WifiOff;
-      default: return Database;
-    }
-  };
-
-  const getStatusText = () => {
-    switch (state.syncStatus) {
-      case 'online': return 'Online';
-      case 'offline': return 'Offline';
-      case 'error': return 'Error';
-      default: return 'Loading';
-    }
-  };
-
-  const StatusIcon = getStatusIcon();
   const currentLocation = authState.company?.locations?.find(loc => loc._id === state.currentLocationId);
 
 
@@ -163,29 +135,8 @@ const Header: React.FC = () => {
       </div>
 
       <div className="flex items-center space-x-2">
-        {/* Status Indicators */}
-        <div className="hidden sm:flex items-center space-x-4">
-          <div className={`flex items-center space-x-2 ${getStatusColor()}`}>
-            <StatusIcon className="w-4 h-4" />
-            <span className="text-sm">{getStatusText()}</span>
-          </div>
-          
-          {state.isSyncing && (
-            <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-              <span className="text-sm">Syncing</span>
-            </div>
-          )}
-
-          {state.lastSyncTime && (
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              Last sync: {new Date(state.lastSyncTime).toLocaleTimeString()}
-            </div>
-          )}
-        </div>
-        
         {/* Refresh Button */}
-        <button 
+        <button
           onClick={handleRefresh}
           disabled={isRefreshing}
           className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
