@@ -11,8 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Initialize(router *gin.Engine) {
-	cfg := config.Load()
+func Initialize(router *gin.Engine, cfg *config.Config) {
 
 	// Initialize JWT utils
 	utils.InitializeJWT(cfg.JWTSecret)

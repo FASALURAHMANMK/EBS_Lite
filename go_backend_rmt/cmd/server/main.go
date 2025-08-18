@@ -39,10 +39,10 @@ func main() {
 	// Apply global middleware
 	router.Use(middleware.Logger())
 	router.Use(middleware.Recovery())
-	router.Use(middleware.CORS())
+	router.Use(middleware.CORS(cfg))
 
 	// Initialize routes
-	routes.Initialize(router)
+	routes.Initialize(router, cfg)
 
 	// Start server
 	port := os.Getenv("PORT")
