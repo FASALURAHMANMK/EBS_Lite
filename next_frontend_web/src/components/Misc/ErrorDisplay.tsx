@@ -62,15 +62,9 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ error, onRetry, onClearErro
           {/* Status Information */}
           <div className="text-xs space-y-1 mb-3">
             <div className="flex items-center space-x-2">
-              <span className={`text-${colorClass}-600 dark:text-${colorClass}-400`}>Database:</span>
-              <span className={authState.databaseReady ? 'text-green-600' : 'text-red-600'}>
-                {authState.databaseReady ? 'Ready' : 'Not Ready'}
-              </span>
-            </div>
-            <div className="flex items-center space-x-2">
               <span className={`text-${colorClass}-600 dark:text-${colorClass}-400`}>Sync Status:</span>
               <span className={
-                state.syncStatus === 'online' ? 'text-green-600' : 
+                state.syncStatus === 'online' ? 'text-green-600' :
                 state.syncStatus === 'offline' ? 'text-yellow-600' : 'text-red-600'
               }>
                 {state.syncStatus.charAt(0).toUpperCase() + state.syncStatus.slice(1)}

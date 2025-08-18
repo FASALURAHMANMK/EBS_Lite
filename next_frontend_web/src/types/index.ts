@@ -412,7 +412,6 @@ type AppAction =
 type AuthAction =
   | { type: 'AUTH_INIT_START' }
   | { type: 'AUTH_INIT_COMPLETE' }
-  | { type: 'DATABASE_READY' }
   | { type: 'LOGIN_START' }
   | { type: 'LOGIN_SUCCESS'; payload: { user: User; company: Company } }
   | { type: 'LOGIN_FAILURE'; payload: string }
@@ -420,9 +419,7 @@ type AuthAction =
   | { type: 'REGISTER_START' }
   | { type: 'REGISTER_SUCCESS'; payload: { user: User; company: Company } }
   | { type: 'REGISTER_FAILURE'; payload: string }
-  | { type: 'CLEAR_ERROR' }
-  | { type: 'UPDATE_USER'; payload: User }
-  | { type: 'UPDATE_COMPANY'; payload: Company };
+  | { type: 'CLEAR_ERROR' };
 
   export interface AuthState {
     isAuthenticated: boolean;
@@ -431,7 +428,6 @@ type AuthAction =
     loading: boolean;
     error: string | null;
     isInitialized: boolean;
-    databaseReady: boolean;
   }
 
 export type {

@@ -1,5 +1,37 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
+let accessToken: string | null = null;
+let refreshToken: string | null = null;
+
+if (typeof window !== 'undefined') {
+  accessToken = localStorage.getItem('accessToken');
+  refreshToken = localStorage.getItem('refreshToken');
+}
+
+export const setAuthTokens = ({
+  accessToken: newAccess,
+  refreshToken: newRefresh,
+}: {
+  accessToken: string;
+  refreshToken: string;
+}) => {
+  accessToken = newAccess;
+  refreshToken = newRefresh;
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('accessToken', newAccess);
+    localStorage.setItem('refreshToken', newRefresh);
+  }
+};
+
+export const clearAuthTokens = () => {
+  accessToken = null;
+  refreshToken = null;
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+  }
+};
+
 interface RequestOptions extends RequestInit {
   auth?: boolean;
 }
@@ -17,14 +49,31 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
   };
 
-  if (auth && typeof window !== 'undefined') {
-    const token = localStorage.getItem('token');
-    if (token) {
-      (config.headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
-    }
+  if (auth && accessToken) {
+    (config.headers as Record<string, string>)['Authorization'] = `Bearer ${accessToken}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+  let response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+
+  if (response.status === 401 && auth && refreshToken) {
+    const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (refreshResponse.ok) {
+      const tokens = (await refreshResponse.json()) as {
+        accessToken: string;
+        refreshToken: string;
+      };
+      setAuthTokens(tokens);
+      (config.headers as Record<string, string>)['Authorization'] = `Bearer ${tokens.accessToken}`;
+      response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    } else {
+      clearAuthTokens();
+    }
+  }
 
   if (!response.ok) {
     let errorMessage = response.statusText;
@@ -38,7 +87,6 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   }
 
   if (response.status === 204) {
-    // No Content
     return null as unknown as T;
   }
 
@@ -58,3 +106,4 @@ const apiClient = {
 };
 
 export default apiClient;
+export { accessToken, refreshToken };

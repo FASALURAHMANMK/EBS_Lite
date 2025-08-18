@@ -9,139 +9,15 @@ import CustomerManagement from './ERP/Customers/CustomerManagement';
 import ErrorBoundary from './Misc/ErrorBoundary';
 import { MapPin } from 'lucide-react';
 
-// Database Loading Screen Component (inline for now)
-const DatabaseLoadingScreen: React.FC<{
-  isAuthenticated: boolean;
-  databaseReady: boolean;
-  user?: { fullName?: string } | null;
-}> = ({ isAuthenticated, databaseReady, user }) => {
-  const getStatus = () => {
-    if (isAuthenticated && databaseReady) {
-      return {
-        title: 'Ready!',
-        message: 'Database initialized successfully',
-        color: 'text-green-600 dark:text-green-400'
-      };
-    } else if (isAuthenticated && !databaseReady) {
-      return {
-        title: 'Initializing Database...',
-        message: 'Setting up your workspace',
-        color: 'text-blue-600 dark:text-blue-400'
-      };
-    } else {
-      return {
-        title: 'Loading...',
-        message: 'Preparing application',
-        color: 'text-gray-600 dark:text-gray-400'
-      };
-    }
-  };
-
-  const status = getStatus();
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
-      <div className="text-center p-8">
-        {/* Logo */}
-        <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-red-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-          <span className="text-white font-bold text-xl">iQ</span>
-        </div>
-        
-        {/* App Title */}
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
-          IQ Spare
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400 mb-8">
-          Electronics & Telecom
-        </p>
-
-        {/* Status */}
-        <div className="mb-6">
-          <div className={`font-medium ${status.color} text-lg mb-2`}>
-            {status.title}
-          </div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            {status.message}
-          </div>
-        </div>
-
-        {/* Loading Spinner */}
-        {!databaseReady && (
-          <div className="w-8 h-8 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        )}
-
-        {/* User Welcome */}
-        {user?.fullName && (
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Welcome back, {user.fullName}!
-          </p>
-        )}
-
-        {/* Progress Steps */}
-        <div className="flex items-center justify-center space-x-4 mb-8">
-          <div className="flex items-center space-x-2">
-            <div className={`w-3 h-3 rounded-full ${
-              isAuthenticated ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
-            }`}></div>
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              Authentication
-            </span>
-          </div>
-          
-          <div className="w-8 h-0.5 bg-gray-300 dark:bg-gray-600"></div>
-          
-          <div className="flex items-center space-x-2">
-            <div className={`w-3 h-3 rounded-full ${
-              databaseReady ? 'bg-green-500' : 
-              isAuthenticated ? 'bg-blue-500 animate-pulse' : 'bg-gray-300 dark:bg-gray-600'
-            }`}></div>
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              Database
-            </span>
-          </div>
-        </div>
-
-        {/* Loading Tips */}
-        <div className="max-w-md mx-auto">
-          <div className="text-sm text-gray-500 dark:text-gray-500">
-            {!isAuthenticated && "Authenticating user..."}
-            {isAuthenticated && !databaseReady && "Initializing database and syncing data..."}
-            {isAuthenticated && databaseReady && "Ready to go!"}
-          </div>
-          
-          {isAuthenticated && !databaseReady && (
-            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <div className="text-blue-800 dark:text-blue-300 text-xs">
-                <strong>First time setup:</strong> This may take a few moments as we set up your local database and sync with remote servers.
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-    
-  );
-};
-
 const MainApp: React.FC = () => {
   const { state } = useApp();
   const { state: authState } = useAuth();
 
-  // Show database loading screen if authenticated but database not ready
-  if (authState.isAuthenticated && !authState.databaseReady) {
-    return (
-      <DatabaseLoadingScreen 
-        isAuthenticated={authState.isAuthenticated}
-        databaseReady={authState.databaseReady}
-        user={authState.user}
-      />
-    );
-  }
 
   
 
   // Show loading screen while POS data is being initialized
-  if (authState.databaseReady && state.isLoading && !state.isInitialized) {
+  if (state.isLoading && !state.isInitialized) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="text-center">
