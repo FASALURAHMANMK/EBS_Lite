@@ -2244,3 +2244,93 @@ AND p.name IN (
     'VIEW_PRODUCTS', 'VIEW_INVENTORY'
 )
 ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- =============================================================================
+-- Audit Triggers
+-- =============================================================================
+-- Optional triggers to ensure auditing at the database level
+-- These triggers log insert/update/delete operations for critical tables
+-- as a fallback when application-level logging is bypassed.
+
+CREATE OR REPLACE FUNCTION fn_log_users_audit() RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO audit_log(action, table_name, record_id, old_value, new_value, timestamp)
+    VALUES (TG_OP, 'users', COALESCE(NEW.user_id, OLD.user_id), to_jsonb(OLD), to_jsonb(NEW), CURRENT_TIMESTAMP);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_users_audit
+AFTER INSERT OR UPDATE OR DELETE ON users
+FOR EACH ROW EXECUTE FUNCTION fn_log_users_audit();
+
+CREATE OR REPLACE FUNCTION fn_log_products_audit() RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO audit_log(action, table_name, record_id, old_value, new_value, timestamp)
+    VALUES (TG_OP, 'products', COALESCE(NEW.product_id, OLD.product_id), to_jsonb(OLD), to_jsonb(NEW), CURRENT_TIMESTAMP);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_products_audit
+AFTER INSERT OR UPDATE OR DELETE ON products
+FOR EACH ROW EXECUTE FUNCTION fn_log_products_audit();
+
+CREATE OR REPLACE FUNCTION fn_log_sales_audit() RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO audit_log(action, table_name, record_id, old_value, new_value, timestamp)
+    VALUES (TG_OP, 'sales', COALESCE(NEW.sale_id, OLD.sale_id), to_jsonb(OLD), to_jsonb(NEW), CURRENT_TIMESTAMP);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_sales_audit
+AFTER INSERT OR UPDATE OR DELETE ON sales
+FOR EACH ROW EXECUTE FUNCTION fn_log_sales_audit();
+
+-- =============================================================================
+-- Master Data Backfill for User References
+-- =============================================================================
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS created_by INT REFERENCES users(user_id);
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS updated_by INT REFERENCES users(user_id);
+UPDATE customers SET created_by = 1, updated_by = 1 WHERE created_by IS NULL;
+ALTER TABLE customers ALTER COLUMN created_by SET NOT NULL;
+
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS created_by INT REFERENCES users(user_id);
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS updated_by INT REFERENCES users(user_id);
+UPDATE suppliers SET created_by = 1, updated_by = 1 WHERE created_by IS NULL;
+ALTER TABLE suppliers ALTER COLUMN created_by SET NOT NULL;
+
+ALTER TABLE products ADD COLUMN IF NOT EXISTS created_by INT REFERENCES users(user_id);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_by INT REFERENCES users(user_id);
+UPDATE products SET created_by = 1, updated_by = 1 WHERE created_by IS NULL;
+ALTER TABLE products ALTER COLUMN created_by SET NOT NULL;
+
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS created_by INT REFERENCES users(user_id);
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS updated_by INT REFERENCES users(user_id);
+UPDATE categories SET created_by = 1, updated_by = 1 WHERE created_by IS NULL;
+ALTER TABLE categories ALTER COLUMN created_by SET NOT NULL;
+
+ALTER TABLE brands ADD COLUMN IF NOT EXISTS created_by INT REFERENCES users(user_id);
+ALTER TABLE brands ADD COLUMN IF NOT EXISTS updated_by INT REFERENCES users(user_id);
+UPDATE brands SET created_by = 1, updated_by = 1 WHERE created_by IS NULL;
+ALTER TABLE brands ALTER COLUMN created_by SET NOT NULL;
+
+-- =============================================================================
+-- Workflow Backfill for User References
+-- =============================================================================
+ALTER TABLE workflow_templates ADD COLUMN IF NOT EXISTS created_by INT REFERENCES users(user_id);
+ALTER TABLE workflow_templates ADD COLUMN IF NOT EXISTS updated_by INT REFERENCES users(user_id);
+UPDATE workflow_templates SET created_by = 1, updated_by = 1 WHERE created_by IS NULL;
+ALTER TABLE workflow_templates ALTER COLUMN created_by SET NOT NULL;
+
+ALTER TABLE workflow_states ADD COLUMN IF NOT EXISTS created_by INT REFERENCES users(user_id);
+ALTER TABLE workflow_states ADD COLUMN IF NOT EXISTS updated_by INT REFERENCES users(user_id);
+UPDATE workflow_states SET created_by = 1, updated_by = 1 WHERE created_by IS NULL;
+ALTER TABLE workflow_states ALTER COLUMN created_by SET NOT NULL;
+
+ALTER TABLE workflow_approvals ADD COLUMN IF NOT EXISTS created_by INT REFERENCES users(user_id);
+ALTER TABLE workflow_approvals ADD COLUMN IF NOT EXISTS updated_by INT REFERENCES users(user_id);
+UPDATE workflow_approvals SET created_by = 1, updated_by = 1 WHERE created_by IS NULL;
+ALTER TABLE workflow_approvals ALTER COLUMN created_by SET NOT NULL;
+
