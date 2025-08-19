@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
 import { AppState, AppAction, Product, Category, Customer, Sale } from '../types';
 import { products, categories, customers, sales, dashboard } from '../services';
+import { useAuth } from './AuthContext';
 
 const initialState: AppState = {
   currentView: 'dashboard',
@@ -120,6 +121,34 @@ const MainContext = createContext<any>({ state: initialState });
 
 export const MainProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
+  const { state: authState, updateUserLanguages } = useAuth();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+      const storedLang = localStorage.getItem('language');
+      if (storedTheme) {
+        dispatch({ type: 'SET_THEME', payload: storedTheme });
+      }
+      if (storedLang) {
+        dispatch({ type: 'SET_LANGUAGE', payload: storedLang });
+      } else if (authState.user?.primaryLanguage) {
+        dispatch({ type: 'SET_LANGUAGE', payload: authState.user.primaryLanguage });
+      }
+    }
+  }, [authState.user]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('theme', state.theme);
+      localStorage.setItem('language', state.language);
+      if (state.theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  }, [state.theme, state.language]);
 
   const loadProducts = async () => {
     try {
@@ -334,6 +363,7 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
 
   const setLanguage = (lang: string) => {
     dispatch({ type: 'SET_LANGUAGE', payload: lang });
+    updateUserLanguages({ primaryLanguage: lang });
   };
 
   useEffect(() => {

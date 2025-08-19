@@ -37,6 +37,10 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
       return { ...initialState, isInitialized: true };
     case 'CLEAR_ERROR':
       return { ...state, error: null };
+    case 'UPDATE_USER_LANGUAGES':
+      return state.user
+        ? { ...state, user: { ...state.user, ...action.payload } }
+        : state;
     default:
       return state;
   }
@@ -91,6 +95,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const clearError = () => dispatch({ type: 'CLEAR_ERROR' });
 
+  const updateUserLanguages = (payload: { primaryLanguage: string; secondaryLanguage?: string }) => {
+    dispatch({ type: 'UPDATE_USER_LANGUAGES', payload });
+  };
+
   const hasRole = (roles: string | string[]) => {
     if (!state.user) return false;
     const roleList = Array.isArray(roles) ? roles : [roles];
@@ -98,7 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ state, login, register, logout, clearError, hasRole }}>
+    <AuthContext.Provider value={{ state, login, register, logout, clearError, hasRole, updateUserLanguages }}>
       {children}
     </AuthContext.Provider>
   );

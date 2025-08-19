@@ -14,11 +14,13 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/MainContext';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from 'next-i18next';
 
 const Header: React.FC = () => {
   const { state, dispatch, loadAllData, setCurrentLocation, setLanguage } = useApp();
 
   const { state: authState, logout } = useAuth();
+  const { t } = useTranslation('common');
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [showHelpDropdown, setShowHelpDropdown] = useState(false);
@@ -171,7 +173,7 @@ const Header: React.FC = () => {
               ) : (
                 <WifiOff className="w-4 h-4 text-red-500" />
               )}
-              <span>{isOnline ? 'Online' : 'Offline'}</span>
+              <span>{isOnline ? t('online') : t('offline')}</span>
             </div>
             <div>
               {state.isSyncing
@@ -210,13 +212,13 @@ const Header: React.FC = () => {
                   onClick={() => handleLanguageChange('en')}
                   className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 w-full text-left"
                 >
-                  English
+                  {t('english')}
                 </button>
                 <button
                   onClick={() => handleLanguageChange('hi')}
                   className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 w-full text-left"
                 >
-                  Hindi
+                  {t('hindi')}
                 </button>
               </div>
             )}
@@ -280,10 +282,10 @@ const Header: React.FC = () => {
             <button
               onClick={handleLogout}
               className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors group"
-              title="Logout"
-            >
-              <LogOut className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-red-600 dark:group-hover:text-red-400" />
-            </button>
+            title={t('logout')}
+          >
+            <LogOut className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-red-600 dark:group-hover:text-red-400" />
+          </button>
           </div>
         </div>
       </header>
