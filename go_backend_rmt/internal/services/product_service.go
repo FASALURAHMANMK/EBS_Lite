@@ -28,6 +28,20 @@ func NewProductService() *ProductService {
 	}
 }
 
+// validateSinglePrimaryBarcode ensures exactly one barcode is marked as primary.
+func validateSinglePrimaryBarcode(barcodes []models.ProductBarcode) error {
+	count := 0
+	for _, bc := range barcodes {
+		if bc.IsPrimary {
+			count++
+		}
+	}
+	if count != 1 {
+		return fmt.Errorf("exactly one primary barcode is required")
+	}
+	return nil
+}
+
 func (s *ProductService) GetProducts(companyID int, filters map[string]string) ([]models.Product, error) {
 	query := `
                 SELECT product_id, company_id, category_id, brand_id, unit_id, name, sku,
@@ -120,6 +134,9 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
 }
 
 func (s *ProductService) CreateProduct(companyID, userID int, req *models.CreateProductRequest) (*models.Product, error) {
+	if err := validateSinglePrimaryBarcode(req.Barcodes); err != nil {
+		return nil, err
+	}
 	if req.SKU != nil {
 		exists, err := s.checkProductExists(companyID, req.SKU, nil, 0)
 		if err != nil {
@@ -206,6 +223,11 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 }
 
 func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *models.UpdateProductRequest) error {
+	if req.Barcodes != nil {
+		if err := validateSinglePrimaryBarcode(req.Barcodes); err != nil {
+			return err
+		}
+	}
 	if req.SKU != nil {
 		exists, err := s.checkProductExists(companyID, req.SKU, nil, productID)
 		if err != nil {
