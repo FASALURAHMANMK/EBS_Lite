@@ -22,17 +22,18 @@ func NewPOSService() *POSService {
 
 func (s *POSService) GetPOSProducts(companyID, locationID int) ([]models.POSProductResponse, error) {
 	query := `
-		SELECT p.product_id, p.name, 
-			   COALESCE(p.selling_price, 0) as price,
-			   COALESCE(st.quantity, 0) as stock,
-			   p.barcode,
-			   c.name as category_name
-		FROM products p
-		LEFT JOIN stock st ON p.product_id = st.product_id AND st.location_id = $2
-		LEFT JOIN categories c ON p.category_id = c.category_id
-		WHERE p.company_id = $1 AND p.is_active = TRUE AND p.is_deleted = FALSE
-		ORDER BY p.name
-	`
+                SELECT p.product_id, p.name,
+                           COALESCE(pb.selling_price, p.selling_price, 0) as price,
+                           COALESCE(st.quantity, 0) as stock,
+                           pb.barcode,
+                           c.name as category_name
+                FROM products p
+                LEFT JOIN product_barcodes pb ON p.product_id = pb.product_id AND pb.is_primary = TRUE
+                LEFT JOIN stock st ON p.product_id = st.product_id AND st.location_id = $2
+                LEFT JOIN categories c ON p.category_id = c.category_id
+                WHERE p.company_id = $1 AND p.is_active = TRUE AND p.is_deleted = FALSE
+                ORDER BY p.name
+        `
 
 	rows, err := s.db.Query(query, companyID, locationID)
 	if err != nil {
@@ -147,23 +148,24 @@ func (s *POSService) GetHeldSales(companyID, locationID int) ([]models.Sale, err
 
 func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string) ([]models.POSProductResponse, error) {
 	query := `
-		SELECT p.product_id, p.name, 
-			   COALESCE(p.selling_price, 0) as price,
-			   COALESCE(st.quantity, 0) as stock,
-			   p.barcode,
-			   c.name as category_name
-		FROM products p
-		LEFT JOIN stock st ON p.product_id = st.product_id AND st.location_id = $2
-		LEFT JOIN categories c ON p.category_id = c.category_id
-		WHERE p.company_id = $1 AND p.is_active = TRUE AND p.is_deleted = FALSE
-		AND (
-			LOWER(p.name) LIKE LOWER($3) OR 
-			LOWER(p.sku) LIKE LOWER($3) OR 
-			p.barcode = $4
-		)
-		ORDER BY p.name
-		LIMIT 50
-	`
+                SELECT p.product_id, p.name,
+                           COALESCE(pb.selling_price, p.selling_price, 0) as price,
+                           COALESCE(st.quantity, 0) as stock,
+                           pb.barcode,
+                           c.name as category_name
+                FROM products p
+                LEFT JOIN product_barcodes pb ON p.product_id = pb.product_id AND pb.is_primary = TRUE
+                LEFT JOIN stock st ON p.product_id = st.product_id AND st.location_id = $2
+                LEFT JOIN categories c ON p.category_id = c.category_id
+                WHERE p.company_id = $1 AND p.is_active = TRUE AND p.is_deleted = FALSE
+                AND (
+                        LOWER(p.name) LIKE LOWER($3) OR
+                        LOWER(p.sku) LIKE LOWER($3) OR
+                        EXISTS (SELECT 1 FROM product_barcodes pb2 WHERE pb2.product_id = p.product_id AND pb2.barcode = $4)
+                )
+                ORDER BY p.name
+                LIMIT 50
+        `
 
 	searchPattern := "%" + searchTerm + "%"
 

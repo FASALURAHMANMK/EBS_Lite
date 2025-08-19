@@ -8,7 +8,7 @@ type Product struct {
 	UnitID       *int               `json:"unit_id,omitempty" db:"unit_id"`
 	Name         string             `json:"name" db:"name" validate:"required,min=2,max=255"`
 	SKU          *string            `json:"sku,omitempty" db:"sku"`
-	Barcode      *string            `json:"barcode,omitempty" db:"barcode"`
+	Barcodes     []ProductBarcode   `json:"barcodes,omitempty" db:"-"`
 	Description  *string            `json:"description,omitempty" db:"description"`
 	CostPrice    *float64           `json:"cost_price,omitempty" db:"cost_price"`
 	SellingPrice *float64           `json:"selling_price,omitempty" db:"selling_price"`
@@ -24,36 +24,36 @@ type Product struct {
 }
 
 type CreateProductRequest struct {
-	CategoryID   *int     `json:"category_id,omitempty"`
-	BrandID      *int     `json:"brand_id,omitempty"`
-	UnitID       *int     `json:"unit_id,omitempty"`
-	Name         string   `json:"name" validate:"required,min=2,max=255"`
-	SKU          *string  `json:"sku,omitempty"`
-	Barcode      *string  `json:"barcode,omitempty"`
-	Description  *string  `json:"description,omitempty"`
-	CostPrice    *float64 `json:"cost_price,omitempty"`
-	SellingPrice *float64 `json:"selling_price,omitempty"`
-	ReorderLevel int      `json:"reorder_level"`
-	Weight       *float64 `json:"weight,omitempty"`
-	Dimensions   *string  `json:"dimensions,omitempty"`
-	IsSerialized bool     `json:"is_serialized"`
+	CategoryID   *int             `json:"category_id,omitempty"`
+	BrandID      *int             `json:"brand_id,omitempty"`
+	UnitID       *int             `json:"unit_id,omitempty"`
+	Name         string           `json:"name" validate:"required,min=2,max=255"`
+	SKU          *string          `json:"sku,omitempty"`
+	Barcodes     []ProductBarcode `json:"barcodes" validate:"required,min=1,dive"`
+	Description  *string          `json:"description,omitempty"`
+	CostPrice    *float64         `json:"cost_price,omitempty"`
+	SellingPrice *float64         `json:"selling_price,omitempty"`
+	ReorderLevel int              `json:"reorder_level"`
+	Weight       *float64         `json:"weight,omitempty"`
+	Dimensions   *string          `json:"dimensions,omitempty"`
+	IsSerialized bool             `json:"is_serialized"`
 }
 
 type UpdateProductRequest struct {
-	CategoryID   *int     `json:"category_id,omitempty"`
-	BrandID      *int     `json:"brand_id,omitempty"`
-	UnitID       *int     `json:"unit_id,omitempty"`
-	Name         *string  `json:"name,omitempty" validate:"omitempty,min=2,max=255"`
-	SKU          *string  `json:"sku,omitempty"`
-	Barcode      *string  `json:"barcode,omitempty"`
-	Description  *string  `json:"description,omitempty"`
-	CostPrice    *float64 `json:"cost_price,omitempty"`
-	SellingPrice *float64 `json:"selling_price,omitempty"`
-	ReorderLevel *int     `json:"reorder_level,omitempty"`
-	Weight       *float64 `json:"weight,omitempty"`
-	Dimensions   *string  `json:"dimensions,omitempty"`
-	IsSerialized *bool    `json:"is_serialized,omitempty"`
-	IsActive     *bool    `json:"is_active,omitempty"`
+	CategoryID   *int             `json:"category_id,omitempty"`
+	BrandID      *int             `json:"brand_id,omitempty"`
+	UnitID       *int             `json:"unit_id,omitempty"`
+	Name         *string          `json:"name,omitempty" validate:"omitempty,min=2,max=255"`
+	SKU          *string          `json:"sku,omitempty"`
+	Barcodes     []ProductBarcode `json:"barcodes,omitempty" validate:"omitempty,dive"`
+	Description  *string          `json:"description,omitempty"`
+	CostPrice    *float64         `json:"cost_price,omitempty"`
+	SellingPrice *float64         `json:"selling_price,omitempty"`
+	ReorderLevel *int             `json:"reorder_level,omitempty"`
+	Weight       *float64         `json:"weight,omitempty"`
+	Dimensions   *string          `json:"dimensions,omitempty"`
+	IsSerialized *bool            `json:"is_serialized,omitempty"`
+	IsActive     *bool            `json:"is_active,omitempty"`
 }
 
 type Category struct {

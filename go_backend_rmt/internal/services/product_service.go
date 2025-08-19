@@ -21,7 +21,7 @@ func NewProductService() *ProductService {
 
 func (s *ProductService) GetProducts(companyID int, filters map[string]string) ([]models.Product, error) {
 	query := `
-                SELECT product_id, company_id, category_id, brand_id, unit_id, name, sku, barcode,
+                SELECT product_id, company_id, category_id, brand_id, unit_id, name, sku,
                            description, cost_price, selling_price, reorder_level, weight, dimensions,
                            is_serialized, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted
                 FROM products
@@ -63,7 +63,7 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 		var product models.Product
 		err := rows.Scan(
 			&product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
-			&product.UnitID, &product.Name, &product.SKU, &product.Barcode, &product.Description,
+			&product.UnitID, &product.Name, &product.SKU, &product.Description,
 			&product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
 			&product.Dimensions, &product.IsSerialized, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
 			&product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
@@ -71,6 +71,7 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan product: %w", err)
 		}
+		product.Barcodes, _ = s.getProductBarcodes(product.ProductID)
 		products = append(products, product)
 	}
 
@@ -79,7 +80,7 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 
 func (s *ProductService) GetProductByID(productID, companyID int) (*models.Product, error) {
 	query := `
-                SELECT product_id, company_id, category_id, brand_id, unit_id, name, sku, barcode,
+                SELECT product_id, company_id, category_id, brand_id, unit_id, name, sku,
                            description, cost_price, selling_price, reorder_level, weight, dimensions,
                            is_serialized, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted
                 FROM products
@@ -89,7 +90,7 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
 	var product models.Product
 	err := s.db.QueryRow(query, productID, companyID).Scan(
 		&product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
-		&product.UnitID, &product.Name, &product.SKU, &product.Barcode, &product.Description,
+		&product.UnitID, &product.Name, &product.SKU, &product.Description,
 		&product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
 		&product.Dimensions, &product.IsSerialized, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
 		&product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
@@ -102,13 +103,24 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
 		return nil, fmt.Errorf("failed to get product: %w", err)
 	}
 
+	product.Barcodes, _ = s.getProductBarcodes(product.ProductID)
+
 	return &product, nil
 }
 
 func (s *ProductService) CreateProduct(companyID, userID int, req *models.CreateProductRequest) (*models.Product, error) {
-	// Check for duplicate SKU or barcode if provided
-	if req.SKU != nil || req.Barcode != nil {
-		exists, err := s.checkProductExists(companyID, req.SKU, req.Barcode, 0)
+	if req.SKU != nil {
+		exists, err := s.checkProductExists(companyID, req.SKU, nil, 0)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check product existence: %w", err)
+		}
+		if exists {
+			return nil, fmt.Errorf("product with this SKU or barcode already exists")
+		}
+	}
+	for _, bc := range req.Barcodes {
+		b := bc.Barcode
+		exists, err := s.checkProductExists(companyID, nil, &b, 0)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check product existence: %w", err)
 		}
@@ -117,24 +129,42 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 		}
 	}
 
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
 	query := `
                 INSERT INTO products (
-                        company_id, category_id, brand_id, unit_id, name, sku, barcode, description,
+                        company_id, category_id, brand_id, unit_id, name, sku, description,
                         cost_price, selling_price, reorder_level, weight, dimensions, is_serialized,
                         created_by, updated_by
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
                 RETURNING product_id, created_at
         `
 
 	var product models.Product
-	err := s.db.QueryRow(query,
-		companyID, req.CategoryID, req.BrandID, req.UnitID, req.Name, req.SKU, req.Barcode,
+	err = tx.QueryRow(query,
+		companyID, req.CategoryID, req.BrandID, req.UnitID, req.Name, req.SKU,
 		req.Description, req.CostPrice, req.SellingPrice, req.ReorderLevel, req.Weight,
-		req.Dimensions, req.IsSerialized, userID,
+		req.Dimensions, req.IsSerialized, userID, userID,
 	).Scan(&product.ProductID, &product.CreatedAt)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to create product: %w", err)
+	}
+
+	// insert barcodes
+	for _, bc := range req.Barcodes {
+		_, err = tx.Exec(`INSERT INTO product_barcodes (product_id, barcode, pack_size, cost_price, selling_price, is_primary) VALUES ($1,$2,$3,$4,$5,$6)`,
+			product.ProductID, bc.Barcode, bc.PackSize, bc.CostPrice, bc.SellingPrice, bc.IsPrimary)
+		if err != nil {
+			return nil, fmt.Errorf("failed to insert product barcode: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	// Set the response fields
@@ -144,7 +174,7 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 	product.UnitID = req.UnitID
 	product.Name = req.Name
 	product.SKU = req.SKU
-	product.Barcode = req.Barcode
+	product.Barcodes = req.Barcodes
 	product.Description = req.Description
 	product.CostPrice = req.CostPrice
 	product.SellingPrice = req.SellingPrice
@@ -160,14 +190,25 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 }
 
 func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *models.UpdateProductRequest) error {
-	// Check for duplicate SKU or barcode if provided
-	if req.SKU != nil || req.Barcode != nil {
-		exists, err := s.checkProductExists(companyID, req.SKU, req.Barcode, productID)
+	if req.SKU != nil {
+		exists, err := s.checkProductExists(companyID, req.SKU, nil, productID)
 		if err != nil {
 			return fmt.Errorf("failed to check product existence: %w", err)
 		}
 		if exists {
 			return fmt.Errorf("product with this SKU or barcode already exists")
+		}
+	}
+	if req.Barcodes != nil {
+		for _, bc := range req.Barcodes {
+			b := bc.Barcode
+			exists, err := s.checkProductExists(companyID, nil, &b, productID)
+			if err != nil {
+				return fmt.Errorf("failed to check product existence: %w", err)
+			}
+			if exists {
+				return fmt.Errorf("product with this SKU or barcode already exists")
+			}
 		}
 	}
 
@@ -211,12 +252,6 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 		setParts = append(setParts, fmt.Sprintf("sku = $%d", argCount))
 		args = append(args, *req.SKU)
 		changes["sku"] = *req.SKU
-	}
-	if req.Barcode != nil {
-		argCount++
-		setParts = append(setParts, fmt.Sprintf("barcode = $%d", argCount))
-		args = append(args, *req.Barcode)
-		changes["barcode"] = *req.Barcode
 	}
 	if req.Description != nil {
 		argCount++
@@ -266,6 +301,9 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 		args = append(args, *req.IsActive)
 		changes["is_active"] = *req.IsActive
 	}
+	if req.Barcodes != nil {
+		changes["barcodes"] = req.Barcodes
+	}
 
 	if len(setParts) == 0 {
 		return fmt.Errorf("no fields to update")
@@ -292,6 +330,18 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 
 	if rowsAffected == 0 {
 		return fmt.Errorf("product not found")
+	}
+
+	if req.Barcodes != nil {
+		if _, err := tx.Exec("DELETE FROM product_barcodes WHERE product_id = $1", productID); err != nil {
+			return fmt.Errorf("failed to clear product barcodes: %w", err)
+		}
+		for _, bc := range req.Barcodes {
+			if _, err := tx.Exec(`INSERT INTO product_barcodes (product_id, barcode, pack_size, cost_price, selling_price, is_primary) VALUES ($1,$2,$3,$4,$5,$6)`,
+				productID, bc.Barcode, bc.PackSize, bc.CostPrice, bc.SellingPrice, bc.IsPrimary); err != nil {
+				return fmt.Errorf("failed to insert product barcode: %w", err)
+			}
+		}
 	}
 
 	if len(changes) > 0 {
@@ -492,44 +542,55 @@ func (s *ProductService) CreateUnit(req *models.CreateUnitRequest) (*models.Unit
 
 // Helper methods
 func (s *ProductService) checkProductExists(companyID int, sku, barcode *string, excludeProductID int) (bool, error) {
-	if sku == nil && barcode == nil {
-		return false, nil
-	}
-
-	conditions := []string{"company_id = $1", "is_deleted = FALSE"}
-	args := []interface{}{companyID}
-	argCount := 1
-
-	if excludeProductID > 0 {
-		argCount++
-		conditions = append(conditions, fmt.Sprintf("product_id != $%d", argCount))
-		args = append(args, excludeProductID)
-	}
-
-	var orConditions []string
 	if sku != nil && *sku != "" {
-		argCount++
-		orConditions = append(orConditions, fmt.Sprintf("sku = $%d", argCount))
-		args = append(args, *sku)
+		query := "SELECT COUNT(*) FROM products WHERE company_id = $1 AND is_deleted = FALSE AND sku = $2"
+		args := []interface{}{companyID, *sku}
+		if excludeProductID > 0 {
+			query += " AND product_id <> $3"
+			args = append(args, excludeProductID)
+		}
+		var count int
+		if err := s.db.QueryRow(query, args...).Scan(&count); err != nil {
+			return false, err
+		}
+		if count > 0 {
+			return true, nil
+		}
 	}
+
 	if barcode != nil && *barcode != "" {
-		argCount++
-		orConditions = append(orConditions, fmt.Sprintf("barcode = $%d", argCount))
-		args = append(args, *barcode)
+		query := `SELECT COUNT(*) FROM products p JOIN product_barcodes pb ON p.product_id = pb.product_id WHERE p.company_id = $1 AND p.is_deleted = FALSE AND pb.barcode = $2`
+		args := []interface{}{companyID, *barcode}
+		if excludeProductID > 0 {
+			query += " AND p.product_id <> $3"
+			args = append(args, excludeProductID)
+		}
+		var count int
+		if err := s.db.QueryRow(query, args...).Scan(&count); err != nil {
+			return false, err
+		}
+		if count > 0 {
+			return true, nil
+		}
 	}
 
-	if len(orConditions) == 0 {
-		return false, nil
-	}
+	return false, nil
+}
 
-	query := fmt.Sprintf("SELECT COUNT(*) FROM products WHERE %s AND (%s)",
-		strings.Join(conditions, " AND "), strings.Join(orConditions, " OR "))
-
-	var count int
-	err := s.db.QueryRow(query, args...).Scan(&count)
+func (s *ProductService) getProductBarcodes(productID int) ([]models.ProductBarcode, error) {
+	rows, err := s.db.Query(`SELECT barcode_id, product_id, barcode, pack_size, cost_price, selling_price, is_primary FROM product_barcodes WHERE product_id = $1`, productID)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
+	defer rows.Close()
 
-	return count > 0, nil
+	var barcodes []models.ProductBarcode
+	for rows.Next() {
+		var bc models.ProductBarcode
+		if err := rows.Scan(&bc.BarcodeID, &bc.ProductID, &bc.Barcode, &bc.PackSize, &bc.CostPrice, &bc.SellingPrice, &bc.IsPrimary); err != nil {
+			return nil, err
+		}
+		barcodes = append(barcodes, bc)
+	}
+	return barcodes, nil
 }

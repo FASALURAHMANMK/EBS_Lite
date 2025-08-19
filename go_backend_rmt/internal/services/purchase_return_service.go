@@ -128,14 +128,15 @@ func (s *PurchaseReturnService) GetPurchaseReturnByID(returnID, companyID int) (
 
 	// Get return details
 	detailsQuery := `
-		SELECT prd.return_detail_id, prd.return_id, prd.purchase_detail_id, prd.product_id,
-			   prd.quantity, prd.unit_price, prd.line_total,
-			   p.name as product_name, p.sku, p.barcode
-		FROM purchase_return_details prd
-		JOIN products p ON prd.product_id = p.product_id
-		WHERE prd.return_id = $1
-		ORDER BY prd.return_detail_id
-	`
+                SELECT prd.return_detail_id, prd.return_id, prd.purchase_detail_id, prd.product_id,
+                           prd.quantity, prd.unit_price, prd.line_total,
+                           p.name as product_name, p.sku, pb.barcode
+                FROM purchase_return_details prd
+                JOIN products p ON prd.product_id = p.product_id
+                LEFT JOIN product_barcodes pb ON p.product_id = pb.product_id AND pb.is_primary = TRUE
+                WHERE prd.return_id = $1
+                ORDER BY prd.return_detail_id
+        `
 
 	rows, err := s.db.Query(detailsQuery, returnID)
 	if err != nil {
@@ -161,7 +162,12 @@ func (s *PurchaseReturnService) GetPurchaseReturnByID(returnID, companyID int) (
 			ProductID: detail.ProductID,
 			Name:      productName.String,
 			SKU:       nullStringToStringPtr(sku),
-			Barcode:   nullStringToStringPtr(barcode),
+			Barcodes: func() []models.ProductBarcode {
+				if barcode.Valid {
+					return []models.ProductBarcode{{Barcode: barcode.String, IsPrimary: true}}
+				}
+				return nil
+			}(),
 		}
 
 		returnData.Items = append(returnData.Items, detail)
