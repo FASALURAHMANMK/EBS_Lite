@@ -91,8 +91,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const clearError = () => dispatch({ type: 'CLEAR_ERROR' });
 
+  const hasRole = (roles: string | string[]) => {
+    if (!state.user) return false;
+    const roleList = Array.isArray(roles) ? roles : [roles];
+    return roleList.includes(state.user.role);
+  };
+
   return (
-    <AuthContext.Provider value={{ state, login, register, logout, clearError }}>
+    <AuthContext.Provider value={{ state, login, register, logout, clearError, hasRole }}>
       {children}
     </AuthContext.Provider>
   );

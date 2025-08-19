@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
 import { Eye, EyeOff, LogIn, Building, User, AlertCircle, CheckCircle } from 'lucide-react';
 
 const RegisterPage: React.FC = () => {
     const { state, register, clearError } = useAuth();
+    const router = useRouter();
     const [currentStep, setCurrentStep] = useState(1);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -460,7 +462,10 @@ const RegisterPage: React.FC = () => {
             <div className="mt-6 text-center">
               <span className="text-gray-600 dark:text-gray-400 text-sm">
                 Already have an account?{' '}
-                <button className="text-red-600 hover:text-red-500 dark:text-red-400 dark:hover:text-red-300 font-medium">
+                <button
+                  className="text-red-600 hover:text-red-500 dark:text-red-400 dark:hover:text-red-300 font-medium"
+                  onClick={() => router.push('/login')}
+                >
                   Sign in
                 </button>
               </span>
