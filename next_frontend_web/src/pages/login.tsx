@@ -9,9 +9,10 @@ const Login: React.FC = () => {
 
   useEffect(() => {
     if (state.isAuthenticated) {
-      router.replace('/dashboard');
+      const target = state.user?.role === 'admin' ? '/dashboard' : '/sales';
+      router.replace(target);
     }
-  }, [state.isAuthenticated, router]);
+  }, [state.isAuthenticated, state.user, router]);
 
   return <LoginPage />;
 };
