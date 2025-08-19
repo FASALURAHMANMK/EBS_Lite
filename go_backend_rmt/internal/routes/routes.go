@@ -201,14 +201,14 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				units.POST("", middleware.RequireRole("Admin"), productHandler.CreateUnit)
 			}
 
-			// Product attribute management routes
-			attributes := protected.Group("/product-attributes")
-			attributes.Use(middleware.RequireCompanyAccess())
+			// Product attribute definition management routes
+			attrDefs := protected.Group("/product-attribute-definitions")
+			attrDefs.Use(middleware.RequireCompanyAccess())
 			{
-				attributes.GET("", middleware.RequirePermission("VIEW_PRODUCTS"), productAttributeHandler.GetAttributes)
-				attributes.POST("", middleware.RequirePermission("CREATE_PRODUCTS"), productAttributeHandler.CreateAttribute)
-				attributes.PUT("/:id", middleware.RequirePermission("UPDATE_PRODUCTS"), productAttributeHandler.UpdateAttribute)
-				attributes.DELETE("/:id", middleware.RequirePermission("DELETE_PRODUCTS"), productAttributeHandler.DeleteAttribute)
+				attrDefs.GET("", middleware.RequirePermission("VIEW_PRODUCTS"), productAttributeHandler.GetDefinitions)
+				attrDefs.POST("", middleware.RequirePermission("CREATE_PRODUCTS"), productAttributeHandler.CreateDefinition)
+				attrDefs.PUT("/:id", middleware.RequirePermission("UPDATE_PRODUCTS"), productAttributeHandler.UpdateDefinition)
+				attrDefs.DELETE("/:id", middleware.RequirePermission("DELETE_PRODUCTS"), productAttributeHandler.DeleteDefinition)
 			}
 
 			// ADD THESE NEW INVENTORY ROUTES:
