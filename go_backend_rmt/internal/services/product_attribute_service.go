@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
@@ -16,44 +17,47 @@ func NewProductAttributeService() *ProductAttributeService {
 	return &ProductAttributeService{db: database.GetDB()}
 }
 
-// GetProductAttributes returns all attributes for a company
-func (s *ProductAttributeService) GetProductAttributes(companyID int) ([]models.ProductAttribute, error) {
+// GetAttributeDefinitions returns all attribute definitions for a company
+func (s *ProductAttributeService) GetAttributeDefinitions(companyID int) ([]models.ProductAttributeDefinition, error) {
 	rows, err := s.db.Query(`
-        SELECT attribute_id, company_id, name, value, sync_status, created_at, updated_at, is_deleted
+        SELECT attribute_id, company_id, name, type, is_required, options, sync_status, created_at, updated_at, is_deleted
         FROM product_attributes WHERE company_id = $1 AND is_deleted = FALSE`, companyID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get product attributes: %w", err)
+		return nil, fmt.Errorf("failed to get product attribute definitions: %w", err)
 	}
 	defer rows.Close()
 
-	var attrs []models.ProductAttribute
+	var defs []models.ProductAttributeDefinition
 	for rows.Next() {
-		var a models.ProductAttribute
-		if err := rows.Scan(&a.AttributeID, &a.CompanyID, &a.Name, &a.Value, &a.SyncStatus, &a.CreatedAt, &a.UpdatedAt, &a.IsDeleted); err != nil {
-			return nil, fmt.Errorf("failed to scan attribute: %w", err)
+		var d models.ProductAttributeDefinition
+		if err := rows.Scan(&d.AttributeID, &d.CompanyID, &d.Name, &d.Type, &d.IsRequired, &d.Options, &d.SyncStatus, &d.CreatedAt, &d.UpdatedAt, &d.IsDeleted); err != nil {
+			return nil, fmt.Errorf("failed to scan attribute definition: %w", err)
 		}
-		attrs = append(attrs, a)
+		defs = append(defs, d)
 	}
-	return attrs, nil
+	return defs, nil
 }
 
-// CreateProductAttribute adds a new attribute
-func (s *ProductAttributeService) CreateProductAttribute(companyID int, req *models.CreateProductAttributeRequest) (*models.ProductAttribute, error) {
-	var attr models.ProductAttribute
+// CreateAttributeDefinition adds a new attribute definition
+func (s *ProductAttributeService) CreateAttributeDefinition(companyID int, req *models.CreateProductAttributeDefinitionRequest) (*models.ProductAttributeDefinition, error) {
+	var def models.ProductAttributeDefinition
 	err := s.db.QueryRow(`
-        INSERT INTO product_attributes (company_id, name, value) VALUES ($1,$2,$3)
-        RETURNING attribute_id, created_at`, companyID, req.Name, req.Value).Scan(&attr.AttributeID, &attr.CreatedAt)
+        INSERT INTO product_attributes (company_id, name, type, is_required, options)
+        VALUES ($1,$2,$3,$4,$5)
+        RETURNING attribute_id, created_at`, companyID, req.Name, req.Type, req.IsRequired, req.Options).Scan(&def.AttributeID, &def.CreatedAt)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create attribute: %w", err)
+		return nil, fmt.Errorf("failed to create attribute definition: %w", err)
 	}
-	attr.CompanyID = companyID
-	attr.Name = req.Name
-	attr.Value = req.Value
-	return &attr, nil
+	def.CompanyID = companyID
+	def.Name = req.Name
+	def.Type = req.Type
+	def.IsRequired = req.IsRequired
+	def.Options = req.Options
+	return &def, nil
 }
 
-// UpdateProductAttribute updates an existing attribute
-func (s *ProductAttributeService) UpdateProductAttribute(id, companyID int, req *models.UpdateProductAttributeRequest) error {
+// UpdateAttributeDefinition updates an existing attribute definition
+func (s *ProductAttributeService) UpdateAttributeDefinition(id, companyID int, req *models.UpdateProductAttributeDefinitionRequest) error {
 	query := "UPDATE product_attributes SET "
 	params := []interface{}{}
 	idx := 1
@@ -63,9 +67,19 @@ func (s *ProductAttributeService) UpdateProductAttribute(id, companyID int, req 
 		params = append(params, *req.Name)
 		idx++
 	}
-	if req.Value != nil {
-		query += fmt.Sprintf("value = $%d,", idx)
-		params = append(params, *req.Value)
+	if req.Type != nil {
+		query += fmt.Sprintf("type = $%d,", idx)
+		params = append(params, *req.Type)
+		idx++
+	}
+	if req.IsRequired != nil {
+		query += fmt.Sprintf("is_required = $%d,", idx)
+		params = append(params, *req.IsRequired)
+		idx++
+	}
+	if req.Options != nil {
+		query += fmt.Sprintf("options = $%d,", idx)
+		params = append(params, *req.Options)
 		idx++
 	}
 	if req.IsActive != nil {
@@ -80,18 +94,45 @@ func (s *ProductAttributeService) UpdateProductAttribute(id, companyID int, req 
 	query += fmt.Sprintf(" WHERE attribute_id = $%d AND company_id = $%d", idx, idx+1)
 	params = append(params, id, companyID)
 
-	_, err := s.db.Exec(query, params...)
-	if err != nil {
-		return fmt.Errorf("failed to update attribute: %w", err)
+	if _, err := s.db.Exec(query, params...); err != nil {
+		return fmt.Errorf("failed to update attribute definition: %w", err)
 	}
 	return nil
 }
 
-// DeleteProductAttribute soft deletes an attribute
-func (s *ProductAttributeService) DeleteProductAttribute(id, companyID int) error {
+// DeleteAttributeDefinition soft deletes an attribute definition
+func (s *ProductAttributeService) DeleteAttributeDefinition(id, companyID int) error {
 	_, err := s.db.Exec(`UPDATE product_attributes SET is_deleted = TRUE WHERE attribute_id = $1 AND company_id = $2`, id, companyID)
 	if err != nil {
-		return fmt.Errorf("failed to delete attribute: %w", err)
+		return fmt.Errorf("failed to delete attribute definition: %w", err)
 	}
 	return nil
+}
+
+// GetDefinitionsByIDs returns definitions for given IDs
+func (s *ProductAttributeService) GetDefinitionsByIDs(companyID int, ids []int) (map[int]models.ProductAttributeDefinition, error) {
+	if len(ids) == 0 {
+		return map[int]models.ProductAttributeDefinition{}, nil
+	}
+	placeholders := make([]string, len(ids))
+	args := []interface{}{companyID}
+	for i, id := range ids {
+		placeholders[i] = fmt.Sprintf("$%d", i+2)
+		args = append(args, id)
+	}
+	query := fmt.Sprintf(`SELECT attribute_id, company_id, name, type, is_required, options FROM product_attributes WHERE company_id = $1 AND attribute_id IN (%s) AND is_deleted = FALSE`, strings.Join(placeholders, ","))
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[int]models.ProductAttributeDefinition)
+	for rows.Next() {
+		var d models.ProductAttributeDefinition
+		if err := rows.Scan(&d.AttributeID, &d.CompanyID, &d.Name, &d.Type, &d.IsRequired, &d.Options); err != nil {
+			return nil, err
+		}
+		result[d.AttributeID] = d
+	}
+	return result, nil
 }

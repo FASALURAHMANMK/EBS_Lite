@@ -964,6 +964,7 @@ CREATE INDEX idx_products_sku ON products(sku);
 CREATE INDEX idx_products_active ON products(company_id, is_active);
 CREATE INDEX idx_product_attributes_company ON product_attributes(company_id);
 CREATE INDEX idx_product_attribute_values_product ON product_attribute_values(product_id);
+CREATE INDEX idx_product_attribute_values_product_attribute ON product_attribute_values(product_id, attribute_id);
 
 -- Categories and Brands
 CREATE INDEX idx_categories_company ON categories(company_id);

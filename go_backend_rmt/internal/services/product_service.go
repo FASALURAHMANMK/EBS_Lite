@@ -2,20 +2,29 @@ package services
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
 )
 
+type AttributeDefinitionProvider interface {
+	GetAttributeDefinitions(companyID int) ([]models.ProductAttributeDefinition, error)
+}
+
 type ProductService struct {
-	db *sql.DB
+	db               *sql.DB
+	attributeService AttributeDefinitionProvider
 }
 
 func NewProductService() *ProductService {
 	return &ProductService{
-		db: database.GetDB(),
+		db:               database.GetDB(),
+		attributeService: NewProductAttributeService(),
 	}
 }
 
@@ -72,6 +81,7 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 			return nil, fmt.Errorf("failed to scan product: %w", err)
 		}
 		product.Barcodes, _ = s.getProductBarcodes(product.ProductID)
+		product.Attributes, _ = s.getProductAttributes(product.ProductID)
 		products = append(products, product)
 	}
 
@@ -104,6 +114,7 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
 	}
 
 	product.Barcodes, _ = s.getProductBarcodes(product.ProductID)
+	product.Attributes, _ = s.getProductAttributes(product.ProductID)
 
 	return &product, nil
 }
@@ -163,6 +174,10 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 		}
 	}
 
+	if err := s.validateAndSaveAttributes(tx, companyID, product.ProductID, req.Attributes); err != nil {
+		return nil, err
+	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
@@ -185,6 +200,7 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 	product.IsActive = true
 	product.CreatedBy = userID
 	product.UpdatedBy = &userID
+	product.Attributes, _ = s.getProductAttributes(product.ProductID)
 
 	return &product, nil
 }
@@ -341,6 +357,12 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 				productID, bc.Barcode, bc.PackSize, bc.CostPrice, bc.SellingPrice, bc.IsPrimary); err != nil {
 				return fmt.Errorf("failed to insert product barcode: %w", err)
 			}
+		}
+	}
+
+	if req.Attributes != nil {
+		if err := s.validateAndSaveAttributes(tx, companyID, productID, req.Attributes); err != nil {
+			return err
 		}
 	}
 
@@ -593,4 +615,96 @@ func (s *ProductService) getProductBarcodes(productID int) ([]models.ProductBarc
 		barcodes = append(barcodes, bc)
 	}
 	return barcodes, nil
+}
+
+func (s *ProductService) getProductAttributes(productID int) ([]models.ProductAttributeValue, error) {
+	rows, err := s.db.Query(`SELECT pav.attribute_id, pav.product_id, pav.value, pa.company_id, pa.name, pa.type, pa.is_required, pa.options FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.attribute_id WHERE pav.product_id = $1`, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var attrs []models.ProductAttributeValue
+	for rows.Next() {
+		var val models.ProductAttributeValue
+		if err := rows.Scan(&val.AttributeID, &val.ProductID, &val.Value, &val.Definition.CompanyID, &val.Definition.Name, &val.Definition.Type, &val.Definition.IsRequired, &val.Definition.Options); err != nil {
+			return nil, err
+		}
+		val.Definition.AttributeID = val.AttributeID
+		attrs = append(attrs, val)
+	}
+	return attrs, nil
+}
+
+type sqlExecutor interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+}
+
+func (s *ProductService) validateAndSaveAttributes(exec sqlExecutor, companyID, productID int, attrs map[int]string) error {
+	defsList, err := s.attributeService.GetAttributeDefinitions(companyID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch attribute definitions: %w", err)
+	}
+	defs := make(map[int]models.ProductAttributeDefinition)
+	for _, d := range defsList {
+		defs[d.AttributeID] = d
+		if d.IsRequired {
+			if _, ok := attrs[d.AttributeID]; !ok {
+				return fmt.Errorf("missing required attribute %s", d.Name)
+			}
+		}
+	}
+
+	if _, err := exec.Exec("DELETE FROM product_attribute_values WHERE product_id = $1", productID); err != nil {
+		return fmt.Errorf("failed to clear attribute values: %w", err)
+	}
+	for id, val := range attrs {
+		def, ok := defs[id]
+		if !ok {
+			return fmt.Errorf("invalid attribute id %d", id)
+		}
+		if err := validateAttributeValue(def, val); err != nil {
+			return err
+		}
+		if _, err := exec.Exec(`INSERT INTO product_attribute_values (product_id, attribute_id, value) VALUES ($1,$2,$3)`, productID, id, val); err != nil {
+			return fmt.Errorf("failed to insert attribute value: %w", err)
+		}
+	}
+	return nil
+}
+
+func validateAttributeValue(def models.ProductAttributeDefinition, value string) error {
+	switch def.Type {
+	case "NUMBER":
+		if _, err := strconv.ParseFloat(value, 64); err != nil {
+			return fmt.Errorf("attribute %s expects NUMBER", def.Name)
+		}
+	case "BOOLEAN":
+		if _, err := strconv.ParseBool(value); err != nil {
+			return fmt.Errorf("attribute %s expects BOOLEAN", def.Name)
+		}
+	case "DATE":
+		if _, err := time.Parse("2006-01-02", value); err != nil {
+			return fmt.Errorf("attribute %s expects DATE", def.Name)
+		}
+	case "SELECT":
+		if def.Options == nil {
+			return fmt.Errorf("attribute %s has no options", def.Name)
+		}
+		var opts []string
+		if err := json.Unmarshal([]byte(*def.Options), &opts); err != nil {
+			return fmt.Errorf("invalid options for attribute %s", def.Name)
+		}
+		valid := false
+		for _, opt := range opts {
+			if opt == value {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return fmt.Errorf("value for attribute %s must be one of %v", def.Name, opts)
+		}
+	}
+	return nil
 }

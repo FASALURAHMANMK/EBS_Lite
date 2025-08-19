@@ -1,25 +1,25 @@
 package models
 
 type Product struct {
-	ProductID    int                `json:"product_id" db:"product_id"`
-	CompanyID    int                `json:"company_id" db:"company_id"`
-	CategoryID   *int               `json:"category_id,omitempty" db:"category_id"`
-	BrandID      *int               `json:"brand_id,omitempty" db:"brand_id"`
-	UnitID       *int               `json:"unit_id,omitempty" db:"unit_id"`
-	Name         string             `json:"name" db:"name" validate:"required,min=2,max=255"`
-	SKU          *string            `json:"sku,omitempty" db:"sku"`
-	Barcodes     []ProductBarcode   `json:"barcodes,omitempty" db:"-"`
-	Description  *string            `json:"description,omitempty" db:"description"`
-	CostPrice    *float64           `json:"cost_price,omitempty" db:"cost_price"`
-	SellingPrice *float64           `json:"selling_price,omitempty" db:"selling_price"`
-	ReorderLevel int                `json:"reorder_level" db:"reorder_level"`
-	Weight       *float64           `json:"weight,omitempty" db:"weight"`
-	Dimensions   *string            `json:"dimensions,omitempty" db:"dimensions"`
-	IsSerialized bool               `json:"is_serialized" db:"is_serialized"`
-	IsActive     bool               `json:"is_active" db:"is_active"`
-	CreatedBy    int                `json:"created_by" db:"created_by"`
-	UpdatedBy    *int               `json:"updated_by,omitempty" db:"updated_by"`
-	Attributes   []ProductAttribute `json:"attributes,omitempty" db:"-"`
+	ProductID    int                     `json:"product_id" db:"product_id"`
+	CompanyID    int                     `json:"company_id" db:"company_id"`
+	CategoryID   *int                    `json:"category_id,omitempty" db:"category_id"`
+	BrandID      *int                    `json:"brand_id,omitempty" db:"brand_id"`
+	UnitID       *int                    `json:"unit_id,omitempty" db:"unit_id"`
+	Name         string                  `json:"name" db:"name" validate:"required,min=2,max=255"`
+	SKU          *string                 `json:"sku,omitempty" db:"sku"`
+	Barcodes     []ProductBarcode        `json:"barcodes,omitempty" db:"-"`
+	Description  *string                 `json:"description,omitempty" db:"description"`
+	CostPrice    *float64                `json:"cost_price,omitempty" db:"cost_price"`
+	SellingPrice *float64                `json:"selling_price,omitempty" db:"selling_price"`
+	ReorderLevel int                     `json:"reorder_level" db:"reorder_level"`
+	Weight       *float64                `json:"weight,omitempty" db:"weight"`
+	Dimensions   *string                 `json:"dimensions,omitempty" db:"dimensions"`
+	IsSerialized bool                    `json:"is_serialized" db:"is_serialized"`
+	IsActive     bool                    `json:"is_active" db:"is_active"`
+	CreatedBy    int                     `json:"created_by" db:"created_by"`
+	UpdatedBy    *int                    `json:"updated_by,omitempty" db:"updated_by"`
+	Attributes   []ProductAttributeValue `json:"attributes,omitempty" db:"-"`
 	SyncModel
 }
 
@@ -37,6 +37,7 @@ type CreateProductRequest struct {
 	Weight       *float64         `json:"weight,omitempty"`
 	Dimensions   *string          `json:"dimensions,omitempty"`
 	IsSerialized bool             `json:"is_serialized"`
+	Attributes   map[int]string   `json:"attributes,omitempty"`
 }
 
 type UpdateProductRequest struct {
@@ -54,6 +55,7 @@ type UpdateProductRequest struct {
 	Dimensions   *string          `json:"dimensions,omitempty"`
 	IsSerialized *bool            `json:"is_serialized,omitempty"`
 	IsActive     *bool            `json:"is_active,omitempty"`
+	Attributes   map[int]string   `json:"attributes,omitempty"`
 }
 
 type Category struct {
