@@ -1,24 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, Sun, Moon, LogOut, Menu, MapPin, RefreshCw, LucideLanguages } from 'lucide-react';
+import {
+  ChevronDown,
+  Sun,
+  Moon,
+  LogOut,
+  Menu,
+  MapPin,
+  RefreshCw,
+  LucideLanguages,
+  HelpCircle,
+  Wifi,
+  WifiOff,
+} from 'lucide-react';
 import { useApp } from '../../context/MainContext';
 import { useAuth } from '../../context/AuthContext';
 
 const Header: React.FC = () => {
-  const { state, dispatch, loadAllData, setCurrentLocation } = useApp();
+  const { state, dispatch, loadAllData, setCurrentLocation, setLanguage } = useApp();
 
   const { state: authState, logout } = useAuth();
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [showHelpDropdown, setShowHelpDropdown] = useState(false);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
   const handleRefresh = async () => {
-    setIsRefreshing(true);
     try {
       await loadAllData();
     } catch (error) {
       console.error('Refresh failed:', error);
-    } finally {
-      setIsRefreshing(false);
     }
+  };
+
+  const handleLanguageChange = (lang: string) => {
+    setLanguage(lang);
+    setShowLanguageDropdown(false);
   };
 
   const handleLogout = () => {
@@ -43,15 +59,28 @@ const Header: React.FC = () => {
 };
 
   useEffect(() => {
-  const handleClickOutside = () => {
-    setShowLocationDropdown(false);
-  };
+    const handleClickOutside = () => {
+      setShowLocationDropdown(false);
+      setShowLanguageDropdown(false);
+      setShowHelpDropdown(false);
+    };
 
-  if (showLocationDropdown) {
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }
-}, [showLocationDropdown]);
+    if (showLocationDropdown || showLanguageDropdown || showHelpDropdown) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showLocationDropdown, showLanguageDropdown, showHelpDropdown]);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const currentLocation = authState.company?.locations?.find(loc => loc._id === state.currentLocationId);
 
@@ -134,60 +163,130 @@ const Header: React.FC = () => {
 </div>
       </div>
 
-      <div className="flex items-center space-x-2">
-        {/* Refresh Button */}
-        <button
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
-          title="Refresh Data"
-        >
-          <RefreshCw className={`w-5 h-5 text-gray-600 dark:text-gray-300 ${isRefreshing ? 'animate-spin' : ''}`} />
-        </button>
-        {/* Language Toggle Button */}
-        <button
-          // onClick={toggleLanguage}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          title="Toggle Language"
-        >
-          <LucideLanguages className="w-5 h-5 text-gray-600 dark:text-gray-300" />
-        </button>
-
-        {/* Theme Toggle */}
-        <button 
-          onClick={toggleTheme}
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          title={`Switch to ${state.theme === 'light' ? 'dark' : 'light'} mode`}
-        >
-          {state.theme === 'light' ? (
-            <Moon className="w-5 h-5 text-gray-600" />
-          ) : (
-            <Sun className="w-5 h-5 text-yellow-500" />
-          )}
-        </button>
-
-        {/* User Menu */}
-        <div className="flex items-center space-x-2">
-          <div className="hidden md:block text-right">
-            <div className="text-sm font-medium text-gray-800 dark:text-white">
-              {authState.user?.fullName}
+        <div className="flex items-center space-x-4">
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex items-center space-x-1">
+              {isOnline ? (
+                <Wifi className="w-4 h-4 text-green-500" />
+              ) : (
+                <WifiOff className="w-4 h-4 text-red-500" />
+              )}
+              <span>{isOnline ? 'Online' : 'Offline'}</span>
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {authState.user?.role}
+            <div>
+              {state.isSyncing
+                ? 'Syncing...'
+                : state.lastSync
+                ? `Last sync: ${new Date(state.lastSync).toLocaleTimeString()}`
+                : 'Never synced'}
             </div>
           </div>
-          
-          {/* Logout Button */}
-          <button 
-            onClick={handleLogout}
-            className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors group"
-            title="Logout"
+
+          {/* Refresh Button */}
+          <button
+            onClick={handleRefresh}
+            disabled={state.isSyncing}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+            title="Refresh Data"
           >
-            <LogOut className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-red-600 dark:group-hover:text-red-400" />
+            <RefreshCw className={`w-5 h-5 text-gray-600 dark:text-gray-300 ${state.isSyncing ? 'animate-spin' : ''}`} />
           </button>
+
+          {/* Language Dropdown */}
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowLanguageDropdown(!showLanguageDropdown);
+              }}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              title="Select Language"
+            >
+              <LucideLanguages className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+            </button>
+            {showLanguageDropdown && (
+              <div className="absolute right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+                <button
+                  onClick={() => handleLanguageChange('en')}
+                  className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 w-full text-left"
+                >
+                  English
+                </button>
+                <button
+                  onClick={() => handleLanguageChange('hi')}
+                  className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 w-full text-left"
+                >
+                  Hindi
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Help Menu */}
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowHelpDropdown(!showHelpDropdown);
+              }}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              title="Help"
+            >
+              <HelpCircle className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+            </button>
+            {showHelpDropdown && (
+              <div className="absolute right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 min-w-[8rem]">
+                <a
+                  href="/help"
+                  className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  User Guide
+                </a>
+                <a
+                  href="/support"
+                  className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  Support
+                </a>
+              </div>
+            )}
+          </div>
+
+          {/* Theme Toggle */}
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            title={`Switch to ${state.theme === 'light' ? 'dark' : 'light'} mode`}
+          >
+            {state.theme === 'light' ? (
+              <Moon className="w-5 h-5 text-gray-600" />
+            ) : (
+              <Sun className="w-5 h-5 text-yellow-500" />
+            )}
+          </button>
+
+          {/* User Menu */}
+          <div className="flex items-center space-x-2">
+            <div className="hidden md:block text-right">
+              <div className="text-sm font-medium text-gray-800 dark:text-white">
+                {authState.user?.fullName}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                {authState.user?.role}
+              </div>
+            </div>
+
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors group"
+              title="Logout"
+            >
+              <LogOut className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-red-600 dark:group-hover:text-red-400" />
+            </button>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
   );
 };
 

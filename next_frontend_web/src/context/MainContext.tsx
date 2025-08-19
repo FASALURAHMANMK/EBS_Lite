@@ -18,6 +18,9 @@ const initialState: AppState = {
   recentSales: [],
   theme: 'light',
   sidebarCollapsed: false,
+  language: 'en',
+  lastSync: null,
+  isSyncing: false,
   currentPage: 1,
   itemsPerPage: 20,
   totalItems: 0,
@@ -100,6 +103,12 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
       return { ...state, sidebarCollapsed: !state.sidebarCollapsed };
     case 'SET_PAGINATION':
       return { ...state, currentPage: action.payload.currentPage, totalItems: action.payload.totalItems };
+    case 'SET_LANGUAGE':
+      return { ...state, language: action.payload };
+    case 'SET_LAST_SYNC':
+      return { ...state, lastSync: action.payload };
+    case 'SET_SYNCING':
+      return { ...state, isSyncing: action.payload };
     case 'RESET_STATE':
       return { ...initialState };
     default:
@@ -150,13 +159,16 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
 
   const loadAllData = async () => {
     dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_SYNCING', payload: true });
     try {
       await Promise.all([loadProducts(), loadCategories(), loadCustomers(), loadSales()]);
       dispatch({ type: 'SET_INITIALIZED', payload: true });
+      dispatch({ type: 'SET_LAST_SYNC', payload: new Date().toISOString() });
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: error.message });
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
+      dispatch({ type: 'SET_SYNCING', payload: false });
     }
   };
 
@@ -320,6 +332,10 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const setLanguage = (lang: string) => {
+    dispatch({ type: 'SET_LANGUAGE', payload: lang });
+  };
+
   useEffect(() => {
     loadAllData();
   }, []);
@@ -350,6 +366,7 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
         createSale,
         setCurrentLocation,
         getDashboardStats,
+        setLanguage,
       }}
     >
       {children}
