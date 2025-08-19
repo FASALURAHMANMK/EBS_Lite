@@ -32,6 +32,32 @@ export const clearAuthTokens = () => {
   }
 };
 
+const toSnakeCase = (obj: any): any => {
+  if (Array.isArray(obj)) return obj.map(toSnakeCase);
+  if (obj && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj).map(([key, value]) => [
+        key.replace(/[A-Z]/g, (l) => `_${l.toLowerCase()}`),
+        toSnakeCase(value),
+      ])
+    );
+  }
+  return obj;
+};
+
+const toCamelCase = (obj: any): any => {
+  if (Array.isArray(obj)) return obj.map(toCamelCase);
+  if (obj && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj).map(([key, value]) => [
+        key.replace(/_([a-z])/g, (_, g) => g.toUpperCase()),
+        toCamelCase(value),
+      ])
+    );
+  }
+  return obj;
+};
+
 interface RequestOptions extends RequestInit {
   auth?: boolean;
 }
@@ -46,7 +72,11 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
       Accept: 'application/json',
       ...(headers || {}),
     },
-    body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
+    body: body
+      ? typeof body === 'string'
+        ? body
+        : JSON.stringify(toSnakeCase(body))
+      : undefined,
   };
 
   if (auth && accessToken) {
@@ -56,7 +86,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   let response = await fetch(`${API_BASE_URL}${endpoint}`, config);
 
   if (response.status === 401 && auth && refreshToken) {
-    const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+    const refreshResponse = await fetch(`${API_BASE_URL}/api/v1/auth/refresh-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
@@ -90,7 +120,8 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     return null as unknown as T;
   }
 
-  return (await response.json()) as T;
+  const data = await response.json();
+  return toCamelCase(data) as T;
 }
 
 const apiClient = {

@@ -49,7 +49,39 @@ export interface Company {
   createdAt: string;
   updatedAt: string;
 }
-export interface Product {
+
+export interface AuditFields {
+  createdBy: string;
+  updatedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductAttributeDefinition {
+  attributeId: string;
+  name: string;
+  type: 'TEXT' | 'NUMBER' | 'DATE' | 'BOOLEAN' | 'SELECT';
+  isRequired: boolean;
+  options?: string[];
+}
+
+export interface ProductAttributeValue {
+  attributeId: string;
+  value: string;
+  definition?: ProductAttributeDefinition;
+}
+
+export interface ProductBarcode {
+  barcodeId?: string;
+  productId?: string;
+  barcode: string;
+  packSize: number;
+  costPrice?: number;
+  sellingPrice?: number;
+  isPrimary: boolean;
+}
+
+export interface Product extends AuditFields {
   _id: string;
   name: string;
   price: number;
@@ -69,22 +101,20 @@ export interface Product {
   costPrice?: number;
   minStock?: number;
   maxStock?: number;
-  createdAt: string;
-  updatedAt: string;
+  barcodes?: ProductBarcode[];
+  attributes?: ProductAttributeValue[];
 }
 
-export interface Category {
+export interface Category extends AuditFields {
   _id: string;
   name: string;
   description?: string;
   companyId: string;
   locationId: string;
   isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
 }
 
-export interface Customer {
+export interface Customer extends AuditFields {
   _id: string;
   name: string;
   phone: string;
@@ -97,11 +127,9 @@ export interface Customer {
   locationId: string;
   isActive: boolean;
   notes?: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
-export interface CreditTransaction {
+export interface CreditTransaction extends AuditFields {
   _id: string;
   customerId: string;
   amount: number;
@@ -112,8 +140,6 @@ export interface CreditTransaction {
   companyId: string;
   locationId: string;
   userId: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface CartItem {
@@ -124,7 +150,7 @@ export interface CartItem {
   discount?: number;
 }
 
-export interface Sale {
+export interface Sale extends AuditFields {
   _id: string;
   saleNumber: string;
   customerId?: string;
@@ -147,11 +173,9 @@ export interface Sale {
   locationId: string;
   userId: string;
   date: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
-export interface Supplier {
+export interface Supplier extends AuditFields {
   _id: string;
   name: string;
   contact: string;
@@ -161,8 +185,6 @@ export interface Supplier {
   locationId: string;
   isActive: boolean;
   notes?: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface AppState {
@@ -310,11 +332,15 @@ export interface ProductFormData {
   model: string;
   sku: string;
   supplierId: string;
+  barcodes: ProductBarcode[];
+  attributes: Record<string, string>;
   description: string;
   warranty: string;
   minStock: number;
   maxStock: number;
   specifications: Record<string, string>;
+  companyId: string;
+  locationId: string;
 }
 
 export interface CustomerFormData {
@@ -324,6 +350,8 @@ export interface CustomerFormData {
   address: string;
   creditLimit: number;
   notes: string;
+  companyId: string;
+  locationId: string;
 }
 
 export interface SupplierFormData {
@@ -332,11 +360,15 @@ export interface SupplierFormData {
   email: string;
   address: string;
   notes: string;
+  companyId: string;
+  locationId: string;
 }
 
 export interface CategoryFormData {
   name: string;
   description: string;
+  companyId: string;
+  locationId: string;
 }
 // Utility Types
 export type EntityId = string;
