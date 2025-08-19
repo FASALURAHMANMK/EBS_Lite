@@ -246,7 +246,7 @@ Products
 
 Stock Management
 
- Products can have dynamic attributes like stored location(warehouse number, rack number/shelf number),IMEI, SN, Size(In case of textiles), Colours, Year of MF etc.Product must keep seperate stock,price,cost,etc   parameters locationswise(if company have multiple locations).
+ Products can have multiple barcodes, dynamic attributes like stored location(warehouse number, rack number/shelf number),IMEI, SN, Size(In case of textiles), Colours, Year of MF etc.Product must keep seperate stock,price,cost,etc   parameters locationswise(if company have multiple locations).
 
  Attributes can be created, ticked and filled on creation time as needed.ie It should be capable of listing any items.
 
