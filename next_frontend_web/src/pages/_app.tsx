@@ -1,17 +1,17 @@
 import type { AppProps } from 'next/app';
 import { AuthProvider } from '../context/AuthContext';
-import { POSProvider } from '../context/MainContext';
+import { MainProvider } from '../context/MainContext';
+import { appWithTranslation } from 'next-i18next';
 import '../styles/globals.css';
 import '../utils/dbTest';
 
 function MyApp({ Component, pageProps }: AppProps) {
   return (
     <AuthProvider>
-      <POSProvider>
+      <MainProvider>
         <Component {...pageProps} />
-      </POSProvider>
+      </MainProvider>
     </AuthProvider>
   );
 }
-
-export default MyApp;
+export default appWithTranslation(MyApp);

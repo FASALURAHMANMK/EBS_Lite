@@ -7,6 +7,8 @@ export interface User {
   companyId: string;
   isActive: boolean;
   permissions: string[];
+  primaryLanguage?: string;
+  secondaryLanguage?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -429,7 +431,8 @@ type AuthAction =
   | { type: 'REGISTER_START' }
   | { type: 'REGISTER_SUCCESS'; payload: { user: User; company: Company } }
   | { type: 'REGISTER_FAILURE'; payload: string }
-  | { type: 'CLEAR_ERROR' };
+  | { type: 'CLEAR_ERROR' }
+  | { type: 'UPDATE_USER_LANGUAGES'; payload: { primaryLanguage: string; secondaryLanguage?: string } };
 
   export interface AuthState {
     isAuthenticated: boolean;
