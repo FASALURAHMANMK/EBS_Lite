@@ -217,7 +217,12 @@ export interface AppState {
   // UI Preferences
   theme: 'light' | 'dark';
   sidebarCollapsed: boolean;
-  
+  language: string;
+
+  // Sync Status
+  lastSync: string | null;
+  isSyncing: boolean;
+
   // Pagination
   currentPage: number;
   itemsPerPage: number;
@@ -409,6 +414,9 @@ type AppAction =
   | { type: 'SET_THEME'; payload: 'light' | 'dark' }
   | { type: 'TOGGLE_SIDEBAR' }
   | { type: 'SET_PAGINATION'; payload: { currentPage: number; totalItems: number } }
+  | { type: 'SET_LANGUAGE'; payload: string }
+  | { type: 'SET_LAST_SYNC'; payload: string | null }
+  | { type: 'SET_SYNCING'; payload: boolean }
   | { type: 'RESET_STATE' };
 
 type AuthAction =
