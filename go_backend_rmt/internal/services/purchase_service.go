@@ -140,16 +140,17 @@ func (s *PurchaseService) GetPurchaseByID(purchaseID, companyID int) (*models.Pu
 
 	// Get purchase details
 	detailsQuery := `
-		SELECT pd.purchase_detail_id, pd.purchase_id, pd.product_id, pd.quantity,
-			   pd.unit_price, pd.discount_percentage, pd.discount_amount, pd.tax_id,
-			   pd.tax_amount, pd.line_total, pd.received_quantity, pd.serial_numbers,
-			   pd.expiry_date, pd.batch_number,
-			   p.name as product_name, p.sku, p.barcode
-		FROM purchase_details pd
-		JOIN products p ON pd.product_id = p.product_id
-		WHERE pd.purchase_id = $1
-		ORDER BY pd.purchase_detail_id
-	`
+                SELECT pd.purchase_detail_id, pd.purchase_id, pd.product_id, pd.quantity,
+                           pd.unit_price, pd.discount_percentage, pd.discount_amount, pd.tax_id,
+                           pd.tax_amount, pd.line_total, pd.received_quantity, pd.serial_numbers,
+                           pd.expiry_date, pd.batch_number,
+                           p.name as product_name, p.sku, pb.barcode
+                FROM purchase_details pd
+                JOIN products p ON pd.product_id = p.product_id
+                LEFT JOIN product_barcodes pb ON p.product_id = pb.product_id AND pb.is_primary = TRUE
+                WHERE pd.purchase_id = $1
+                ORDER BY pd.purchase_detail_id
+        `
 
 	rows, err := s.db.Query(detailsQuery, purchaseID)
 	if err != nil {
@@ -177,7 +178,12 @@ func (s *PurchaseService) GetPurchaseByID(purchaseID, companyID int) (*models.Pu
 			ProductID: detail.ProductID,
 			Name:      productName.String,
 			SKU:       nullStringToStringPtr(sku),
-			Barcode:   nullStringToStringPtr(barcode),
+			Barcodes: func() []models.ProductBarcode {
+				if barcode.Valid {
+					return []models.ProductBarcode{{Barcode: barcode.String, IsPrimary: true}}
+				}
+				return nil
+			}(),
 		}
 
 		purchase.Items = append(purchase.Items, detail)
