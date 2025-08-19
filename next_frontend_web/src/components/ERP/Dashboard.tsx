@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { useAppState, useAppActions, useAppDispatch } from '../../context/MainContext';
+import { useAppState, useAppDispatch } from '../../context/MainContext';
 import { useAuth } from '../../context/AuthContext';
 import ErrorDisplay from '../Misc/ErrorDisplay';
-import { 
-  TrendingUp, 
-  DollarSign, 
-  ShoppingCart, 
-  Users, 
+import api from '../../services/apiClient';
+import {
+  TrendingUp,
+  DollarSign,
+  ShoppingCart,
+  Users,
   Package,
   AlertTriangle,
   BarChart3,
-  CreditCard,
-  Zap
+  CreditCard
 } from 'lucide-react';
+import QuickActionMenu from './Common/QuickActionMenu';
 
 interface DashboardStats {
   todayRevenue: number;
@@ -27,57 +28,13 @@ interface DashboardStats {
   creditOutstanding: number;
 }
 
-interface QuickActionButtonProps {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  color: string;
-  position: number;
-  isVisible: boolean;
-}
-
-const QuickActionButton: React.FC<QuickActionButtonProps> = ({ 
-  icon, 
-  label, 
-  onClick, 
-  color, 
-  position, 
-  isVisible 
-}) => {
-  const angle = (position * 45) - 200; 
-  const radius = 80; // Distance from center
-  const x = Math.cos((angle * Math.PI) / 180) * radius;
-  const y = Math.sin((angle * Math.PI) / 180) * radius;
-
-  return (
-    <button
-      onClick={onClick}
-      className={`absolute w-12 h-12 ${color} rounded-full shadow-lg hover:scale-110 transition-all duration-300 ease-in-out flex items-center justify-center group ${
-        isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-0'
-      }`}
-      style={{
-        transform: `translate(${x}px, ${y}px)`,
-        transitionDelay: isVisible ? `${position * 50}ms` : '0ms'
-      }}
-      title={label}
-    >
-      {icon}
-      <span className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-        {label}
-      </span>
-    </button>
-  );
-};
-
 const Dashboard: React.FC = () => {
   const state = useAppState(s => s);
   const dispatch = useAppDispatch();
-  const { getDashboardStats } = useAppActions();
   const { state: authState } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
@@ -90,7 +47,7 @@ const Dashboard: React.FC = () => {
   const loadDashboardData = async () => {
     try {
       setIsLoading(true);
-      const dashboardData = await getDashboardStats();
+      const dashboardData = await api.get<DashboardStats>('/api/v1/dashboard');
       
       if (dashboardData) {
         setStats(dashboardData);
@@ -117,10 +74,6 @@ const Dashboard: React.FC = () => {
 
   const handleClearError = () => {
     dispatch({ type: 'SET_ERROR', payload: null });
-  };
-
-  const toggleQuickMenu = () => {
-    setIsQuickMenuOpen(!isQuickMenuOpen);
   };
 
   if (state.error) {
@@ -517,65 +470,7 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Floating Quick Actions Button */}
-      <div className="fixed bottom-8 right-8 z-50">
-        <div className="relative">
-          {/* Action Buttons - Half Circle */}
-          <QuickActionButton
-            icon={<ShoppingCart className="w-5 h-5 text-white" />}
-            label="New Sale"
-            onClick={() => dispatch({ type: 'SET_VIEW', payload: 'sales' })}
-            color="bg-gradient-to-r from-red-500 to-red-600"
-            position={0}
-            isVisible={isQuickMenuOpen}
-          />
-          
-          <QuickActionButton
-            icon={<Package className="w-5 h-5 text-white" />}
-            label="Products"
-            onClick={() => dispatch({ type: 'SET_VIEW', payload: 'inventory' })}
-            color="bg-gradient-to-r from-blue-500 to-blue-600"
-            position={1}
-            isVisible={isQuickMenuOpen}
-          />
-          
-          <QuickActionButton
-            icon={<Users className="w-5 h-5 text-white" />}
-            label="Customers"
-            onClick={() => dispatch({ type: 'SET_VIEW', payload: 'customers' })}
-            color="bg-gradient-to-r from-green-500 to-green-600"
-            position={2}
-            isVisible={isQuickMenuOpen}
-          />
-          
-          <QuickActionButton
-            icon={<BarChart3 className="w-5 h-5 text-white" />}
-            label="Reports"
-            onClick={() => dispatch({ type: 'SET_VIEW', payload: 'reports' })}
-            color="bg-gradient-to-r from-purple-500 to-purple-600"
-            position={3}
-            isVisible={isQuickMenuOpen}
-          />
-
-          {/* Main FAB Button */}
-          <button
-            onClick={toggleQuickMenu}
-            className={`w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ease-in-out transform hover:scale-110 ${
-              isQuickMenuOpen ? 'rotate-45' : 'rotate-0'
-            }`}
-          >
-            <Zap className="w-8 h-8 text-white" />
-          </button>
-          
-          {/* Backdrop overlay when menu is open */}
-          {isQuickMenuOpen && (
-            <div 
-              className="fixed inset-0 bg-black/20 -z-10"
-              onClick={() => setIsQuickMenuOpen(false)}
-            />
-          )}
-        </div>
-      </div>
+      <QuickActionMenu />
     </div>
   );
 };
