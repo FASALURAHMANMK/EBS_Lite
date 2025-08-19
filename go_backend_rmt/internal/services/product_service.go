@@ -94,8 +94,17 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan product: %w", err)
 		}
-		product.Barcodes, _ = s.getProductBarcodes(product.ProductID)
-		product.Attributes, _ = s.getProductAttributes(product.ProductID)
+
+		product.Barcodes, err = s.getProductBarcodes(product.ProductID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get product barcodes: %w", err)
+		}
+
+		product.Attributes, err = s.getProductAttributes(product.ProductID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get product attributes: %w", err)
+		}
+
 		products = append(products, product)
 	}
 
@@ -127,8 +136,15 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
 		return nil, fmt.Errorf("failed to get product: %w", err)
 	}
 
-	product.Barcodes, _ = s.getProductBarcodes(product.ProductID)
-	product.Attributes, _ = s.getProductAttributes(product.ProductID)
+	product.Barcodes, err = s.getProductBarcodes(product.ProductID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get product barcodes: %w", err)
+	}
+
+	product.Attributes, err = s.getProductAttributes(product.ProductID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get product attributes: %w", err)
+	}
 
 	return &product, nil
 }
