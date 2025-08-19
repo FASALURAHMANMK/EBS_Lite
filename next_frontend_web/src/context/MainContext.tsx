@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, ReactNode, useEffect } fr
 import { AppState, AppAction, Product, Category, Customer, Sale } from '../types';
 import { products, categories, customers, sales, dashboard } from '../services';
 import { useAuth } from './AuthContext';
+import { setCompanyLocation } from '../services/apiClient';
 
 const initialState: AppState = {
   currentView: 'dashboard',
@@ -9,6 +10,7 @@ const initialState: AppState = {
   isLoading: false,
   isInitialized: false,
   error: null,
+  currentCompanyId: null,
   currentLocationId: null,
   cart: [],
   customer: { phone: '', name: '', creditBalance: 0, address: '' },
@@ -29,6 +31,8 @@ const initialState: AppState = {
 
 const appReducer = (state: AppState, action: AppAction): AppState => {
   switch (action.type) {
+    case 'SET_CURRENT_COMPANY':
+      return { ...state, currentCompanyId: action.payload };
     case 'SET_CURRENT_LOCATION':
       return { ...state, currentLocationId: action.payload };
     case 'SET_LOADING':
@@ -149,6 +153,10 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
       }
     }
   }, [state.theme, state.language]);
+
+  useEffect(() => {
+    setCompanyLocation(state.currentCompanyId, state.currentLocationId);
+  }, [state.currentCompanyId, state.currentLocationId]);
 
   const loadProducts = async () => {
     try {
@@ -347,8 +355,15 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const setCurrentCompany = async (companyId: string) => {
+    dispatch({ type: 'SET_CURRENT_COMPANY', payload: companyId });
+    setCompanyLocation(companyId, state.currentLocationId);
+    await loadAllData();
+  };
+
   const setCurrentLocation = async (locationId: string) => {
     dispatch({ type: 'SET_CURRENT_LOCATION', payload: locationId });
+    setCompanyLocation(state.currentCompanyId, locationId);
     await loadAllData();
   };
 
@@ -394,6 +409,7 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
         searchCustomers,
         getProductsByCategory,
         createSale,
+        setCurrentCompany,
         setCurrentLocation,
         getDashboardStats,
         setLanguage,
@@ -434,6 +450,7 @@ export const useAppActions = () => {
     searchCustomers,
     getProductsByCategory,
     createSale,
+    setCurrentCompany,
     setCurrentLocation,
     getDashboardStats,
   } = useContext(MainContext);
@@ -458,6 +475,7 @@ export const useAppActions = () => {
     searchCustomers,
     getProductsByCategory,
     createSale,
+    setCurrentCompany,
     setCurrentLocation,
     getDashboardStats,
   };
