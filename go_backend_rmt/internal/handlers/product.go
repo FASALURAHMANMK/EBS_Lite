@@ -45,7 +45,7 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 
 	products, err := h.productService.GetProducts(companyID, filters)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get products", err)
+		utils.ErrorResponse(c, http.StatusInternalServerError, err.Error(), err)
 		return
 	}
 
@@ -72,7 +72,7 @@ func (h *ProductHandler) GetProduct(c *gin.Context) {
 			utils.NotFoundResponse(c, "Product not found")
 			return
 		}
-		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get product", err)
+		utils.ErrorResponse(c, http.StatusInternalServerError, err.Error(), err)
 		return
 	}
 
