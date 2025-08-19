@@ -13,7 +13,7 @@ export const login = async (
   password: string
 ): Promise<{ user: User; company: Company }> => {
   const data = await api.post<AuthResponse>(
-    '/auth/login',
+    '/api/v1/auth/login',
     { username, password },
     { auth: false }
   );
@@ -25,7 +25,7 @@ export const register = async (
   payload: Record<string, any>
 ): Promise<{ user: User; company: Company }> => {
   const data = await api.post<AuthResponse>(
-    '/auth/register',
+    '/api/v1/auth/register',
     payload,
     { auth: false }
   );
@@ -34,10 +34,10 @@ export const register = async (
 };
 
 export const getProfile = () =>
-  api.get<{ user: User; company: Company }>('/auth/me');
+  api.get<{ user: User; company: Company }>('/api/v1/auth/me');
 
 export const logout = async () => {
-  await api.post('/auth/logout');
+  await api.post('/api/v1/auth/logout');
   clearAuthTokens();
 };
 
