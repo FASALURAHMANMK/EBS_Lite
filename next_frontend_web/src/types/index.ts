@@ -196,6 +196,7 @@ export interface AppState {
   isLoading: boolean;
   isInitialized: boolean;
   error: string | null;
+  currentCompanyId: string | null;
   currentLocationId: string | null;
   
   // Cart State
@@ -384,6 +385,7 @@ export type Currency = number;
 
 // Action Types for Reducers
 type AppAction =
+  | { type: 'SET_CURRENT_COMPANY'; payload: string }
   | { type: 'SET_CURRENT_LOCATION'; payload: string }
   | { type: 'LOAD_ALL_DATA' }
   | { type: 'SET_LOADING'; payload: boolean }
