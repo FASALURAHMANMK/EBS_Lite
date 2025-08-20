@@ -3,7 +3,7 @@ import SalesInterface from '../../components/ERP/Sales/SalesInterface';
 import RoleGuard from '../../components/Auth/RoleGuard';
 
 const SalesPage: React.FC = () => (
-  <RoleGuard roles={['admin', 'manager']}>
+  <RoleGuard roles={['Admin', 'Manager', 'Sales']}>
     <MainLayout>
       <SalesInterface />
     </MainLayout>

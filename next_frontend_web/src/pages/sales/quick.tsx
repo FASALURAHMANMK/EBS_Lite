@@ -3,7 +3,7 @@ import ClassicPOS from '../../components/ERP/Sales/ClassicPOS';
 import RoleGuard from '../../components/Auth/RoleGuard';
 
 const QuickSalesPage: React.FC = () => (
-  <RoleGuard roles={['admin', 'manager']}>
+  <RoleGuard roles={['Admin', 'Manager', 'Sales']}>
     <MainLayout>
       <ClassicPOS />
     </MainLayout>

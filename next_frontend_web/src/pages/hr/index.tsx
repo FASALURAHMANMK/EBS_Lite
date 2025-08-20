@@ -3,7 +3,7 @@ import RoleGuard from '../../components/Auth/RoleGuard';
 import Link from 'next/link';
 
 const HRDashboard: React.FC = () => (
-  <RoleGuard roles={['admin', 'manager', 'employee']}>
+  <RoleGuard roles={['Admin', 'HR']}>
     <MainLayout>
       <div className="p-6 space-y-4">
         <h1 className="text-2xl font-bold">Human Resources</h1>

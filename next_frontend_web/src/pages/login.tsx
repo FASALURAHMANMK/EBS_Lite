@@ -4,15 +4,15 @@ import { useAuth } from '../context/AuthContext';
 import { LoginPage } from '../components/Auth/LoginPage';
 
 const Login: React.FC = () => {
-  const { state } = useAuth();
+  const { state, hasRole } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (state.isAuthenticated) {
-      const target = state.user?.role === 'admin' ? '/dashboard' : '/sales';
+      const target = hasRole('Admin') ? '/dashboard' : '/sales';
       router.replace(target);
     }
-  }, [state.isAuthenticated, state.user, router]);
+  }, [state.isAuthenticated, hasRole, router]);
 
   return <LoginPage />;
 };

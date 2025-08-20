@@ -99,14 +99,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     dispatch({ type: 'UPDATE_USER_LANGUAGES', payload });
   };
 
+  const role = state.user?.role;
+  const permissions = state.user?.permissions || [];
+
   const hasRole = (roles: string | string[]) => {
-    if (!state.user) return false;
+    if (!role) return false;
     const roleList = Array.isArray(roles) ? roles : [roles];
-    return roleList.includes(state.user.role);
+    return roleList.map(r => r.toLowerCase()).includes(role.toLowerCase());
+  };
+
+  const hasPermission = (perms: string | string[]) => {
+    if (!permissions.length) return false;
+    const permList = Array.isArray(perms) ? perms : [perms];
+    return permList.some(p => permissions.includes(p));
   };
 
   return (
-    <AuthContext.Provider value={{ state, login, register, logout, clearError, hasRole, updateUserLanguages }}>
+    <AuthContext.Provider
+      value={{
+        state,
+        login,
+        register,
+        logout,
+        clearError,
+        hasRole,
+        hasPermission,
+        role,
+        permissions,
+        updateUserLanguages,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
