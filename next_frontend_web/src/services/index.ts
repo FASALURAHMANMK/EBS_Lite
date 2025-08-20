@@ -6,3 +6,5 @@ export * as customers from './customers';
 export * as sales from './sales';
 export * as dashboard from './dashboard';
 export * as inventory from './inventory';
+export * as purchases from './purchases';
+export * as suppliers from './suppliers';
