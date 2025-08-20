@@ -1,3 +1,4 @@
+// NOTE: Reserved for future desktop offline mode. Not used in web builds.
 import React, { useState, useEffect } from 'react';
 import { Database, Wifi, WifiOff, CheckCircle, XCircle, RefreshCw, Play } from 'lucide-react';
 
