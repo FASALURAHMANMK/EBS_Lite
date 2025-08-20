@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Wifi, WifiOff, CheckCircle, XCircle, RefreshCw, Play, Trash2 } from 'lucide-react';
-import { DatabaseTester, runDatabaseTests, initializeDatabaseWithSampleData } from '../utils/dbTest';
+import { Database, Wifi, WifiOff, CheckCircle, XCircle, RefreshCw, Play } from 'lucide-react';
 
 interface DatabaseStatusProps {
   className?: string;
@@ -35,12 +34,20 @@ const DatabaseStatus: React.FC<DatabaseStatusProps> = ({ className = '' }) => {
 
   const checkDatabaseStatus = async () => {
     try {
-      const tester = new DatabaseTester();
-      const statusInfo = tester.getStatus();
-      setStatus({
-        ...statusInfo,
-        lastCheck: new Date()
-      });
+      if (typeof window !== 'undefined' && window.DatabaseTester) {
+        const tester = new window.DatabaseTester();
+        const statusInfo = tester.getStatus();
+        setStatus({
+          ...statusInfo,
+          lastCheck: new Date()
+        });
+      } else {
+        setStatus({
+          online: false,
+          initialized: false,
+          lastCheck: new Date()
+        });
+      }
     } catch (error) {
       console.error('Error checking database status:', error);
       setStatus({
@@ -52,9 +59,13 @@ const DatabaseStatus: React.FC<DatabaseStatusProps> = ({ className = '' }) => {
   };
 
   const runTests = async () => {
+    if (typeof window === 'undefined' || !window.runDatabaseTests) {
+      alert('Database tests are unavailable in this environment.');
+      return;
+    }
     setIsLoading(true);
     try {
-      const results = await runDatabaseTests();
+      const results = await window.runDatabaseTests();
       setTestResults(results.results);
       setShowDetails(true);
       await checkDatabaseStatus();
@@ -66,13 +77,17 @@ const DatabaseStatus: React.FC<DatabaseStatusProps> = ({ className = '' }) => {
   };
 
   const initializeWithSampleData = async () => {
+    if (typeof window === 'undefined' || !window.initializeDatabaseWithSampleData) {
+      alert('Sample data initialization is unavailable in this environment.');
+      return;
+    }
     if (window.confirm('This will clear all existing data and create sample data. Continue?')) {
       setIsLoading(true);
       try {
-        await initializeDatabaseWithSampleData();
+        await window.initializeDatabaseWithSampleData();
         await checkDatabaseStatus();
         alert('Database initialized with sample data successfully!');
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error initializing database:', error);
         alert('Error initializing database: ' + error.message);
       } finally {
