@@ -3,7 +3,7 @@ import RoleGuard from '../../components/Auth/RoleGuard';
 import ClockInOut from '../../components/ERP/HR/ClockInOut';
 
 const ClockPage: React.FC = () => (
-  <RoleGuard roles={['admin', 'manager', 'employee']}>
+  <RoleGuard roles={['Admin', 'HR']}>
     <MainLayout>
       <ClockInOut />
     </MainLayout>

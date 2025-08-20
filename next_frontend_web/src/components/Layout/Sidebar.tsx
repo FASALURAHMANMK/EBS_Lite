@@ -134,7 +134,7 @@ const Sidebar: React.FC = () => {
     {
       icon: UserCheck,
       label: 'HR',
-      roles: ['Admin', 'Manager', 'HR'],
+      roles: ['Admin', 'HR'],
       subItems: [
         { label: 'Employees', view: 'employees', icon: Users },
         { label: 'Attendance', view: 'attendance', icon: History },

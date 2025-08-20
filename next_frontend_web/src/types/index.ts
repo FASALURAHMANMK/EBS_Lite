@@ -3,7 +3,7 @@ export interface User {
   username: string;
   email: string;
   fullName: string;
-  role: 'admin' | 'manager' | 'user';
+  role: 'Admin' | 'Manager' | 'Sales' | 'HR' | 'Accountant' | 'Store' | 'User';
   companyId: string;
   isActive: boolean;
   permissions: string[];

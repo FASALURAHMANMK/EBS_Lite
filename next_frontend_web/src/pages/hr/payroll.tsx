@@ -3,7 +3,7 @@ import RoleGuard from '../../components/Auth/RoleGuard';
 import SalaryProcessing from '../../components/ERP/HR/SalaryProcessing';
 
 const PayrollPage: React.FC = () => (
-  <RoleGuard roles={['admin', 'manager', 'employee']}>
+  <RoleGuard roles={['Admin', 'HR']}>
     <MainLayout>
       <SalaryProcessing />
     </MainLayout>

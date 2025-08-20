@@ -3,7 +3,7 @@ import RoleGuard from '../../components/Auth/RoleGuard';
 import LeaveCalendar from '../../components/ERP/HR/LeaveCalendar';
 
 const LeavePage: React.FC = () => (
-  <RoleGuard roles={['admin', 'manager', 'employee']}>
+  <RoleGuard roles={['Admin', 'HR']}>
     <MainLayout>
       <LeaveCalendar />
     </MainLayout>

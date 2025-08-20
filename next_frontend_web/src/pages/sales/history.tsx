@@ -3,7 +3,7 @@ import SalesHistory from '../../components/ERP/Sales/SalesHistory';
 import RoleGuard from '../../components/Auth/RoleGuard';
 
 const SalesHistoryPage: React.FC = () => (
-  <RoleGuard roles={['admin', 'manager']}>
+  <RoleGuard roles={['Admin', 'Manager', 'Sales']}>
     <MainLayout>
       <SalesHistory />
     </MainLayout>

@@ -4,15 +4,15 @@ import { useAuth } from '../context/AuthContext';
 import { RegisterPage } from '../components/Auth/RegisterPage';
 
 const Register: React.FC = () => {
-  const { state } = useAuth();
+  const { state, hasRole } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (state.isAuthenticated) {
-      const target = state.user?.role === 'admin' ? '/dashboard' : '/sales';
+      const target = hasRole('Admin') ? '/dashboard' : '/sales';
       router.replace(target);
     }
-  }, [state.isAuthenticated, state.user, router]);
+  }, [state.isAuthenticated, hasRole, router]);
 
   return <RegisterPage />;
 };
