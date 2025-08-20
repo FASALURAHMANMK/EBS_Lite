@@ -239,16 +239,16 @@ const Header: React.FC = () => {
             {showHelpDropdown && (
               <div className="absolute right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 min-w-[8rem]">
                 <a
-                  href="/help"
+                  href="/faq"
                   className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
-                  User Guide
+                  FAQ
                 </a>
                 <a
                   href="/support"
                   className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
-                  Support
+                  Contact Support
                 </a>
               </div>
             )}
