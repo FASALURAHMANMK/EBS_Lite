@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"log"
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
@@ -11,12 +12,14 @@ import (
 type POSService struct {
 	db           *sql.DB
 	salesService *SalesService
+	printService *PrintService
 }
 
 func NewPOSService() *POSService {
 	return &POSService{
 		db:           database.GetDB(),
 		salesService: NewSalesService(),
+		printService: NewPrintService(),
 	}
 }
 
@@ -125,16 +128,12 @@ func (s *POSService) PrintInvoice(invoiceID, companyID int) error {
 		return fmt.Errorf("invoice not found")
 	}
 
-	// TODO: Implement actual printing logic
-	// This would typically involve:
-	// 1. Getting printer settings for the location
-	// 2. Formatting the invoice data
-	// 3. Sending to printer via appropriate driver/API
-	// 4. Logging the print job
+	if err := s.printService.PrintReceipt("invoice", invoiceID, companyID); err != nil {
+		log.Printf("failed to print invoice %d: %v", invoiceID, err)
+		return fmt.Errorf("failed to print invoice: %w", err)
+	}
 
-	// For now, just log that print was requested
-	fmt.Printf("Print requested for invoice ID: %d\n", invoiceID)
-
+	log.Printf("invoice %d printed successfully", invoiceID)
 	return nil
 }
 
