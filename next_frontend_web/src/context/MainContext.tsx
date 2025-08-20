@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode, useEffect, useCallback } from 'react';
 import { AppState, AppAction, Product, Category, Customer, Sale, Supplier } from '../types';
 import { products, categories, customers, sales, dashboard, suppliers } from '../services';
 import { useAuth } from './AuthContext';
@@ -404,17 +404,19 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const setCurrentCompany = async (companyId: string) => {
-    dispatch({ type: 'SET_CURRENT_COMPANY', payload: companyId });
-    setCompanyLocation(companyId, state.currentLocationId);
-    await loadAllData();
-  };
+  const setCurrentCompany = useCallback(
+    (companyId: string) => {
+      dispatch({ type: 'SET_CURRENT_COMPANY', payload: companyId });
+    },
+    [dispatch]
+  );
 
-  const setCurrentLocation = async (locationId: string) => {
-    dispatch({ type: 'SET_CURRENT_LOCATION', payload: locationId });
-    setCompanyLocation(state.currentCompanyId, locationId);
-    await loadAllData();
-  };
+  const setCurrentLocation = useCallback(
+    (locationId: string) => {
+      dispatch({ type: 'SET_CURRENT_LOCATION', payload: locationId });
+    },
+    [dispatch]
+  );
 
   const getDashboardStats = async () => {
     try {
@@ -431,8 +433,23 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    loadAllData();
-  }, []);
+    if (authState.isAuthenticated && authState.company) {
+      const companyId = authState.company._id;
+      const locationId = authState.company.locations?.[0]?._id;
+      if (companyId && companyId !== state.currentCompanyId) {
+        setCurrentCompany(companyId);
+      }
+      if (locationId && locationId !== state.currentLocationId) {
+        setCurrentLocation(locationId);
+      }
+    }
+  }, [authState.isAuthenticated, authState.company, state.currentCompanyId, state.currentLocationId, setCurrentCompany, setCurrentLocation]);
+
+  useEffect(() => {
+    if (authState.isAuthenticated && state.currentCompanyId && state.currentLocationId) {
+      loadAllData();
+    }
+  }, [authState.isAuthenticated, state.currentCompanyId, state.currentLocationId]);
 
   return (
     <MainContext.Provider
