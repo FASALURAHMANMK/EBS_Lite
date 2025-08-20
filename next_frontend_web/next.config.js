@@ -12,10 +12,11 @@ const nextConfig = {
   basePath: '',
   distDir: 'out',
   async rewrites() {
+    const apiProxyUrl = process.env.API_PROXY_URL || process.env.NEXT_PUBLIC_API_URL;
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.API_PROXY_URL}/api/:path*`,
+        destination: `${apiProxyUrl}/api/:path*`,
       },
     ];
   },
