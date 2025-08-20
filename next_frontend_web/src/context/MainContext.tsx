@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
-import { AppState, AppAction, Product, Category, Customer, Sale } from '../types';
-import { products, categories, customers, sales, dashboard } from '../services';
+import { AppState, AppAction, Product, Category, Customer, Sale, Supplier } from '../types';
+import { products, categories, customers, sales, dashboard, suppliers } from '../services';
 import { useAuth } from './AuthContext';
 import { setCompanyLocation } from '../services/apiClient';
 
@@ -185,6 +185,16 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const loadSuppliers = async () => {
+    try {
+      const data = await suppliers.getSuppliers();
+      dispatch({ type: 'SET_SUPPLIERS', payload: data });
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+    }
+  };
+
+
   const loadSales = async () => {
     try {
       const data = await sales.getSales();
@@ -198,7 +208,7 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_SYNCING', payload: true });
     try {
-      await Promise.all([loadProducts(), loadCategories(), loadCustomers(), loadSales()]);
+      await Promise.all([loadProducts(), loadCategories(), loadCustomers(), loadSuppliers(), loadSales()]);
       dispatch({ type: 'SET_INITIALIZED', payload: true });
       dispatch({ type: 'SET_LAST_SYNC', payload: new Date().toISOString() });
     } catch (error: any) {
@@ -305,6 +315,45 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const createSupplier = async (payload: Partial<Supplier>) => {
+    try {
+      const data = await suppliers.createSupplier(payload);
+      dispatch({ type: 'ADD_SUPPLIER', payload: data });
+      return data;
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
+  const updateSupplier = async (id: string, payload: Partial<Supplier>) => {
+    try {
+      const data = await suppliers.updateSupplier(id, payload);
+      dispatch({ type: 'UPDATE_SUPPLIER', payload: data });
+      return data;
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
+  const deleteSupplier = async (id: string) => {
+    try {
+      await suppliers.deleteSupplier(id);
+      dispatch({ type: 'DELETE_SUPPLIER', payload: id });
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+      throw error;
+    }
+  };
+
+  const searchSuppliers = (term: string) => {
+    return state.suppliers.filter(s =>
+      s.name.toLowerCase().includes(term.toLowerCase()) ||
+      s.contact.toLowerCase().includes(term.toLowerCase())
+    );
+  };
+
   const updateCustomerCredit = async (id: string, amount: number, type: 'credit' | 'debit', description: string) => {
     try {
       const data = await customers.updateCustomerCredit(id, amount, type, description);
@@ -393,6 +442,9 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
         loadAllData,
         loadProducts,
         loadCustomers,
+    loadSuppliers,
+    loadSuppliers,
+        loadSuppliers,
         loadSales,
         createProduct,
         updateProduct,
@@ -403,6 +455,34 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
         createCustomer,
         updateCustomer,
         deleteCustomer,
+    createSupplier,
+    updateSupplier,
+    deleteSupplier,
+    searchSuppliers,
+    createSupplier,
+    updateSupplier,
+    deleteSupplier,
+    searchSuppliers,
+    createSupplier,
+    updateSupplier,
+    deleteSupplier,
+    searchSuppliers,
+    createSupplier,
+    updateSupplier,
+    deleteSupplier,
+    searchSuppliers,
+    createSupplier,
+    updateSupplier,
+    deleteSupplier,
+    searchSuppliers,
+    createSupplier,
+    updateSupplier,
+    deleteSupplier,
+    searchSuppliers,
+        createSupplier,
+        updateSupplier,
+        deleteSupplier,
+        searchSuppliers,
         updateCustomerCredit,
         getCustomerCreditHistory,
         searchProducts,
@@ -434,6 +514,7 @@ export const useAppActions = () => {
     loadAllData,
     loadProducts,
     loadCustomers,
+    loadSuppliers,
     loadSales,
     createProduct,
     updateProduct,
@@ -444,6 +525,10 @@ export const useAppActions = () => {
     createCustomer,
     updateCustomer,
     deleteCustomer,
+    createSupplier,
+    updateSupplier,
+    deleteSupplier,
+    searchSuppliers,
     updateCustomerCredit,
     getCustomerCreditHistory,
     searchProducts,
@@ -459,6 +544,7 @@ export const useAppActions = () => {
     loadAllData,
     loadProducts,
     loadCustomers,
+    loadSuppliers,
     loadSales,
     createProduct,
     updateProduct,
@@ -469,6 +555,10 @@ export const useAppActions = () => {
     createCustomer,
     updateCustomer,
     deleteCustomer,
+    createSupplier,
+    updateSupplier,
+    deleteSupplier,
+    searchSuppliers,
     updateCustomerCredit,
     getCustomerCreditHistory,
     searchProducts,
@@ -480,4 +570,3 @@ export const useAppActions = () => {
     getDashboardStats,
   };
 };
-

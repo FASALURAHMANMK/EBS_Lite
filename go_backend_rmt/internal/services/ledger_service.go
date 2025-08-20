@@ -189,3 +189,9 @@ func (s *LedgerService) GetAccountEntries(companyID, accountID int, filters map[
 
 	return entries, total, nil
 }
+
+// RecordPurchaseReturn creates ledger entries for a purchase return
+func (s *LedgerService) RecordPurchaseReturn(companyID, returnID int, amount float64, userID int) error {
+	_, err := s.db.Exec(`INSERT INTO ledger_entries (company_id, reference, credit, created_by, updated_by) VALUES ($1,$2,$3,$4,$4)`, companyID, returnID, amount, userID)
+	return err
+}
