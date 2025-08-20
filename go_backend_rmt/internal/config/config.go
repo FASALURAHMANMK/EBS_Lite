@@ -47,6 +47,10 @@ type Config struct {
 	SMTPUsername string
 	SMTPPassword string
 	FromEmail    string
+
+	// Printing
+	DefaultPrinter string
+	TemplatePath   string
 }
 
 func Load() *Config {
@@ -91,6 +95,10 @@ func Load() *Config {
 		SMTPUsername: getEnv("SMTP_USERNAME", ""),
 		SMTPPassword: getEnv("SMTP_PASSWORD", ""),
 		FromEmail:    getEnv("FROM_EMAIL", "noreply@company.com"),
+
+		// Printing
+		DefaultPrinter: getEnv("DEFAULT_PRINTER", "default"),
+		TemplatePath:   getEnv("TEMPLATE_PATH", "./templates"),
 	}
 }
 
