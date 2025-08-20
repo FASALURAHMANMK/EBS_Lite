@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { Building, Save } from 'lucide-react';
+import { useRouter } from 'next/router';
+import { companies } from '../../services';
 
 const CompanyCreatePage: React.FC = () => {
   const [form, setForm] = useState({ name: '', address: '', phone: '', email: '' });
+  const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -11,7 +14,13 @@ const CompanyCreatePage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: integrate with company creation service
+    try {
+      await companies.createCompany(form);
+      router.push('/settings/company');
+    } catch (error: any) {
+      console.error('Error creating company:', error);
+      alert(error.message || 'Failed to create company');
+    }
   };
 
   return (

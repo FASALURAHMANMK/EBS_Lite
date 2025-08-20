@@ -3,6 +3,7 @@ export * as auth from './auth';
 export * as products from './products';
 export * as categories from './categories';
 export * as customers from './customers';
+export * as companies from './companies';
 export * as sales from './sales';
 export * as dashboard from './dashboard';
 export * as inventory from './inventory';
