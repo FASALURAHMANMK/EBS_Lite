@@ -3,7 +3,6 @@ import { AuthProvider } from '../context/AuthContext';
 import { MainProvider } from '../context/MainContext';
 import { appWithTranslation } from 'next-i18next';
 import '../styles/globals.css';
-import '../utils/dbTest';
 
 function MyApp({ Component, pageProps }: AppProps) {
   return (
