@@ -5,3 +5,4 @@ export * as categories from './categories';
 export * as customers from './customers';
 export * as sales from './sales';
 export * as dashboard from './dashboard';
+export * as inventory from './inventory';

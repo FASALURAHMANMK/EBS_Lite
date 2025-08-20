@@ -89,6 +89,14 @@ const ProductManagement: React.FC = () => {
     outOfStock: false
   });
 
+  const getStockForLocation = (product: Product) => {
+    if (product.stockLevels && state.currentLocationId) {
+      const level = product.stockLevels.find(l => l.locationId === state.currentLocationId);
+      return level ? level.quantity : 0;
+    }
+    return product.stock;
+  };
+
   useEffect(() => {
     loadProducts();
     loadCategories();
@@ -107,9 +115,13 @@ const ProductManagement: React.FC = () => {
       filtered = filtered.filter(p => p.category === selectedCategory);
     }
 
-     if (state.currentLocationId) {
-    filtered = filtered.filter(p => p.locationId === state.currentLocationId);
-  }
+    if (state.currentLocationId) {
+      filtered = filtered.filter(p =>
+        p.stockLevels
+          ? p.stockLevels.some(l => l.locationId === state.currentLocationId)
+          : p.locationId === state.currentLocationId
+      );
+    }
 
     // Advanced filters
     if (filters.priceMin) {
@@ -119,10 +131,10 @@ const ProductManagement: React.FC = () => {
       filtered = filtered.filter(p => p.price <= parseFloat(filters.priceMax));
     }
     if (filters.stockMin) {
-      filtered = filtered.filter(p => p.stock >= parseInt(filters.stockMin));
+      filtered = filtered.filter(p => getStockForLocation(p) >= parseInt(filters.stockMin));
     }
     if (filters.stockMax) {
-      filtered = filtered.filter(p => p.stock <= parseInt(filters.stockMax));
+      filtered = filtered.filter(p => getStockForLocation(p) <= parseInt(filters.stockMax));
     }
     if (filters.brand) {
       filtered = filtered.filter(p => p.brand?.toLowerCase().includes(filters.brand.toLowerCase()));
@@ -134,10 +146,10 @@ const ProductManagement: React.FC = () => {
       }
     }
     if (filters.lowStock) {
-      filtered = filtered.filter(p => p.stock <= (p.minStock || 5));
+      filtered = filtered.filter(p => getStockForLocation(p) <= (p.minStock || 5));
     }
     if (filters.outOfStock) {
-      filtered = filtered.filter(p => p.stock === 0);
+      filtered = filtered.filter(p => getStockForLocation(p) === 0);
     }
 
     setFilteredProducts(filtered);
@@ -266,26 +278,26 @@ const ProductManagement: React.FC = () => {
   };
 
   const openEditProductModal = (product: Product) => {
-  setSelectedProduct(product);
-  setProductForm({
-    name: product.name,
-    price: product.price,
-    costPrice: product.costPrice || 0,
-    stock: product.stock,
-    category: product.category,
-    brand: product.brand || '',
-    model: product.model || '',
-    sku: product.sku,
-    locationId: product.locationId, // Add this
-    supplierId: product.supplierId || '',
-    description: product.description || '',
-    warranty: product.warranty || '',
-    minStock: product.minStock || 5,
-    maxStock: product.maxStock || 100,
-    specifications: product.specifications || {}
-  });
-  setShowEditProductModal(true);
-};
+    setSelectedProduct(product);
+    setProductForm({
+      name: product.name,
+      price: product.price,
+      costPrice: product.costPrice || 0,
+      stock: getStockForLocation(product),
+      category: product.category,
+      brand: product.brand || '',
+      model: product.model || '',
+      sku: product.sku,
+      locationId: product.locationId || state.currentLocationId || '', // Add this
+      supplierId: product.supplierId || '',
+      description: product.description || '',
+      warranty: product.warranty || '',
+      minStock: product.minStock || 5,
+      maxStock: product.maxStock || 100,
+      specifications: product.specifications || {}
+    });
+    setShowEditProductModal(true);
+  };
 
   const openEditCategoryModal = (category: Category) => {
     setSelectedCategoryData(category);
@@ -304,16 +316,17 @@ const ProductManagement: React.FC = () => {
   };
 
   const getStockStatus = (product: Product) => {
-    if (product.stock === 0) return { status: 'out', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' };
-    if (product.stock <= (product.minStock || 5)) return { status: 'low', color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-100 dark:bg-yellow-900/30' };
+    const stock = getStockForLocation(product);
+    if (stock === 0) return { status: 'out', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' };
+    if (stock <= (product.minStock || 5)) return { status: 'low', color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-100 dark:bg-yellow-900/30' };
     return { status: 'good', color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30' };
   };
 
   const getProductStats = () => {
     const totalProducts = state.products.length;
-    const totalValue = state.products.reduce((sum, p) => sum + (p.price * p.stock), 0);
-    const lowStockProducts = state.products.filter(p => p.stock <= (p.minStock || 5)).length;
-    const outOfStockProducts = state.products.filter(p => p.stock === 0).length;
+    const totalValue = state.products.reduce((sum, p) => sum + (p.price * getStockForLocation(p)), 0);
+    const lowStockProducts = state.products.filter(p => getStockForLocation(p) <= (p.minStock || 5)).length;
+    const outOfStockProducts = state.products.filter(p => getStockForLocation(p) === 0).length;
 
     return {
       totalProducts,
@@ -671,7 +684,7 @@ const ProductManagement: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {product.stock} units
+                          {getStockForLocation(product)} units
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
                           Min: {product.minStock || 5}
@@ -765,7 +778,7 @@ const ProductManagement: React.FC = () => {
                       {formatCurrency(product.price)}
                     </span>
                     <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Stock: {product.stock}
+                      Stock: {getStockForLocation(product)}
                     </span>
                   </div>
 
