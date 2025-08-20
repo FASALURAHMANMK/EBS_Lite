@@ -50,9 +50,17 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 // POST /auth/logout
 func (h *AuthHandler) Logout(c *gin.Context) {
-	// In a stateless JWT system, logout is handled client-side
-	// Here you could implement token blacklisting if needed
-	utils.SuccessResponse(c, "Logout successful", nil)
+       userID := c.GetInt("user_id")
+       sessionID := c.GetString("session_id")
+       if userID == 0 || sessionID == "" {
+               utils.ForbiddenResponse(c, "User session not found")
+               return
+       }
+       if err := h.authService.Logout(userID, sessionID); err != nil {
+               utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to logout", err)
+               return
+       }
+       utils.SuccessResponse(c, "Logout successful", nil)
 }
 
 // POST /auth/refresh-token

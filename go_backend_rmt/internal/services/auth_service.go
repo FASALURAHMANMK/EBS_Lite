@@ -13,7 +13,7 @@ import (
 )
 
 type AuthService struct {
-	db *sql.DB
+        db *sql.DB
 }
 
 func NewAuthService() *AuthService {
@@ -154,6 +154,18 @@ func (s *AuthService) Login(req *models.LoginRequest, ipAddress, userAgent strin
 		SessionID:    sessionID,
 		User:         userResponse,
 	}, nil
+}
+
+// Logout deactivates a device session for the given user
+func (s *AuthService) Logout(userID int, sessionID string) error {
+       if sessionID == "" {
+               return fmt.Errorf("session ID required")
+       }
+       _, err := s.db.Exec(`UPDATE device_sessions SET is_active=FALSE WHERE user_id=$1 AND session_id=$2`, userID, sessionID)
+       if err != nil {
+               return fmt.Errorf("failed to revoke session: %w", err)
+       }
+       return nil
 }
 
 func (s *AuthService) RefreshToken(req *models.RefreshTokenRequest) (*models.RefreshTokenResponse, error) {
