@@ -83,6 +83,11 @@ export interface ProductBarcode {
   isPrimary: boolean;
 }
 
+export interface ProductStockLevel {
+  locationId: string;
+  quantity: number;
+}
+
 export interface Product extends AuditFields {
   _id: string;
   name: string;
@@ -105,6 +110,7 @@ export interface Product extends AuditFields {
   maxStock?: number;
   barcodes?: ProductBarcode[];
   attributes?: ProductAttributeValue[];
+  stockLevels?: ProductStockLevel[];
 }
 
 export interface Category extends AuditFields {
