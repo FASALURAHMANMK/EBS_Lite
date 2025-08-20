@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAppState, useAppDispatch } from '../../context/MainContext';
 import { useAuth } from '../../context/AuthContext';
 import ErrorDisplay from '../Misc/ErrorDisplay';
@@ -242,85 +243,93 @@ const Dashboard: React.FC = () => {
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Today's Revenue</p>
-              <p className="text-2xl font-bold text-gray-800 dark:text-white">
-                {formatCurrency(stats?.todayRevenue || 0)}
-              </p>
-              <div className="flex items-center mt-2">
-                <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                <span className="text-sm text-green-600 dark:text-green-400">
-                  {stats?.todayOrders || 0} orders
-                </span>
+        <Link href="/reports/sales" className="block">
+          <div className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Today's Revenue</p>
+                <p className="text-2xl font-bold text-gray-800 dark:text-white">
+                  {formatCurrency(stats?.todayRevenue || 0)}
+                </p>
+                <div className="flex items-center mt-2">
+                  <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
+                  <span className="text-sm text-green-600 dark:text-green-400">
+                    {stats?.todayOrders || 0} orders
+                  </span>
+                </div>
+              </div>
+              <div className="bg-gradient-to-r from-green-500 to-green-600 p-3 rounded-lg">
+                <DollarSign className="w-6 h-6 text-white" />
               </div>
             </div>
-            <div className="bg-gradient-to-r from-green-500 to-green-600 p-3 rounded-lg">
-              <DollarSign className="w-6 h-6 text-white" />
-            </div>
           </div>
-        </div>
+        </Link>
 
-        <div className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Products</p>
-              <p className="text-2xl font-bold text-gray-800 dark:text-white">
-                {stats?.totalProducts || 0}
-              </p>
-              <div className="flex items-center mt-2">
-                <Package className="w-4 h-4 text-blue-500 mr-1" />
-                <span className="text-sm text-blue-600 dark:text-blue-400">
-                  {formatCurrency(stats?.totalInventoryValue || 0)} value
-                </span>
+        <Link href="/reports/inventory" className="block">
+          <div className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Products</p>
+                <p className="text-2xl font-bold text-gray-800 dark:text-white">
+                  {stats?.totalProducts || 0}
+                </p>
+                <div className="flex items-center mt-2">
+                  <Package className="w-4 h-4 text-blue-500 mr-1" />
+                  <span className="text-sm text-blue-600 dark:text-blue-400">
+                    {formatCurrency(stats?.totalInventoryValue || 0)} value
+                  </span>
+                </div>
+              </div>
+              <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-3 rounded-lg">
+                <Package className="w-6 h-6 text-white" />
               </div>
             </div>
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-3 rounded-lg">
-              <Package className="w-6 h-6 text-white" />
-            </div>
           </div>
-        </div>
+        </Link>
 
-        <div className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Customers</p>
-              <p className="text-2xl font-bold text-gray-800 dark:text-white">
-                {stats?.totalCustomers || 0}
-              </p>
-              <div className="flex items-center mt-2">
-                <CreditCard className="w-4 h-4 text-purple-500 mr-1" />
-                <span className="text-sm text-purple-600 dark:text-purple-400">
-                  {formatCurrency(stats?.creditOutstanding || 0)} credit
-                </span>
+        <Link href="/reports/customers" className="block">
+          <div className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Customers</p>
+                <p className="text-2xl font-bold text-gray-800 dark:text-white">
+                  {stats?.totalCustomers || 0}
+                </p>
+                <div className="flex items-center mt-2">
+                  <CreditCard className="w-4 h-4 text-purple-500 mr-1" />
+                  <span className="text-sm text-purple-600 dark:text-purple-400">
+                    {formatCurrency(stats?.creditOutstanding || 0)} credit
+                  </span>
+                </div>
+              </div>
+              <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-3 rounded-lg">
+                <Users className="w-6 h-6 text-white" />
               </div>
             </div>
-            <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-3 rounded-lg">
-              <Users className="w-6 h-6 text-white" />
-            </div>
           </div>
-        </div>
+        </Link>
 
-        <div className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Low Stock Items</p>
-              <p className="text-2xl font-bold text-gray-800 dark:text-white">
-                {stats?.lowStockCount || 0}
-              </p>
-              <div className="flex items-center mt-2">
-                <AlertTriangle className="w-4 h-4 text-yellow-500 mr-1" />
-                <span className="text-sm text-yellow-600 dark:text-yellow-400">
-                  Needs attention
-                </span>
+        <Link href="/reports/inventory" className="block">
+          <div className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Low Stock Items</p>
+                <p className="text-2xl font-bold text-gray-800 dark:text-white">
+                  {stats?.lowStockCount || 0}
+                </p>
+                <div className="flex items-center mt-2">
+                  <AlertTriangle className="w-4 h-4 text-yellow-500 mr-1" />
+                  <span className="text-sm text-yellow-600 dark:text-yellow-400">
+                    Needs attention
+                  </span>
+                </div>
+              </div>
+              <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 p-3 rounded-lg">
+                <AlertTriangle className="w-6 h-6 text-white" />
               </div>
             </div>
-            <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 p-3 rounded-lg">
-              <AlertTriangle className="w-6 h-6 text-white" />
-            </div>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Charts and Lists */}
@@ -331,9 +340,12 @@ const Dashboard: React.FC = () => {
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Recent Sales</h3>
-                <button className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium">
+                <Link
+                  href="/reports/sales"
+                  className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium"
+                >
                   View All
-                </button>
+                </Link>
               </div>
             </div>
             <div className="p-6">
@@ -390,7 +402,15 @@ const Dashboard: React.FC = () => {
           {/* Top Products */}
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Top Products</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Top Products</h3>
+                <Link
+                  href="/reports/sales"
+                  className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium"
+                >
+                  View All
+                </Link>
+              </div>
             </div>
             <div className="p-6">
               {stats?.topProducts && stats.topProducts.length > 0 ? (
@@ -430,10 +450,18 @@ const Dashboard: React.FC = () => {
           {/* Low Stock Alert */}
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-white flex items-center">
-                <AlertTriangle className="w-5 h-5 text-yellow-500 mr-2" />
-                Low Stock Alert
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white flex items-center">
+                  <AlertTriangle className="w-5 h-5 text-yellow-500 mr-2" />
+                  Low Stock Alert
+                </h3>
+                <Link
+                  href="/reports/inventory"
+                  className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium"
+                >
+                  View All
+                </Link>
+              </div>
             </div>
             <div className="p-6">
             {stats?.lowStockProducts && stats.lowStockProducts.length > 0 ? (
@@ -476,3 +504,4 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
+
