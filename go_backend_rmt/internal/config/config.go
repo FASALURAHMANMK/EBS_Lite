@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -68,7 +69,7 @@ func Load() *Config {
 		Environment: getEnv("ENVIRONMENT", "development"),
 
 		// CORS
-		AllowedOrigins: []string{getEnv("ALLOWED_ORIGINS", "http://localhost:3000")},
+		AllowedOrigins: parseCSV("ALLOWED_ORIGINS", "http://localhost:3000"),
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"Content-Type", "Authorization", "Accept", "company_id", "location_id"},
 
@@ -137,4 +138,16 @@ func parseSize(key, defaultValue string) int64 {
 		}
 	}
 	return 10 * 1024 * 1024 // 10MB default
+}
+
+func parseCSV(key, defaultValue string) []string {
+	value := getEnv(key, defaultValue)
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if trimmed := strings.TrimSpace(p); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }
