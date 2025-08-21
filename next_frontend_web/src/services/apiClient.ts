@@ -5,9 +5,26 @@ let refreshToken: string | null = null;
 let companyId: string | null = null;
 let locationId: string | null = null;
 
+const getCookie = (name: string): string | null => {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+};
+
+const setCookie = (name: string, value: string, days = 7) => {
+  if (typeof document === 'undefined') return;
+  const expires = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; secure; SameSite=Strict`;
+};
+
+const deleteCookie = (name: string) => {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/;`;
+};
+
 if (typeof window !== 'undefined') {
-  accessToken = localStorage.getItem('accessToken');
-  refreshToken = localStorage.getItem('refreshToken');
+  accessToken = getCookie('accessToken');
+  refreshToken = getCookie('refreshToken');
 }
 
 export const setAuthTokens = ({
@@ -19,19 +36,15 @@ export const setAuthTokens = ({
 }) => {
   accessToken = newAccess;
   refreshToken = newRefresh;
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('accessToken', newAccess);
-    localStorage.setItem('refreshToken', newRefresh);
-  }
+  setCookie('accessToken', newAccess);
+  setCookie('refreshToken', newRefresh, 30);
 };
 
 export const clearAuthTokens = () => {
   accessToken = null;
   refreshToken = null;
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-  }
+  deleteCookie('accessToken');
+  deleteCookie('refreshToken');
 };
 
 export const setCompanyLocation = (
@@ -76,6 +89,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   const { auth = true, headers, body, ...rest } = options;
 
   const config: RequestInit = {
+    credentials: 'include',
     ...rest,
     headers: {
       'Content-Type': 'application/json',
@@ -105,6 +119,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     const refreshResponse = await fetch(`${API_BASE_URL}/api/v1/auth/refresh-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ refreshToken }),
     });
 

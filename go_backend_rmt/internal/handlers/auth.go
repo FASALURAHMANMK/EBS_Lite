@@ -45,22 +45,31 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	// issue httpOnly cookies for tokens
+	c.SetSameSite(http.SameSiteStrictMode)
+	c.SetCookie("accessToken", response.AccessToken, 24*60*60, "/", "", true, true)
+	c.SetCookie("refreshToken", response.RefreshToken, 7*24*60*60, "/", "", true, true)
+
 	utils.SuccessResponse(c, "Login successful", response)
 }
 
 // POST /auth/logout
 func (h *AuthHandler) Logout(c *gin.Context) {
-       userID := c.GetInt("user_id")
-       sessionID := c.GetString("session_id")
-       if userID == 0 || sessionID == "" {
-               utils.ForbiddenResponse(c, "User session not found")
-               return
-       }
-       if err := h.authService.Logout(userID, sessionID); err != nil {
-               utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to logout", err)
-               return
-       }
-       utils.SuccessResponse(c, "Logout successful", nil)
+	userID := c.GetInt("user_id")
+	sessionID := c.GetString("session_id")
+	if userID == 0 || sessionID == "" {
+		utils.ForbiddenResponse(c, "User session not found")
+		return
+	}
+	if err := h.authService.Logout(userID, sessionID); err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to logout", err)
+		return
+	}
+	// clear auth cookies
+	c.SetSameSite(http.SameSiteStrictMode)
+	c.SetCookie("accessToken", "", -1, "/", "", true, true)
+	c.SetCookie("refreshToken", "", -1, "/", "", true, true)
+	utils.SuccessResponse(c, "Logout successful", nil)
 }
 
 // POST /auth/refresh-token
@@ -84,6 +93,10 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusUnauthorized, "Token refresh failed", err)
 		return
 	}
+
+	// update auth cookie
+	c.SetSameSite(http.SameSiteStrictMode)
+	c.SetCookie("accessToken", response.AccessToken, 24*60*60, "/", "", true, true)
 
 	utils.SuccessResponse(c, "Token refreshed successfully", response)
 }
