@@ -45,7 +45,7 @@ const RegisterPage: React.FC = () => {
       }
   
       try {
-        const { confirmPassword, agreeToTerms, ...registrationData } = formData;
+        const { confirmPassword: _confirmPassword, agreeToTerms: _agreeToTerms, ...registrationData } = formData;
         await register(registrationData);
       } catch (error) {
         // Error is handled by the context
