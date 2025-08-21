@@ -6,6 +6,13 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+        CREATE ROLE authenticated;
+    END IF;
+END$$;
+
 -- ===============================================
 -- MASTER TABLES
 -- ===============================================
@@ -60,7 +67,7 @@ CREATE TABLE locations (
 -- Roles Table
 CREATE TABLE roles (
     role_id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL UNIQUE,
     description TEXT,
     is_system_role BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -69,7 +76,7 @@ CREATE TABLE roles (
 -- Permissions Table
 CREATE TABLE permissions (
     permission_id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL UNIQUE,
     description TEXT,
     module VARCHAR(50) NOT NULL,
     action VARCHAR(50) NOT NULL
@@ -185,7 +192,6 @@ CREATE TABLE products (
     unit_id INTEGER REFERENCES units(unit_id),
     name VARCHAR(255) NOT NULL,
     sku VARCHAR(100),
-    barcode VARCHAR(100),
     description TEXT,
     cost_price NUMERIC(12,2),
     selling_price NUMERIC(12,2),
@@ -200,6 +206,17 @@ CREATE TABLE products (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_deleted BOOLEAN DEFAULT FALSE
+);
+
+-- Product Barcodes Table
+CREATE TABLE product_barcodes (
+    barcode_id SERIAL PRIMARY KEY,
+    product_id INTEGER NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+    barcode VARCHAR(100) NOT NULL,
+    pack_size INTEGER NOT NULL DEFAULT 1,
+    cost_price NUMERIC(12,2),
+    selling_price NUMERIC(12,2),
+    is_primary BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- Product Attribute Values Table
@@ -320,6 +337,118 @@ CREATE TABLE expense_categories (
     is_deleted BOOLEAN DEFAULT FALSE
 );
 
+-- Workflow Tables
+CREATE TABLE workflow_templates (
+    workflow_id SERIAL PRIMARY KEY,
+    name VARCHAR(100),
+    description TEXT,
+    created_by INT NOT NULL REFERENCES users(user_id),
+    updated_by INT REFERENCES users(user_id)
+);
+
+CREATE TABLE workflow_states (
+    state_id SERIAL PRIMARY KEY,
+    workflow_id INT REFERENCES workflow_templates(workflow_id),
+    state_name VARCHAR(100),
+    sequence INT,
+    is_final BOOLEAN DEFAULT FALSE,
+    created_by INT NOT NULL REFERENCES users(user_id),
+    updated_by INT REFERENCES users(user_id)
+);
+
+CREATE TABLE workflow_approvals (
+    approval_id SERIAL PRIMARY KEY,
+    state_id INT REFERENCES workflow_states(state_id),
+    approver_role_id INT REFERENCES roles(role_id),
+    status VARCHAR(50),
+    remarks TEXT,
+    approved_at TIMESTAMP,
+    created_by INT NOT NULL REFERENCES users(user_id),
+    updated_by INT REFERENCES users(user_id)
+);
+
+ALTER TABLE workflow_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workflow_states ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workflow_approvals ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY workflow_templates_rls ON workflow_templates FOR ALL TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM users u
+      WHERE u.user_id = workflow_templates.created_by
+        AND u.company_id = current_setting('app.current_company_id')::int
+        AND (
+          u.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users u
+      WHERE u.user_id = workflow_templates.created_by
+        AND u.company_id = current_setting('app.current_company_id')::int
+        AND (
+          u.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  );
+
+CREATE POLICY workflow_states_rls ON workflow_states FOR ALL TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM workflow_templates wt
+      JOIN users u ON u.user_id = wt.created_by
+      WHERE wt.workflow_id = workflow_states.workflow_id
+        AND u.company_id = current_setting('app.current_company_id')::int
+        AND (
+          u.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM workflow_templates wt
+      JOIN users u ON u.user_id = wt.created_by
+      WHERE wt.workflow_id = workflow_states.workflow_id
+        AND u.company_id = current_setting('app.current_company_id')::int
+        AND (
+          u.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  );
+
+CREATE POLICY workflow_approvals_rls ON workflow_approvals FOR ALL TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM workflow_states ws
+      JOIN workflow_templates wt ON wt.workflow_id = ws.workflow_id
+      JOIN users u ON u.user_id = wt.created_by
+      WHERE ws.state_id = workflow_approvals.state_id
+        AND u.company_id = current_setting('app.current_company_id')::int
+        AND (
+          u.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM workflow_states ws
+      JOIN workflow_templates wt ON wt.workflow_id = ws.workflow_id
+      JOIN users u ON u.user_id = wt.created_by
+      WHERE ws.state_id = workflow_approvals.state_id
+        AND u.company_id = current_setting('app.current_company_id')::int
+        AND (
+          u.location_id = current_setting('app.current_location_id')::int OR
+          current_setting('app.current_location_id', true) IS NULL
+        )
+    )
+  );
+
 -- ===============================================
 -- TRANSACTIONAL TABLES
 -- ===============================================
@@ -407,6 +536,23 @@ CREATE TABLE purchase_orders (
     total_amount NUMERIC(12,2) DEFAULT 0,
     created_by INTEGER NOT NULL REFERENCES users(user_id),
     workflow_state_id INTEGER REFERENCES workflow_states(state_id),
+    updated_by INTEGER REFERENCES users(user_id),
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE
+);
+
+-- Purchase Order Items Table
+CREATE TABLE purchase_order_items (
+    purchase_order_item_id SERIAL PRIMARY KEY,
+    purchase_order_id INTEGER NOT NULL REFERENCES purchase_orders(purchase_order_id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(product_id),
+    quantity NUMERIC(10,3) NOT NULL,
+    unit_price NUMERIC(12,2) NOT NULL,
+    line_total NUMERIC(12,2) NOT NULL
+);
+
 -- Quotes Table
 CREATE TABLE quotes (
     quote_id SERIAL PRIMARY KEY,
@@ -613,6 +759,26 @@ CREATE TABLE collection_invoices (
     collection_id INTEGER NOT NULL REFERENCES collections(collection_id) ON DELETE CASCADE,
     sale_id INTEGER NOT NULL REFERENCES sales(sale_id),
     amount NUMERIC(12,2) NOT NULL
+);
+
+-- Payments Table
+CREATE TABLE payments (
+    payment_id SERIAL PRIMARY KEY,
+    payment_number VARCHAR(100) NOT NULL,
+    supplier_id INTEGER REFERENCES suppliers(supplier_id),
+    purchase_id INTEGER REFERENCES purchases(purchase_id),
+    location_id INTEGER REFERENCES locations(location_id),
+    payment_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    amount NUMERIC(12,2) NOT NULL,
+    payment_method_id INTEGER REFERENCES payment_methods(method_id),
+    reference_number VARCHAR(100),
+    notes TEXT,
+    created_by INTEGER NOT NULL REFERENCES users(user_id),
+    updated_by INTEGER REFERENCES users(user_id),
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE
 );
 
 -- Expenses Table
@@ -959,9 +1125,11 @@ CREATE INDEX idx_device_sessions_active ON device_sessions(user_id, is_active);
 CREATE INDEX idx_products_company_id ON products(company_id);
 CREATE INDEX idx_products_category ON products(category_id);
 CREATE INDEX idx_products_brand ON products(brand_id);
-CREATE INDEX idx_products_barcode ON products(barcode);
 CREATE INDEX idx_products_sku ON products(sku);
 CREATE INDEX idx_products_active ON products(company_id, is_active);
+CREATE UNIQUE INDEX ux_product_barcodes_barcode ON product_barcodes(barcode);
+CREATE UNIQUE INDEX ux_product_barcodes_product_id_barcode ON product_barcodes(product_id, barcode);
+CREATE UNIQUE INDEX ux_product_barcodes_primary ON product_barcodes(product_id) WHERE is_primary;
 CREATE INDEX idx_product_attributes_company ON product_attributes(company_id);
 CREATE INDEX idx_product_attribute_values_product ON product_attribute_values(product_id);
 CREATE INDEX idx_product_attribute_values_product_attribute ON product_attribute_values(product_id, attribute_id);
@@ -1382,117 +1550,6 @@ CREATE POLICY collections_rls ON collections FOR ALL TO authenticated
     )
   );
 
-CREATE TABLE workflow_templates (
-    workflow_id SERIAL PRIMARY KEY,
-    name VARCHAR(100),
-    description TEXT,
-    created_by INT NOT NULL REFERENCES users(user_id),
-    updated_by INT REFERENCES users(user_id)
-);
-
-CREATE TABLE workflow_states (
-    state_id SERIAL PRIMARY KEY,
-    workflow_id INT REFERENCES workflow_templates(workflow_id),
-    state_name VARCHAR(100),
-    sequence INT,
-    is_final BOOLEAN DEFAULT FALSE,
-    created_by INT NOT NULL REFERENCES users(user_id),
-    updated_by INT REFERENCES users(user_id)
-);
-
-CREATE TABLE workflow_approvals (
-    approval_id SERIAL PRIMARY KEY,
-    state_id INT REFERENCES workflow_states(state_id),
-    approver_role_id INT REFERENCES roles(role_id),
-    status VARCHAR(50),
-    remarks TEXT,
-    approved_at TIMESTAMP,
-    created_by INT NOT NULL REFERENCES users(user_id),
-    updated_by INT REFERENCES users(user_id)
-);
-
-ALTER TABLE workflow_templates ENABLE ROW LEVEL SECURITY;
-ALTER TABLE workflow_states ENABLE ROW LEVEL SECURITY;
-ALTER TABLE workflow_approvals ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY workflow_templates_rls ON workflow_templates FOR ALL TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM users u
-      WHERE u.user_id = workflow_templates.created_by
-        AND u.company_id = current_setting('app.current_company_id')::int
-        AND (
-          u.location_id = current_setting('app.current_location_id')::int OR
-          current_setting('app.current_location_id', true) IS NULL
-        )
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM users u
-      WHERE u.user_id = workflow_templates.created_by
-        AND u.company_id = current_setting('app.current_company_id')::int
-        AND (
-          u.location_id = current_setting('app.current_location_id')::int OR
-          current_setting('app.current_location_id', true) IS NULL
-        )
-    )
-  );
-
-CREATE POLICY workflow_states_rls ON workflow_states FOR ALL TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM workflow_templates wt
-      JOIN users u ON u.user_id = wt.created_by
-      WHERE wt.workflow_id = workflow_states.workflow_id
-        AND u.company_id = current_setting('app.current_company_id')::int
-        AND (
-          u.location_id = current_setting('app.current_location_id')::int OR
-          current_setting('app.current_location_id', true) IS NULL
-        )
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM workflow_templates wt
-      JOIN users u ON u.user_id = wt.created_by
-      WHERE wt.workflow_id = workflow_states.workflow_id
-        AND u.company_id = current_setting('app.current_company_id')::int
-        AND (
-          u.location_id = current_setting('app.current_location_id')::int OR
-          current_setting('app.current_location_id', true) IS NULL
-        )
-    )
-  );
-
-CREATE POLICY workflow_approvals_rls ON workflow_approvals FOR ALL TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM workflow_states ws
-      JOIN workflow_templates wt ON wt.workflow_id = ws.workflow_id
-      JOIN users u ON u.user_id = wt.created_by
-      WHERE ws.state_id = workflow_approvals.state_id
-        AND u.company_id = current_setting('app.current_company_id')::int
-        AND (
-          u.location_id = current_setting('app.current_location_id')::int OR
-          current_setting('app.current_location_id', true) IS NULL
-        )
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM workflow_states ws
-      JOIN workflow_templates wt ON wt.workflow_id = ws.workflow_id
-      JOIN users u ON u.user_id = wt.created_by
-      WHERE ws.state_id = workflow_approvals.state_id
-        AND u.company_id = current_setting('app.current_company_id')::int
-        AND (
-          u.location_id = current_setting('app.current_location_id')::int OR
-          current_setting('app.current_location_id', true) IS NULL
-        )
-    )
-  );
-
 ALTER TABLE stock_transfers ADD COLUMN workflow_state_id INT REFERENCES workflow_states(state_id);
 
 -- Reporting Views
@@ -1824,19 +1881,19 @@ CREATE INDEX IF NOT EXISTS idx_sale_return_details_return ON sale_return_details
 CREATE INDEX IF NOT EXISTS idx_sale_return_details_product ON sale_return_details(product_id);
 
 -- Add any missing constraints (if not already exists)
-ALTER TABLE loyalty_programs ADD CONSTRAINT IF NOT EXISTS chk_loyalty_points_positive 
+ALTER TABLE loyalty_programs ADD CONSTRAINT chk_loyalty_points_positive
     CHECK (points >= 0);
 
-ALTER TABLE loyalty_programs ADD CONSTRAINT IF NOT EXISTS chk_loyalty_totals_positive 
+ALTER TABLE loyalty_programs ADD CONSTRAINT chk_loyalty_totals_positive
     CHECK (total_earned >= 0 AND total_redeemed >= 0);
 
-ALTER TABLE loyalty_redemptions ADD CONSTRAINT IF NOT EXISTS chk_redemption_points_positive 
+ALTER TABLE loyalty_redemptions ADD CONSTRAINT chk_redemption_points_positive
     CHECK (points_used > 0 AND value_redeemed > 0);
 
-ALTER TABLE promotions ADD CONSTRAINT IF NOT EXISTS chk_promotion_dates 
+ALTER TABLE promotions ADD CONSTRAINT chk_promotion_dates
     CHECK (end_date >= start_date);
 
-ALTER TABLE sale_returns ADD CONSTRAINT IF NOT EXISTS chk_return_amount_positive 
+ALTER TABLE sale_returns ADD CONSTRAINT chk_return_amount_positive
     CHECK (total_amount >= 0);
 
 -- Create unique constraint for customer loyalty programs (if not exists)
