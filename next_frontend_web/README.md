@@ -67,12 +67,12 @@ npm run electron-pack
 
 This command runs `next build` and then packages the app using `electron-builder`.
 
-## Testing and Linting
+## Linting and Manual Testing
 
-The continuous integration pipeline runs tests and linting using these commands:
+Automated tests are not currently configured. Verify changes by running the
+application and exercising its features manually in your environment.
 
 ```bash
-npm test      # run unit tests
 npm run lint  # run ESLint
 ```
 
