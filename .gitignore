@@ -6,6 +6,7 @@ next_frontend_web/node_modules/
 .next/
 dist/
 build/
+next_frontend_web/out/
 
 # Electron
 *.exe
@@ -13,4 +14,7 @@ build/
 
 # Other large files
 *.zip
-*.tar.g
+*.tar.gz
+
+# Environment files
+.env*
