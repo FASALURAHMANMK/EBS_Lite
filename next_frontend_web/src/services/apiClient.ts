@@ -14,7 +14,9 @@ const getCookie = (name: string): string | null => {
 const setCookie = (name: string, value: string, days = 7) => {
   if (typeof document === 'undefined') return;
   const expires = new Date(Date.now() + days * 864e5).toUTCString();
-  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; secure; SameSite=Strict`;
+  const isSecure =
+    typeof window !== 'undefined' && window.location.protocol === 'https:';
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Strict${isSecure ? '; secure' : ''}`;
 };
 
 const deleteCookie = (name: string) => {
