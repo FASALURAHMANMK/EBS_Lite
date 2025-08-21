@@ -132,9 +132,13 @@ const ProductAddDialog: React.FC<{
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-red-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
             required
           >
-            {state.categories.filter(cat => cat !== 'All').map(category => (
-              <option key={category} value={category}>{category}</option>
-            ))}
+            {categories
+              .filter((cat: string) => cat !== 'All')
+              .map((category: string) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
           </select>
         </div>
 
@@ -149,11 +153,13 @@ const ProductAddDialog: React.FC<{
     required
   >
     <option value="">Select Location</option>
-    {authState.company?.locations?.filter(loc => loc.isActive).map(location => (
-      <option key={location._id} value={location._id}>
-        {location.name}
-      </option>
-    ))}
+    {authState.company?.locations
+      ?.filter((loc: any) => loc.isActive)
+      .map((location: any) => (
+        <option key={location._id} value={location._id}>
+          {location.name}
+        </option>
+      ))}
   </select>
 </div>
 
