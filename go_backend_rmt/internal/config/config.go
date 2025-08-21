@@ -70,7 +70,7 @@ func Load() *Config {
 		// CORS
 		AllowedOrigins: []string{getEnv("ALLOWED_ORIGINS", "http://localhost:3000")},
 		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"Content-Type", "Authorization"},
+		AllowedHeaders: []string{"Content-Type", "Authorization", "Accept", "company_id", "location_id"},
 
 		// Rate Limiting
 		RateLimitRequests: parseInt("RATE_LIMIT_REQUESTS", 100),
