@@ -313,3 +313,58 @@ func (h *CustomerHandler) ExportCustomers(c *gin.Context) {
 	c.Header("Content-Disposition", "attachment; filename=customers.xlsx")
 	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
 }
+
+// POST /customers/:id/credit
+func (h *CustomerHandler) RecordCreditTransaction(c *gin.Context) {
+	customerID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid customer ID", err)
+		return
+	}
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	userID := c.GetInt("user_id")
+
+	var req models.CreditTransactionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+
+	tx, err := h.customerService.RecordCreditTransaction(customerID, companyID, userID, &req)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to record transaction", err)
+		return
+	}
+
+	utils.CreatedResponse(c, "Credit transaction recorded successfully", tx)
+}
+
+// GET /customers/:id/credit
+func (h *CustomerHandler) GetCreditHistory(c *gin.Context) {
+	customerID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid customer ID", err)
+		return
+	}
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	history, err := h.customerService.GetCreditHistory(customerID, companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get credit history", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Credit history retrieved successfully", history)
+}
