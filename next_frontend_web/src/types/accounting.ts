@@ -14,6 +14,11 @@ export interface Voucher {
   createdAt: string;
 }
 
+export interface VoucherPayload {
+  amount: number;
+  description?: string;
+}
+
 export interface LedgerEntry {
   id: number;
   accountId: number;
@@ -22,4 +27,16 @@ export interface LedgerEntry {
   credit: number;
   balance: number;
   entryDate: string;
+}
+
+export interface LedgerQueryPayload {
+  accountId: number | string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface AccountBalance {
+  accountId: number;
+  accountName: string;
+  balance: number;
 }

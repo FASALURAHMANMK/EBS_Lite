@@ -63,7 +63,7 @@ const QuickActionMenu: React.FC = () => {
         <QuickActionButton
           icon={<ShoppingBag className="w-5 h-5 text-white" />}
           label="Purchase"
-          onClick={() => dispatch({ type: 'SET_VIEW', payload: 'purchase-entry' as any })}
+          onClick={() => dispatch({ type: 'SET_VIEW', payload: 'purchase-entry' })}
           color="bg-gradient-to-r from-blue-500 to-blue-600"
           position={1}
           isVisible={isOpen}
@@ -72,7 +72,7 @@ const QuickActionMenu: React.FC = () => {
         <QuickActionButton
           icon={<Banknote className="w-5 h-5 text-white" />}
           label="Collection"
-          onClick={() => dispatch({ type: 'SET_VIEW', payload: 'collectionss' as any })}
+          onClick={() => dispatch({ type: 'SET_VIEW', payload: 'collectionss' })}
           color="bg-gradient-to-r from-green-500 to-green-600"
           position={2}
           isVisible={isOpen}
@@ -81,7 +81,7 @@ const QuickActionMenu: React.FC = () => {
         <QuickActionButton
           icon={<CreditCard className="w-5 h-5 text-white" />}
           label="Expense"
-          onClick={() => dispatch({ type: 'SET_VIEW', payload: 'cash-register' as any })}
+          onClick={() => dispatch({ type: 'SET_VIEW', payload: 'cash-register' })}
           color="bg-gradient-to-r from-purple-500 to-purple-600"
           position={3}
           isVisible={isOpen}

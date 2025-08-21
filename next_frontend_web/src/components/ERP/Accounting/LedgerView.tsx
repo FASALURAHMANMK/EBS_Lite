@@ -1,12 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { accounting } from '../../../services';
-import { LedgerEntry } from '../../../types/accounting';
-
-interface AccountBalance {
-  accountId: number;
-  accountName: string;
-  balance: number;
-}
+import { LedgerEntry, AccountBalance } from '../../../types/accounting';
 
 const LedgerView: React.FC = () => {
   const [balances, setBalances] = useState<AccountBalance[]>([]);
@@ -18,7 +12,7 @@ const LedgerView: React.FC = () => {
 
   const loadEntries = (accountId: number) => {
     accounting
-      .getLedgerEntries(accountId)
+      .getLedgerEntries({ accountId })
       .then((data) => setEntries(data));
   };
 
