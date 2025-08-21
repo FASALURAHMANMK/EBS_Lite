@@ -195,9 +195,50 @@ export interface Supplier extends AuditFields {
   notes?: string;
 }
 
+export type SidebarView =
+  | 'dashboard'
+  | 'sales'
+  | 'sales-invoice'
+  | 'sales-returns'
+  | 'sales-history'
+  | 'collectionss'
+  | 'customers'
+  | 'customers_management'
+  | 'purchase-entry'
+  | 'purchase-orders'
+  | 'purchase-returns'
+  | 'suppliers'
+  | 'inventory'
+  | 'inventory-products'
+  | 'inventory-stock-transfers'
+  | 'inventory-low-stock'
+  | 'inventory-suppliers'
+  | 'cash-register'
+  | 'vouchers'
+  | 'ledgers'
+  | 'banking'
+  | 'sales-reports'
+  | 'inventory-reports'
+  | 'customer-reports'
+  | 'supplier-reports'
+  | 'purchase-reports'
+  | 'accounts-reports'
+  | 'general-reports'
+  | 'employees'
+  | 'attendance'
+  | 'payroll'
+  | 'leave-management'
+  | 'settings-general'
+  | 'settings-company'
+  | 'settings-users'
+  | 'settings-devices'
+  | 'settings-backup'
+  | 'settings-integrations'
+  | 'settings-pos-printer';
+
 export interface AppState {
   // UI State
-  currentView: 'dashboard' | 'sales' | 'inventory' | 'customers' | 'reports' | 'settings';
+  currentView: SidebarView;
   selectedCategory: string;
   isLoading: boolean;
   isInitialized: boolean;
@@ -398,7 +439,7 @@ type AppAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_INITIALIZED'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'SET_VIEW'; payload: AppState['currentView'] }
+  | { type: 'SET_VIEW'; payload: SidebarView }
   | { type: 'SET_CATEGORY'; payload: string }
   | { type: 'SET_PRODUCTS'; payload: Product[] }
   | { type: 'ADD_PRODUCT'; payload: Product }
