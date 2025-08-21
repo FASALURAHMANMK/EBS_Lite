@@ -12,7 +12,7 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react';
-import { useApp } from '../../context/MainContext';
+import { useApp, SYNC_THRESHOLD_MS } from '../../context/MainContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from 'next-i18next';
 
@@ -25,6 +25,7 @@ const Header: React.FC = () => {
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [showHelpDropdown, setShowHelpDropdown] = useState(false);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const isSyncStale = state.lastSync ? Date.now() - new Date(state.lastSync).getTime() > SYNC_THRESHOLD_MS : false;
 
   const handleRefresh = async () => {
     try {
@@ -175,13 +176,16 @@ const Header: React.FC = () => {
               )}
               <span>{isOnline ? t('online') : t('offline')}</span>
             </div>
-            <div>
+            <div className={isSyncStale ? 'text-red-500' : undefined}>
               {state.isSyncing
                 ? 'Syncing...'
                 : state.lastSync
                 ? `Last sync: ${new Date(state.lastSync).toLocaleTimeString()}`
                 : 'Never synced'}
             </div>
+            {isSyncStale && (
+              <div className="text-red-500">Data out of sync</div>
+            )}
           </div>
 
           {/* Refresh Button */}
