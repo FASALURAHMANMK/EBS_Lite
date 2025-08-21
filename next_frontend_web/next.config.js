@@ -13,6 +13,9 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  publicRuntimeConfig: {
+    COUCHDB_URL: process.env.COUCHDB_URL,
+  },
   async rewrites() {
     const apiProxyUrl = process.env.API_PROXY_URL || process.env.NEXT_PUBLIC_API_URL;
     return [
