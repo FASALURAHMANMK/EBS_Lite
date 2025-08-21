@@ -484,9 +484,9 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const getDashboardStats = async () => {
-    try {
-      return await dashboard.getStats();
-    } catch (error: any) {
+      try {
+        return await dashboard.getMetrics();
+      } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: error.message });
       throw error;
     }

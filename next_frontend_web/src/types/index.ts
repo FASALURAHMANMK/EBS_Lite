@@ -294,6 +294,16 @@ export interface DashboardStats {
   creditOutstanding: number;
 }
 
+export interface QuickActionCounts {
+  salesToday: number;
+  purchasesToday: number;
+  collectionsToday: number;
+  paymentsToday: number;
+  receiptsToday: number;
+  journalsToday: number;
+  lowStockItems: number;
+}
+
 export interface TopProduct {
   name: string;
   quantity: number;
