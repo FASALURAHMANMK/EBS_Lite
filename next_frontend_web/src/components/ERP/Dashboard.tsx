@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useAppState, useAppDispatch } from '../../context/MainContext';
 import { useAuth } from '../../context/AuthContext';
 import ErrorDisplay from '../Misc/ErrorDisplay';
-import api from '../../services/apiClient';
+import { dashboard } from '../../services';
 import {
   TrendingUp,
   DollarSign,
@@ -15,13 +15,14 @@ import {
   CreditCard
 } from 'lucide-react';
 import QuickActionMenu from './Common/QuickActionMenu';
-import { DashboardStats, Product, Sale } from '../../types';
+import { DashboardStats, Product, Sale, QuickActionCounts } from '../../types';
 
 const Dashboard: React.FC = () => {
   const state = useAppState(s => s);
   const dispatch = useAppDispatch();
   const { state: authState } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [quickActions, setQuickActions] = useState<QuickActionCounts | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -35,15 +36,18 @@ const Dashboard: React.FC = () => {
   const loadDashboardData = async () => {
     try {
       setIsLoading(true);
-      const dashboardData = await api.get<DashboardStats>('/api/v1/dashboard');
-      
-      if (dashboardData) {
-        setStats(dashboardData);
+      const [metricsData, quickActionData] = await Promise.all([
+        dashboard.getMetrics<DashboardStats>(),
+        dashboard.getQuickActions<QuickActionCounts>(),
+      ]);
+
+      if (metricsData) {
+        setStats(metricsData);
       } else {
-        // Fallback to calculating stats from current state
         const fallbackStats = calculateFallbackStats();
         setStats(fallbackStats);
       }
+      setQuickActions(quickActionData);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
       // Use fallback stats on error
@@ -484,7 +488,7 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      <QuickActionMenu />
+      <QuickActionMenu counts={quickActions || undefined} />
     </div>
   );
 };

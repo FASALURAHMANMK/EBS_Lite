@@ -1,3 +1,4 @@
 import api from './apiClient';
 
-export const getStats = () => api.get('/api/v1/dashboard');
+export const getMetrics = <T = any>() => api.get<T>('/api/v1/dashboard/metrics');
+export const getQuickActions = <T = any>() => api.get<T>('/api/v1/dashboard/quick-actions');

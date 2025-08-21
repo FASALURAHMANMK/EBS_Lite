@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAppDispatch } from '../../../context/MainContext';
 import { ShoppingCart, ShoppingBag, Banknote, CreditCard, Zap } from 'lucide-react';
+import { QuickActionCounts } from '../../../types';
 
 interface QuickActionButtonProps {
   icon: React.ReactNode;
@@ -9,6 +10,7 @@ interface QuickActionButtonProps {
   color: string;
   position: number;
   isVisible: boolean;
+  count?: number;
 }
 
 const QuickActionButton: React.FC<QuickActionButtonProps> = ({
@@ -18,6 +20,7 @@ const QuickActionButton: React.FC<QuickActionButtonProps> = ({
   color,
   position,
   isVisible,
+  count,
 }) => {
   const angle = position * 45 - 200;
   const radius = 80;
@@ -27,7 +30,7 @@ const QuickActionButton: React.FC<QuickActionButtonProps> = ({
   return (
     <button
       onClick={onClick}
-      className={`absolute w-12 h-12 ${color} rounded-full shadow-lg hover:scale-110 transition-all duration-300 ease-in-out flex items-center justify-center group ${
+      className={`relative absolute w-12 h-12 ${color} rounded-full shadow-lg hover:scale-110 transition-all duration-300 ease-in-out flex items-center justify-center group ${
         isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-0'
       }`}
       style={{
@@ -37,6 +40,11 @@ const QuickActionButton: React.FC<QuickActionButtonProps> = ({
       title={label}
     >
       {icon}
+      {typeof count === 'number' && (
+        <span className="absolute -top-1 -right-1 bg-white text-gray-800 text-xs rounded-full w-5 h-5 flex items-center justify-center">
+          {count}
+        </span>
+      )}
       <span className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
         {label}
       </span>
@@ -44,7 +52,11 @@ const QuickActionButton: React.FC<QuickActionButtonProps> = ({
   );
 };
 
-const QuickActionMenu: React.FC = () => {
+interface QuickActionMenuProps {
+  counts?: QuickActionCounts;
+}
+
+const QuickActionMenu: React.FC<QuickActionMenuProps> = ({ counts }) => {
   const dispatch = useAppDispatch();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -58,6 +70,7 @@ const QuickActionMenu: React.FC = () => {
           color="bg-gradient-to-r from-red-500 to-red-600"
           position={0}
           isVisible={isOpen}
+          count={counts?.salesToday}
         />
 
         <QuickActionButton
@@ -67,6 +80,7 @@ const QuickActionMenu: React.FC = () => {
           color="bg-gradient-to-r from-blue-500 to-blue-600"
           position={1}
           isVisible={isOpen}
+          count={counts?.purchasesToday}
         />
 
         <QuickActionButton
@@ -76,6 +90,7 @@ const QuickActionMenu: React.FC = () => {
           color="bg-gradient-to-r from-green-500 to-green-600"
           position={2}
           isVisible={isOpen}
+          count={counts?.collectionsToday}
         />
 
         <QuickActionButton
@@ -85,6 +100,7 @@ const QuickActionMenu: React.FC = () => {
           color="bg-gradient-to-r from-purple-500 to-purple-600"
           position={3}
           isVisible={isOpen}
+          count={counts?.paymentsToday}
         />
 
         <button
