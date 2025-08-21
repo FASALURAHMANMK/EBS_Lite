@@ -231,6 +231,7 @@ export interface AppState {
   // Sync Status
   lastSync: string | null;
   isSyncing: boolean;
+  unsyncedSales: Partial<Sale>[];
 
   // Pagination
   currentPage: number;
@@ -427,6 +428,8 @@ type AppAction =
   | { type: 'SET_LANGUAGE'; payload: string }
   | { type: 'SET_LAST_SYNC'; payload: string | null }
   | { type: 'SET_SYNCING'; payload: boolean }
+  | { type: 'SET_UNSYNCED_SALES'; payload: Partial<Sale>[] }
+  | { type: 'QUEUE_SALE'; payload: Partial<Sale> }
   | { type: 'RESET_STATE' };
 
 type AuthAction =

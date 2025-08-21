@@ -4,6 +4,8 @@ import { products, categories, customers, sales, dashboard, suppliers } from '..
 import { useAuth } from './AuthContext';
 import { setCompanyLocation } from '../services/apiClient';
 
+export const SYNC_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
 const initialState: AppState = {
   currentView: 'dashboard',
   selectedCategory: 'All',
@@ -24,6 +26,7 @@ const initialState: AppState = {
   language: 'en',
   lastSync: null,
   isSyncing: false,
+  unsyncedSales: [],
   currentPage: 1,
   itemsPerPage: 20,
   totalItems: 0,
@@ -114,6 +117,10 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
       return { ...state, lastSync: action.payload };
     case 'SET_SYNCING':
       return { ...state, isSyncing: action.payload };
+    case 'SET_UNSYNCED_SALES':
+      return { ...state, unsyncedSales: action.payload };
+    case 'QUEUE_SALE':
+      return { ...state, unsyncedSales: [...state.unsyncedSales, action.payload] };
     case 'RESET_STATE':
       return { ...initialState };
     default:
@@ -131,6 +138,8 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
     if (typeof window !== 'undefined') {
       const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
       const storedLang = localStorage.getItem('language');
+      const storedLastSync = localStorage.getItem('lastSync');
+      const storedUnsynced = localStorage.getItem('unsyncedSales');
       if (storedTheme) {
         dispatch({ type: 'SET_THEME', payload: storedTheme });
       }
@@ -139,6 +148,14 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
       } else if (authState.user?.primaryLanguage) {
         dispatch({ type: 'SET_LANGUAGE', payload: authState.user.primaryLanguage });
       }
+      if (storedLastSync) {
+        dispatch({ type: 'SET_LAST_SYNC', payload: storedLastSync });
+      }
+      if (storedUnsynced) {
+        try {
+          dispatch({ type: 'SET_UNSYNCED_SALES', payload: JSON.parse(storedUnsynced) });
+        } catch {}
+      }
     }
   }, [authState.user]);
 
@@ -146,17 +163,51 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('theme', state.theme);
       localStorage.setItem('language', state.language);
+      if (state.lastSync) {
+        localStorage.setItem('lastSync', state.lastSync);
+      } else {
+        localStorage.removeItem('lastSync');
+      }
+      localStorage.setItem('unsyncedSales', JSON.stringify(state.unsyncedSales));
       if (state.theme === 'dark') {
         document.documentElement.classList.add('dark');
       } else {
         document.documentElement.classList.remove('dark');
       }
     }
-  }, [state.theme, state.language]);
+  }, [state.theme, state.language, state.lastSync, state.unsyncedSales]);
 
   useEffect(() => {
     setCompanyLocation(state.currentCompanyId, state.currentLocationId);
   }, [state.currentCompanyId, state.currentLocationId]);
+
+  const syncUnsyncedSales = async () => {
+    if (!state.unsyncedSales.length) return;
+    const remaining: Partial<Sale>[] = [];
+    for (const sale of state.unsyncedSales) {
+      try {
+        const data = await sales.createSale(sale);
+        dispatch({ type: 'ADD_SALE', payload: data });
+      } catch {
+        remaining.push(sale);
+      }
+    }
+    dispatch({ type: 'SET_UNSYNCED_SALES', payload: remaining });
+    if (!remaining.length) {
+      dispatch({ type: 'SET_LAST_SYNC', payload: new Date().toISOString() });
+    }
+  };
+
+  useEffect(() => {
+    const handleOnline = () => {
+      syncUnsyncedSales();
+    };
+    window.addEventListener('online', handleOnline);
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      syncUnsyncedSales();
+    }
+    return () => window.removeEventListener('online', handleOnline);
+  }, [state.unsyncedSales]);
 
   const loadProducts = async () => {
     try {
@@ -394,13 +445,27 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const createSale = async (payload: Partial<Sale>) => {
+    const isStale = !state.lastSync || Date.now() - new Date(state.lastSync).getTime() > SYNC_THRESHOLD_MS;
+    if (isStale) {
+      const err = new Error('Data is out of sync. Please refresh before creating new transactions.');
+      dispatch({ type: 'SET_ERROR', payload: err.message });
+      throw err;
+    }
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      dispatch({ type: 'QUEUE_SALE', payload });
+      return payload as Sale;
+    }
+
     try {
       const data = await sales.createSale(payload);
       dispatch({ type: 'ADD_SALE', payload: data });
+      dispatch({ type: 'SET_LAST_SYNC', payload: new Date().toISOString() });
       return data;
     } catch (error: any) {
+      dispatch({ type: 'QUEUE_SALE', payload });
       dispatch({ type: 'SET_ERROR', payload: error.message });
-      throw error;
+      return payload as Sale;
     }
   };
 
