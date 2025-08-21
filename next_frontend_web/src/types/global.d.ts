@@ -1,7 +1,7 @@
 declare global {
   interface Window {
     ENV: {
-      NEXT_PUBLIC_COUCHDB_URL?: string;
+      NEXT_PUBLIC_API_URL?: string;
       NODE_ENV?: string;
     };
     testDatabaseConnection?: () => Promise<any>;
