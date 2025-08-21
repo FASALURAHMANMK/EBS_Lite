@@ -569,6 +569,7 @@ export const useAppActions = () => {
   const {
     loadAllData,
     loadProducts,
+    loadCategories,
     loadCustomers,
     loadSuppliers,
     loadSales,
@@ -600,6 +601,7 @@ export const useAppActions = () => {
   return {
     loadAllData,
     loadProducts,
+    loadCategories,
     loadCustomers,
     loadSuppliers,
     loadSales,

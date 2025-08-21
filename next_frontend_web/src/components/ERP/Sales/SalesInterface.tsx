@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAppState, useAppActions, useAppDispatch } from '../../../context/MainContext';
-import { useAuth } from '../../../context/AuthContext';
 import { Product,Customer } from '../../../types';
 import { 
   Search, 
@@ -14,7 +13,6 @@ import {
   Smartphone,
   Package,
   X,
-  Check,
   AlertCircle,
   Calculator,
   Receipt,
@@ -44,9 +42,7 @@ const SalesInterface: React.FC = () => {
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const { state: authState } = useAuth();
-
-
+  
   const [newCustomerForm, setNewCustomerForm] = useState({
     name: '',
     phone: '',
@@ -61,9 +57,9 @@ const SalesInterface: React.FC = () => {
     let filtered = state.products.filter(p => p.stock > 0); // Only show products in stock
     
     if (productSearchTerm.trim()) {
-      filtered = searchProducts(productSearchTerm).filter(p => p.stock > 0);
+      filtered = searchProducts(productSearchTerm).filter((p: Product) => p.stock > 0);
     } else if (state.selectedCategory !== 'All') {
-      filtered = getProductsByCategory(state.selectedCategory).filter(p => p.stock > 0);
+      filtered = getProductsByCategory(state.selectedCategory).filter((p: Product) => p.stock > 0);
     }
     
     setFilteredProducts(filtered);
@@ -71,7 +67,7 @@ const SalesInterface: React.FC = () => {
 
   useEffect(() => {
   if (state.currentLocationId && !newCustomerForm.locationId) {
-    setNewCustomerForm(prev => ({ ...prev, locationId: state.currentLocationId }));
+    setNewCustomerForm(prev => ({ ...prev, locationId: state.currentLocationId || '' }));
   }
 }, [state.currentLocationId]);
 

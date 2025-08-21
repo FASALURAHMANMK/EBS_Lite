@@ -15,6 +15,7 @@ import {
 import { useApp, SYNC_THRESHOLD_MS } from '../../context/MainContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from 'next-i18next';
+import { Location } from '../../types';
 
 const Header: React.FC = () => {
   const { state, dispatch, loadAllData, setCurrentLocation, setLanguage } = useApp();
@@ -85,7 +86,7 @@ const Header: React.FC = () => {
     };
   }, []);
 
-  const currentLocation = authState.company?.locations?.find(loc => loc._id === state.currentLocationId);
+  const currentLocation = authState.company?.locations?.find((loc: Location) => loc._id === state.currentLocationId);
 
 
   return (
@@ -143,7 +144,7 @@ const Header: React.FC = () => {
 
   {showLocationDropdown && authState.company?.locations && (
     <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg z-50 min-w-48">
-      {authState.company.locations.map((location) => (
+      {authState.company.locations.map((location: Location) => (
         <button
           key={location._id}
           onClick={() => handleLocationChange(location._id)}

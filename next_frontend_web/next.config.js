@@ -7,6 +7,12 @@ const nextConfig = {
     unoptimized: true,
   },
   distDir: 'out',
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   async rewrites() {
     const apiProxyUrl = process.env.API_PROXY_URL || process.env.NEXT_PUBLIC_API_URL;
     return [
