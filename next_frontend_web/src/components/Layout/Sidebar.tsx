@@ -30,11 +30,12 @@ import {
   Blocks,
   Printer,
 } from 'lucide-react';
+import { SidebarView, Product } from '../../types';
 
 interface MenuItem {
   icon?: React.ElementType;
   label: string;
-  view?: string;
+  view?: SidebarView;
   subItems?: MenuItem[];
   badge?: number;
   roles?: string[];
@@ -46,7 +47,7 @@ const Sidebar: React.FC = () => {
   const [expandedItems, setExpandedItems] = useState<string[]>(['Sales']);
 
   const lowStockCount = state.products.filter(
-    (p) => typeof p.minStock === 'number' && p.stock <= p.minStock!
+    (p: Product) => typeof p.minStock === 'number' && p.stock <= p.minStock!
   ).length;
 
   const menuItems: MenuItem[] = [
@@ -166,11 +167,11 @@ const Sidebar: React.FC = () => {
     );
   };
 
-  const handleItemClick = (view: string) => {
-    dispatch({ type: 'SET_VIEW', payload: view as any });
+  const handleItemClick = (view: SidebarView) => {
+    dispatch({ type: 'SET_VIEW', payload: view });
   };
 
-  const isActive = (view: string) => state.currentView === view;
+  const isActive = (view: SidebarView) => state.currentView === view;
 
   const isItemActive = (item: MenuItem): boolean => {
     if (item.view && isActive(item.view)) return true;

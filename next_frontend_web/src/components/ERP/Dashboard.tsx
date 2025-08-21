@@ -15,19 +15,7 @@ import {
   CreditCard
 } from 'lucide-react';
 import QuickActionMenu from './Common/QuickActionMenu';
-
-interface DashboardStats {
-  todayRevenue: number;
-  todayOrders: number;
-  totalCustomers: number;
-  lowStockCount: number;
-  recentSales: any[];
-  topProducts: any[];
-  lowStockProducts: any[];
-  totalProducts: number;
-  totalInventoryValue: number;
-  creditOutstanding: number;
-}
+import { DashboardStats, Product, Sale } from '../../types';
 
 const Dashboard: React.FC = () => {
   const state = useAppState(s => s);
@@ -162,9 +150,9 @@ const Dashboard: React.FC = () => {
     );
   
     // Calculate top products (simplified)
-    const productSales = new Map();
-    state.recentSales.forEach(sale => {
-      sale.items.forEach((item: any) => {
+    const productSales = new Map<string, { name: string; quantity: number; revenue: number }>();
+    state.recentSales.forEach((sale: Sale) => {
+      sale.items.forEach((item) => {
         const current = productSales.get(item.productId) || { name: item.productName, quantity: 0, revenue: 0 };
         current.quantity += item.quantity;
         current.revenue += item.totalPrice;
@@ -206,7 +194,7 @@ const Dashboard: React.FC = () => {
     });
   };
 
-  const getStockStatusColor = (product: any) => {
+  const getStockStatusColor = (product: Product) => {
     if (product.stock === 0) return 'text-red-600 dark:text-red-400';
     if (product.stock <= (product.minStock || 5)) return 'text-yellow-600 dark:text-yellow-400';
     return 'text-green-600 dark:text-green-400';

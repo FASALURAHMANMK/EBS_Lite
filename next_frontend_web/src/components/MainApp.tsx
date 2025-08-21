@@ -8,6 +8,7 @@ import ProductManagement from './ERP/Inventory/ProductManagement';
 import CustomerManagement from './ERP/Customers/CustomerManagement';
 import ErrorBoundary from './Misc/ErrorBoundary';
 import { MapPin } from 'lucide-react';
+import { Location } from '../types';
 
 const MainApp: React.FC = () => {
   const { state } = useApp();
@@ -78,7 +79,7 @@ const MainApp: React.FC = () => {
             Please select a location to continue
           </p>
           <div className="space-y-2">
-            {authState.company.locations.map((location) => (
+            {authState.company.locations.map((location: Location) => (
               <button
                 key={location._id}
                 // onClick={() => {
