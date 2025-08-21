@@ -1,5 +1,12 @@
 import api from './apiClient';
-import { CashRegister, Voucher, LedgerEntry } from '../types/accounting';
+import {
+  CashRegister,
+  Voucher,
+  VoucherPayload,
+  LedgerEntry,
+  LedgerQueryPayload,
+  AccountBalance,
+} from '../types/accounting';
 
 // Cash Register
 export const getCashRegisters = () =>
@@ -21,13 +28,13 @@ export const recordCashTally = (payload: { count: number; notes?: string }) =>
 export const listVouchers = () =>
   api.get<Voucher[]>('/api/v1/vouchers');
 
-export const createVoucher = (type: string, payload: any) =>
+export const createVoucher = (type: string, payload: VoucherPayload) =>
   api.post<{ voucherId: number }>(`/api/v1/vouchers/${type}`, payload);
 
 // Ledger
 export const getLedgerBalances = () =>
-  api.get<any[]>('/api/v1/ledgers');
+  api.get<AccountBalance[]>('/api/v1/ledgers');
 
 export const getLedgerEntries = (
-  accountId: number | string
-) => api.get<LedgerEntry[]>(`/api/v1/ledgers/${accountId}/entries`);
+  payload: LedgerQueryPayload
+) => api.get<LedgerEntry[]>(`/api/v1/ledgers/${payload.accountId}/entries`);
