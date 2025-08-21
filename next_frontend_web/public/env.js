@@ -11,8 +11,12 @@
     }
   });
 
+  const isDev =
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1';
+
   // Development overrides from localStorage
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  if (isDev) {
     try {
       const overrides = localStorage.getItem('pos_env_overrides');
       if (overrides) {
@@ -23,5 +27,7 @@
     }
   }
 
-  console.log('Environment initialized:', window.ENV);
+  if (isDev) {
+    console.log('Environment initialized:', window.ENV);
+  }
 })();
