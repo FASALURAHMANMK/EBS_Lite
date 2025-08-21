@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
-import { Eye, EyeOff, LogIn, Building, User, AlertCircle, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Building, AlertCircle, CheckCircle } from 'lucide-react';
 
 const RegisterPage: React.FC = () => {
     const { state, register, clearError } = useAuth();

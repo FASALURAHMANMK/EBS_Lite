@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppState, useAppDispatch, useAppActions } from '../../../context/MainContext';
 import { useAuth } from '../../../context/AuthContext';
-import { Search, ScanLine, Package, AlertTriangle, Plus, X } from 'lucide-react';
+import { Search, ScanLine, Package, Plus, X } from 'lucide-react';
 
 // Modal Component
 const Modal: React.FC<{

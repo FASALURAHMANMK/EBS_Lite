@@ -81,7 +81,7 @@ const CustomerList: React.FC<CustomerListProps> = ({
               className="hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               <td className="px-6 py-4 whitespace-nowrap">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200">
                   {authState.company?.locations?.find(
                     loc => loc._id === customer.locationId
                   )?.name || 'Unknown'}

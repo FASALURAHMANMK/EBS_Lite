@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppState, useAppDispatch, useAppActions } from '../../../context/MainContext';
-import { ShoppingCart, Plus, Minus, Trash2, X, CreditCard, Banknote, Search, User, Check } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, X, CreditCard, Banknote, Search, User } from 'lucide-react';
 
 // Modal Component
 const Modal: React.FC<{
