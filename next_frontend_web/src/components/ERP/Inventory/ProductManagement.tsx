@@ -1,29 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useAppState, useAppActions } from '../../../context/MainContext';
 import { useAuth } from '../../../context/AuthContext';
-import { Product,Category } from '../../../types';
+import { Product, Category, Location } from '../../../types';
 import { 
   Plus, 
   Search, 
   Edit3, 
   Trash2, 
-  Package, 
-  DollarSign, 
-  Barcode, 
-  Tag, 
+  Package,
+  DollarSign,
+  Tag,
   AlertTriangle,
   TrendingDown,
-  TrendingUp,
-  MoreVertical,
   X,
   Save,
   Grid3X3,
   List,
-  Filter,
-  Download,
-  Upload,
-  Eye,
-  Archive
+  Filter
 } from 'lucide-react';
 
 const ProductManagement: React.FC = () => {
@@ -37,8 +30,7 @@ const ProductManagement: React.FC = () => {
     createCategory,
     updateCategory,
     deleteCategory,
-    searchProducts,
-    getProductsByCategory
+    searchProducts
   } = useAppActions();
 
   const { state: authState } = useAuth();
@@ -297,15 +289,6 @@ const ProductManagement: React.FC = () => {
       specifications: product.specifications || {}
     });
     setShowEditProductModal(true);
-  };
-
-  const openEditCategoryModal = (category: Category) => {
-    setSelectedCategoryData(category);
-    setCategoryForm({
-      name: category.name,
-      description: category.description || ''
-    });
-    setShowEditCategoryModal(true);
   };
 
   const formatCurrency = (amount: number) => {
@@ -883,7 +866,7 @@ const ProductManagement: React.FC = () => {
     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-800 dark:text-white"
   >
     <option value="">Select Location</option>
-    {authState.company?.locations?.filter(loc => loc.isActive).map(location => (
+    {authState.company?.locations?.filter((loc: Location) => loc.isActive).map((location: Location) => (
       <option key={location._id} value={location._id}>
         {location.name}
       </option>
@@ -1130,7 +1113,7 @@ const ProductManagement: React.FC = () => {
     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-800 dark:text-white"
   >
     <option value="">Select Location</option>
-    {authState.company?.locations?.filter(loc => loc.isActive).map(location => (
+    {authState.company?.locations?.filter((loc: Location) => loc.isActive).map((location: Location) => (
       <option key={location._id} value={location._id}>
         {location.name}
       </option>
@@ -1248,7 +1231,7 @@ const ProductManagement: React.FC = () => {
     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-800 dark:text-white"
   >
     <option value="">Select Location</option>
-    {authState.company?.locations?.filter(loc => loc.isActive).map(location => (
+    {authState.company?.locations?.filter((loc: Location) => loc.isActive).map((location: Location) => (
       <option key={location._id} value={location._id}>
         {location.name}
       </option>

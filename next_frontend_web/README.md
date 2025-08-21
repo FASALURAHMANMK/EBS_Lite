@@ -30,6 +30,10 @@ API_PROXY_URL=http://localhost:8080
 NEXT_PUBLIC_AUTH_REDIRECT=http://localhost:3000/auth/callback
 ```
 
+## Deployment
+
+This project runs with server-side rendering due to its use of internationalization. To create a production build, run `npm run build` and then launch the application with `npm start`. Ensure the environment variables above are configured in your hosting environment.
+=======
 ## Development Server
 
 Start the application in watch mode:

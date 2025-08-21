@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppState, useAppActions } from '../../../context/MainContext';
-import { Customer, CreditTransaction } from '../../../types';
+import { useAuth } from '../../../context/AuthContext';
+import { Customer, CreditTransaction, Location } from '../../../types';
 import { Search, Plus, Upload, Download, X, Save } from 'lucide-react';
 import CustomerList from './CustomerList';
 import CustomerSummaryModal from './CustomerSummaryModal';
@@ -10,6 +11,7 @@ import * as XLSX from 'xlsx';
 
 const CustomerManagement: React.FC = () => {
   const state = useAppState(s => s);
+  const { state: authState } = useAuth();
   const {
     loadCustomers,
     createCustomer,
@@ -259,7 +261,7 @@ const CustomerManagement: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Location *</label>
                 <select required value={formData.locationId} onChange={e => setFormData(prev => ({ ...prev, locationId: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-800 dark:text-white">
                   <option value="">Select Location</option>
-                  {state.locations.map(loc => (
+                  {authState.company?.locations?.map((loc: Location) => (
                     <option key={loc._id} value={loc._id}>{loc.name}</option>
                   ))}
                 </select>
@@ -312,7 +314,7 @@ const CustomerManagement: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Location *</label>
                 <select required value={formData.locationId} onChange={e => setFormData(prev => ({ ...prev, locationId: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-800 dark:text-white">
                   <option value="">Select Location</option>
-                  {state.locations.map(loc => (
+                  {authState.company?.locations?.map((loc: Location) => (
                     <option key={loc._id} value={loc._id}>{loc.name}</option>
                   ))}
                 </select>
