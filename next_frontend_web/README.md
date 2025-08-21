@@ -21,6 +21,7 @@ The application requires the following environment variables to be set:
 - `NEXT_PUBLIC_API_URL` – Base URL used by the client for API requests.
 - `API_PROXY_URL` – URL used by Next.js rewrites to proxy `/api/*` calls to the backend. Defaults to `NEXT_PUBLIC_API_URL` if not set.
 - `NEXT_PUBLIC_AUTH_REDIRECT` – Redirect URL for authentication callbacks.
+- `COUCHDB_URL` – CouchDB endpoint. Only the URL is exposed to the browser through Next.js runtime configuration; credentials must be provided server-side.
 
 Define these variables in your environment or in a `.env` file before running or building the project. For example:
 
@@ -28,12 +29,17 @@ Define these variables in your environment or in a `.env` file before running or
 NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
 API_PROXY_URL=http://localhost:8080
 NEXT_PUBLIC_AUTH_REDIRECT=http://localhost:3000/auth/callback
+COUCHDB_URL=http://localhost:5984
 ```
+
+### Runtime overrides
+
+Non-sensitive values such as `COUCHDB_URL` can be overridden in the browser by adding `<meta>` tags with names prefixed by `env:` or by setting the `pos_env_overrides` entry in `localStorage`. These mechanisms are intended for development and should not include secrets.
 
 ## Deployment
 
 This project runs with server-side rendering due to its use of internationalization. To create a production build, run `npm run build` and then launch the application with `npm start`. Ensure the environment variables above are configured in your hosting environment.
-=======
+
 ## Development Server
 
 Start the application in watch mode:

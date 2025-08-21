@@ -1,17 +1,6 @@
 (function() {
-  // Default environment variables
-  const defaults = {
-    NEXT_PUBLIC_COUCHDB_URL: 'http://localhost:5984',
-    NEXT_PUBLIC_COUCHDB_USERNAME: 'admin', 
-    NEXT_PUBLIC_COUCHDB_PASSWORD: 'admin',
-    NODE_ENV: 'production'
-  };
-
   // Initialize window.ENV
   window.ENV = window.ENV || {};
-
-  // Apply defaults first
-  Object.assign(window.ENV, defaults);
 
   // Override with meta tags if present
   document.querySelectorAll('meta[name^="env:"]').forEach(meta => {
@@ -34,8 +23,5 @@
     }
   }
 
-  console.log('Environment initialized:', {
-    ...window.ENV,
-    NEXT_PUBLIC_COUCHDB_PASSWORD: '***'
-  });
+  console.log('Environment initialized:', window.ENV);
 })();
