@@ -83,7 +83,7 @@ const CustomerList: React.FC<CustomerListProps> = ({
               <td className="px-6 py-4 whitespace-nowrap">
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200">
                   {authState.company?.locations?.find(
-                    loc => loc._id === customer.locationId
+                    (loc: any) => loc._id === customer.locationId
                   )?.name || 'Unknown'}
                 </span>
                 <div className="flex items-center mt-2">

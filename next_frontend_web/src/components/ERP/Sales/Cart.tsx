@@ -401,7 +401,10 @@ const Cart: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <button className="w-full bg-red-600 dark:bg-red-500 text-white py-3 rounded-lg hover:bg-red-700 dark:hover:bg-red-400 transition-colors flex items-center justify-center space-x-2">
+            <button
+              onClick={handleCheckout}
+              className="w-full bg-red-600 dark:bg-red-500 text-white py-3 rounded-lg hover:bg-red-700 dark:hover:bg-red-400 transition-colors flex items-center justify-center space-x-2"
+            >
               <CreditCard className="w-5 h-5" />
               <span>Checkout</span>
             </button>
