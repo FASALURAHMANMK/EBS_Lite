@@ -35,7 +35,6 @@ const Dashboard: React.FC = () => {
   const { state: authState } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   useEffect(() => {
     loadDashboardData();
@@ -57,7 +56,6 @@ const Dashboard: React.FC = () => {
         const fallbackStats = calculateFallbackStats();
         setStats(fallbackStats);
       }
-      setLastUpdated(new Date());
     } catch (error) {
       console.error('Error loading dashboard data:', error);
       // Use fallback stats on error
