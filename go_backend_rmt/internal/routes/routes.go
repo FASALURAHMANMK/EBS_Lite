@@ -373,6 +373,12 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				customers.GET("/export", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.ExportCustomers)
 				customers.PUT("/:id", middleware.RequirePermission("UPDATE_CUSTOMERS"), customerHandler.UpdateCustomer)
 				customers.DELETE("/:id", middleware.RequirePermission("DELETE_CUSTOMERS"), customerHandler.DeleteCustomer)
+
+				credit := customers.Group("/:id/credit")
+				{
+					credit.GET("", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.GetCreditHistory)
+					credit.POST("", middleware.RequirePermission("UPDATE_CUSTOMERS"), customerHandler.RecordCreditTransaction)
+				}
 			}
 
 			// Employee management routes (require company)

@@ -298,3 +298,60 @@ func (s *CustomerService) GetCustomerSummary(customerID, companyID int) (*models
 
 	return summary, nil
 }
+
+// RecordCreditTransaction creates a credit or debit adjustment for a customer.
+func (s *CustomerService) RecordCreditTransaction(customerID, companyID, userID int, req *models.CreditTransactionRequest) (*models.CreditTransaction, error) {
+	var tx models.CreditTransaction
+	err := s.db.QueryRow(
+		`INSERT INTO customer_credit_transactions (customer_id, company_id, amount, type, description, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING transaction_id, created_at`,
+		customerID, companyID, req.Amount, req.Type, req.Description, userID,
+	).Scan(&tx.TransactionID, &tx.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to record credit transaction: %w", err)
+	}
+
+	if err := s.db.QueryRow(
+		`SELECT COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE -amount END),0)
+         FROM customer_credit_transactions WHERE customer_id = $1 AND company_id = $2`,
+		customerID, companyID,
+	).Scan(&tx.NewBalance); err != nil {
+		return nil, fmt.Errorf("failed to calculate new balance: %w", err)
+	}
+
+	tx.CustomerID = customerID
+	tx.CompanyID = companyID
+	tx.Amount = req.Amount
+	tx.Type = req.Type
+	tx.Description = req.Description
+	tx.CreatedBy = userID
+
+	return &tx, nil
+}
+
+// GetCreditHistory retrieves credit and debit adjustments for a customer.
+func (s *CustomerService) GetCreditHistory(customerID, companyID int) ([]models.CreditTransaction, error) {
+	rows, err := s.db.Query(
+		`SELECT transaction_id, customer_id, company_id, amount, type, description, created_by, created_at,
+                SUM(CASE WHEN type = 'credit' THEN amount ELSE -amount END) OVER (ORDER BY created_at ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS new_balance
+         FROM customer_credit_transactions
+         WHERE customer_id = $1 AND company_id = $2
+         ORDER BY created_at DESC`,
+		customerID, companyID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get credit history: %w", err)
+	}
+	defer rows.Close()
+
+	var history []models.CreditTransaction
+	for rows.Next() {
+		var tx models.CreditTransaction
+		if err := rows.Scan(&tx.TransactionID, &tx.CustomerID, &tx.CompanyID, &tx.Amount, &tx.Type, &tx.Description, &tx.CreatedBy, &tx.CreatedAt, &tx.NewBalance); err != nil {
+			return nil, fmt.Errorf("failed to scan credit transaction: %w", err)
+		}
+		history = append(history, tx)
+	}
+	return history, nil
+}
