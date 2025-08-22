@@ -4,7 +4,6 @@ import { inventory } from '../../../services';
 
 const TransferRequest: React.FC = () => {
   const state = useAppState(s => s);
-  const [fromLocation, setFromLocation] = useState(state.currentLocationId || '');
   const [toLocation, setToLocation] = useState('');
   const [productId, setProductId] = useState('');
   const [quantity, setQuantity] = useState(0);
@@ -18,7 +17,6 @@ const TransferRequest: React.FC = () => {
     e.preventDefault();
     try {
       await inventory.createTransfer({
-        fromLocationId: fromLocation,
         toLocationId: toLocation,
         items: [{ productId, quantity }],
       });
@@ -36,11 +34,9 @@ const TransferRequest: React.FC = () => {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm mb-1">From Location</label>
-          <input
-            className="w-full border px-2 py-1"
-            value={fromLocation}
-            onChange={e => setFromLocation(e.target.value)}
-          />
+          <div className="w-full border px-2 py-1 bg-gray-100">
+            {state.currentLocationId || ''}
+          </div>
         </div>
         <div>
           <label className="block text-sm mb-1">To Location</label>
@@ -79,7 +75,7 @@ const TransferRequest: React.FC = () => {
               Items:{' '}
               {t.items?.map((i: any) => `${i.productId} (${i.quantity})`).join(', ')}
             </div>
-            {t.reference && <div>Ref: {t.reference}</div>}
+            {t.notes && <div>Notes: {t.notes}</div>}
           </li>
         ))}
       </ul>

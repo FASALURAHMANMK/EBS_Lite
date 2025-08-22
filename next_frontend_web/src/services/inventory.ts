@@ -14,10 +14,9 @@ export const getStockAdjustments = () =>
   api.get(`/api/v1/inventory/stock-adjustments`);
 
 export const createTransfer = (payload: {
-  fromLocationId: string;
   toLocationId: string;
   items: Array<{ productId: string; quantity: number }>;
-  reference?: string;
+  notes?: string;
 }) => api.post('/api/v1/inventory/transfers', payload);
 
 export const getTransfers = () => api.get('/api/v1/inventory/transfers');
