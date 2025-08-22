@@ -10,3 +10,8 @@ export * as inventory from './inventory';
 export * as purchases from './purchases';
 export * as suppliers from './suppliers';
 export * as accounting from './accounting';
+export * as users from './users';
+export * as roles from './roles';
+export * as locations from './locations';
+export * as employees from './employees';
+export * as attendance from './attendance';
