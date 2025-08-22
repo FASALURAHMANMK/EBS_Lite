@@ -21,6 +21,8 @@ func NewAuthHandler() *AuthHandler {
 }
 
 // POST /auth/login
+// Accepts either a username or email with password and device information.
+// Returns access/refresh tokens, session identifier and optional company data.
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req models.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
