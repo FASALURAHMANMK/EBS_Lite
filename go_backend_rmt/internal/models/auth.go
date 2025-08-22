@@ -2,19 +2,29 @@ package models
 
 import "time"
 
+// LoginRequest represents the payload accepted by the login endpoint.
+// Either Email or Username must be supplied along with password and
+// device information. DeviceID identifies the client device for the
+// session tracking functionality.
 type LoginRequest struct {
-	Email              string  `json:"email" validate:"required,email"`
-	Password           string  `json:"password" validate:"required"`
-	DeviceID           string  `json:"device_id" validate:"required"`
-	DeviceName         *string `json:"device_name,omitempty"`
-	IncludePreferences bool    `json:"include_preferences,omitempty"`
+        Username           string  `json:"username,omitempty" validate:"required_without=Email,omitempty,min=3"`
+        Email              string  `json:"email,omitempty" validate:"required_without=Username,omitempty,email"`
+        Password           string  `json:"password" validate:"required"`
+        DeviceID           string  `json:"device_id" validate:"required"`
+        DeviceName         *string `json:"device_name,omitempty"`
+        IncludePreferences bool    `json:"include_preferences,omitempty"`
 }
 
+// LoginResponse describes the fields returned after a successful login.
+// Tokens are issued for subsequent authenticated requests, a session ID
+// identifies the device session, and optional company information is
+// included when the user belongs to a company.
 type LoginResponse struct {
-	AccessToken  string       `json:"access_token"`
-	RefreshToken string       `json:"refresh_token"`
-	SessionID    string       `json:"session_id"`
-	User         UserResponse `json:"user"`
+        AccessToken  string       `json:"access_token"`
+        RefreshToken string       `json:"refresh_token"`
+        SessionID    string       `json:"session_id"`
+        User         UserResponse `json:"user"`
+        Company      *Company     `json:"company,omitempty"`
 }
 
 type RefreshTokenRequest struct {

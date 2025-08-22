@@ -23,14 +23,22 @@ func NewAuthService() *AuthService {
 }
 
 func (s *AuthService) Login(req *models.LoginRequest, ipAddress, userAgent string) (*models.LoginResponse, error) {
-	// Get user by email
-	user, err := s.getUserByEmail(req.Email)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("invalid credentials")
-		}
-		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
+        // Get user by username or email
+        var (
+                user *models.User
+                err  error
+        )
+        if req.Username != "" {
+                user, err = s.getUserByUsername(req.Username)
+        } else {
+                user, err = s.getUserByEmail(req.Email)
+        }
+        if err != nil {
+                if err == sql.ErrNoRows {
+                        return nil, fmt.Errorf("invalid credentials")
+                }
+                return nil, fmt.Errorf("failed to get user: %w", err)
+        }
 
 	// Check if user is active
 	if !user.IsActive || user.IsLocked {
@@ -129,31 +137,37 @@ func (s *AuthService) Login(req *models.LoginRequest, ipAddress, userAgent strin
 		}
 	}
 
-	userResponse := models.UserResponse{
-		UserID:            user.UserID,
-		Username:          user.Username,
-		Email:             user.Email,
-		FirstName:         user.FirstName,
-		LastName:          user.LastName,
-		Phone:             user.Phone,
-		RoleID:            user.RoleID,
-		LocationID:        user.LocationID,
-		CompanyID:         user.CompanyID,
-		IsActive:          user.IsActive,
-		IsLocked:          user.IsLocked,
-		PreferredLanguage: user.PreferredLanguage,
-		SecondaryLanguage: user.SecondaryLanguage,
-		LastLogin:         user.LastLogin,
-		Permissions:       permissions,
-		Preferences:       prefs,
-	}
+        userResponse := models.UserResponse{
+                UserID:            user.UserID,
+                Username:          user.Username,
+                Email:             user.Email,
+                FirstName:         user.FirstName,
+                LastName:          user.LastName,
+                Phone:             user.Phone,
+                RoleID:            user.RoleID,
+                LocationID:        user.LocationID,
+                CompanyID:         user.CompanyID,
+                IsActive:          user.IsActive,
+                IsLocked:          user.IsLocked,
+                PreferredLanguage: user.PreferredLanguage,
+                SecondaryLanguage: user.SecondaryLanguage,
+                LastLogin:         user.LastLogin,
+                Permissions:       permissions,
+                Preferences:       prefs,
+        }
 
-	return &models.LoginResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		SessionID:    sessionID,
-		User:         userResponse,
-	}, nil
+        var company *models.Company
+        if user.CompanyID != nil {
+                company, _ = s.getCompanyByID(*user.CompanyID)
+        }
+
+        return &models.LoginResponse{
+                AccessToken:  accessToken,
+                RefreshToken: refreshToken,
+                SessionID:    sessionID,
+                User:         userResponse,
+                Company:      company,
+        }, nil
 }
 
 // Logout deactivates a device session for the given user
@@ -332,6 +346,46 @@ func (s *AuthService) getUserByEmail(email string) (*models.User, error) {
 	)
 
 	return &user, err
+}
+
+func (s *AuthService) getUserByUsername(username string) (*models.User, error) {
+        query := `
+                SELECT user_id, company_id, location_id, role_id, username, email, password_hash,
+                           first_name, last_name, phone, preferred_language, secondary_language,
+                           max_allowed_devices, is_locked, is_active, last_login, sync_status,
+                           created_at, updated_at, is_deleted
+                FROM users
+                WHERE username = $1 AND is_deleted = FALSE
+        `
+
+        var user models.User
+        err := s.db.QueryRow(query, username).Scan(
+                &user.UserID, &user.CompanyID, &user.LocationID, &user.RoleID,
+                &user.Username, &user.Email, &user.PasswordHash, &user.FirstName,
+                &user.LastName, &user.Phone, &user.PreferredLanguage, &user.SecondaryLanguage,
+                &user.MaxAllowedDevices, &user.IsLocked, &user.IsActive, &user.LastLogin,
+                &user.SyncStatus, &user.CreatedAt, &user.UpdatedAt, &user.IsDeleted,
+        )
+
+        return &user, err
+}
+
+func (s *AuthService) getCompanyByID(companyID int) (*models.Company, error) {
+        query := `
+                SELECT company_id, name, logo, address, phone, email, tax_number,
+                       currency_id, is_active, created_at, updated_at
+                FROM companies
+                WHERE company_id = $1 AND is_active = TRUE
+        `
+
+        var company models.Company
+        err := s.db.QueryRow(query, companyID).Scan(
+                &company.CompanyID, &company.Name, &company.Logo, &company.Address,
+                &company.Phone, &company.Email, &company.TaxNumber, &company.CurrencyID,
+                &company.IsActive, &company.CreatedAt, &company.UpdatedAt,
+        )
+
+        return &company, err
 }
 
 func (s *AuthService) getUserByID(userID int) (*models.User, error) {
