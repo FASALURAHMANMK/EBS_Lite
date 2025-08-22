@@ -13,6 +13,13 @@ Optional query parameters:
 - `credit_min` / `credit_max` – credit limit range
 - `balance_min` / `balance_max` – outstanding balance range
 
+### GET /api/v1/ledgers/:account_id/entries
+
+Optional query parameters:
+
+- `date_from` – filter entries on or after this date (YYYY-MM-DD)
+- `date_to` – filter entries on or before this date (YYYY-MM-DD)
+
 ## Product Attributes
 
 The API supports dynamic product attributes. First create attribute definitions:
