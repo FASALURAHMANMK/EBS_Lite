@@ -195,6 +195,33 @@ export interface Supplier extends AuditFields {
   notes?: string;
 }
 
+export interface Role extends AuditFields {
+  _id: string;
+  name: string;
+  permissions: string[];
+  companyId: string;
+}
+
+export interface Employee extends AuditFields {
+  _id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  position?: string;
+  department?: string;
+  companyId: string;
+  locationId?: string;
+  isActive: boolean;
+}
+
+export interface AttendanceRecord extends AuditFields {
+  _id: string;
+  employeeId: string;
+  type: 'check-in' | 'check-out' | 'leave';
+  timestamp: string;
+  note?: string;
+}
+
 export type SidebarView =
   | 'dashboard'
   | 'sales'
