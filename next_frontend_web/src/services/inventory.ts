@@ -6,8 +6,7 @@ export const getProductStock = (productId: string) =>
 
 export const adjustStock = (payload: {
   productId: string;
-  locationId: string;
-  quantity: number;
+  adjustment: number;
   reason: string;
 }) => api.post<void>('/api/v1/inventory/stock-adjustment', payload);
 

@@ -5,8 +5,7 @@ import { inventory } from '../../../services';
 const StockAdjustments: React.FC = () => {
   const state = useAppState(s => s);
   const [productId, setProductId] = useState('');
-  const [locationId, setLocationId] = useState(state.currentLocationId || '');
-  const [quantity, setQuantity] = useState(0);
+  const [adjustment, setAdjustment] = useState(0);
   const [reason, setReason] = useState('');
   const [adjustments, setAdjustments] = useState<any[]>([]);
 
@@ -17,9 +16,9 @@ const StockAdjustments: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await inventory.adjustStock({ productId, locationId, quantity, reason });
+      await inventory.adjustStock({ productId, adjustment, reason });
       setProductId('');
-      setQuantity(0);
+      setAdjustment(0);
       setReason('');
       inventory.getStockAdjustments().then(setAdjustments).catch(() => {});
     } catch (err) {
@@ -41,20 +40,12 @@ const StockAdjustments: React.FC = () => {
           </select>
         </div>
         <div>
-          <label className="block text-sm mb-1">Location</label>
-          <input
-            className="w-full border px-2 py-1"
-            value={locationId}
-            onChange={e => setLocationId(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="block text-sm mb-1">Quantity</label>
+          <label className="block text-sm mb-1">Adjustment</label>
           <input
             type="number"
             className="w-full border px-2 py-1"
-            value={quantity}
-            onChange={e => setQuantity(parseFloat(e.target.value))}
+            value={adjustment}
+            onChange={e => setAdjustment(parseFloat(e.target.value))}
           />
         </div>
         <div>
@@ -71,8 +62,8 @@ const StockAdjustments: React.FC = () => {
         {adjustments.map((a, idx) => (
           <li key={idx} className="border p-2 rounded">
             <div>Product: {a.productId}</div>
-            <div>Location: {a.locationId}</div>
-            <div>Quantity: {a.quantity}</div>
+            {a.locationId && <div>Location: {a.locationId}</div>}
+            <div>Adjustment: {a.adjustment}</div>
             {a.reason && <div>Reason: {a.reason}</div>}
           </li>
         ))}
