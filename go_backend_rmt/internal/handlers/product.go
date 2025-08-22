@@ -255,6 +255,71 @@ func (h *ProductHandler) CreateCategory(c *gin.Context) {
 	utils.CreatedResponse(c, "Category created successfully", category)
 }
 
+// PUT /categories/:id
+func (h *ProductHandler) UpdateCategory(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	userID := c.GetInt("user_id")
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid category ID", err)
+		return
+	}
+
+	var req models.UpdateCategoryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	if err := utils.ValidateStruct(&req); err != nil {
+		validationErrors := utils.GetValidationErrors(err)
+		utils.ValidationErrorResponse(c, validationErrors)
+		return
+	}
+
+	category, err := h.productService.UpdateCategory(companyID, id, userID, &req)
+	if err != nil {
+		if err.Error() == "category not found" {
+			utils.NotFoundResponse(c, "Category not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update category", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Category updated successfully", category)
+}
+
+// DELETE /categories/:id
+func (h *ProductHandler) DeleteCategory(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	userID := c.GetInt("user_id")
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid category ID", err)
+		return
+	}
+
+	if err := h.productService.DeleteCategory(companyID, id, userID); err != nil {
+		if err.Error() == "category not found" {
+			utils.NotFoundResponse(c, "Category not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to delete category", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Category deleted successfully", nil)
+}
+
 // GET /brands
 func (h *ProductHandler) GetBrands(c *gin.Context) {
 	companyID := c.GetInt("company_id")

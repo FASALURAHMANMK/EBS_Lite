@@ -493,6 +493,76 @@ func (s *ProductService) CreateCategory(companyID, userID int, req *models.Creat
 	return &category, nil
 }
 
+func (s *ProductService) UpdateCategory(companyID, categoryID, userID int, req *models.UpdateCategoryRequest) (*models.Category, error) {
+	setParts := []string{}
+	args := []interface{}{}
+	argCount := 1
+
+	if req.Name != nil {
+		setParts = append(setParts, fmt.Sprintf("name = $%d", argCount))
+		args = append(args, *req.Name)
+		argCount++
+	}
+	if req.Description != nil {
+		setParts = append(setParts, fmt.Sprintf("description = $%d", argCount))
+		args = append(args, *req.Description)
+		argCount++
+	}
+	if req.ParentID != nil {
+		setParts = append(setParts, fmt.Sprintf("parent_id = $%d", argCount))
+		args = append(args, *req.ParentID)
+		argCount++
+	}
+	if req.IsActive != nil {
+		setParts = append(setParts, fmt.Sprintf("is_active = $%d", argCount))
+		args = append(args, *req.IsActive)
+		argCount++
+	}
+
+	if len(setParts) == 0 {
+		return nil, fmt.Errorf("no fields to update")
+	}
+
+	setParts = append(setParts, fmt.Sprintf("updated_by = $%d", argCount))
+	args = append(args, userID)
+	argCount++
+
+	query := fmt.Sprintf(`UPDATE categories SET %s, updated_at = CURRENT_TIMESTAMP WHERE category_id = $%d AND company_id = $%d RETURNING category_id, company_id, name, description, parent_id, is_active, created_by, updated_by, created_at, updated_at`, strings.Join(setParts, ", "), argCount, argCount+1)
+	args = append(args, categoryID, companyID)
+
+	var category models.Category
+	err := s.db.QueryRow(query, args...).Scan(
+		&category.CategoryID, &category.CompanyID, &category.Name, &category.Description,
+		&category.ParentID, &category.IsActive, &category.CreatedBy, &category.UpdatedBy,
+		&category.CreatedAt, &category.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("category not found")
+		}
+		return nil, fmt.Errorf("failed to update category: %w", err)
+	}
+
+	return &category, nil
+}
+
+func (s *ProductService) DeleteCategory(companyID, categoryID, userID int) error {
+	query := `UPDATE categories SET is_active = FALSE, updated_by = $3, updated_at = CURRENT_TIMESTAMP WHERE category_id = $1 AND company_id = $2 AND is_active = TRUE`
+
+	res, err := s.db.Exec(query, categoryID, companyID, userID)
+	if err != nil {
+		return fmt.Errorf("failed to delete category: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("category not found")
+	}
+	return nil
+}
+
 // Brands
 func (s *ProductService) GetBrands(companyID int) ([]models.Brand, error) {
 	query := `
