@@ -184,6 +184,8 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			{
 				categories.GET("", middleware.RequirePermission("VIEW_PRODUCTS"), productHandler.GetCategories)
 				categories.POST("", middleware.RequirePermission("CREATE_PRODUCTS"), productHandler.CreateCategory)
+				categories.PUT("/:id", middleware.RequirePermission("UPDATE_PRODUCTS"), productHandler.UpdateCategory)
+				categories.DELETE("/:id", middleware.RequirePermission("DELETE_PRODUCTS"), productHandler.DeleteCategory)
 			}
 
 			// Brand management routes (require company)
