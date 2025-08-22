@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppState } from '../../../context/MainContext';
 import { inventory } from '../../../services';
 
@@ -8,6 +8,11 @@ const StockAdjustments: React.FC = () => {
   const [locationId, setLocationId] = useState(state.currentLocationId || '');
   const [quantity, setQuantity] = useState(0);
   const [reason, setReason] = useState('');
+  const [adjustments, setAdjustments] = useState<any[]>([]);
+
+  useEffect(() => {
+    inventory.getStockAdjustments().then(setAdjustments).catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,6 +21,7 @@ const StockAdjustments: React.FC = () => {
       setProductId('');
       setQuantity(0);
       setReason('');
+      inventory.getStockAdjustments().then(setAdjustments).catch(() => {});
     } catch (err) {
       console.error(err);
     }
@@ -61,6 +67,16 @@ const StockAdjustments: React.FC = () => {
         </div>
         <button className="px-4 py-2 bg-blue-600 text-white rounded" type="submit">Adjust</button>
       </form>
+      <ul className="mt-4 space-y-2">
+        {adjustments.map((a, idx) => (
+          <li key={idx} className="border p-2 rounded">
+            <div>Product: {a.productId}</div>
+            <div>Location: {a.locationId}</div>
+            <div>Quantity: {a.quantity}</div>
+            {a.reason && <div>Reason: {a.reason}</div>}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };
