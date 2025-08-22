@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { AuthState, AuthAction } from '../types';
 import { login as loginService, register as registerService, getProfile, logout as logoutService } from '../services/auth';
+import { accessToken } from '../services/apiClient';
 
 const initialState: AuthState = {
   isAuthenticated: false,
@@ -21,7 +22,6 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
     case 'REGISTER_START':
       return { ...state, loading: true, error: null };
     case 'LOGIN_SUCCESS':
-    case 'REGISTER_SUCCESS':
       return {
         ...state,
         loading: false,
@@ -30,6 +30,8 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         company: action.payload.company,
         error: null,
       };
+    case 'REGISTER_SUCCESS':
+      return { ...state, loading: false, error: null };
     case 'LOGIN_FAILURE':
     case 'REGISTER_FAILURE':
       return { ...state, loading: false, error: action.payload };
@@ -47,6 +49,18 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 };
 const AuthContext = createContext<any>(null);
 
+const getDeviceId = (): string => {
+  if (typeof window === 'undefined') return '';
+  let id = localStorage.getItem('deviceId');
+  if (!id) {
+    const generate = () =>
+      globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2);
+    id = generate();
+    localStorage.setItem('deviceId', id);
+  }
+  return id;
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
@@ -54,8 +68,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const initialize = async () => {
       dispatch({ type: 'AUTH_INIT_START' });
       try {
-        const session = await getProfile();
-        dispatch({ type: 'LOGIN_SUCCESS', payload: session });
+        if (accessToken) {
+          const session = await getProfile();
+          dispatch({ type: 'LOGIN_SUCCESS', payload: session });
+        }
       } catch (err) {
         // not authenticated
       } finally {
@@ -68,7 +84,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (username: string, password: string) => {
     dispatch({ type: 'LOGIN_START' });
     try {
-      const data = await loginService(username, password);
+      const deviceId = getDeviceId();
+      const data = await loginService(username, password, deviceId);
       dispatch({ type: 'LOGIN_SUCCESS', payload: data });
     } catch (err: any) {
       dispatch({ type: 'LOGIN_FAILURE', payload: err.message });
@@ -78,8 +95,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const register = async (userData: any) => {
     dispatch({ type: 'REGISTER_START' });
     try {
-      const data = await registerService(userData);
-      dispatch({ type: 'REGISTER_SUCCESS', payload: data });
+      await registerService(userData);
+      dispatch({ type: 'REGISTER_SUCCESS' });
     } catch (err: any) {
       dispatch({ type: 'REGISTER_FAILURE', payload: err.message });
     }
