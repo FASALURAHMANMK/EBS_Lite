@@ -120,12 +120,12 @@ const CustomerList: React.FC<CustomerListProps> = ({
               <td className="px-6 py-4 whitespace-nowrap">
                 <div
                   className={`text-sm font-medium ${
-                    customer.creditBalance > 0
+                    customer.credit_balance > 0
                       ? 'text-red-600 dark:text-red-400'
                       : 'text-green-600 dark:text-green-400'
                   }`}
                 >
-                  {formatCurrency(customer.creditBalance)}
+                  {formatCurrency(customer.credit_balance)}
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">

@@ -9,7 +9,7 @@ const CustomersReport: React.FC = () => (
     columns={[
       { key: 'name', label: 'Name' },
       { key: 'email', label: 'Email' },
-      { key: 'creditBalance', label: 'Credit' }
+      { key: 'credit_balance', label: 'Credit' }
     ]}
     dateField="createdAt"
   />

@@ -15,7 +15,7 @@ const initialState: AppState = {
   currentCompanyId: null,
   currentLocationId: null,
   cart: [],
-  customer: { phone: '', name: '', creditBalance: 0, address: '' },
+  customer: { phone: '', name: '', credit_balance: 0, address: '' },
   products: [],
   categories: ['All'],
   customers: [],
@@ -96,7 +96,7 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
         cart: state.cart.map(i => i.product._id === action.payload.id ? { ...i, quantity: action.payload.quantity, totalPrice: action.payload.quantity * i.unitPrice } : i)
       };
     case 'CLEAR_CART':
-      return { ...state, cart: [], customer: { phone: '', name: '', creditBalance: 0, address: '' } };
+      return { ...state, cart: [], customer: { phone: '', name: '', credit_balance: 0, address: '' } };
     case 'SET_CUSTOMER':
       return { ...state, customer: { ...state.customer, ...action.payload } };
     case 'SET_RECENT_SALES':

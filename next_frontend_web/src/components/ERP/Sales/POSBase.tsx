@@ -71,7 +71,7 @@ const POSBase: React.FC<POSBaseProps> = ({ variant, mode = 'sale' }) => {
       locationId: state.currentLocationId || '',
       creditLimit: 0,
       notes: '',
-      creditBalance: 0,
+      credit_balance: 0,
       loyaltyPoints: 0,
       isActive: true
     });

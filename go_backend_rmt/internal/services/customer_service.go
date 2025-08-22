@@ -25,7 +25,7 @@ func (s *CustomerService) GetCustomers(companyID int, filters map[string]string)
                 SELECT c.customer_id, c.company_id, c.name, c.phone, c.email, c.address, c.tax_number,
                        c.credit_limit, c.payment_terms, c.is_active, c.created_by, c.updated_by,
                        c.sync_status, c.created_at, c.updated_at, c.is_deleted,
-                       COALESCE(SUM(s.total_amount - s.paid_amount),0) AS outstanding_balance
+                       COALESCE(SUM(s.total_amount - s.paid_amount),0) AS credit_balance
                 FROM customers c
                 LEFT JOIN sales s ON c.customer_id = s.customer_id AND s.is_deleted = FALSE
                 WHERE c.company_id = $1 AND c.is_deleted = FALSE`
@@ -107,7 +107,7 @@ func (s *CustomerService) GetCustomers(companyID int, filters map[string]string)
 			&c.CustomerID, &c.CompanyID, &c.Name, &c.Phone, &c.Email, &c.Address,
 			&c.TaxNumber, &c.CreditLimit, &c.PaymentTerms, &c.IsActive,
 			&c.CreatedBy, &c.UpdatedBy, &c.SyncStatus, &c.CreatedAt, &c.UpdatedAt, &c.IsDeleted,
-			&c.OutstandingBalance,
+			&c.CreditBalance,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan customer: %w", err)
 		}

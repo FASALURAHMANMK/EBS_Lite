@@ -1,20 +1,20 @@
 package models
 
 type Customer struct {
-	CustomerID         int                        `json:"customer_id" db:"customer_id"`
-	CompanyID          int                        `json:"company_id" db:"company_id"`
-	Name               string                     `json:"name" db:"name" validate:"required,min=2,max=255"`
-	Phone              *string                    `json:"phone,omitempty" db:"phone"`
-	Email              *string                    `json:"email,omitempty" db:"email" validate:"omitempty,email"`
-	Address            *string                    `json:"address,omitempty" db:"address"`
-	TaxNumber          *string                    `json:"tax_number,omitempty" db:"tax_number"`
-	CreditLimit        float64                    `json:"credit_limit" db:"credit_limit"`
-	PaymentTerms       int                        `json:"payment_terms" db:"payment_terms"` // Days
-	IsActive           bool                       `json:"is_active" db:"is_active"`
-	CreatedBy          int                        `json:"created_by" db:"created_by"`
-	UpdatedBy          *int                       `json:"updated_by,omitempty" db:"updated_by"`
-	OutstandingBalance float64                    `json:"outstanding_balance,omitempty" db:"-"`
-	Invoices           []CustomerInvoiceReference `json:"invoices,omitempty" db:"-"`
+	CustomerID    int                        `json:"customer_id" db:"customer_id"`
+	CompanyID     int                        `json:"company_id" db:"company_id"`
+	Name          string                     `json:"name" db:"name" validate:"required,min=2,max=255"`
+	Phone         *string                    `json:"phone,omitempty" db:"phone"`
+	Email         *string                    `json:"email,omitempty" db:"email" validate:"omitempty,email"`
+	Address       *string                    `json:"address,omitempty" db:"address"`
+	TaxNumber     *string                    `json:"tax_number,omitempty" db:"tax_number"`
+	CreditLimit   float64                    `json:"credit_limit" db:"credit_limit"`
+	PaymentTerms  int                        `json:"payment_terms" db:"payment_terms"` // Days
+	IsActive      bool                       `json:"is_active" db:"is_active"`
+	CreatedBy     int                        `json:"created_by" db:"created_by"`
+	UpdatedBy     *int                       `json:"updated_by,omitempty" db:"updated_by"`
+	CreditBalance float64                    `json:"credit_balance,omitempty" db:"-"`
+	Invoices      []CustomerInvoiceReference `json:"invoices,omitempty" db:"-"`
 	SyncModel
 }
 

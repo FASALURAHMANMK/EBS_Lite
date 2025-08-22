@@ -70,7 +70,7 @@ const CustomerManagement: React.FC = () => {
     e.preventDefault();
     await createCustomer({
       ...formData,
-      creditBalance: 0,
+      credit_balance: 0,
       loyaltyPoints: 0,
       isActive: true
     });
@@ -149,7 +149,7 @@ const CustomerManagement: React.FC = () => {
           locationId: state.currentLocationId || '',
           creditLimit: Number(row.creditLimit) || 0,
           notes: row.notes || '',
-          creditBalance: 0,
+          credit_balance: 0,
           loyaltyPoints: 0,
           isActive: true
         });

@@ -150,7 +150,7 @@ const Dashboard: React.FC = () => {
   
     // Calculate credit outstanding
     const creditOutstanding = state.customers.reduce((sum, c) => 
-      sum + c.creditBalance, 0
+      sum + c.credit_balance, 0
     );
   
     // Calculate top products (simplified)
