@@ -2,7 +2,6 @@ import React, { createContext, useContext, useReducer, ReactNode, useEffect, use
 import { AppState, AppAction, Product, Category, Customer, Sale, Supplier } from '../types';
 import { products, categories, customers, sales, dashboard, suppliers } from '../services';
 import { useAuth } from './AuthContext';
-import { setCompanyLocation } from '../services/apiClient';
 
 export const SYNC_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -176,10 +175,6 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
       }
     }
   }, [state.theme, state.language, state.lastSync, state.unsyncedSales]);
-
-  useEffect(() => {
-    setCompanyLocation(state.currentCompanyId, state.currentLocationId);
-  }, [state.currentCompanyId, state.currentLocationId]);
 
   const syncUnsyncedSales = async () => {
     if (!state.unsyncedSales.length) return;
