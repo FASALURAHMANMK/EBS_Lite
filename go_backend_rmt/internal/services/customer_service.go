@@ -117,13 +117,13 @@ func (s *CustomerService) GetCustomers(companyID int, filters map[string]string)
 	return customers, nil
 }
 
-// GetCustomerByID retrieves a single customer with outstanding balance
+// GetCustomerByID retrieves a single customer with credit balance
 func (s *CustomerService) GetCustomerByID(customerID, companyID int) (*models.Customer, error) {
 	query := `
                SELECT c.customer_id, c.company_id, c.name, c.phone, c.email, c.address, c.tax_number,
                       c.credit_limit, c.payment_terms, c.is_active, c.created_by, c.updated_by,
                       c.sync_status, c.created_at, c.updated_at, c.is_deleted,
-                      COALESCE(SUM(s.total_amount - s.paid_amount),0) AS outstanding_balance
+                      COALESCE(SUM(s.total_amount - s.paid_amount),0) AS credit_balance
                FROM customers c
                LEFT JOIN sales s ON c.customer_id = s.customer_id AND s.is_deleted = FALSE
                WHERE c.customer_id = $1 AND c.company_id = $2 AND c.is_deleted = FALSE
@@ -134,7 +134,7 @@ func (s *CustomerService) GetCustomerByID(customerID, companyID int) (*models.Cu
 		&c.CustomerID, &c.CompanyID, &c.Name, &c.Phone, &c.Email, &c.Address,
 		&c.TaxNumber, &c.CreditLimit, &c.PaymentTerms, &c.IsActive,
 		&c.CreatedBy, &c.UpdatedBy, &c.SyncStatus, &c.CreatedAt, &c.UpdatedAt, &c.IsDeleted,
-		&c.OutstandingBalance,
+		&c.CreditBalance,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
