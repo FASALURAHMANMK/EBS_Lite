@@ -1,7 +1,28 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { AuthState, AuthAction } from '../types';
-import { login as loginService, register as registerService, getProfile, logout as logoutService } from '../services/auth';
+import {
+  login as loginService,
+  register as registerService,
+  getProfile,
+  logout as logoutService,
+} from '../services/auth';
 import { getStoredAuthTokens } from '../services/apiClient';
+
+interface AuthContextValue {
+  state: AuthState;
+  login: (username: string, password: string) => Promise<void>;
+  register: (userData: any) => Promise<void>;
+  logout: () => Promise<void>;
+  clearError: () => void;
+  hasRole: (roles: string | string[]) => boolean;
+  hasPermission: (perms: string | string[]) => boolean;
+  role?: string;
+  permissions: string[];
+  updateUserLanguages: (payload: {
+    primaryLanguage: string;
+    secondaryLanguage?: string;
+  }) => void;
+}
 
 const initialState: AuthState = {
   isAuthenticated: false,
@@ -47,7 +68,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
       return state;
   }
 };
-const AuthContext = createContext<any>(null);
+const AuthContext = createContext<AuthContextValue | null>(null);
 
 const getDeviceId = (): string => {
   if (typeof window === 'undefined') return '';
@@ -152,5 +173,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
 

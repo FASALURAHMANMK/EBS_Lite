@@ -65,7 +65,8 @@ const MainApp: React.FC = () => {
 
  const renderCurrentView = () => {
   // Check if user needs to select a location
-  if (authState.company?.locations?.length > 1 && !state.currentLocationId) {
+  const locations = authState.company?.locations ?? [];
+  if (locations.length > 1 && !state.currentLocationId) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="text-center p-8 max-w-md">
@@ -79,7 +80,7 @@ const MainApp: React.FC = () => {
             Please select a location to continue
           </p>
           <div className="space-y-2">
-            {authState.company.locations.map((location: Location) => (
+            {locations.map((location: Location) => (
               <button
                 key={location._id}
                 // onClick={() => {
