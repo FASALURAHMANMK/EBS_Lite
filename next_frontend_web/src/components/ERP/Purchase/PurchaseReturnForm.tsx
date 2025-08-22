@@ -4,6 +4,7 @@ import { purchases } from '../../../services';
 const PurchaseReturnForm: React.FC = () => {
   const [form, setForm] = useState({
     purchaseId: '',
+    purchaseDetailId: '',
     productId: '',
     quantity: 1,
     reason: '',
@@ -18,13 +19,14 @@ const PurchaseReturnForm: React.FC = () => {
         reason: form.reason,
         items: [
           {
+            purchaseDetailId: Number(form.purchaseDetailId),
             productId: Number(form.productId),
             quantity: Number(form.quantity),
             unitPrice: Number(form.unitPrice),
           },
         ],
       });
-      setForm({ purchaseId: '', productId: '', quantity: 1, reason: '', unitPrice: 0 });
+      setForm({ purchaseId: '', purchaseDetailId: '', productId: '', quantity: 1, reason: '', unitPrice: 0 });
     } catch (err) {
       console.error(err);
     }
@@ -38,6 +40,13 @@ const PurchaseReturnForm: React.FC = () => {
         placeholder="Purchase ID"
         value={form.purchaseId}
         onChange={e => setForm({ ...form, purchaseId: e.target.value })}
+        required
+      />
+      <input
+        className="border p-2 w-full"
+        placeholder="Purchase Detail ID"
+        value={form.purchaseDetailId}
+        onChange={e => setForm({ ...form, purchaseDetailId: e.target.value })}
         required
       />
       <input
