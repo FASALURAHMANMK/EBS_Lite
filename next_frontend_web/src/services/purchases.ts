@@ -14,5 +14,7 @@ export const createPurchaseOrder = (payload: PurchaseOrderPayload) =>
 export const recordGoodsReceipt = (payload: GoodsReceiptPayload) =>
   api.post<GoodsReceipt | null>('/api/v1/goods-receipts', payload);
 
-export const createPurchaseReturn = (payload: PurchaseReturnPayload) =>
-  api.post<PurchaseReturn>('/api/v1/purchase-returns', payload);
+export const createPurchaseReturn = (payload: PurchaseReturnPayload) => {
+  // payload items should include purchaseDetailId
+  return api.post<PurchaseReturn>('/api/v1/purchase-returns', payload);
+};

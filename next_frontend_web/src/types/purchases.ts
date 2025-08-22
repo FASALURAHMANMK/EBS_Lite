@@ -36,6 +36,7 @@ export interface GoodsReceipt {
 }
 
 export interface PurchaseReturnItemPayload {
+  purchaseDetailId: number;
   productId: number;
   quantity: number;
   unitPrice: number;
