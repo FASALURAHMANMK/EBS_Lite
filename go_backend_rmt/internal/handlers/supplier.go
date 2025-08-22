@@ -161,7 +161,7 @@ func (h *SupplierHandler) UpdateSupplier(c *gin.Context) {
 		return
 	}
 
-	err = h.supplierService.UpdateSupplier(supplierID, companyID, userID, &req)
+	supplier, err := h.supplierService.UpdateSupplier(supplierID, companyID, userID, &req)
 	if err != nil {
 		if err.Error() == "supplier not found" {
 			utils.NotFoundResponse(c, "Supplier not found")
@@ -175,7 +175,7 @@ func (h *SupplierHandler) UpdateSupplier(c *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(c, "Supplier updated successfully", nil)
+	utils.SuccessResponse(c, "Supplier updated successfully", supplier)
 }
 
 // DELETE /suppliers/:id

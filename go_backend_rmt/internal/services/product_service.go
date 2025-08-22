@@ -238,19 +238,19 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 	return &product, nil
 }
 
-func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *models.UpdateProductRequest) error {
+func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *models.UpdateProductRequest) (*models.Product, error) {
 	if req.Barcodes != nil {
 		if err := validateSinglePrimaryBarcode(req.Barcodes); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if req.SKU != nil {
 		exists, err := s.checkProductExists(companyID, req.SKU, nil, productID)
 		if err != nil {
-			return fmt.Errorf("failed to check product existence: %w", err)
+			return nil, fmt.Errorf("failed to check product existence: %w", err)
 		}
 		if exists {
-			return fmt.Errorf("product with this SKU or barcode already exists")
+			return nil, fmt.Errorf("product with this SKU or barcode already exists")
 		}
 	}
 	if req.Barcodes != nil {
@@ -258,17 +258,17 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 			b := bc.Barcode
 			exists, err := s.checkProductExists(companyID, nil, &b, productID)
 			if err != nil {
-				return fmt.Errorf("failed to check product existence: %w", err)
+				return nil, fmt.Errorf("failed to check product existence: %w", err)
 			}
 			if exists {
-				return fmt.Errorf("product with this SKU or barcode already exists")
+				return nil, fmt.Errorf("product with this SKU or barcode already exists")
 			}
 		}
 	}
 
 	tx, err := s.db.Begin()
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
@@ -360,7 +360,7 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 	}
 
 	if len(setParts) == 0 {
-		return fmt.Errorf("no fields to update")
+		return nil, fmt.Errorf("no fields to update")
 	}
 
 	argCount++
@@ -374,33 +374,33 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 
 	result, err := tx.Exec(query, args...)
 	if err != nil {
-		return fmt.Errorf("failed to update product: %w", err)
+		return nil, fmt.Errorf("failed to update product: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
+		return nil, fmt.Errorf("failed to get rows affected: %w", err)
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("product not found")
+		return nil, fmt.Errorf("product not found")
 	}
 
 	if req.Barcodes != nil {
 		if _, err := tx.Exec("DELETE FROM product_barcodes WHERE product_id = $1", productID); err != nil {
-			return fmt.Errorf("failed to clear product barcodes: %w", err)
+			return nil, fmt.Errorf("failed to clear product barcodes: %w", err)
 		}
 		for _, bc := range req.Barcodes {
 			if _, err := tx.Exec(`INSERT INTO product_barcodes (product_id, barcode, pack_size, cost_price, selling_price, is_primary) VALUES ($1,$2,$3,$4,$5,$6)`,
 				productID, bc.Barcode, bc.PackSize, bc.CostPrice, bc.SellingPrice, bc.IsPrimary); err != nil {
-				return fmt.Errorf("failed to insert product barcode: %w", err)
+				return nil, fmt.Errorf("failed to insert product barcode: %w", err)
 			}
 		}
 	}
 
 	if req.Attributes != nil {
 		if err := s.validateAndSaveAttributes(tx, companyID, productID, req.Attributes); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -408,11 +408,20 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 		recordID := productID
 		actorID := userID
 		if err := LogAudit(tx, "UPDATE", "products", &recordID, &actorID, nil, nil, &changes, nil, nil); err != nil {
-			return fmt.Errorf("failed to log audit: %w", err)
+			return nil, fmt.Errorf("failed to log audit: %w", err)
 		}
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	product, err := s.GetProductByID(productID, companyID)
+	if err != nil {
+		return nil, err
+	}
+
+	return product, nil
 }
 
 func (s *ProductService) DeleteProduct(productID, companyID, userID int) error {

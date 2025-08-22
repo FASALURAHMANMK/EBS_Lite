@@ -64,12 +64,31 @@ func (c *barcodeMockConn) QueryContext(ctx context.Context, query string, args [
 		return &barcodeMockRows{cols: []string{"id"}, vals: [][]driver.Value{{int64(1)}}}, nil
 	}
 	c.db.queries = append(c.db.queries, query)
-	var res int
-	if len(c.db.queryResults) > 0 {
-		res = c.db.queryResults[0]
-		c.db.queryResults = c.db.queryResults[1:]
+	lower := strings.ToLower(query)
+	if strings.HasPrefix(strings.TrimSpace(lower), "select count") {
+		var res int
+		if len(c.db.queryResults) > 0 {
+			res = c.db.queryResults[0]
+			c.db.queryResults = c.db.queryResults[1:]
+		}
+		return &barcodeMockRows{cols: []string{"count"}, vals: [][]driver.Value{{int64(res)}}}, nil
 	}
-	return &barcodeMockRows{cols: []string{"count"}, vals: [][]driver.Value{{int64(res)}}}, nil
+	if strings.Contains(lower, "from products") {
+		cols := []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted"}
+		vals := []driver.Value{int64(1), int64(1), nil, nil, nil, "name", "sku", "desc", float64(0), float64(0), int64(0), nil, nil, false, true, int64(1), nil, "synced", time.Now(), time.Now(), false}
+		return &barcodeMockRows{cols: cols, vals: [][]driver.Value{vals}}, nil
+	}
+	if strings.Contains(lower, "from product_barcodes") {
+		cols := []string{"barcode_id", "product_id", "barcode", "pack_size", "cost_price", "selling_price", "is_primary"}
+		vals := []driver.Value{int64(1), int64(1), "111", int64(1), float64(0), float64(0), true}
+		return &barcodeMockRows{cols: cols, vals: [][]driver.Value{vals}}, nil
+	}
+	if strings.Contains(lower, "from product_attribute_values") {
+		cols := []string{"attribute_id", "product_id", "value", "company_id", "name", "type", "is_required", "options"}
+		vals := []driver.Value{int64(1), int64(1), "val", int64(1), "attr", "TEXT", true, nil}
+		return &barcodeMockRows{cols: cols, vals: [][]driver.Value{vals}}, nil
+	}
+	return &barcodeMockRows{cols: []string{"count"}, vals: [][]driver.Value{{int64(0)}}}, nil
 }
 
 func (c *barcodeMockConn) CheckNamedValue(*driver.NamedValue) error { return nil }
@@ -192,11 +211,11 @@ func TestUpdateProduct_UpdatesBarcodes(t *testing.T) {
 			{Barcode: "222", IsPrimary: false},
 		},
 	}
-	if err := svc.UpdateProduct(1, 1, 1, req); err != nil {
+	if _, err := svc.UpdateProduct(1, 1, 1, req); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(mock.queries) != 2 {
-		t.Fatalf("expected 2 pre-update queries, got %d", len(mock.queries))
+	if len(mock.queries) != 5 {
+		t.Fatalf("expected 5 pre-update queries, got %d", len(mock.queries))
 	}
 	if !contains(mock.txQueries, "update products set") {
 		t.Fatalf("missing product update: %v", mock.txQueries)
@@ -241,7 +260,7 @@ func TestUpdateProduct_DuplicateBarcode(t *testing.T) {
 			{Barcode: "222", IsPrimary: false},
 		},
 	}
-	if err := svc.UpdateProduct(1, 1, 1, req); err == nil {
+	if _, err := svc.UpdateProduct(1, 1, 1, req); err == nil {
 		t.Fatalf("expected duplicate barcode error")
 	}
 }
