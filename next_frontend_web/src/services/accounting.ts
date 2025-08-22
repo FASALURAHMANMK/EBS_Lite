@@ -37,4 +37,12 @@ export const getLedgerBalances = () =>
 
 export const getLedgerEntries = (
   payload: LedgerQueryPayload
-) => api.get<LedgerEntry[]>(`/api/v1/ledgers/${payload.accountId}/entries`);
+) => {
+  const params = new URLSearchParams();
+  if (payload.dateFrom) params.append('date_from', payload.dateFrom);
+  if (payload.dateTo) params.append('date_to', payload.dateTo);
+  const query = params.toString();
+  return api.get<LedgerEntry[]>(
+    `/api/v1/ledgers/${payload.accountId}/entries${query ? `?${query}` : ''}`
+  );
+};
