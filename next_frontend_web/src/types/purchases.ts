@@ -20,8 +20,8 @@ export interface PurchaseOrder {
 }
 
 export interface GoodsReceiptItemPayload {
-  productId: number;
-  quantity: number;
+  purchaseDetailId: number;
+  receivedQuantity: number;
 }
 
 export interface GoodsReceiptPayload {

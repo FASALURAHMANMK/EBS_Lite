@@ -4,8 +4,8 @@ import { purchases } from '../../../services';
 const GoodsReceiptForm: React.FC = () => {
   const [form, setForm] = useState({
     purchaseId: '',
-    productId: '',
-    quantity: 1,
+    purchaseDetailId: '',
+    receivedQuantity: 1,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -14,10 +14,13 @@ const GoodsReceiptForm: React.FC = () => {
       await purchases.recordGoodsReceipt({
         purchaseId: Number(form.purchaseId),
         items: [
-          { productId: Number(form.productId), quantity: Number(form.quantity) },
+          {
+            purchaseDetailId: Number(form.purchaseDetailId),
+            receivedQuantity: Number(form.receivedQuantity),
+          },
         ],
       });
-      setForm({ purchaseId: '', productId: '', quantity: 1 });
+      setForm({ purchaseId: '', purchaseDetailId: '', receivedQuantity: 1 });
     } catch (err) {
       console.error(err);
     }
@@ -35,17 +38,19 @@ const GoodsReceiptForm: React.FC = () => {
       />
       <input
         className="border p-2 w-full"
-        placeholder="Product ID"
-        value={form.productId}
-        onChange={e => setForm({ ...form, productId: e.target.value })}
+        placeholder="Purchase Detail ID"
+        value={form.purchaseDetailId}
+        onChange={e => setForm({ ...form, purchaseDetailId: e.target.value })}
         required
       />
       <input
         type="number"
         className="border p-2 w-full"
-        placeholder="Quantity"
-        value={form.quantity}
-        onChange={e => setForm({ ...form, quantity: Number(e.target.value) })}
+        placeholder="Received Quantity"
+        value={form.receivedQuantity}
+        onChange={e =>
+          setForm({ ...form, receivedQuantity: Number(e.target.value) })
+        }
         required
       />
       <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">
