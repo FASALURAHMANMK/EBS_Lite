@@ -1948,7 +1948,7 @@ SELECT
     COALESCE(SUM(p.total_amount), 0) AS total_purchases,
     COALESCE(SUM(pay.amount), 0) AS total_payments,
     COALESCE(SUM(pr.total_amount), 0) AS total_returns,
-    COALESCE(SUM(p.total_amount), 0) - COALESCE(SUM(pay.amount), 0) - COALESCE(SUM(pr.total_amount), 0) AS outstanding_balance
+    COALESCE(SUM(p.total_amount), 0) - COALESCE(SUM(pay.amount), 0) - COALESCE(SUM(pr.total_amount), 0) AS credit_balance
 FROM suppliers s
 LEFT JOIN purchases p ON p.supplier_id = s.supplier_id AND p.is_deleted = FALSE
 LEFT JOIN payments pay ON pay.supplier_id = s.supplier_id AND pay.is_deleted = FALSE

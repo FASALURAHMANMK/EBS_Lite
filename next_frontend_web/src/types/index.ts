@@ -128,7 +128,7 @@ export interface Customer extends AuditFields {
   phone: string;
   email?: string;
   address?: string;
-  creditBalance: number;
+  credit_balance: number;
   creditLimit: number;
   loyaltyPoints?: number;
   companyId: string;
@@ -253,7 +253,7 @@ export interface AppState {
     name: string;
     phone: string;
     address?: string;
-    creditBalance?: number;
+    credit_balance?: number;
     creditLimit?: number;
   };
   

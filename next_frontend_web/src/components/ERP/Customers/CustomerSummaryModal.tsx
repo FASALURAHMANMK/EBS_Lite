@@ -49,7 +49,7 @@ const CustomerSummaryModal: React.FC<Props> = ({ customer, onClose }) => {
           </div>
           <div className="flex items-center text-gray-700 dark:text-gray-300">
             <Wallet className="w-4 h-4 mr-2" />
-            Balance: {formatCurrency(customer.creditBalance)}
+            Balance: {formatCurrency(customer.credit_balance)}
           </div>
         </div>
       </div>

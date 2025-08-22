@@ -231,7 +231,7 @@ func (s *CollectionService) GetCollectionByID(collectionID, companyID int) (*mod
 func (s *CollectionService) GetOutstanding(companyID int) ([]models.Customer, error) {
 	query := `
                SELECT c.customer_id, c.name,
-                      COALESCE(SUM(s.total_amount - s.paid_amount),0) AS outstanding_balance
+                      COALESCE(SUM(s.total_amount - s.paid_amount),0) AS credit_balance
                FROM customers c
                JOIN sales s ON c.customer_id = s.customer_id
                WHERE c.company_id = $1 AND c.is_deleted = FALSE AND s.is_deleted = FALSE
@@ -248,7 +248,7 @@ func (s *CollectionService) GetOutstanding(companyID int) ([]models.Customer, er
 	var customers []models.Customer
 	for rows.Next() {
 		var cust models.Customer
-		if err := rows.Scan(&cust.CustomerID, &cust.Name, &cust.OutstandingBalance); err != nil {
+		if err := rows.Scan(&cust.CustomerID, &cust.Name, &cust.CreditBalance); err != nil {
 			return nil, fmt.Errorf("failed to scan customer: %w", err)
 		}
 

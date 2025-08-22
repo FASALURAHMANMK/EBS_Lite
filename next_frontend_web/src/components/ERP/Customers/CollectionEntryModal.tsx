@@ -35,8 +35,8 @@ const CollectionEntryModal: React.FC<Props> = ({ customer, onSubmit, onClose }) 
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-gray-600 dark:text-gray-400">Current Balance:</span>
-              <div className={`${customer.creditBalance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'} font-medium`}>
-                {formatCurrency(customer.creditBalance)}
+              <div className={`${customer.credit_balance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'} font-medium`}>
+                {formatCurrency(customer.credit_balance)}
               </div>
             </div>
             <div>

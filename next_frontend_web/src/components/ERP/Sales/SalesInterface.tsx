@@ -117,7 +117,7 @@ const SalesInterface: React.FC = () => {
   };
 
   const clearCustomer = () => {
-    dispatch({ type: 'SET_CUSTOMER', payload: { name: '', phone: '', address: '', creditBalance: 0 } });
+    dispatch({ type: 'SET_CUSTOMER', payload: { name: '', phone: '', address: '', credit_balance: 0 } });
   };
 
   const getSubtotal = () => {
@@ -152,7 +152,7 @@ const SalesInterface: React.FC = () => {
     if (selectedPaymentMethod === 'credit') {
       if (!state.customer._id) return false;
       const total = getTotal();
-      const newBalance = (state.customer.creditBalance || 0) + total;
+      const newBalance = (state.customer.credit_balance || 0) + total;
       return newBalance <= (state.customer.creditLimit || 0);
     }
     return paymentReceived >= getTotal();
@@ -164,7 +164,7 @@ const SalesInterface: React.FC = () => {
     const newCustomer = await createCustomer({
         ...newCustomerForm,
         locationId: newCustomerForm.locationId || state.currentLocationId, // Use form or current location
-        creditBalance: 0,
+        credit_balance: 0,
         loyaltyPoints: 0,
         isActive: true
     });
@@ -361,9 +361,9 @@ const SalesInterface: React.FC = () => {
                     <div className="text-xs text-gray-500 dark:text-gray-400">
                       {state.customer.phone}
                     </div>
-                    {(state.customer.creditBalance || 0) > 0 && (
+                    {(state.customer.credit_balance || 0) > 0 && (
                       <div className="text-xs text-red-600 dark:text-red-400">
-                        Credit: {formatCurrency(state.customer.creditBalance || 0)}
+                        Credit: {formatCurrency(state.customer.credit_balance || 0)}
                       </div>
                     )}
                   </div>
@@ -527,9 +527,9 @@ const SalesInterface: React.FC = () => {
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                           {customer.phone}
                         </div>
-                        {customer.creditBalance > 0 && (
+                        {customer.credit_balance > 0 && (
                           <div className="text-sm text-red-600 dark:text-red-400">
-                            Credit: {formatCurrency(customer.creditBalance)}
+                            Credit: {formatCurrency(customer.credit_balance)}
                           </div>
                         )}
                       </div>
@@ -771,10 +771,10 @@ const SalesInterface: React.FC = () => {
                 </div>
                 <div className="text-sm text-yellow-700 dark:text-yellow-400 space-y-1">
                   <div>Customer: {state.customer.name}</div>
-                  <div>Current Balance: {formatCurrency(state.customer.creditBalance || 0)}</div>
-                  <div>New Balance: {formatCurrency((state.customer.creditBalance || 0) + getTotal())}</div>
+                  <div>Current Balance: {formatCurrency(state.customer.credit_balance || 0)}</div>
+                  <div>New Balance: {formatCurrency((state.customer.credit_balance || 0) + getTotal())}</div>
                   <div>Credit Limit: {formatCurrency(state.customer.creditLimit || 0)}</div>
-                  {(state.customer.creditBalance || 0) + getTotal() > (state.customer.creditLimit || 0) && (
+                  {(state.customer.credit_balance || 0) + getTotal() > (state.customer.creditLimit || 0) && (
                     <div className="text-red-600 dark:text-red-400 font-medium">
                       ⚠️ Credit limit exceeded!
                     </div>
@@ -818,7 +818,7 @@ const SalesInterface: React.FC = () => {
                 {state.cart.length === 0 && 'Cart is empty'}
                 {selectedPaymentMethod === 'credit' && !state.customer._id && 'Please select a customer for credit sale'}
                 {selectedPaymentMethod === 'credit' && state.customer._id && 
-                  (state.customer.creditBalance || 0) + getTotal() > (state.customer.creditLimit || 0) && 
+                  (state.customer.credit_balance || 0) + getTotal() > (state.customer.creditLimit || 0) && 
                   'Credit limit exceeded'}
                 {selectedPaymentMethod !== 'credit' && paymentReceived < getTotal() && 'Insufficient payment received'}
               </div>
