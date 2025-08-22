@@ -140,37 +140,6 @@ func (h *InventoryHandler) GetStockAdjustments(c *gin.Context) {
 	utils.SuccessResponse(c, "Stock adjustments retrieved successfully", adjustments)
 }
 
-// GET /inventory/transfers
-// func (h *InventoryHandler) GetStockTransfers(c *gin.Context) {
-// 	companyID := c.GetInt("company_id")
-// 	locationID := c.GetInt("location_id")
-
-// 	if companyID == 0 {
-// 		utils.ForbiddenResponse(c, "Company access required")
-// 		return
-// 	}
-
-// 	// Use location from context or query parameter
-// 	if locationParam := c.Query("location_id"); locationParam != "" {
-// 		if id, err := strconv.Atoi(locationParam); err == nil {
-// 			locationID = id
-// 		}
-// 	}
-
-// 	if locationID == 0 {
-// 		utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
-// 		return
-// 	}
-
-// 	transfers, err := h.inventoryService.GetStockTransfers(companyID, locationID)
-// 	if err != nil {
-// 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get stock transfers", err)
-// 		return
-// 	}
-
-// 	utils.SuccessResponse(c, "Stock transfers retrieved successfully", transfers)
-// }
-
 func (h *InventoryHandler) GetStockTransfers(c *gin.Context) {
 	companyID := c.GetInt("company_id")
 	locationID := c.GetInt("location_id")
