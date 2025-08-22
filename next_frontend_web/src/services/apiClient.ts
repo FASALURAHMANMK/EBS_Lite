@@ -27,6 +27,11 @@ if (typeof window !== 'undefined') {
   refreshToken = getCookie('refreshToken');
 }
 
+export const getStoredAuthTokens = () => ({
+  accessToken: typeof document === 'undefined' ? null : getCookie('accessToken'),
+  refreshToken: typeof document === 'undefined' ? null : getCookie('refreshToken'),
+});
+
 export const setAuthTokens = ({
   accessToken: newAccess,
   refreshToken: newRefresh,
