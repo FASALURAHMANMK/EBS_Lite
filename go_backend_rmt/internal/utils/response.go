@@ -10,6 +10,9 @@ import (
 
 // SuccessResponse sends a success response
 func SuccessResponse(c *gin.Context, message string, data interface{}) {
+	if data == nil {
+		data = gin.H{}
+	}
 	response := models.APIResponse{
 		Success: true,
 		Message: message,
@@ -20,6 +23,9 @@ func SuccessResponse(c *gin.Context, message string, data interface{}) {
 
 // CreatedResponse sends a created response
 func CreatedResponse(c *gin.Context, message string, data interface{}) {
+	if data == nil {
+		data = gin.H{}
+	}
 	response := models.APIResponse{
 		Success: true,
 		Message: message,

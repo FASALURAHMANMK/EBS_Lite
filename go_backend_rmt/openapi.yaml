@@ -1,0 +1,50 @@
+openapi: 3.0.0
+info:
+  title: EBS Lite API
+  version: "1.0.0"
+servers:
+  - url: /api
+paths:
+  /employees:
+    get:
+      summary: List employees
+      responses:
+        '200':
+          description: A list of employees
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /employees/{id}:
+    get:
+      summary: Get employee by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Employee retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+components:
+  schemas:
+    APIResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: object
+          additionalProperties: true
+        error:
+          type: string
+        meta:
+          type: object
+          additionalProperties: true
