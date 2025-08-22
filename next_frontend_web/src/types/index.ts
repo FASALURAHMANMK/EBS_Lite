@@ -518,7 +518,7 @@ type AuthAction =
   | { type: 'LOGIN_FAILURE'; payload: string }
   | { type: 'LOGOUT' }
   | { type: 'REGISTER_START' }
-  | { type: 'REGISTER_SUCCESS'; payload: { user: User; company: Company } }
+  | { type: 'REGISTER_SUCCESS' }
   | { type: 'REGISTER_FAILURE'; payload: string }
   | { type: 'CLEAR_ERROR' }
   | { type: 'UPDATE_USER_LANGUAGES'; payload: { primaryLanguage: string; secondaryLanguage?: string } };

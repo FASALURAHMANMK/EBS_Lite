@@ -11,7 +11,7 @@ export const adjustStock = (payload: {
 }) => api.post<void>('/api/v1/inventory/stock-adjustment', payload);
 
 export const getStockAdjustments = () =>
-  api.get(`/api/v1/inventory/stock-adjustments`);
+  api.get<any[]>(`/api/v1/inventory/stock-adjustments`);
 
 export const createTransfer = (payload: {
   toLocationId: string;
@@ -19,4 +19,4 @@ export const createTransfer = (payload: {
   notes?: string;
 }) => api.post('/api/v1/inventory/transfers', payload);
 
-export const getTransfers = () => api.get('/api/v1/inventory/transfers');
+export const getTransfers = () => api.get<any[]>('/api/v1/inventory/transfers');

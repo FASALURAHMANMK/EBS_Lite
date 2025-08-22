@@ -16,11 +16,13 @@ export const updateCustomerCredit = (
   type: "credit" | "debit",
   description: string,
 ) =>
-  api.post<CreditTransaction>(`/api/v1/customers/${id}/credit`, {
-    amount,
-    type,
-    description,
-  });
+  api
+    .post<ApiResponse<Customer>>(`/api/v1/customers/${id}/credit`, {
+      amount,
+      type,
+      description,
+    })
+    .then((res) => res.data!);
 export const getCustomerCreditHistory = (id: string) =>
   api.get<CreditTransaction[]>(`/api/v1/customers/${id}/credit`);
 export const searchCustomers = (query: string) =>
