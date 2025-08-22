@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { AuthState, AuthAction } from '../types';
 import { login as loginService, register as registerService, getProfile, logout as logoutService } from '../services/auth';
+import { accessToken } from '../services/apiClient';
 
 const initialState: AuthState = {
   isAuthenticated: false,
@@ -67,8 +68,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const initialize = async () => {
       dispatch({ type: 'AUTH_INIT_START' });
       try {
-        const session = await getProfile();
-        dispatch({ type: 'LOGIN_SUCCESS', payload: session });
+        if (accessToken) {
+          const session = await getProfile();
+          dispatch({ type: 'LOGIN_SUCCESS', payload: session });
+        }
       } catch (err) {
         // not authenticated
       } finally {

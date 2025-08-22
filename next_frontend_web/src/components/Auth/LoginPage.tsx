@@ -17,6 +17,12 @@ const LoginPage: React.FC = () => {
     clearError();
   }, []);
 
+  useEffect(() => {
+    if (state.isAuthenticated) {
+      router.replace('/dashboard');
+    }
+  }, [state.isAuthenticated, router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
