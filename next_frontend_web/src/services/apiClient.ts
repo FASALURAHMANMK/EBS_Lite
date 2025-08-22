@@ -2,8 +2,6 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
-let companyId: string | null = null;
-let locationId: string | null = null;
 
 const getCookie = (name: string): string | null => {
   if (typeof document === 'undefined') return null;
@@ -47,14 +45,6 @@ export const clearAuthTokens = () => {
   refreshToken = null;
   deleteCookie('accessToken');
   deleteCookie('refreshToken');
-};
-
-export const setCompanyLocation = (
-  company: string | null,
-  location: string | null
-) => {
-  companyId = company;
-  locationId = location;
 };
 
 const toSnakeCase = (obj: any): any => {
@@ -107,12 +97,6 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 
   if (auth && accessToken) {
     (config.headers as Record<string, string>)['Authorization'] = `Bearer ${accessToken}`;
-  }
-  if (companyId) {
-    (config.headers as Record<string, string>)['company_id'] = companyId;
-  }
-  if (locationId) {
-    (config.headers as Record<string, string>)['location_id'] = locationId;
   }
 
   let response = await fetch(`${API_BASE_URL}${endpoint}`, config);
