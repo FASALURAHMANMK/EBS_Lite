@@ -25,6 +25,18 @@ export interface AuthResponse {
   company: Company;
 }
 
+/**
+ * Response returned after a successful registration.
+ * Only confirmation details are provided; tokens are not issued
+ * until the user explicitly logs in.
+ */
+export interface RegisterResponse {
+  userId: number;
+  username: string;
+  email: string;
+  message: string;
+}
+
 export const login = async (
   email: string,
   password: string,
@@ -42,15 +54,12 @@ export const login = async (
 
 export const register = async (
   payload: Record<string, any>
-): Promise<{ user: User; company: Company }> => {
-  const data = await api.post<AuthResponse>(
+): Promise<RegisterResponse> =>
+  api.post<RegisterResponse>(
     '/api/v1/auth/register',
     payload,
     { auth: false }
   );
-  setAuthTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
-  return { user: data.user, company: data.company };
-};
 
 export const getProfile = () =>
   api.get<{ user: User; company: Company }>('/api/v1/auth/me');
