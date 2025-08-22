@@ -117,6 +117,35 @@ func (s *CustomerService) GetCustomers(companyID int, filters map[string]string)
 	return customers, nil
 }
 
+// GetCustomerByID retrieves a single customer with outstanding balance
+func (s *CustomerService) GetCustomerByID(customerID, companyID int) (*models.Customer, error) {
+	query := `
+               SELECT c.customer_id, c.company_id, c.name, c.phone, c.email, c.address, c.tax_number,
+                      c.credit_limit, c.payment_terms, c.is_active, c.created_by, c.updated_by,
+                      c.sync_status, c.created_at, c.updated_at, c.is_deleted,
+                      COALESCE(SUM(s.total_amount - s.paid_amount),0) AS outstanding_balance
+               FROM customers c
+               LEFT JOIN sales s ON c.customer_id = s.customer_id AND s.is_deleted = FALSE
+               WHERE c.customer_id = $1 AND c.company_id = $2 AND c.is_deleted = FALSE
+               GROUP BY c.customer_id`
+
+	var c models.Customer
+	err := s.db.QueryRow(query, customerID, companyID).Scan(
+		&c.CustomerID, &c.CompanyID, &c.Name, &c.Phone, &c.Email, &c.Address,
+		&c.TaxNumber, &c.CreditLimit, &c.PaymentTerms, &c.IsActive,
+		&c.CreatedBy, &c.UpdatedBy, &c.SyncStatus, &c.CreatedAt, &c.UpdatedAt, &c.IsDeleted,
+		&c.OutstandingBalance,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("customer not found")
+		}
+		return nil, fmt.Errorf("failed to get customer: %w", err)
+	}
+
+	return &c, nil
+}
+
 // CreateCustomer adds a new customer for the company
 func (s *CustomerService) CreateCustomer(companyID, userID int, req *models.CreateCustomerRequest) (*models.Customer, error) {
 	query := `
@@ -151,8 +180,8 @@ func (s *CustomerService) CreateCustomer(companyID, userID int, req *models.Crea
 	return &c, nil
 }
 
-// UpdateCustomer modifies existing customer fields
-func (s *CustomerService) UpdateCustomer(customerID, companyID, userID int, req *models.UpdateCustomerRequest) error {
+// UpdateCustomer modifies existing customer fields and returns updated customer
+func (s *CustomerService) UpdateCustomer(customerID, companyID, userID int, req *models.UpdateCustomerRequest) (*models.Customer, error) {
 	updates := []string{}
 	args := []interface{}{}
 	argCount := 1
@@ -199,7 +228,7 @@ func (s *CustomerService) UpdateCustomer(customerID, companyID, userID int, req 
 	}
 
 	if len(updates) == 0 {
-		return nil
+		return s.GetCustomerByID(customerID, companyID)
 	}
 
 	updates = append(updates, fmt.Sprintf("updated_at = $%d", argCount))
@@ -215,17 +244,18 @@ func (s *CustomerService) UpdateCustomer(customerID, companyID, userID int, req 
 
 	result, err := s.db.Exec(query, args...)
 	if err != nil {
-		return fmt.Errorf("failed to update customer: %w", err)
+		return nil, fmt.Errorf("failed to update customer: %w", err)
 	}
 
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
+		return nil, fmt.Errorf("failed to get rows affected: %w", err)
 	}
 	if rows == 0 {
-		return fmt.Errorf("customer not found")
+		return nil, fmt.Errorf("customer not found")
 	}
-	return nil
+
+	return s.GetCustomerByID(customerID, companyID)
 }
 
 // DeleteCustomer marks customer as deleted

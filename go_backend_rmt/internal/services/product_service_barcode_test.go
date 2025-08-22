@@ -33,12 +33,12 @@ func TestUpdateProduct_InvalidPrimaryBarcode(t *testing.T) {
 			{Barcode: "222"},
 		},
 	}
-	if err := svc.UpdateProduct(1, 1, 1, req); err == nil {
+	if _, err := svc.UpdateProduct(1, 1, 1, req); err == nil {
 		t.Fatalf("expected error for missing primary barcode")
 	}
 	req.Barcodes[0].IsPrimary = true
 	req.Barcodes[1].IsPrimary = true
-	if err := svc.UpdateProduct(1, 1, 1, req); err == nil {
+	if _, err := svc.UpdateProduct(1, 1, 1, req); err == nil {
 		t.Fatalf("expected error for multiple primary barcodes")
 	}
 }

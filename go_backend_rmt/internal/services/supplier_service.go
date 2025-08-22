@@ -197,16 +197,16 @@ func (s *SupplierService) CreateSupplier(companyID, userID int, req *models.Crea
 	return &supplier, nil
 }
 
-func (s *SupplierService) UpdateSupplier(supplierID, companyID, userID int, req *models.UpdateSupplierRequest) error {
+func (s *SupplierService) UpdateSupplier(supplierID, companyID, userID int, req *models.UpdateSupplierRequest) (*models.SupplierWithStats, error) {
 	// Verify supplier exists and belongs to company
 	var exists bool
 	err := s.db.QueryRow("SELECT TRUE FROM suppliers WHERE supplier_id = $1 AND company_id = $2",
 		supplierID, companyID).Scan(&exists)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return fmt.Errorf("supplier not found")
+			return nil, fmt.Errorf("supplier not found")
 		}
-		return fmt.Errorf("failed to verify supplier: %w", err)
+		return nil, fmt.Errorf("failed to verify supplier: %w", err)
 	}
 
 	// Check for duplicate name if updating name
@@ -217,9 +217,9 @@ func (s *SupplierService) UpdateSupplier(supplierID, companyID, userID int, req 
 			WHERE company_id = $1 AND LOWER(name) = LOWER($2) AND supplier_id != $3
 		`, companyID, *req.Name, supplierID).Scan(&existingID)
 		if err == nil {
-			return fmt.Errorf("supplier with this name already exists")
+			return nil, fmt.Errorf("supplier with this name already exists")
 		} else if err != sql.ErrNoRows {
-			return fmt.Errorf("failed to check existing supplier: %w", err)
+			return nil, fmt.Errorf("failed to check existing supplier: %w", err)
 		}
 	}
 
@@ -283,7 +283,7 @@ func (s *SupplierService) UpdateSupplier(supplierID, companyID, userID int, req 
 	}
 
 	if len(updates) == 0 {
-		return nil // No updates requested
+		return s.GetSupplierByID(supplierID, companyID)
 	}
 
 	// Add updated_at and updated_by
@@ -302,10 +302,10 @@ func (s *SupplierService) UpdateSupplier(supplierID, companyID, userID int, req 
 
 	_, err = s.db.Exec(query, args...)
 	if err != nil {
-		return fmt.Errorf("failed to update supplier: %w", err)
+		return nil, fmt.Errorf("failed to update supplier: %w", err)
 	}
 
-	return nil
+	return s.GetSupplierByID(supplierID, companyID)
 }
 
 func (s *SupplierService) DeleteSupplier(supplierID, companyID, userID int) error {

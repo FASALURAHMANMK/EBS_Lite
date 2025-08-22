@@ -1,11 +1,13 @@
 import api from "./apiClient";
-import { Customer, CreditTransaction } from "../types";
+import { Customer, CreditTransaction, ApiResponse } from "../types";
 
 export const getCustomers = () => api.get<Customer[]>("/api/v1/customers");
 export const createCustomer = (payload: Partial<Customer>) =>
   api.post<Customer>("/api/v1/customers", payload);
 export const updateCustomer = (id: string, payload: Partial<Customer>) =>
-  api.put<Customer>(`/api/v1/customers/${id}`, payload);
+  api
+    .put<ApiResponse<Customer>>(`/api/v1/customers/${id}`, payload)
+    .then((res) => res.data!);
 export const deleteCustomer = (id: string) =>
   api.delete<void>(`/api/v1/customers/${id}`);
 export const updateCustomerCredit = (

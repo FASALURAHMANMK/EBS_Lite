@@ -142,7 +142,7 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 		return
 	}
 
-	err = h.productService.UpdateProduct(productID, companyID, userID, &req)
+	product, err := h.productService.UpdateProduct(productID, companyID, userID, &req)
 	if err != nil {
 		if err.Error() == "product not found" {
 			utils.NotFoundResponse(c, "Product not found")
@@ -156,7 +156,7 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(c, "Product updated successfully", nil)
+	utils.SuccessResponse(c, "Product updated successfully", product)
 }
 
 // DELETE /products/:id

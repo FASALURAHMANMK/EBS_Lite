@@ -138,7 +138,8 @@ func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
 		return
 	}
 
-	if err := h.customerService.UpdateCustomer(customerID, companyID, userID, &req); err != nil {
+	customer, err := h.customerService.UpdateCustomer(customerID, companyID, userID, &req)
+	if err != nil {
 		if err.Error() == "customer not found" {
 			utils.NotFoundResponse(c, "Customer not found")
 			return
@@ -147,7 +148,7 @@ func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(c, "Customer updated successfully", nil)
+	utils.SuccessResponse(c, "Customer updated successfully", customer)
 }
 
 // DELETE /customers/:id
