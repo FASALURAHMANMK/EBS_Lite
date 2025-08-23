@@ -545,7 +545,6 @@ type AuthAction =
     isInitialized: boolean;
   }
 
-export { ROLES };
 export type {
   User as UserType,
   Company as CompanyType,
