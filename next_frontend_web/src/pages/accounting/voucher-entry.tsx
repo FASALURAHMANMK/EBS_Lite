@@ -3,7 +3,7 @@ import RoleGuard from '../../components/Auth/RoleGuard';
 import VoucherEntry from '../../components/ERP/Accounting/VoucherEntry';
 
 const VoucherEntryPage: React.FC = () => (
-  <RoleGuard roles={['admin', 'manager']}>
+  <RoleGuard roles={['admin', 'manager', 'accountant']}>
     <MainLayout>
       <VoucherEntry />
     </MainLayout>

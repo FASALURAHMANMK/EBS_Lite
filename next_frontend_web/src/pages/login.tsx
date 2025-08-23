@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import { useAppActions } from '../context/MainContext';
 import { LoginPage } from '../components/Auth/LoginPage';
+import { getInitialRoute } from '../utils/routes';
 
 const Login: React.FC = () => {
   const { state, hasRole } = useAuth();
@@ -16,7 +17,7 @@ const Login: React.FC = () => {
       if (defaultLocation) {
         setCurrentLocation(defaultLocation);
       }
-      const target = hasRole('Admin') ? '/dashboard' : '/sales';
+      const target = getInitialRoute(hasRole);
       router.replace(target);
     }
   }, [state.isAuthenticated, state.company, hasRole, router, setCurrentCompany, setCurrentLocation]);

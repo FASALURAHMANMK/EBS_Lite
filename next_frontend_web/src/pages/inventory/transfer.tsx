@@ -3,7 +3,7 @@ import RoleGuard from '../../components/Auth/RoleGuard';
 import TransferRequest from '../../components/ERP/Inventory/TransferRequest';
 
 const TransferPage: React.FC = () => (
-  <RoleGuard roles={['admin', 'manager']}>
+  <RoleGuard roles={['admin', 'manager', 'store']}>
     <MainLayout>
       <TransferRequest />
     </MainLayout>

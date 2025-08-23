@@ -3,7 +3,7 @@ import RoleGuard from '../../components/Auth/RoleGuard';
 import LedgerView from '../../components/ERP/Accounting/LedgerView';
 
 const LedgerPage: React.FC = () => (
-  <RoleGuard roles={['admin', 'manager']}>
+  <RoleGuard roles={['admin', 'manager', 'accountant']}>
     <MainLayout>
       <LedgerView />
     </MainLayout>

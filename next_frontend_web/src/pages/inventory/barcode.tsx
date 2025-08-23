@@ -3,7 +3,7 @@ import RoleGuard from '../../components/Auth/RoleGuard';
 import BarcodeLabelPrinter from '../../components/ERP/Inventory/BarcodeLabelPrinter';
 
 const BarcodePage: React.FC = () => (
-  <RoleGuard roles={['admin', 'manager']}>
+  <RoleGuard roles={['admin', 'manager', 'store']}>
     <MainLayout>
       <BarcodeLabelPrinter />
     </MainLayout>

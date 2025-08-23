@@ -3,7 +3,7 @@ import RoleGuard from '../../components/Auth/RoleGuard';
 import ProductManagement from '../../components/ERP/Inventory/ProductManagement';
 
 const InventoryPage: React.FC = () => (
-  <RoleGuard roles={['admin', 'manager']}>
+  <RoleGuard roles={['admin', 'manager', 'store']}>
     <MainLayout>
       <ProductManagement />
     </MainLayout>

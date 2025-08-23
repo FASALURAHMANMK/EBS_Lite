@@ -3,7 +3,7 @@ import RoleGuard from '../../components/Auth/RoleGuard';
 import CashRegister from '../../components/ERP/Accounting/CashRegister';
 
 const CashRegisterPage: React.FC = () => (
-  <RoleGuard roles={['admin', 'manager']}>
+  <RoleGuard roles={['admin', 'manager', 'accountant']}>
     <MainLayout>
       <CashRegister />
     </MainLayout>
