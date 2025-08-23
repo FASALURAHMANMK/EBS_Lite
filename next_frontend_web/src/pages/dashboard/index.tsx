@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
 import MainLayout from '../../components/Layout/MainLayout';
 import Dashboard from '../../components/ERP/Dashboard';
+import { ROLES } from '../../types';
 
 const DashboardPage: React.FC = () => {
   const { state, hasRole } = useAuth();
@@ -16,7 +17,7 @@ const DashboardPage: React.FC = () => {
   }, [state.isInitialized, state.isAuthenticated, router]);
 
   if (!state.isInitialized || !state.isAuthenticated) return null;
-  if (!hasRole(['1', 'manager', 'user'])) return <div>Access denied</div>;
+  if (!hasRole([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.SALES])) return <div>Access denied</div>;
 
   return (
     <MainLayout>

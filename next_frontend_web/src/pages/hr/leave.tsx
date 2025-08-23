@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
 import MainLayout from '../../components/Layout/MainLayout';
 import LeaveCalendar from '../../components/ERP/HR/LeaveCalendar';
+import { ROLES } from '../../types';
 
 const LeavePage: React.FC = () => {
   const { state, hasRole } = useAuth();
@@ -16,7 +17,7 @@ const LeavePage: React.FC = () => {
   }, [state.isInitialized, state.isAuthenticated, router]);
 
   if (!state.isInitialized || !state.isAuthenticated) return null;
-  if (!hasRole(['1', 'HR'])) return <div>Access denied</div>;
+  if (!hasRole([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.HR])) return <div>Access denied</div>;
 
   return (
     <MainLayout>

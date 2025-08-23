@@ -279,7 +279,7 @@ const Header: React.FC = () => {
                 {authState.user?.fullName}
               </div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
-                {authState.user?.role_id}
+                {authState.user?.roleName || authState.user?.roleId}
               </div>
             </div>
 

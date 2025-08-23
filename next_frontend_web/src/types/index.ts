@@ -1,10 +1,22 @@
+export enum ROLES {
+  SUPER_ADMIN = 1,
+  ADMIN,
+  MANAGER,
+  SALES,
+  INVENTORY,
+  ACCOUNTANT,
+  CASHIER,
+  HR,
+}
+
 export interface User {
   _id: string;
   username: string;
   email: string;
   fullName: string;
-  //1=Super 1, 2=1, 3=Manager, 4=Sales, 5=Inventory, 6=Accountant, 7=Cashier
-  role_id: '1' | '2' | '3' | '4' | '5' | '6' | '7';
+  // 1=Super Admin, 2=Admin, 3=Manager, 4=Sales, 5=Inventory, 6=Accountant, 7=Cashier, 8=HR
+  roleId: number;
+  roleName?: string;
   companyId: string;
   isActive: boolean;
   permissions: string[];
@@ -533,6 +545,7 @@ type AuthAction =
     isInitialized: boolean;
   }
 
+export { ROLES };
 export type {
   User as UserType,
   Company as CompanyType,
@@ -541,5 +554,6 @@ export type {
   Customer as CustomerType,
   Sale as SaleType,
   Supplier as SupplierType,
-  AuthAction, AppAction
+  AuthAction,
+  AppAction,
 };
