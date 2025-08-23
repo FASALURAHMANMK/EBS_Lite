@@ -1,13 +1,28 @@
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { useAuth } from '../../context/AuthContext';
 import MainLayout from '../../components/Layout/MainLayout';
 import InvoiceView from '../../components/ERP/Sales/InvoiceView';
-import RoleGuard from '../../components/Auth/RoleGuard';
 
-const InvoicePage: React.FC = () => (
-  <RoleGuard roles={['Admin', 'Manager', 'Sales']}>
+const InvoicePage: React.FC = () => {
+  const { state, hasRole } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!state.isInitialized) return;
+    if (!state.isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [state.isInitialized, state.isAuthenticated, router]);
+
+  if (!state.isInitialized || !state.isAuthenticated) return null;
+  if (!hasRole(['Admin', 'Manager', 'Sales'])) return <div>Access denied</div>;
+
+  return (
     <MainLayout>
       <InvoiceView />
     </MainLayout>
-  </RoleGuard>
-);
+  );
+};
 
 export default InvoicePage;
