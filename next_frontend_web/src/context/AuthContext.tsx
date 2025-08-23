@@ -6,7 +6,7 @@ import {
   getProfile,
   logout as logoutService,
 } from '../services/auth';
-import { getStoredAuthTokens } from '../services/apiClient';
+import { accessToken } from '../services/apiClient';
 
 interface AuthContextValue {
   state: AuthState;
@@ -68,7 +68,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
       return state;
   }
 };
-const AuthContext = createContext<AuthContextValue | null>(null);
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const getDeviceId = (): string => {
   if (typeof window === 'undefined') return '';
@@ -89,7 +89,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const initialize = async () => {
       dispatch({ type: 'AUTH_INIT_START' });
       try {
-        const { accessToken } = getStoredAuthTokens();
         if (accessToken) {
           const session = await getProfile();
           dispatch({ type: 'LOGIN_SUCCESS', payload: session });
