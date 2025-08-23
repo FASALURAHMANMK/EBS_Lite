@@ -137,7 +137,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     dispatch({ type: 'UPDATE_USER_LANGUAGES', payload });
   };
 
-  const role = state.user?.role;
+  const role = state.user?.role_id;
   const permissions = state.user?.permissions || [];
 
   const hasRole = (roles: string | string[]) => {

@@ -4,7 +4,7 @@ export interface User {
   email: string;
   fullName: string;
   //1=Super 1, 2=1, 3=Manager, 4=Sales, 5=Inventory, 6=Accountant, 7=Cashier
-  role: '1' | '2' | '3' | '4' | '5' | '6' | '7';
+  role_id: '1' | '2' | '3' | '4' | '5' | '6' | '7';
   companyId: string;
   isActive: boolean;
   permissions: string[];
