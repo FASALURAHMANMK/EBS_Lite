@@ -14,9 +14,9 @@ interface AuthContextValue {
   register: (userData: any) => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
-  hasRole: (roles: string | string[]) => boolean;
+  hasRole: (roles: number | number[]) => boolean;
   hasPermission: (perms: string | string[]) => boolean;
-  role?: string;
+  roleId?: number;
   permissions: string[];
   updateUserLanguages: (payload: {
     primaryLanguage: string;
@@ -137,13 +137,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     dispatch({ type: 'UPDATE_USER_LANGUAGES', payload });
   };
 
-  const role = state.user?.role_id;
+  const roleId = state.user?.roleId;
   const permissions = state.user?.permissions || [];
 
-  const hasRole = (roles: string | string[]) => {
-    if (!role) return false;
+  const hasRole = (roles: number | number[]) => {
+    if (roleId == null) return false;
     const roleList = Array.isArray(roles) ? roles : [roles];
-    return roleList.map(r => r.toLowerCase()).includes(role.toLowerCase());
+    return roleList.includes(roleId);
   };
 
   const hasPermission = (perms: string | string[]) => {
@@ -162,7 +162,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         clearError,
         hasRole,
         hasPermission,
-        role,
+        roleId,
         permissions,
         updateUserLanguages,
       }}

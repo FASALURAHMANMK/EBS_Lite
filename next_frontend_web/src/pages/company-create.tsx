@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import { CompanyCreatePage } from '../components/Auth/CompanyCreatePage';
+import { ROLES } from '../types';
 
 const CompanyCreate: React.FC = () => {
   const { state, hasRole } = useAuth();
@@ -15,7 +16,7 @@ const CompanyCreate: React.FC = () => {
   }, [state.isInitialized, state.isAuthenticated, router]);
 
   if (!state.isInitialized || !state.isAuthenticated) return null;
-  if (!hasRole(['1'])) return <div>Access denied</div>;
+  if (!hasRole([ROLES.SUPER_ADMIN, ROLES.ADMIN])) return <div>Access denied</div>;
 
   return <CompanyCreatePage />;
 };

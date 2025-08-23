@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/MainContext';
 import { useAuth } from '../../context/AuthContext';
+import { ROLES } from '../../types';
 import {
   ShoppingCart,
   BarChart3,
@@ -38,7 +39,7 @@ interface MenuItem {
   view?: SidebarView;
   subItems?: MenuItem[];
   badge?: number;
-  roles?: string[];
+  roles?: number[];
 }
 
 const Sidebar: React.FC = () => {
@@ -55,12 +56,20 @@ const Sidebar: React.FC = () => {
       icon: Home,
       label: 'Dashboard',
       view: 'dashboard',
-      roles: ['1', 'Manager', 'Sales', 'Store', 'HR', 'Accountant'],
+      roles: [
+        ROLES.SUPER_ADMIN,
+        ROLES.ADMIN,
+        ROLES.MANAGER,
+        ROLES.SALES,
+        ROLES.INVENTORY,
+        ROLES.HR,
+        ROLES.ACCOUNTANT,
+      ],
     },
     {
       icon: ShoppingCart,
       label: 'Sales',
-      roles: ['1', 'Manager', 'Sales'],
+      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.SALES],
       subItems: [
         { label: 'POS', view: 'sales', icon: ShoppingCart },
         { label: 'Invoice', view: 'sales-invoice', icon: FileText },
@@ -71,7 +80,7 @@ const Sidebar: React.FC = () => {
     {
       icon: Users,
       label: 'Customers',
-      roles: ['1', 'Manager', 'Sales'],
+      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.SALES],
       subItems: [
         { label: 'Collections', view: 'collectionss', icon: Banknote },
         { label: 'Customers', view: 'customers', icon: Users },
@@ -81,7 +90,7 @@ const Sidebar: React.FC = () => {
     {
       icon: Package,
       label: 'Purchases',
-      roles: ['1', 'Manager'],
+      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER],
       subItems: [
         { label: 'Purchase Entry', view: 'purchase-entry', icon: ShoppingBag },
         { label: 'Purchase Orders', view: 'purchase-orders', icon: ListOrdered },
@@ -92,7 +101,7 @@ const Sidebar: React.FC = () => {
     {
       icon: Warehouse,
       label: 'Inventory',
-      roles: ['1', 'Manager', 'Store'],
+      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.INVENTORY],
       subItems: [
         { label: 'Inventory Summary', view: 'inventory', icon: Eye },
         { label: 'Products', view: 'inventory-products', icon: Package },
@@ -110,7 +119,7 @@ const Sidebar: React.FC = () => {
     {
       icon: DollarSign,
       label: 'Accounting',
-      roles: ['1', 'Manager', 'Accountant'],
+      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT],
       subItems: [
         { label: 'Cash Register', view: 'cash-register', icon: DollarSign },
         { label: 'Vouchers', view: 'vouchers', icon: CreditCard },
@@ -121,7 +130,7 @@ const Sidebar: React.FC = () => {
     {
       icon: BarChart3,
       label: 'Reports',
-      roles: ['1', 'Manager', 'Accountant'],
+      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.ACCOUNTANT],
       subItems: [
         { label: 'Sales Reports', view: 'sales-reports', icon: BarChart3 },
         { label: 'Inventory Reports', view: 'inventory-reports', icon: Package },
@@ -135,7 +144,7 @@ const Sidebar: React.FC = () => {
     {
       icon: UserCheck,
       label: 'HR',
-      roles: ['1', 'HR'],
+      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.HR],
       subItems: [
         { label: 'Employees', view: 'employees', icon: Users },
         { label: 'Attendance', view: 'attendance', icon: History },
@@ -146,7 +155,7 @@ const Sidebar: React.FC = () => {
     {
       icon: Settings,
       label: 'Settings',
-      roles: ['1', 'Manager'],
+      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER],
       subItems: [
         { label: 'General', view: 'settings-general', icon: Settings },
         { label: 'Company Settings', view: 'settings-company', icon: Building2 },

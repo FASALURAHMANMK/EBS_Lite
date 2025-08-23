@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
 import MainLayout from '../../components/Layout/MainLayout';
 import CustomersReport from '../../components/ERP/Reports/CustomersReport';
+import { ROLES } from '../../types';
 
 const CustomersReportPage: React.FC = () => {
   const { state, hasRole } = useAuth();
@@ -16,7 +17,7 @@ const CustomersReportPage: React.FC = () => {
   }, [state.isInitialized, state.isAuthenticated, router]);
 
   if (!state.isInitialized || !state.isAuthenticated) return null;
-  if (!hasRole(['1', 'manager'])) return <div>Access denied</div>;
+  if (!hasRole([ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER])) return <div>Access denied</div>;
 
   return (
     <MainLayout>
