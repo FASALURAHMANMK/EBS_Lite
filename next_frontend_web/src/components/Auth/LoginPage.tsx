@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
 import { Eye, EyeOff, LogIn, Building, User, AlertCircle } from 'lucide-react';
+import { getInitialRoute } from '../../utils/routes';
 
 const LoginPage: React.FC = () => {
-  const { state, login, clearError } = useAuth();
+  const { state, login, clearError, hasRole } = useAuth();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -19,9 +20,9 @@ const LoginPage: React.FC = () => {
 
   useEffect(() => {
     if (state.isAuthenticated) {
-      router.replace('/dashboard');
+      router.replace(getInitialRoute(hasRole));
     }
-  }, [state.isAuthenticated, router]);
+  }, [state.isAuthenticated, hasRole, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

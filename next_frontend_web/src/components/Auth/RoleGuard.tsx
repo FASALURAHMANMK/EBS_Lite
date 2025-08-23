@@ -1,6 +1,7 @@
 import React, { ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
+import { getInitialRoute } from '../../utils/routes';
 
 interface RoleGuardProps {
   roles: string[];
@@ -16,7 +17,7 @@ const RoleGuard: React.FC<RoleGuardProps> = ({ roles, children }) => {
     if (!state.isAuthenticated) {
       router.replace('/login');
     } else if (!hasRole(roles)) {
-      router.replace('/dashboard');
+      router.replace(getInitialRoute(hasRole));
     }
   }, [state.isInitialized, state.isAuthenticated, state.user, roles, router, hasRole]);
 
