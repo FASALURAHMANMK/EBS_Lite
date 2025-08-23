@@ -20,6 +20,14 @@ const RoleGuard: React.FC<RoleGuardProps> = ({ roles, children }) => {
     }
   }, [state.isInitialized, state.isAuthenticated, state.user, roles, router, hasRole]);
 
+  if (!state.isInitialized) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   if (!state.isAuthenticated || !hasRole(roles)) return null;
 
   return <>{children}</>;
