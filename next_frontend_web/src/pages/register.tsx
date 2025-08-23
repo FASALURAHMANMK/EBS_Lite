@@ -9,7 +9,7 @@ const Register: React.FC = () => {
 
   useEffect(() => {
     if (state.isAuthenticated) {
-      const target = hasRole('Admin') ? '/dashboard' : '/sales';
+      const target = hasRole('1') ? '/dashboard' : '/sales';
       router.replace(target);
     }
   }, [state.isAuthenticated, hasRole, router]);

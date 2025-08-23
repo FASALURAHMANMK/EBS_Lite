@@ -99,7 +99,7 @@ Sidebar sections:
 
  Role-Based Access Control:
 
- Roles: Admin, Manager, Sales, Store, HR, Accountant
+ Roles: 1, Manager, Sales, Store, HR, Accountant
 
  Users are linked to company + location
 

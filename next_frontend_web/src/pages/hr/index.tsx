@@ -16,7 +16,7 @@ const HRDashboard: React.FC = () => {
   }, [state.isInitialized, state.isAuthenticated, router]);
 
   if (!state.isInitialized || !state.isAuthenticated) return null;
-  if (!hasRole(['Admin', 'HR'])) return <div>Access denied</div>;
+  if (!hasRole(['1', 'HR'])) return <div>Access denied</div>;
 
   return (
     <MainLayout>

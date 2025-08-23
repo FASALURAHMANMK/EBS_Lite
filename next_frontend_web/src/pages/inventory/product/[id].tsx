@@ -16,7 +16,7 @@ const ProductDetailPage: React.FC = () => {
   }, [state.isInitialized, state.isAuthenticated, router]);
 
   if (!state.isInitialized || !state.isAuthenticated) return null;
-  if (!hasRole(['admin', 'manager'])) return <div>Access denied</div>;
+  if (!hasRole(['1', 'manager'])) return <div>Access denied</div>;
 
   return (
     <MainLayout>

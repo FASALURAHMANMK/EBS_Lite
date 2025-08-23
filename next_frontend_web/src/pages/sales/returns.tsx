@@ -16,7 +16,7 @@ const ReturnsPage: React.FC = () => {
   }, [state.isInitialized, state.isAuthenticated, router]);
 
   if (!state.isInitialized || !state.isAuthenticated) return null;
-  if (!hasRole(['Admin', 'Manager', 'Sales'])) return <div>Access denied</div>;
+  if (!hasRole(['1', 'Manager', 'Sales'])) return <div>Access denied</div>;
 
   return (
     <MainLayout>

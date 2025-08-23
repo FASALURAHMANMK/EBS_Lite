@@ -55,12 +55,12 @@ const Sidebar: React.FC = () => {
       icon: Home,
       label: 'Dashboard',
       view: 'dashboard',
-      roles: ['Admin', 'Manager', 'Sales', 'Store', 'HR', 'Accountant'],
+      roles: ['1', 'Manager', 'Sales', 'Store', 'HR', 'Accountant'],
     },
     {
       icon: ShoppingCart,
       label: 'Sales',
-      roles: ['Admin', 'Manager', 'Sales'],
+      roles: ['1', 'Manager', 'Sales'],
       subItems: [
         { label: 'POS', view: 'sales', icon: ShoppingCart },
         { label: 'Invoice', view: 'sales-invoice', icon: FileText },
@@ -71,7 +71,7 @@ const Sidebar: React.FC = () => {
     {
       icon: Users,
       label: 'Customers',
-      roles: ['Admin', 'Manager', 'Sales'],
+      roles: ['1', 'Manager', 'Sales'],
       subItems: [
         { label: 'Collections', view: 'collectionss', icon: Banknote },
         { label: 'Customers', view: 'customers', icon: Users },
@@ -81,7 +81,7 @@ const Sidebar: React.FC = () => {
     {
       icon: Package,
       label: 'Purchases',
-      roles: ['Admin', 'Manager'],
+      roles: ['1', 'Manager'],
       subItems: [
         { label: 'Purchase Entry', view: 'purchase-entry', icon: ShoppingBag },
         { label: 'Purchase Orders', view: 'purchase-orders', icon: ListOrdered },
@@ -92,7 +92,7 @@ const Sidebar: React.FC = () => {
     {
       icon: Warehouse,
       label: 'Inventory',
-      roles: ['Admin', 'Manager', 'Store'],
+      roles: ['1', 'Manager', 'Store'],
       subItems: [
         { label: 'Inventory Summary', view: 'inventory', icon: Eye },
         { label: 'Products', view: 'inventory-products', icon: Package },
@@ -110,7 +110,7 @@ const Sidebar: React.FC = () => {
     {
       icon: DollarSign,
       label: 'Accounting',
-      roles: ['Admin', 'Manager', 'Accountant'],
+      roles: ['1', 'Manager', 'Accountant'],
       subItems: [
         { label: 'Cash Register', view: 'cash-register', icon: DollarSign },
         { label: 'Vouchers', view: 'vouchers', icon: CreditCard },
@@ -121,7 +121,7 @@ const Sidebar: React.FC = () => {
     {
       icon: BarChart3,
       label: 'Reports',
-      roles: ['Admin', 'Manager', 'Accountant'],
+      roles: ['1', 'Manager', 'Accountant'],
       subItems: [
         { label: 'Sales Reports', view: 'sales-reports', icon: BarChart3 },
         { label: 'Inventory Reports', view: 'inventory-reports', icon: Package },
@@ -135,7 +135,7 @@ const Sidebar: React.FC = () => {
     {
       icon: UserCheck,
       label: 'HR',
-      roles: ['Admin', 'HR'],
+      roles: ['1', 'HR'],
       subItems: [
         { label: 'Employees', view: 'employees', icon: Users },
         { label: 'Attendance', view: 'attendance', icon: History },
@@ -146,7 +146,7 @@ const Sidebar: React.FC = () => {
     {
       icon: Settings,
       label: 'Settings',
-      roles: ['Admin', 'Manager'],
+      roles: ['1', 'Manager'],
       subItems: [
         { label: 'General', view: 'settings-general', icon: Settings },
         { label: 'Company Settings', view: 'settings-company', icon: Building2 },
