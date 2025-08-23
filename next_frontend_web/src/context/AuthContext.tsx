@@ -82,18 +82,6 @@ const getDeviceId = (): string => {
   return id;
 };
 
-const getDeviceId = (): string => {
-  if (typeof window === 'undefined') return '';
-  let id = localStorage.getItem('deviceId');
-  if (!id) {
-    const generate = () =>
-      globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2);
-    id = generate();
-    localStorage.setItem('deviceId', id);
-  }
-  return id;
-};
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
