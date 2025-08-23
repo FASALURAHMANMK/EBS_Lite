@@ -1,13 +1,28 @@
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { useAuth } from '../../context/AuthContext';
 import MainLayout from '../../components/Layout/MainLayout';
 import SalesReport from '../../components/ERP/Reports/SalesReport';
-import RoleGuard from '../../components/Auth/RoleGuard';
 
-const SalesReportPage: React.FC = () => (
-  <RoleGuard roles={['admin', 'manager']}>
+const SalesReportPage: React.FC = () => {
+  const { state, hasRole } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!state.isInitialized) return;
+    if (!state.isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [state.isInitialized, state.isAuthenticated, router]);
+
+  if (!state.isInitialized || !state.isAuthenticated) return null;
+  if (!hasRole(['admin', 'manager'])) return <div>Access denied</div>;
+
+  return (
     <MainLayout>
       <SalesReport />
     </MainLayout>
-  </RoleGuard>
-);
+  );
+};
 
 export default SalesReportPage;

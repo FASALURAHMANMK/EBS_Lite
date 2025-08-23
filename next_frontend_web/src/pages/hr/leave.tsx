@@ -1,13 +1,28 @@
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { useAuth } from '../../context/AuthContext';
 import MainLayout from '../../components/Layout/MainLayout';
-import RoleGuard from '../../components/Auth/RoleGuard';
 import LeaveCalendar from '../../components/ERP/HR/LeaveCalendar';
 
-const LeavePage: React.FC = () => (
-  <RoleGuard roles={['Admin', 'HR']}>
+const LeavePage: React.FC = () => {
+  const { state, hasRole } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!state.isInitialized) return;
+    if (!state.isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [state.isInitialized, state.isAuthenticated, router]);
+
+  if (!state.isInitialized || !state.isAuthenticated) return null;
+  if (!hasRole(['Admin', 'HR'])) return <div>Access denied</div>;
+
+  return (
     <MainLayout>
       <LeaveCalendar />
     </MainLayout>
-  </RoleGuard>
-);
+  );
+};
 
 export default LeavePage;

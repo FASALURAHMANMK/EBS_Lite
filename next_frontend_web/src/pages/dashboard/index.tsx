@@ -1,13 +1,28 @@
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { useAuth } from '../../context/AuthContext';
 import MainLayout from '../../components/Layout/MainLayout';
 import Dashboard from '../../components/ERP/Dashboard';
-import RoleGuard from '../../components/Auth/RoleGuard';
 
-const DashboardPage: React.FC = () => (
-  <RoleGuard roles={['admin', 'manager', 'user']}>
+const DashboardPage: React.FC = () => {
+  const { state, hasRole } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!state.isInitialized) return;
+    if (!state.isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [state.isInitialized, state.isAuthenticated, router]);
+
+  if (!state.isInitialized || !state.isAuthenticated) return null;
+  if (!hasRole(['admin', 'manager', 'user'])) return <div>Access denied</div>;
+
+  return (
     <MainLayout>
       <Dashboard />
     </MainLayout>
-  </RoleGuard>
-);
+  );
+};
 
 export default DashboardPage;

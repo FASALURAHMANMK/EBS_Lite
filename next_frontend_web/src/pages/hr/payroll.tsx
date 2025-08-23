@@ -1,13 +1,28 @@
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { useAuth } from '../../context/AuthContext';
 import MainLayout from '../../components/Layout/MainLayout';
-import RoleGuard from '../../components/Auth/RoleGuard';
 import SalaryProcessing from '../../components/ERP/HR/SalaryProcessing';
 
-const PayrollPage: React.FC = () => (
-  <RoleGuard roles={['Admin', 'HR']}>
+const PayrollPage: React.FC = () => {
+  const { state, hasRole } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!state.isInitialized) return;
+    if (!state.isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [state.isInitialized, state.isAuthenticated, router]);
+
+  if (!state.isInitialized || !state.isAuthenticated) return null;
+  if (!hasRole(['Admin', 'HR'])) return <div>Access denied</div>;
+
+  return (
     <MainLayout>
       <SalaryProcessing />
     </MainLayout>
-  </RoleGuard>
-);
+  );
+};
 
 export default PayrollPage;
