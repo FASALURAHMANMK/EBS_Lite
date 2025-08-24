@@ -20,7 +20,7 @@ final ThemeData lightTheme = ThemeData(
     foregroundColor: Colors.black,
     elevation: 0,
   ),
-  cardTheme: CardTheme(
+  cardTheme: CardThemeData(
     color: Colors.grey.shade50,
     elevation: 0,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -68,7 +68,7 @@ final ThemeData darkTheme = ThemeData(
     foregroundColor: Colors.white,
     elevation: 0,
   ),
-  cardTheme: CardTheme(
+  cardTheme: CardThemeData(
     color: Colors.grey.shade900,
     elevation: 0,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
