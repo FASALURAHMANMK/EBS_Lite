@@ -6,6 +6,7 @@ import '../../dashboard/presentation/dashboard_screen.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 import 'create_company_screen.dart';
+import '../../../core/theme_notifier.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -24,7 +25,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordFocus = FocusNode();
 
   bool _obscure = true;
-  bool _rememberMe = true;
+  bool _rememberMe = false;
+
+  @override
+  void initState() {
+    super.initState();
+    ref.listen(authNotifierProvider, (prev, next) {
+      if (next.error != null && mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(next.error!),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -86,20 +104,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ Riverpod listener must be inside build (or use listenManual in initState)
-    ref.listen(authNotifierProvider, (prev, next) {
-      if (next.error != null && mounted) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(next.error!),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-      }
-    });
-
     final state = ref.watch(authNotifierProvider);
     final theme = Theme.of(context);
     final media = MediaQuery.of(context);
@@ -112,7 +116,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        appBar: AppBar(title: const Text('Login')),
+        appBar: AppBar(
+          title: const Text('Login'),
+          actions: [
+            IconButton(
+              tooltip: 'Toggle theme',
+              onPressed: () =>
+                  ref.read(themeNotifierProvider.notifier).toggle(),
+              icon: Icon(
+                theme.brightness == Brightness.dark
+                    ? Icons.light_mode
+                    : Icons.dark_mode,
+              ),
+            ),
+          ],
+        ),
         body: SafeArea(
           child: Align(
             alignment: Alignment.topCenter,
