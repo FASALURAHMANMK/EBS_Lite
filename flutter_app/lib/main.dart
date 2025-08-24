@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'core/app_theme.dart';
 import 'core/theme_notifier.dart';
 import 'features/auth/controllers/auth_notifier.dart';
 import 'features/auth/data/auth_repository.dart';
@@ -12,7 +11,7 @@ import 'features/auth/presentation/login_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
-  final dio = Dio(BaseOptions(baseUrl: 'http://localhost:8080/api/v1'));
+  final dio = Dio(BaseOptions(baseUrl: 'http://192.168.100.128:8080/api/v1'));
   runApp(
     ProviderScope(
       overrides: [

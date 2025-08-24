@@ -145,9 +145,7 @@ Insights
 
 POS Interface
 
- Switchable UI: Classic / Modern
-
- Modern Exclusively For Mobile devices(also available for PC) : Cart like Interface
+ Modern Exclusively For Mobile devices
 
  Live product search (Product list with categories)
 
@@ -161,25 +159,7 @@ POS Interface
 
  Hold / Resume bills
 
- Print/WhatsApp/SMS/Email Invoices
-
- Classic:
-
- Standard Table like POS Interface(Not for Mobile Devices. Only for PC)(legacy)
-
- Live product search (in line)
-
- Live customer search + Add new
-
- Add multiple items with real-time total
-
- Discount, Tax, Barcode support
-
- Warranty, Loyalty and Promotions
-
- Hold / Resume bills
-
- Print/WhatsApp/SMS/Email Invoices
+ Print/WhatsApp/SMS/Email Invoicess
  
 Returns
 

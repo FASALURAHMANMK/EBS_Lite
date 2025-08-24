@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Light theme following the black, red and white palette
-final ThemeData lightTheme = ThemeData(
+final ThemeData appTheme = ThemeData(
   colorScheme: const ColorScheme.light(
     primary: Colors.black,
     secondary: Colors.red,

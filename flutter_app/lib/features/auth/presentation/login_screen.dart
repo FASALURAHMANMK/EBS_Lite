@@ -66,7 +66,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (_) => const DashboardScreen()),
+                                    builder: (_) => const DashboardScreen())
                               );
                             }
                           } else if (mounted && state.error != null) {

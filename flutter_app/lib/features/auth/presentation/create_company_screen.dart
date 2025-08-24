@@ -56,7 +56,7 @@ class _CreateCompanyScreenState extends ConsumerState<CreateCompanyScreen> {
                             Navigator.pushAndRemoveUntil(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) => const DashboardScreen()),
+                                  builder: (_) => const DashboardScreen())
                               (route) => false,
                             );
                           } else if (mounted && state.error != null) {
