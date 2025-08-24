@@ -17,11 +17,12 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _emailFocus = FocusNode();
+  late final ProviderSubscription<AuthState> _authSub;
 
   @override
   void initState() {
     super.initState();
-    ref.listen(authNotifierProvider, (prev, next) {
+    _authSub = ref.listenManual(authNotifierProvider, (prev, next) {
       if (next.error != null && mounted) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
@@ -37,6 +38,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
   @override
   void dispose() {
+    _authSub.close();
     _emailController.dispose();
     _emailFocus.dispose();
     super.dispose();
