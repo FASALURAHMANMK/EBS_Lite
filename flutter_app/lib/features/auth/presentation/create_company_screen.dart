@@ -17,6 +17,13 @@ class _CreateCompanyScreenState extends ConsumerState<CreateCompanyScreen> {
   final _emailController = TextEditingController();
 
   @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = ref.watch(authNotifierProvider);
     return Scaffold(
@@ -56,7 +63,7 @@ class _CreateCompanyScreenState extends ConsumerState<CreateCompanyScreen> {
                             Navigator.pushAndRemoveUntil(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) => const DashboardScreen())
+                                  builder: (_) => const DashboardScreen()),
                               (route) => false,
                             );
                           } else if (mounted && state.error != null) {
