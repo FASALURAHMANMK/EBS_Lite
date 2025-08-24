@@ -22,23 +22,6 @@ class _CreateCompanyScreenState extends ConsumerState<CreateCompanyScreen> {
   final _emailFocus = FocusNode();
 
   @override
-  void initState() {
-    super.initState();
-    ref.listen(authNotifierProvider, (prev, next) {
-      if (next.error != null && mounted) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(next.error!),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-      }
-    });
-  }
-
-  @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
@@ -90,6 +73,18 @@ class _CreateCompanyScreenState extends ConsumerState<CreateCompanyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(authNotifierProvider, (prev, next) {
+      if (next.error != null && mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(next.error!),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+      }
+    });
     final state = ref.watch(authNotifierProvider);
     final theme = Theme.of(context);
     final media = MediaQuery.of(context);
