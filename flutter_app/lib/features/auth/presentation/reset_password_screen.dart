@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../controllers/auth_notifier.dart';
+import '../../../core/theme_notifier.dart';
 
 class ResetPasswordScreen extends ConsumerStatefulWidget {
   const ResetPasswordScreen({super.key});
@@ -24,6 +25,23 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
 
   bool _obscure = true;
   bool _obscureConfirm = true;
+
+  @override
+  void initState() {
+    super.initState();
+    ref.listen(authNotifierProvider, (prev, next) {
+      if (next.error != null && mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(next.error!),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -94,20 +112,6 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ move listen into build
-    ref.listen(authNotifierProvider, (prev, next) {
-      if (next.error != null && mounted) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(next.error!),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-      }
-    });
-
     final state = ref.watch(authNotifierProvider);
     final theme = Theme.of(context);
     final media = MediaQuery.of(context);
@@ -131,7 +135,21 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        appBar: AppBar(title: const Text('Reset Password')),
+        appBar: AppBar(
+          title: const Text('Reset Password'),
+          actions: [
+            IconButton(
+              tooltip: 'Toggle theme',
+              onPressed: () =>
+                  ref.read(themeNotifierProvider.notifier).toggle(),
+              icon: Icon(
+                theme.brightness == Brightness.dark
+                    ? Icons.light_mode
+                    : Icons.dark_mode,
+              ),
+            ),
+          ],
+        ),
         body: SafeArea(
           child: Align(
             alignment: Alignment.topCenter,

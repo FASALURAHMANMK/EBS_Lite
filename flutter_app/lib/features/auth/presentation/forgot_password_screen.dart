@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../controllers/auth_notifier.dart';
 import 'reset_password_screen.dart';
+import '../../../core/theme_notifier.dart';
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -16,6 +17,23 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _emailFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    ref.listen(authNotifierProvider, (prev, next) {
+      if (next.error != null && mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(next.error!),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -66,20 +84,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ move listen into build
-    ref.listen(authNotifierProvider, (prev, next) {
-      if (next.error != null && mounted) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(next.error!),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-      }
-    });
-
     final state = ref.watch(authNotifierProvider);
     final theme = Theme.of(context);
     final media = MediaQuery.of(context);
@@ -94,6 +98,18 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Forgot Password'),
+          actions: [
+            IconButton(
+              tooltip: 'Toggle theme',
+              onPressed: () =>
+                  ref.read(themeNotifierProvider.notifier).toggle(),
+              icon: Icon(
+                theme.brightness == Brightness.dark
+                    ? Icons.light_mode
+                    : Icons.dark_mode,
+              ),
+            ),
+          ],
         ),
         body: SafeArea(
           child: Align(
