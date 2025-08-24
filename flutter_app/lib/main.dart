@@ -11,7 +11,7 @@ import 'features/auth/presentation/login_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
-  final dio = Dio(BaseOptions(baseUrl: 'http://localhost:8080/api/v1'));
+  final dio = Dio(BaseOptions(baseUrl: 'http://192.168.100.128:8080/api/v1'));
   runApp(
     ProviderScope(
       overrides: [
