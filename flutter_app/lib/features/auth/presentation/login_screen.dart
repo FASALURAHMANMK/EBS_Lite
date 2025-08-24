@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../controllers/auth_notifier.dart';
-import '../../../home_screen.dart';
+import '../../dashboard/presentation/dashboard_screen.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 import 'create_company_screen.dart';
@@ -66,7 +66,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (_) => const HomeScreen()),
+                                    builder: (_) => const DashboardScreen())
                               );
                             }
                           } else if (mounted && state.error != null) {

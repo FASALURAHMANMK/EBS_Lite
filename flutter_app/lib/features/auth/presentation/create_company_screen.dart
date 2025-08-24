@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../controllers/auth_notifier.dart';
-import '../../../home_screen.dart';
+import '../../dashboard/presentation/dashboard_screen.dart';
 
 class CreateCompanyScreen extends ConsumerStatefulWidget {
   const CreateCompanyScreen({super.key});
@@ -56,7 +56,7 @@ class _CreateCompanyScreenState extends ConsumerState<CreateCompanyScreen> {
                             Navigator.pushAndRemoveUntil(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) => const HomeScreen()),
+                                  builder: (_) => const DashboardScreen())
                               (route) => false,
                             );
                           } else if (mounted && state.error != null) {
