@@ -1,6 +1,6 @@
-# flutter_app
+# ebs_lite
 
-A new Flutter project.
+A new ERP project.
 
 ## Getting Started
 
