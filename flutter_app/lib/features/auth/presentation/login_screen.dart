@@ -113,7 +113,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Login'),
+          title: const Text('Login',
+              style: TextStyle(fontWeight: FontWeight.w700)),
           actions: [
             IconButton(
               tooltip: 'Toggle theme',
@@ -129,7 +130,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         body: SafeArea(
           child: Align(
-            alignment: Alignment.topCenter,
+            alignment: Alignment.center,
             child: SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(
                   padH, padV, padH, media.viewPadding.bottom + 24),
@@ -148,16 +149,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          const SizedBox(height: 8),
                           Text(
                             'Welcome back',
                             style: theme.textTheme.headlineSmall
                                 ?.copyWith(fontWeight: FontWeight.w700),
+                            textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'Sign in to continue to your workspace.',
                             style: theme.textTheme.bodyMedium?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant),
+                            textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 24),
                           TextFormField(
@@ -166,8 +170,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             textInputAction: TextInputAction.next,
                             keyboardType: TextInputType.emailAddress,
                             decoration: InputDecoration(
-                              labelText: 'Email or username',
-                              hintText: 'name@example.com or yourhandle',
+                              hintText: 'Email or Username',
                               prefixIcon: const Icon(Icons.person_rounded),
                             ),
                             validator: _validateIdentifier,
@@ -182,7 +185,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             textInputAction: TextInputAction.done,
                             obscureText: _obscure,
                             decoration: InputDecoration(
-                              labelText: 'Password',
+                              hintText: 'Password',
                               prefixIcon: const Icon(Icons.lock_rounded),
                               suffixIcon: IconButton(
                                 tooltip: _obscure

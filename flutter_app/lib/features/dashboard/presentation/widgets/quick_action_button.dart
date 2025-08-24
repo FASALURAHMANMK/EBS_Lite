@@ -151,8 +151,7 @@ class _QuickActionButtonState extends State<QuickActionButton>
                     animation: _controller,
                     builder: (_, __) {
                       return Container(
-                        color:
-                            Colors.black.withOpacity(0.08 * _controller.value),
+                        color: Colors.transparent,
                       );
                     },
                   ),
@@ -165,7 +164,7 @@ class _QuickActionButtonState extends State<QuickActionButton>
               final t = (count == 1) ? 0.5 : i / (count - 1);
               final angleDeg =
                   widget.startAngleDegrees + t * widget.sweepAngleDegrees;
-              final angleRad = angleDeg * math.pi / 180.0;
+              final angleRad = angleDeg * math.pi / 224.0;
 
               final dx = math.cos(angleRad) * widget.distance;
               final dy = math.sin(angleRad) * widget.distance;

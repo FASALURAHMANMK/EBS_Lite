@@ -11,23 +11,29 @@ class DashboardSidebar extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Drawer(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.zero,
+      ),
       child: SafeArea(
+        top: false,
         child: Column(
           children: [
             // Brand header
-            DrawerHeader(
-              margin: EdgeInsets.zero,
+            Container(
+              alignment: Alignment.bottomCenter,
+              height: 140, // custom height
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
                     theme.colorScheme.primary,
-                    theme.colorScheme.primaryContainer
+                    theme.colorScheme.primaryContainer,
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
               ),
+
               child: Row(
                 children: [
                   CircleAvatar(

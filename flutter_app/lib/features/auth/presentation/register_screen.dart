@@ -155,7 +155,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Register'),
+          title: const Text('Register',
+              style: TextStyle(fontWeight: FontWeight.w700)),
           actions: [
             IconButton(
               tooltip: 'Toggle theme',
@@ -171,7 +172,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ),
         body: SafeArea(
           child: Align(
-            alignment: Alignment.topCenter,
+            alignment: Alignment.center,
             child: SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(
                   padH, padV, padH, media.viewPadding.bottom + 24),
@@ -194,12 +195,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             'Create your account',
                             style: theme.textTheme.headlineSmall
                                 ?.copyWith(fontWeight: FontWeight.w700),
+                            textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'Join your team and start collaborating.',
                             style: theme.textTheme.bodyMedium?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant),
+                            textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 24),
                           TextFormField(
@@ -207,8 +210,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             focusNode: _usernameFocus,
                             textInputAction: TextInputAction.next,
                             decoration: InputDecoration(
-                              labelText: 'Username',
-                              hintText: 'yourhandle',
+                              hintText: 'Username',
                               prefixIcon:
                                   const Icon(Icons.alternate_email_rounded),
                             ),
@@ -223,8 +225,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             keyboardType: TextInputType.emailAddress,
                             textInputAction: TextInputAction.next,
                             decoration: InputDecoration(
-                              labelText: 'Email',
-                              hintText: 'name@example.com',
+                              hintText: 'Email',
                               prefixIcon: const Icon(Icons.email_rounded),
                             ),
                             validator: _validateEmail,
@@ -243,7 +244,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                     obscureText: _obscure,
                                     onChanged: (_) => setInner(() {}),
                                     decoration: InputDecoration(
-                                      labelText: 'Password',
+                                      hintText: 'Password',
                                       prefixIcon:
                                           const Icon(Icons.lock_rounded),
                                       suffixIcon: IconButton(
@@ -298,7 +299,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             textInputAction: TextInputAction.done,
                             obscureText: _obscureConfirm,
                             decoration: InputDecoration(
-                              labelText: 'Confirm password',
+                              hintText: 'Confirm Password',
                               prefixIcon: const Icon(Icons.lock_reset_rounded),
                               suffixIcon: IconButton(
                                 tooltip: _obscureConfirm

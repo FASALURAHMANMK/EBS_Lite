@@ -12,12 +12,10 @@ class DashboardHeader extends ConsumerStatefulWidget
     this.onToggleTheme,
     this.onHelp,
     this.onLogout,
-    this.locations = const ['Location 1', 'Location 2'],
+    this.locations = const ['Default', 'Location 2'],
     this.selectedLocation,
     this.onLocationChanged,
     this.languages = const ['English', 'Spanish'],
-    this.selectedLanguage,
-    this.onLanguageChanged,
   });
 
   /// Branding
@@ -39,8 +37,6 @@ class DashboardHeader extends ConsumerStatefulWidget
 
   /// Language selector
   final List<String> languages;
-  final String? selectedLanguage;
-  final ValueChanged<String>? onLanguageChanged;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -58,18 +54,13 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
     super.initState();
     _location = widget.selectedLocation ??
         (widget.locations.isNotEmpty ? widget.locations.first : 'Default');
-    _language = widget.selectedLanguage ??
+    _language =
         (widget.languages.isNotEmpty ? widget.languages.first : 'English');
   }
 
   void _setLocation(String value) {
     setState(() => _location = value);
     widget.onLocationChanged?.call(value);
-  }
-
-  void _setLanguage(String value) {
-    setState(() => _language = value);
-    widget.onLanguageChanged?.call(value);
   }
 
   @override
@@ -123,7 +114,6 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
             locations: widget.locations,
             languages: widget.languages,
             onSelectLocation: _setLocation,
-            onSelectLanguage: _setLanguage,
           )
         else ...[
           // Online/Sync status chip
@@ -147,15 +137,6 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
               ),
             ),
           ),
-          // Language selector
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: _LanguageSelector(
-              value: _language,
-              items: widget.languages,
-              onChanged: _setLanguage,
-            ),
-          ),
         ],
         // Theme toggle
         IconButton(
@@ -164,12 +145,6 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
               Icon(isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded),
           onPressed: widget.onToggleTheme,
         ),
-        // Help
-        IconButton(
-          tooltip: 'Help & support',
-          icon: const Icon(Icons.help_outline_rounded),
-          onPressed: widget.onHelp,
-        ),
         // Profile / Logout overflow
         PopupMenuButton<_HeaderMenu>(
           tooltip: 'Account',
@@ -177,6 +152,8 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
           onSelected: (v) {
             if (v == _HeaderMenu.logout) {
               widget.onLogout?.call();
+            } else if (v == _HeaderMenu.help) {
+              widget.onHelp?.call();
             }
           },
           itemBuilder: (context) => [
@@ -190,6 +167,15 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
               ),
             ),
             const PopupMenuDivider(),
+            const PopupMenuItem(
+              value: _HeaderMenu.help,
+              child: ListTile(
+                leading: Icon(Icons.help_outline_rounded),
+                title: Text('Help & support'),
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+              ),
+            ),
             const PopupMenuItem(
               value: _HeaderMenu.logout,
               child: ListTile(
@@ -211,57 +197,11 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
   }
 }
 
-enum _HeaderMenu { profile, logout }
+enum _HeaderMenu { profile, help, logout }
 
 /// Wide-layout dropdown for Locations.
 class _LocationSelector extends StatelessWidget {
   const _LocationSelector({
-    required this.value,
-    required this.items,
-    required this.onChanged,
-  });
-
-  final String value;
-  final List<String> items;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      height: 36,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: theme.dividerColor.withOpacity(0.3)),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: items.contains(value)
-              ? value
-              : (items.isNotEmpty ? items.first : null),
-          onChanged: (v) {
-            if (v != null) onChanged(v);
-          },
-          icon: const Icon(Icons.keyboard_arrow_down_rounded),
-          alignment: Alignment.centerLeft,
-          borderRadius: BorderRadius.circular(12),
-          items: items
-              .map((e) => DropdownMenuItem<String>(
-                    value: e,
-                    child: Text(e, overflow: TextOverflow.ellipsis),
-                  ))
-              .toList(),
-        ),
-      ),
-    );
-  }
-}
-
-/// Wide-layout dropdown for Languages.
-class _LanguageSelector extends StatelessWidget {
-  const _LanguageSelector({
     required this.value,
     required this.items,
     required this.onChanged,
@@ -313,7 +253,6 @@ class _CompactMenus extends StatelessWidget {
     required this.locations,
     required this.languages,
     required this.onSelectLocation,
-    required this.onSelectLanguage,
   });
 
   final String locationValue;
@@ -321,7 +260,6 @@ class _CompactMenus extends StatelessWidget {
   final List<String> locations;
   final List<String> languages;
   final ValueChanged<String> onSelectLocation;
-  final ValueChanged<String> onSelectLanguage;
 
   @override
   Widget build(BuildContext context) {
@@ -343,32 +281,6 @@ class _CompactMenus extends StatelessWidget {
                               ? Icons.radio_button_checked
                               : Icons.radio_button_unchecked,
                           color: e == locationValue
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.onSurfaceVariant,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Flexible(child: Text(e)),
-                      ],
-                    ),
-                  ))
-              .toList(),
-        ),
-        PopupMenuButton<String>(
-          tooltip: 'Language',
-          icon: const Icon(Icons.language_rounded),
-          initialValue: languageValue,
-          onSelected: onSelectLanguage,
-          itemBuilder: (context) => languages
-              .map((e) => PopupMenuItem<String>(
-                    value: e,
-                    child: Row(
-                      children: [
-                        Icon(
-                          e == languageValue
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_unchecked,
-                          color: e == languageValue
                               ? theme.colorScheme.primary
                               : theme.colorScheme.onSurfaceVariant,
                           size: 18,

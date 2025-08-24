@@ -99,7 +99,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Forgot Password'),
+          title: const Text('Forgot Password',
+              style: TextStyle(fontWeight: FontWeight.w700)),
           actions: [
             IconButton(
               tooltip: 'Toggle theme',
@@ -115,7 +116,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         ),
         body: SafeArea(
           child: Align(
-            alignment: Alignment.topCenter,
+            alignment: Alignment.center,
             child: SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(
                   padH, padV, padH, media.viewPadding.bottom + 24),
@@ -134,16 +135,19 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          const SizedBox(height: 8),
                           Text(
                             'Reset your password',
                             style: theme.textTheme.headlineSmall
                                 ?.copyWith(fontWeight: FontWeight.w700),
+                            textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'Enter the email associated with your account. We’ll send you a secure link to reset your password.',
                             style: theme.textTheme.bodyMedium?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant),
+                            textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 24),
                           TextFormField(
@@ -153,8 +157,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                             keyboardType: TextInputType.emailAddress,
                             textInputAction: TextInputAction.done,
                             decoration: InputDecoration(
-                              labelText: 'Email',
-                              hintText: 'name@example.com',
+                              hintText: 'Email',
                               prefixIcon:
                                   const Icon(Icons.alternate_email_rounded),
                             ),
@@ -242,6 +245,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                               textAlign: TextAlign.center,
                             ),
                           ),
+                          const SizedBox(height: 8),
                         ],
                       ),
                     ),
