@@ -16,6 +16,13 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   final _passwordController = TextEditingController();
 
   @override
+  void dispose() {
+    _tokenController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = ref.watch(authNotifierProvider);
     return Scaffold(

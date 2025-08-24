@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-final ThemeData appTheme = ThemeData(
+/// Light theme definition used across the app.
+final ThemeData lightTheme = ThemeData(
   colorScheme: const ColorScheme.light(
     primary: Colors.black,
     secondary: Colors.red,
