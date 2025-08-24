@@ -26,10 +26,12 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   bool _obscure = true;
   bool _obscureConfirm = true;
 
+  ProviderSubscription<AuthState>? _authSub;
+
   @override
   void initState() {
     super.initState();
-    ref.listen(authNotifierProvider, (prev, next) {
+    _authSub = ref.listenManual(authNotifierProvider, (prev, next) {
       if (next.error != null && mounted) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
@@ -51,6 +53,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
     _tokenFocus.dispose();
     _passwordFocus.dispose();
     _confirmFocus.dispose();
+    _authSub?.close();
     super.dispose();
   }
 
