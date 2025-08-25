@@ -42,24 +42,31 @@ class AuthRepository {
     if (email != null && email.isNotEmpty) {
       payload['email'] = email;
     }
-    final response = await _dio.post('/auth/login', data: payload);
-    final data =
-        LoginResponse.fromJson(response.data['data'] as Map<String, dynamic>);
-    await _prefs.setString(accessTokenKey, data.accessToken);
-    await _prefs.setString(refreshTokenKey, data.refreshToken);
-    await _prefs.setString(sessionIdKey, data.sessionId);
-    if (data.company != null) {
-      await _prefs.setString(
-        companyKey,
-        jsonEncode({
-          'company_id': data.company!.companyId,
-          'name': data.company!.name,
-        }),
-      );
-    } else {
-      await _prefs.remove(companyKey);
+    try {
+      final response = await _dio.post('/auth/login', data: payload);
+      final data =
+          LoginResponse.fromJson(response.data['data'] as Map<String, dynamic>);
+      await _prefs.setString(accessTokenKey, data.accessToken);
+      await _prefs.setString(refreshTokenKey, data.refreshToken);
+      await _prefs.setString(sessionIdKey, data.sessionId);
+      if (data.company != null) {
+        await _prefs.setString(
+          companyKey,
+          jsonEncode({
+            'company_id': data.company!.companyId,
+            'name': data.company!.name,
+          }),
+        );
+      } else {
+        await _prefs.remove(companyKey);
+      }
+      return data;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        throw AuthException('Invalid email or password', statusCode: 401);
+      }
+      throw AuthException('Unable to connect. Please try again.');
     }
-    return data;
   }
 
   Future<RegisterResponse> register({
