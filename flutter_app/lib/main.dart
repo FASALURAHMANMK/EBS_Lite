@@ -10,6 +10,7 @@ import 'core/api_client.dart';
 import 'features/auth/controllers/auth_notifier.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/login_screen.dart';
+import 'features/auth/presentation/splash_screen.dart';
 import 'features/auth/data/models.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'package:dio/dio.dart';
@@ -19,7 +20,6 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
   final apiClient = ApiClient(prefs);
-  final authRepo = AuthRepository(apiClient.dio, prefs);
   const userKey = 'user';
   User? user;
   Company? company;
@@ -40,45 +40,14 @@ void main() async {
       await prefs.remove(AuthRepository.companyKey);
     }
   }
-  final accessToken = prefs.getString(AuthRepository.accessTokenKey);
-  final refreshToken = prefs.getString(AuthRepository.refreshTokenKey);
-  final sessionId = prefs.getString(AuthRepository.sessionIdKey);
-  if (accessToken != null && refreshToken != null && sessionId != null) {
-    try {
-      final res = await authRepo.me();
-      user = res.user.toUser();
-      company = res.company;
-      await prefs.setString(
-        userKey,
-        jsonEncode({
-          'user_id': user.userId,
-          'username': user.username,
-          'email': user.email,
-        }),
-      );
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 401) {
-        await prefs.remove(AuthRepository.accessTokenKey);
-        await prefs.remove(AuthRepository.refreshTokenKey);
-        await prefs.remove(AuthRepository.sessionIdKey);
-        await prefs.remove(userKey);
-        user = null;
-        company = null;
-      } else {
-        debugPrint('authRepo.me error: $e');
-        // For other errors, keep tokens and any cached user/company info
-      }
-    } catch (e) {
-      debugPrint('authRepo.me error: $e');
-      // Parsing or other errors should not clear tokens
-    }
-  } else {
+  final hasTokens =
+      prefs.getString(AuthRepository.accessTokenKey) != null &&
+          prefs.getString(AuthRepository.refreshTokenKey) != null &&
+          prefs.getString(AuthRepository.sessionIdKey) != null;
+  if (!hasTokens) {
     await prefs.remove(AuthRepository.accessTokenKey);
     await prefs.remove(AuthRepository.refreshTokenKey);
     await prefs.remove(AuthRepository.sessionIdKey);
-    await prefs.remove(userKey);
-    user = null;
-    company = null;
   }
   runApp(
     ProviderScope(
@@ -86,21 +55,29 @@ void main() async {
         dioProvider.overrideWithValue(apiClient.dio),
         sharedPreferencesProvider.overrideWithValue(prefs),
       ],
-      child: MyApp(initialUser: user, initialCompany: company),
+      child: MyApp(
+        initialUser: user,
+        initialCompany: company,
+        needsValidation: hasTokens,
+      ),
     ),
   );
 }
 
 class MyApp extends ConsumerStatefulWidget {
-  const MyApp({super.key, this.initialUser, this.initialCompany});
+  const MyApp(
+      {super.key, this.initialUser, this.initialCompany, this.needsValidation});
   final User? initialUser;
   final Company? initialCompany;
+  final bool? needsValidation;
 
   @override
   ConsumerState<MyApp> createState() => _MyAppState();
 }
 
 class _MyAppState extends ConsumerState<MyApp> {
+  bool _validating = false;
+
   @override
   void initState() {
     super.initState();
@@ -114,14 +91,64 @@ class _MyAppState extends ConsumerState<MyApp> {
             ref.read(locationNotifierProvider.notifier).load(company.companyId));
       }
     }
+    if (widget.needsValidation == true) {
+      _validating = true;
+      _validate();
+    }
+  }
+
+  Future<void> _validate() async {
+    const userKey = 'user';
+    final authRepo = ref.read(authRepositoryProvider);
+    final prefs = ref.read(sharedPreferencesProvider);
+    try {
+      final res = await authRepo.me();
+      final user = res.user.toUser();
+      final company = res.company;
+      await prefs.setString(
+        userKey,
+        jsonEncode({
+          'user_id': user.userId,
+          'username': user.username,
+          'email': user.email,
+        }),
+      );
+      ref
+          .read(authNotifierProvider.notifier)
+          .setAuth(user: user, company: company);
+      if (company != null) {
+        ref.read(locationNotifierProvider.notifier).load(company.companyId);
+      }
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        await prefs.remove(AuthRepository.accessTokenKey);
+        await prefs.remove(AuthRepository.refreshTokenKey);
+        await prefs.remove(AuthRepository.sessionIdKey);
+        if (widget.initialUser == null) {
+          await prefs.remove(userKey);
+          ref.read(authNotifierProvider.notifier).state = const AuthState();
+        }
+      } else {
+        debugPrint('authRepo.me error: $e');
+      }
+    } catch (e) {
+      debugPrint('authRepo.me error: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _validating = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final mode = ref.watch(themeNotifierProvider);
-    final home = widget.initialUser != null
-        ? const DashboardScreen()
-        : const LoginScreen();
+    final authState = ref.watch(authNotifierProvider);
+    final home = _validating
+        ? const SplashScreen()
+        : authState.user != null
+            ? const DashboardScreen()
+            : const LoginScreen();
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'EBS Lite',
