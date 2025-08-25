@@ -78,3 +78,17 @@ class CompanyResponse {
   factory CompanyResponse.fromJson(Map<String, dynamic> json) =>
       CompanyResponse(Company.fromJson(json));
 }
+
+class MeResponse {
+  final User user;
+  final Company? company;
+
+  MeResponse({required this.user, this.company});
+
+  factory MeResponse.fromJson(Map<String, dynamic> json) => MeResponse(
+        user: User.fromJson(json['user'] as Map<String, dynamic>),
+        company: json['company'] != null
+            ? Company.fromJson(json['company'] as Map<String, dynamic>)
+            : null,
+      );
+}
