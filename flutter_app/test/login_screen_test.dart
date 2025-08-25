@@ -12,12 +12,16 @@ import 'package:flutter_test/flutter_test.dart';
 // invoked by this smoke test.
 class _FakeAuthRepository implements AuthRepository {
   @override
-  Future<LoginResponse> login({String? username, String? email, required String password}) {
+  Future<LoginResponse> login(
+      {String? username, String? email, required String password}) {
     throw UnimplementedError();
   }
 
   @override
-  Future<RegisterResponse> register({required String username, required String email, required String password}) {
+  Future<RegisterResponse> register(
+      {required String username,
+      required String email,
+      required String password}) {
     throw UnimplementedError();
   }
 
@@ -25,7 +29,8 @@ class _FakeAuthRepository implements AuthRepository {
   Future<void> forgotPassword(String email) async {}
 
   @override
-  Future<void> resetPassword({required String token, required String newPassword}) async {}
+  Future<void> resetPassword(
+      {required String token, required String newPassword}) async {}
 
   @override
   Future<Company> createCompany({required String name, String? email}) {
@@ -33,7 +38,7 @@ class _FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<UserResponse> me() {
+  Future<AuthMeResponse> me() {
     throw UnimplementedError();
   }
 }
@@ -53,4 +58,3 @@ void main() {
     expect(find.text('Login'), findsOneWidget);
   });
 }
-
