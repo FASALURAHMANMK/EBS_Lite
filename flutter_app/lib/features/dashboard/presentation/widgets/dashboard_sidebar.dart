@@ -45,8 +45,8 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                   end: Alignment.bottomRight,
                 ),
               ),
-
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   CircleAvatar(
                     radius: 24,
@@ -58,6 +58,7 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Flexible(
@@ -70,14 +71,12 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(height: 4),
                         if (locationState.locations.isNotEmpty)
                           Flexible(
                             child: DropdownButton<Location>(
                               isExpanded: true,
                               value: locationState.selected,
-                              dropdownColor:
-                                  theme.colorScheme.primaryContainer,
+                              dropdownColor: theme.colorScheme.primaryContainer,
                               iconEnabledColor: Colors.white,
                               items: locationState.locations
                                   .map(

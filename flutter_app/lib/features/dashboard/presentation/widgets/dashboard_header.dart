@@ -28,7 +28,6 @@ class DashboardHeader extends ConsumerStatefulWidget
 }
 
 class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -42,7 +41,8 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
       elevation: 0,
       centerTitle: false,
       automaticallyImplyLeading: true,
-      title: const Text('Dashboard'),
+      title: const Text('Dashboard',
+          style: TextStyle(fontWeight: FontWeight.w600)),
       actions: [
         // Online/Sync status chip
         Padding(
@@ -51,18 +51,7 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
             message: widget.isOnline
                 ? 'All changes are synced'
                 : 'Offline — changes will sync later',
-            child: Chip(
-              visualDensity: VisualDensity.compact,
-              backgroundColor: statusColor.withOpacity(0.12),
-              side: BorderSide(color: statusColor.withOpacity(0.24)),
-              labelPadding: const EdgeInsets.symmetric(horizontal: 6),
-              avatar: Icon(statusIcon, size: 18, color: statusColor),
-              label: Text(
-                widget.isOnline ? 'Online' : 'Offline',
-                style: theme.textTheme.labelMedium?.copyWith(
-                    color: statusColor, fontWeight: FontWeight.w700),
-              ),
-            ),
+            child: Icon(statusIcon, color: statusColor),
           ),
         ),
         // Theme toggle
