@@ -25,7 +25,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordFocus = FocusNode();
 
   bool _obscure = true;
-  bool _rememberMe = false;
 
   @override
   void dispose() {
@@ -202,29 +201,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             onFieldSubmitted: (_) => _submit(),
                           ),
                           const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Checkbox.adaptive(
-                                value: _rememberMe,
-                                onChanged: (v) =>
-                                    setState(() => _rememberMe = v ?? true),
-                                materialTapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              const SizedBox(width: 4),
-                              const Text('Remember me'),
-                              const Spacer(),
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                        builder: (_) =>
-                                            const ForgotPasswordScreen()),
-                                  );
-                                },
-                                child: const Text('Forgot password?'),
-                              ),
-                            ],
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          const ForgotPasswordScreen()),
+                                );
+                              },
+                              child: const Text('Forgot password?'),
+                            ),
                           ),
                           const SizedBox(height: 8),
                           if (state.error != null) ...[
