@@ -51,6 +51,30 @@ func (s *CompanyService) GetCompanies() ([]models.Company, error) {
 	return companies, nil
 }
 
+// GetCompanyByID retrieves a single company by its identifier. It returns an
+// error if the company does not exist or is inactive.
+func (s *CompanyService) GetCompanyByID(companyID int) (*models.Company, error) {
+	query := `
+               SELECT company_id, name, logo, address, phone, email, tax_number,
+                      currency_id, is_active, created_at, updated_at
+               FROM companies
+               WHERE company_id = $1 AND is_active = TRUE
+       `
+
+	var company models.Company
+	err := s.db.QueryRow(query, companyID).Scan(
+		&company.CompanyID, &company.Name, &company.Logo, &company.Address,
+		&company.Phone, &company.Email, &company.TaxNumber, &company.CurrencyID,
+		&company.IsActive, &company.CreatedAt, &company.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &company, nil
+}
+
 // func (s *CompanyService) CreateCompany(req *models.CreateCompanyRequest) (*models.Company, error) {
 // 	query := `
 // 		INSERT INTO companies (name, logo, address, phone, email, tax_number, currency_id)

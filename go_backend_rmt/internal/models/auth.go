@@ -7,12 +7,12 @@ import "time"
 // device information. DeviceID identifies the client device for the
 // session tracking functionality.
 type LoginRequest struct {
-        Username           string  `json:"username,omitempty" validate:"required_without=Email,omitempty,min=3"`
-        Email              string  `json:"email,omitempty" validate:"required_without=Username,omitempty,email"`
-        Password           string  `json:"password" validate:"required"`
-        DeviceID           string  `json:"device_id" validate:"required"`
-        DeviceName         *string `json:"device_name,omitempty"`
-        IncludePreferences bool    `json:"include_preferences,omitempty"`
+	Username           string  `json:"username,omitempty" validate:"required_without=Email,omitempty,min=3"`
+	Email              string  `json:"email,omitempty" validate:"required_without=Username,omitempty,email"`
+	Password           string  `json:"password" validate:"required"`
+	DeviceID           string  `json:"device_id" validate:"required"`
+	DeviceName         *string `json:"device_name,omitempty"`
+	IncludePreferences bool    `json:"include_preferences,omitempty"`
 }
 
 // LoginResponse describes the fields returned after a successful login.
@@ -20,11 +20,20 @@ type LoginRequest struct {
 // identifies the device session, and optional company information is
 // included when the user belongs to a company.
 type LoginResponse struct {
-        AccessToken  string       `json:"access_token"`
-        RefreshToken string       `json:"refresh_token"`
-        SessionID    string       `json:"session_id"`
-        User         UserResponse `json:"user"`
-        Company      *Company     `json:"company,omitempty"`
+	AccessToken  string       `json:"access_token"`
+	RefreshToken string       `json:"refresh_token"`
+	SessionID    string       `json:"session_id"`
+	User         UserResponse `json:"user"`
+	Company      *Company     `json:"company,omitempty"`
+}
+
+// AuthMeResponse represents the payload returned by the /auth/me endpoint.
+// It combines the authenticated user's details with their associated company
+// information when available. The company field is nil for users that have not
+// yet created or joined a company.
+type AuthMeResponse struct {
+	User    UserResponse `json:"user"`
+	Company *Company     `json:"company,omitempty"`
 }
 
 type RefreshTokenRequest struct {

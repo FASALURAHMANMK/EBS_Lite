@@ -86,7 +86,9 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 		protected := v1.Group("")
 		protected.Use(middleware.RequireAuth())
 		{
-			// Auth routes that require authentication
+			// Auth routes that require authentication. These routes do not
+			// enforce company access so any authenticated user can retrieve
+			// their profile or terminate their session.
 			authProtected := protected.Group("/auth")
 			{
 				authProtected.GET("/me", authHandler.GetMe)
