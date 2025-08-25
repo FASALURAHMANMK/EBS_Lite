@@ -151,7 +151,6 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                     ),
                     horizontalTitleGap: 12,
                     onTap: () async {
-                      Navigator.pop(context);
                       final confirm = await showDialog<bool>(
                         context: context,
                         builder: (context) => AlertDialog(
