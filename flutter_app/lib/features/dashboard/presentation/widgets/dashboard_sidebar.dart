@@ -1,14 +1,26 @@
 // lib/dashboard/presentation/dashboard_sidebar.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class DashboardSidebar extends StatelessWidget {
+import '../../../auth/controllers/auth_notifier.dart';
+import '../../controllers/location_notifier.dart';
+import '../../data/models.dart';
+
+class DashboardSidebar extends ConsumerStatefulWidget {
   const DashboardSidebar({super.key, this.onSelect});
 
   final ValueChanged<String>? onSelect;
 
   @override
+  ConsumerState<DashboardSidebar> createState() => _DashboardSidebarState();
+}
+
+class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final authState = ref.watch(authNotifierProvider);
+    final locationState = ref.watch(locationNotifierProvider);
 
     return Drawer(
       shape: RoundedRectangleBorder(
@@ -45,13 +57,49 @@ class DashboardSidebar extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      'Company Name',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            authState.company?.name ?? '',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        if (locationState.locations.isNotEmpty)
+                          Flexible(
+                            child: DropdownButton<Location>(
+                              isExpanded: true,
+                              value: locationState.selected,
+                              dropdownColor:
+                                  theme.colorScheme.primaryContainer,
+                              iconEnabledColor: Colors.white,
+                              items: locationState.locations
+                                  .map(
+                                    (l) => DropdownMenuItem<Location>(
+                                      value: l,
+                                      child: Text(
+                                        l.name,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (loc) {
+                                if (loc != null) {
+                                  ref
+                                      .read(locationNotifierProvider.notifier)
+                                      .select(loc);
+                                }
+                              },
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ],
@@ -106,7 +154,7 @@ class DashboardSidebar extends StatelessWidget {
       horizontalTitleGap: 12,
       onTap: () {
         Navigator.pop(context);
-        onSelect?.call(label);
+        widget.onSelect?.call(label);
       },
     );
   }

@@ -39,3 +39,15 @@ class QuickActionCounts {
         expenses: json['expenses'] as int? ?? 0,
       );
 }
+
+class Location {
+  final int locationId;
+  final String name;
+
+  Location({required this.locationId, required this.name});
+
+  factory Location.fromJson(Map<String, dynamic> json) => Location(
+        locationId: json['location_id'] as int,
+        name: json['name'] as String? ?? '',
+      );
+}
