@@ -87,7 +87,8 @@ class AuthRepository {
     await _dio.post('/auth/forgot-password', data: {'email': email});
   }
 
-  Future<void> resetPassword({required String token, required String newPassword}) async {
+  Future<void> resetPassword(
+      {required String token, required String newPassword}) async {
     await _dio.post('/auth/reset-password', data: {
       'token': token,
       'new_password': newPassword,
