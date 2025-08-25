@@ -70,7 +70,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           password: _passwordController.text,
         );
 
-    if (!mounted) return;
+    if (!context.mounted) return;
 
     if (res != null) {
       if (res.company == null) {
@@ -81,6 +81,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         await ref
             .read(locationNotifierProvider.notifier)
             .load(res.company!.companyId);
+        if (!context.mounted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const DashboardScreen()),
         );
@@ -91,7 +92,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen(authNotifierProvider, (prev, next) {
-      if (next.error != null && mounted) {
+      if (next.error != null && context.mounted) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
