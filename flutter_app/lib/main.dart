@@ -82,14 +82,17 @@ class _MyAppState extends ConsumerState<MyApp> {
   void initState() {
     super.initState();
     if (widget.initialUser != null) {
-      ref
-          .read(authNotifierProvider.notifier)
-          .setAuth(user: widget.initialUser!, company: widget.initialCompany);
-      final company = widget.initialCompany;
-      if (company != null) {
-        Future.microtask(() =>
-            ref.read(locationNotifierProvider.notifier).load(company.companyId));
-      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref
+            .read(authNotifierProvider.notifier)
+            .setAuth(user: widget.initialUser!, company: widget.initialCompany);
+        final company = widget.initialCompany;
+        if (company != null) {
+          ref
+              .read(locationNotifierProvider.notifier)
+              .load(company.companyId);
+        }
+      });
     }
     if (widget.needsValidation == true) {
       _validating = true;
