@@ -8,6 +8,7 @@ import 'widgets/dashboard_header.dart';
 import 'widgets/dashboard_sidebar.dart';
 import 'widgets/quick_action_button.dart';
 import '../../auth/controllers/auth_notifier.dart';
+import '../controllers/dashboard_notifier.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -50,6 +51,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final authState = ref.watch(authNotifierProvider);
     final companyName = authState.company?.name ?? 'Company';
+    final dashboardState = ref.watch(dashboardNotifierProvider);
+    final quickCounts = dashboardState.quickActions;
 
     final isWide = width >= 1000; // rail for desktop/tablet, drawer for phones
     final railExtended = width >= 1300;
@@ -122,11 +125,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ],
       ),
       floatingActionButton: QuickActionButton(
-        actions: const [
-          QuickAction(icon: Icons.point_of_sale_rounded, label: 'Sale'),
-          QuickAction(icon: Icons.shopping_cart_rounded, label: 'Purchase'),
-          QuickAction(icon: Icons.payments_rounded, label: 'Collection'),
-          QuickAction(icon: Icons.money_off_rounded, label: 'Expense'),
+        actions: [
+          QuickAction(
+              icon: Icons.point_of_sale_rounded,
+              label: 'Sale (${quickCounts?.sales ?? 0})'),
+          QuickAction(
+              icon: Icons.shopping_cart_rounded,
+              label: 'Purchase (${quickCounts?.purchases ?? 0})'),
+          QuickAction(
+              icon: Icons.payments_rounded,
+              label: 'Collection (${quickCounts?.collections ?? 0})'),
+          QuickAction(
+              icon: Icons.money_off_rounded,
+              label: 'Expense (${quickCounts?.expenses ?? 0})'),
         ],
         onOpenChanged: (open) {
           // Example: dim app bar or log analytics here.
