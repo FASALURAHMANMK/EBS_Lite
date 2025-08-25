@@ -170,7 +170,8 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                         ),
                       );
                       if (confirm == true) {
-                        Navigator.popUntil(context, (r) => r.isFirst);
+                        await ref.read(authNotifierProvider.notifier).logout(context);
+                        Navigator.pop(context);
                       }
                     },
                   ),
