@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -13,6 +15,7 @@ class AuthRepository {
   static const accessTokenKey = 'access_token';
   static const refreshTokenKey = 'refresh_token';
   static const sessionIdKey = 'session_id';
+  static const companyKey = 'company';
 
   Future<String> _getDeviceId() async {
     var id = _prefs.getString(_deviceKey);
@@ -45,6 +48,17 @@ class AuthRepository {
     await _prefs.setString(accessTokenKey, data.accessToken);
     await _prefs.setString(refreshTokenKey, data.refreshToken);
     await _prefs.setString(sessionIdKey, data.sessionId);
+    if (data.company != null) {
+      await _prefs.setString(
+        companyKey,
+        jsonEncode({
+          'company_id': data.company!.companyId,
+          'name': data.company!.name,
+        }),
+      );
+    } else {
+      await _prefs.remove(companyKey);
+    }
     return data;
   }
 
@@ -76,14 +90,34 @@ class AuthRepository {
   Future<Company> createCompany({required String name, String? email}) async {
     final response = await _dio.post('/companies',
         data: {'name': name, if (email != null) 'email': email});
-    return Company.fromJson(
-        response.data['data'] as Map<String, dynamic>);
+    final company =
+        Company.fromJson(response.data['data'] as Map<String, dynamic>);
+    await _prefs.setString(
+      companyKey,
+      jsonEncode({
+        'company_id': company.companyId,
+        'name': company.name,
+      }),
+    );
+    return company;
   }
 
   Future<MeResponse> me() async {
     final response = await _dio.get('/auth/me');
-    return MeResponse.fromJson(
+    final data = MeResponse.fromJson(
       response.data['data'] as Map<String, dynamic>,
     );
+    if (data.company != null) {
+      await _prefs.setString(
+        companyKey,
+        jsonEncode({
+          'company_id': data.company!.companyId,
+          'name': data.company!.name,
+        }),
+      );
+    } else {
+      await _prefs.remove(companyKey);
+    }
+    return data;
   }
 }
