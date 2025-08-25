@@ -31,6 +31,11 @@ class _FakeAuthRepository implements AuthRepository {
   Future<Company> createCompany({required String name, String? email}) {
     throw UnimplementedError();
   }
+
+  @override
+  Future<MeResponse> me() {
+    throw UnimplementedError();
+  }
 }
 
 void main() {
