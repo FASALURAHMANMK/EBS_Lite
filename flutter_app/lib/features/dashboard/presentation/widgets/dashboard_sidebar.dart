@@ -121,6 +121,59 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                   _item(context, Icons.group_rounded, 'HR'),
                   const Divider(height: 24),
                   _item(context, Icons.settings_rounded, 'Settings'),
+                  ListTile(
+                    leading: Icon(Icons.help_outline_rounded,
+                        color: theme.colorScheme.primary),
+                    title: Text(
+                      'Help & support',
+                      style: theme.textTheme.bodyLarge
+                          ?.copyWith(fontWeight: FontWeight.w500),
+                    ),
+                    horizontalTitleGap: 12,
+                    onTap: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(const SnackBar(
+                          content: Text(
+                              'Help is on the way! (wire up your help center)'),
+                          behavior: SnackBarBehavior.floating,
+                        ));
+                    },
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.logout_rounded,
+                        color: theme.colorScheme.primary),
+                    title: Text(
+                      'Logout',
+                      style: theme.textTheme.bodyLarge
+                          ?.copyWith(fontWeight: FontWeight.w500),
+                    ),
+                    horizontalTitleGap: 12,
+                    onTap: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Logout'),
+                          content: const Text(
+                              'Are you sure you want to logout?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('Logout'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        Navigator.popUntil(context, (r) => r.isFirst);
+                      }
+                    },
+                  ),
                 ],
               ),
             ),
