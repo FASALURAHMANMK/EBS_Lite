@@ -109,6 +109,17 @@ class AuthRepository {
     return company;
   }
 
+  Future<void> logout() async {
+    try {
+      await _dio.post('/auth/logout');
+    } finally {
+      await _prefs.remove(accessTokenKey);
+      await _prefs.remove(refreshTokenKey);
+      await _prefs.remove(sessionIdKey);
+      await _prefs.remove(companyKey);
+    }
+  }
+
   Future<AuthMeResponse> me() async {
     final response = await _dio.get('/auth/me');
     final data =

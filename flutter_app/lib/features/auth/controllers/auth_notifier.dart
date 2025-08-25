@@ -1,8 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/auth_repository.dart';
 import '../data/models.dart';
 import '../../../core/api_client.dart';
+import '../presentation/login_screen.dart';
 
 class AuthState {
   final bool isLoading;
@@ -107,6 +109,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   void setAuth({required User user, Company? company}) {
     state = state.copyWith(user: user, company: company);
+  }
+
+  Future<void> logout(BuildContext context) async {
+    await _repository.logout();
+    state = const AuthState();
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
   }
 }
 
