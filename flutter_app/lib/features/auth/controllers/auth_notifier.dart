@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/auth_repository.dart';
 import '../data/models.dart';
+import '../../../core/api_client.dart';
 
 class AuthState {
   final bool isLoading;
@@ -110,5 +111,7 @@ final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref
 });
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  throw UnimplementedError();
+  final dio = ref.watch(dioProvider);
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return AuthRepository(dio, prefs);
 });

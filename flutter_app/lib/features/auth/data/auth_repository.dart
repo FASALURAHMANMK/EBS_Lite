@@ -74,20 +74,14 @@ class AuthRepository {
   }
 
   Future<Company> createCompany({required String name, String? email}) async {
-    final token = _prefs.getString(accessTokenKey);
     final response = await _dio.post('/companies',
-        data: {'name': name, if (email != null) 'email': email},
-        options: Options(headers: {'Authorization': 'Bearer $token'}));
+        data: {'name': name, if (email != null) 'email': email});
     return Company.fromJson(
         response.data['data'] as Map<String, dynamic>);
   }
 
   Future<MeResponse> me() async {
-    final token = _prefs.getString(accessTokenKey);
-    final response = await _dio.get(
-      '/auth/me',
-      options: Options(headers: {'Authorization': 'Bearer $token'}),
-    );
+    final response = await _dio.get('/auth/me');
     return MeResponse.fromJson(
       response.data['data'] as Map<String, dynamic>,
     );

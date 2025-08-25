@@ -1,10 +1,10 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/theme_notifier.dart';
 import 'core/app_theme.dart';
+import 'core/api_client.dart';
 import 'features/auth/controllers/auth_notifier.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/login_screen.dart';
@@ -14,8 +14,8 @@ import 'features/dashboard/presentation/dashboard_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
-  final dio = Dio(BaseOptions(baseUrl: 'http://192.168.100.128:8080/api/v1'));
-  final authRepo = AuthRepository(dio, prefs);
+  final apiClient = ApiClient(prefs);
+  final authRepo = AuthRepository(apiClient.dio, prefs);
   User? user;
   Company? company;
   final accessToken = prefs.getString(AuthRepository.accessTokenKey);
@@ -35,7 +35,8 @@ void main() async {
   runApp(
     ProviderScope(
       overrides: [
-        authRepositoryProvider.overrideWithValue(authRepo),
+        dioProvider.overrideWithValue(apiClient.dio),
+        sharedPreferencesProvider.overrideWithValue(prefs),
       ],
       child: MyApp(initialUser: user, initialCompany: company),
     ),
