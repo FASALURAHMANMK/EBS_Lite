@@ -33,7 +33,7 @@ class _FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<MeResponse> me() {
+  Future<UserResponse> me() {
     throw UnimplementedError();
   }
 }

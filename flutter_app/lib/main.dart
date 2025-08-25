@@ -12,6 +12,7 @@ import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/data/models.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
+import 'package:dio/dio.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,10 +21,11 @@ void main() async {
   final authRepo = AuthRepository(apiClient.dio, prefs);
   User? user;
   Company? company;
-  final storedCompany = prefs.getString(AuthRepository.companyKey);
+  var storedCompany = prefs.getString(AuthRepository.companyKey);
   if (storedCompany != null) {
     try {
-      company = Company.fromJson(jsonDecode(storedCompany) as Map<String, dynamic>);
+      company =
+          Company.fromJson(jsonDecode(storedCompany) as Map<String, dynamic>);
     } catch (_) {
       await prefs.remove(AuthRepository.companyKey);
     }
@@ -34,12 +36,26 @@ void main() async {
   if (accessToken != null && refreshToken != null && sessionId != null) {
     try {
       final res = await authRepo.me();
-      user = res.user;
-      company = res.company;
+      user = res.toUser();
+      storedCompany = prefs.getString(AuthRepository.companyKey);
+      if (storedCompany != null) {
+        try {
+          company = Company.fromJson(
+              jsonDecode(storedCompany) as Map<String, dynamic>);
+        } catch (_) {
+          await prefs.remove(AuthRepository.companyKey);
+        }
+      } else {
+        company = null;
+      }
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        await prefs.remove(AuthRepository.accessTokenKey);
+        await prefs.remove(AuthRepository.refreshTokenKey);
+        await prefs.remove(AuthRepository.sessionIdKey);
+      }
     } catch (_) {
-      await prefs.remove(AuthRepository.accessTokenKey);
-      await prefs.remove(AuthRepository.refreshTokenKey);
-      await prefs.remove(AuthRepository.sessionIdKey);
+      // Parsing or other errors should not clear tokens
     }
   }
   runApp(
