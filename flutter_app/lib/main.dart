@@ -20,8 +20,17 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   final apiClient = ApiClient(prefs);
   final authRepo = AuthRepository(apiClient.dio, prefs);
+  const userKey = 'user';
   User? user;
   Company? company;
+  var storedUser = prefs.getString(userKey);
+  if (storedUser != null) {
+    try {
+      user = User.fromJson(jsonDecode(storedUser) as Map<String, dynamic>);
+    } catch (_) {
+      await prefs.remove(userKey);
+    }
+  }
   var storedCompany = prefs.getString(AuthRepository.companyKey);
   if (storedCompany != null) {
     try {
@@ -39,16 +48,37 @@ void main() async {
       final res = await authRepo.me();
       user = res.user.toUser();
       company = res.company;
+      await prefs.setString(
+        userKey,
+        jsonEncode({
+          'user_id': user.userId,
+          'username': user.username,
+          'email': user.email,
+        }),
+      );
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
         await prefs.remove(AuthRepository.accessTokenKey);
         await prefs.remove(AuthRepository.refreshTokenKey);
         await prefs.remove(AuthRepository.sessionIdKey);
+        await prefs.remove(userKey);
+        user = null;
+        company = null;
+      } else {
+        debugPrint('authRepo.me error: $e');
+        // For other errors, keep tokens and any cached user/company info
       }
-      // For other errors, keep tokens and any cached company info
-    } catch (_) {
+    } catch (e) {
+      debugPrint('authRepo.me error: $e');
       // Parsing or other errors should not clear tokens
     }
+  } else {
+    await prefs.remove(AuthRepository.accessTokenKey);
+    await prefs.remove(AuthRepository.refreshTokenKey);
+    await prefs.remove(AuthRepository.sessionIdKey);
+    await prefs.remove(userKey);
+    user = null;
+    company = null;
   }
   runApp(
     ProviderScope(
