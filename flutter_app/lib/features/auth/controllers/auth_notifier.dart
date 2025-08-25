@@ -39,11 +39,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<LoginResponse?> login({String? username, String? email, required String password}) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final res = await _repository.login(username: username, email: email, password: password);
+      final res =
+          await _repository.login(username: username, email: email, password: password);
       state = state.copyWith(isLoading: false, user: res.user, company: res.company);
       return res;
+    } on AuthException catch (ex) {
+      state = state.copyWith(isLoading: false, error: ex.message);
+      return null;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(
+          isLoading: false, error: 'Login failed. Please try again later.');
       return null;
     }
   }
