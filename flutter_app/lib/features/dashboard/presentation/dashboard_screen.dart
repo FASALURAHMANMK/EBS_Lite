@@ -7,7 +7,6 @@ import 'widgets/dashboard_content.dart';
 import 'widgets/dashboard_header.dart';
 import 'widgets/dashboard_sidebar.dart';
 import 'widgets/quick_action_button.dart';
-import '../../auth/controllers/auth_notifier.dart';
 import '../controllers/dashboard_notifier.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -49,8 +48,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final media = MediaQuery.of(context);
     final width = media.size.width;
 
-    final authState = ref.watch(authNotifierProvider);
-    final companyName = authState.company?.name ?? 'Company';
     final dashboardState = ref.watch(dashboardNotifierProvider);
     final quickCounts = dashboardState.quickActions;
 
@@ -75,7 +72,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               behavior: SnackBarBehavior.floating,
             ));
         },
-        companyName: companyName,
         isOnline: true,
       ),
       drawer: isWide
