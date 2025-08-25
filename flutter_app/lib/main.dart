@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,6 +20,14 @@ void main() async {
   final authRepo = AuthRepository(apiClient.dio, prefs);
   User? user;
   Company? company;
+  final storedCompany = prefs.getString(AuthRepository.companyKey);
+  if (storedCompany != null) {
+    try {
+      company = Company.fromJson(jsonDecode(storedCompany) as Map<String, dynamic>);
+    } catch (_) {
+      await prefs.remove(AuthRepository.companyKey);
+    }
+  }
   final accessToken = prefs.getString(AuthRepository.accessTokenKey);
   final refreshToken = prefs.getString(AuthRepository.refreshTokenKey);
   final sessionId = prefs.getString(AuthRepository.sessionIdKey);

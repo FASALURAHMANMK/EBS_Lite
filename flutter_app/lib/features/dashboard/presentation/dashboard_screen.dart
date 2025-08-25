@@ -7,6 +7,7 @@ import 'widgets/dashboard_content.dart';
 import 'widgets/dashboard_header.dart';
 import 'widgets/dashboard_sidebar.dart';
 import 'widgets/quick_action_button.dart';
+import '../../auth/controllers/auth_notifier.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -47,6 +48,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final media = MediaQuery.of(context);
     final width = media.size.width;
 
+    final authState = ref.watch(authNotifierProvider);
+    final companyName = authState.company?.name ?? 'Company';
+
     final isWide = width >= 1000; // rail for desktop/tablet, drawer for phones
     final railExtended = width >= 1300;
 
@@ -68,7 +72,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               behavior: SnackBarBehavior.floating,
             ));
         },
-        companyName: 'Company',
+        companyName: companyName,
         isOnline: true,
       ),
       drawer: isWide
