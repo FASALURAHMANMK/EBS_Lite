@@ -111,13 +111,13 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 		return
 	}
 
-	user, err := h.authService.GetMe(userID)
+	me, err := h.authService.GetMe(userID)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get user details", err)
 		return
 	}
 
-	utils.SuccessResponse(c, "User details retrieved successfully", user)
+	utils.SuccessResponse(c, "User details retrieved successfully", me)
 }
 
 // POST /auth/forgot-password

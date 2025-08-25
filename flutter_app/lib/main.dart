@@ -37,24 +37,15 @@ void main() async {
   if (accessToken != null && refreshToken != null && sessionId != null) {
     try {
       final res = await authRepo.me();
-      user = res.toUser();
-      storedCompany = prefs.getString(AuthRepository.companyKey);
-      if (storedCompany != null) {
-        try {
-          company = Company.fromJson(
-              jsonDecode(storedCompany) as Map<String, dynamic>);
-        } catch (_) {
-          await prefs.remove(AuthRepository.companyKey);
-        }
-      } else {
-        company = null;
-      }
+      user = res.user.toUser();
+      company = res.company;
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
         await prefs.remove(AuthRepository.accessTokenKey);
         await prefs.remove(AuthRepository.refreshTokenKey);
         await prefs.remove(AuthRepository.sessionIdKey);
       }
+      // For other errors, keep tokens and any cached company info
     } catch (_) {
       // Parsing or other errors should not clear tokens
     }

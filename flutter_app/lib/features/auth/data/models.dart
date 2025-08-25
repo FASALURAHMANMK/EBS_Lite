@@ -114,6 +114,20 @@ class LoginResponse {
       );
 }
 
+class AuthMeResponse {
+  final UserResponse user;
+  final Company? company;
+
+  AuthMeResponse({required this.user, this.company});
+
+  factory AuthMeResponse.fromJson(Map<String, dynamic> json) => AuthMeResponse(
+        user: UserResponse.fromJson(json['user'] as Map<String, dynamic>),
+        company: json['company'] != null
+            ? Company.fromJson(json['company'] as Map<String, dynamic>)
+            : null,
+      );
+}
+
 class RegisterResponse {
   final int userId;
   final String username;

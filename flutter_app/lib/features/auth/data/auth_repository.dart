@@ -102,34 +102,21 @@ class AuthRepository {
     return company;
   }
 
-  Future<UserResponse> me() async {
+  Future<AuthMeResponse> me() async {
     final response = await _dio.get('/auth/me');
-    final user =
-        UserResponse.fromJson(response.data['data'] as Map<String, dynamic>);
-    Company? company;
-    if (user.companyId != null) {
-      final companiesRes = await _dio.get('/companies');
-      final list = companiesRes.data['data'] as List<dynamic>;
-      try {
-        final companyJson = list
-            .cast<Map<String, dynamic>>()
-            .firstWhere((c) => c['company_id'] == user.companyId);
-        company = Company.fromJson(companyJson);
-      } catch (_) {
-        company = null;
-      }
-    }
-    if (company != null) {
+    final data =
+        AuthMeResponse.fromJson(response.data['data'] as Map<String, dynamic>);
+    if (data.company != null) {
       await _prefs.setString(
         companyKey,
         jsonEncode({
-          'company_id': company.companyId,
-          'name': company.name,
+          'company_id': data.company!.companyId,
+          'name': data.company!.name,
         }),
       );
     } else {
       await _prefs.remove(companyKey);
     }
-    return user;
+    return data;
   }
 }

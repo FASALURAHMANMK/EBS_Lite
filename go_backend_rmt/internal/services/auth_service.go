@@ -13,7 +13,7 @@ import (
 )
 
 type AuthService struct {
-        db *sql.DB
+	db *sql.DB
 }
 
 func NewAuthService() *AuthService {
@@ -23,22 +23,22 @@ func NewAuthService() *AuthService {
 }
 
 func (s *AuthService) Login(req *models.LoginRequest, ipAddress, userAgent string) (*models.LoginResponse, error) {
-        // Get user by username or email
-        var (
-                user *models.User
-                err  error
-        )
-        if req.Username != "" {
-                user, err = s.getUserByUsername(req.Username)
-        } else {
-                user, err = s.getUserByEmail(req.Email)
-        }
-        if err != nil {
-                if err == sql.ErrNoRows {
-                        return nil, fmt.Errorf("invalid credentials")
-                }
-                return nil, fmt.Errorf("failed to get user: %w", err)
-        }
+	// Get user by username or email
+	var (
+		user *models.User
+		err  error
+	)
+	if req.Username != "" {
+		user, err = s.getUserByUsername(req.Username)
+	} else {
+		user, err = s.getUserByEmail(req.Email)
+	}
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("invalid credentials")
+		}
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
 
 	// Check if user is active
 	if !user.IsActive || user.IsLocked {
@@ -137,49 +137,49 @@ func (s *AuthService) Login(req *models.LoginRequest, ipAddress, userAgent strin
 		}
 	}
 
-        userResponse := models.UserResponse{
-                UserID:            user.UserID,
-                Username:          user.Username,
-                Email:             user.Email,
-                FirstName:         user.FirstName,
-                LastName:          user.LastName,
-                Phone:             user.Phone,
-                RoleID:            user.RoleID,
-                LocationID:        user.LocationID,
-                CompanyID:         user.CompanyID,
-                IsActive:          user.IsActive,
-                IsLocked:          user.IsLocked,
-                PreferredLanguage: user.PreferredLanguage,
-                SecondaryLanguage: user.SecondaryLanguage,
-                LastLogin:         user.LastLogin,
-                Permissions:       permissions,
-                Preferences:       prefs,
-        }
+	userResponse := models.UserResponse{
+		UserID:            user.UserID,
+		Username:          user.Username,
+		Email:             user.Email,
+		FirstName:         user.FirstName,
+		LastName:          user.LastName,
+		Phone:             user.Phone,
+		RoleID:            user.RoleID,
+		LocationID:        user.LocationID,
+		CompanyID:         user.CompanyID,
+		IsActive:          user.IsActive,
+		IsLocked:          user.IsLocked,
+		PreferredLanguage: user.PreferredLanguage,
+		SecondaryLanguage: user.SecondaryLanguage,
+		LastLogin:         user.LastLogin,
+		Permissions:       permissions,
+		Preferences:       prefs,
+	}
 
-        var company *models.Company
-        if user.CompanyID != nil {
-                company, _ = s.getCompanyByID(*user.CompanyID)
-        }
+	var company *models.Company
+	if user.CompanyID != nil {
+		company, _ = s.getCompanyByID(*user.CompanyID)
+	}
 
-        return &models.LoginResponse{
-                AccessToken:  accessToken,
-                RefreshToken: refreshToken,
-                SessionID:    sessionID,
-                User:         userResponse,
-                Company:      company,
-        }, nil
+	return &models.LoginResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		SessionID:    sessionID,
+		User:         userResponse,
+		Company:      company,
+	}, nil
 }
 
 // Logout deactivates a device session for the given user
 func (s *AuthService) Logout(userID int, sessionID string) error {
-       if sessionID == "" {
-               return fmt.Errorf("session ID required")
-       }
-       _, err := s.db.Exec(`UPDATE device_sessions SET is_active=FALSE WHERE user_id=$1 AND session_id=$2`, userID, sessionID)
-       if err != nil {
-               return fmt.Errorf("failed to revoke session: %w", err)
-       }
-       return nil
+	if sessionID == "" {
+		return fmt.Errorf("session ID required")
+	}
+	_, err := s.db.Exec(`UPDATE device_sessions SET is_active=FALSE WHERE user_id=$1 AND session_id=$2`, userID, sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to revoke session: %w", err)
+	}
+	return nil
 }
 
 func (s *AuthService) RefreshToken(req *models.RefreshTokenRequest) (*models.RefreshTokenResponse, error) {
@@ -287,7 +287,7 @@ func (s *AuthService) ResetPassword(req *models.ResetPasswordRequest) error {
 	return nil
 }
 
-func (s *AuthService) GetMe(userID int) (*models.UserResponse, error) {
+func (s *AuthService) GetMe(userID int) (*models.AuthMeResponse, error) {
 	user, err := s.getUserByID(userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -305,7 +305,7 @@ func (s *AuthService) GetMe(userID int) (*models.UserResponse, error) {
 		prefs = map[string]string{}
 	}
 
-	return &models.UserResponse{
+	userResp := models.UserResponse{
 		UserID:            user.UserID,
 		Username:          user.Username,
 		Email:             user.Email,
@@ -322,6 +322,17 @@ func (s *AuthService) GetMe(userID int) (*models.UserResponse, error) {
 		LastLogin:         user.LastLogin,
 		Permissions:       permissions,
 		Preferences:       prefs,
+	}
+
+	var company *models.Company
+	if user.CompanyID != nil {
+		companySvc := NewCompanyService()
+		company, _ = companySvc.GetCompanyByID(*user.CompanyID)
+	}
+
+	return &models.AuthMeResponse{
+		User:    userResp,
+		Company: company,
 	}, nil
 }
 
@@ -349,7 +360,7 @@ func (s *AuthService) getUserByEmail(email string) (*models.User, error) {
 }
 
 func (s *AuthService) getUserByUsername(username string) (*models.User, error) {
-        query := `
+	query := `
                 SELECT user_id, company_id, location_id, role_id, username, email, password_hash,
                            first_name, last_name, phone, preferred_language, secondary_language,
                            max_allowed_devices, is_locked, is_active, last_login, sync_status,
@@ -358,34 +369,34 @@ func (s *AuthService) getUserByUsername(username string) (*models.User, error) {
                 WHERE username = $1 AND is_deleted = FALSE
         `
 
-        var user models.User
-        err := s.db.QueryRow(query, username).Scan(
-                &user.UserID, &user.CompanyID, &user.LocationID, &user.RoleID,
-                &user.Username, &user.Email, &user.PasswordHash, &user.FirstName,
-                &user.LastName, &user.Phone, &user.PreferredLanguage, &user.SecondaryLanguage,
-                &user.MaxAllowedDevices, &user.IsLocked, &user.IsActive, &user.LastLogin,
-                &user.SyncStatus, &user.CreatedAt, &user.UpdatedAt, &user.IsDeleted,
-        )
+	var user models.User
+	err := s.db.QueryRow(query, username).Scan(
+		&user.UserID, &user.CompanyID, &user.LocationID, &user.RoleID,
+		&user.Username, &user.Email, &user.PasswordHash, &user.FirstName,
+		&user.LastName, &user.Phone, &user.PreferredLanguage, &user.SecondaryLanguage,
+		&user.MaxAllowedDevices, &user.IsLocked, &user.IsActive, &user.LastLogin,
+		&user.SyncStatus, &user.CreatedAt, &user.UpdatedAt, &user.IsDeleted,
+	)
 
-        return &user, err
+	return &user, err
 }
 
 func (s *AuthService) getCompanyByID(companyID int) (*models.Company, error) {
-        query := `
+	query := `
                 SELECT company_id, name, logo, address, phone, email, tax_number,
                        currency_id, is_active, created_at, updated_at
                 FROM companies
                 WHERE company_id = $1 AND is_active = TRUE
         `
 
-        var company models.Company
-        err := s.db.QueryRow(query, companyID).Scan(
-                &company.CompanyID, &company.Name, &company.Logo, &company.Address,
-                &company.Phone, &company.Email, &company.TaxNumber, &company.CurrencyID,
-                &company.IsActive, &company.CreatedAt, &company.UpdatedAt,
-        )
+	var company models.Company
+	err := s.db.QueryRow(query, companyID).Scan(
+		&company.CompanyID, &company.Name, &company.Logo, &company.Address,
+		&company.Phone, &company.Email, &company.TaxNumber, &company.CurrencyID,
+		&company.IsActive, &company.CreatedAt, &company.UpdatedAt,
+	)
 
-        return &company, err
+	return &company, err
 }
 
 func (s *AuthService) getUserByID(userID int) (*models.User, error) {
