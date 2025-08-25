@@ -13,6 +13,7 @@ import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/data/models.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'package:dio/dio.dart';
+import 'features/dashboard/controllers/location_notifier.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -86,6 +87,11 @@ class _MyAppState extends ConsumerState<MyApp> {
       ref
           .read(authNotifierProvider.notifier)
           .setAuth(user: widget.initialUser!, company: widget.initialCompany);
+      final company = widget.initialCompany;
+      if (company != null) {
+        Future.microtask(() =>
+            ref.read(locationNotifierProvider.notifier).load(company.companyId));
+      }
     }
   }
 

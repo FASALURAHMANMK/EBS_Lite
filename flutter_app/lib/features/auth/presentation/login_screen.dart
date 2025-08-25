@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../controllers/auth_notifier.dart';
 import '../../dashboard/presentation/dashboard_screen.dart';
+import '../../dashboard/controllers/location_notifier.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 import 'create_company_screen.dart';
@@ -77,6 +78,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           MaterialPageRoute(builder: (_) => const CreateCompanyScreen()),
         );
       } else {
+        await ref
+            .read(locationNotifierProvider.notifier)
+            .load(res.company!.companyId);
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const DashboardScreen()),
         );
