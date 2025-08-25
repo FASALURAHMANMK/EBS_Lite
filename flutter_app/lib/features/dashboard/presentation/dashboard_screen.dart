@@ -63,15 +63,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Scaffold(
       appBar: DashboardHeader(
         onToggleTheme: () => themeNotifier.toggle(),
-        onLogout: () => Navigator.popUntil(context, (r) => r.isFirst),
-        onHelp: () {
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(const SnackBar(
-              content: Text('Help is on the way! (wire up your help center)'),
-              behavior: SnackBarBehavior.floating,
-            ));
-        },
         isOnline: true,
       ),
       drawer: isWide

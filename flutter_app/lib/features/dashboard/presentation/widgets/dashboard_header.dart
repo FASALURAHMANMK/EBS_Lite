@@ -8,8 +8,7 @@ class DashboardHeader extends ConsumerStatefulWidget
     super.key,
     this.isOnline = true,
     this.onToggleTheme,
-    this.onHelp,
-    this.onLogout,
+    this.onNotifications,
   });
 
   /// Realtime/Sync status
@@ -17,8 +16,7 @@ class DashboardHeader extends ConsumerStatefulWidget
 
   /// Callbacks
   final VoidCallback? onToggleTheme;
-  final VoidCallback? onHelp;
-  final VoidCallback? onLogout;
+  final VoidCallback? onNotifications;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -61,47 +59,11 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
               Icon(isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded),
           onPressed: widget.onToggleTheme,
         ),
-        // Profile / Logout overflow
-        PopupMenuButton<_HeaderMenu>(
-          tooltip: 'Account',
-          icon: const Icon(Icons.account_circle_rounded),
-          onSelected: (v) {
-            if (v == _HeaderMenu.logout) {
-              widget.onLogout?.call();
-            } else if (v == _HeaderMenu.help) {
-              widget.onHelp?.call();
-            }
-          },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: _HeaderMenu.profile,
-              child: ListTile(
-                leading: Icon(Icons.person_rounded),
-                title: Text('Profile'),
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-              ),
-            ),
-            const PopupMenuDivider(),
-            const PopupMenuItem(
-              value: _HeaderMenu.help,
-              child: ListTile(
-                leading: Icon(Icons.help_outline_rounded),
-                title: Text('Help & support'),
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-              ),
-            ),
-            const PopupMenuItem(
-              value: _HeaderMenu.logout,
-              child: ListTile(
-                leading: Icon(Icons.logout_rounded),
-                title: Text('Logout'),
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-              ),
-            ),
-          ],
+        // Notifications
+        IconButton(
+          tooltip: 'Notifications',
+          icon: const Icon(Icons.notifications_none_rounded),
+          onPressed: widget.onNotifications,
         ),
         const SizedBox(width: 4),
       ],
@@ -112,5 +74,3 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
     );
   }
 }
-
-enum _HeaderMenu { profile, help, logout }
