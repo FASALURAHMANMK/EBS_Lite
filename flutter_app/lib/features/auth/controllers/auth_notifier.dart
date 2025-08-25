@@ -98,6 +98,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return null;
     }
   }
+
+  void setAuth({required User user, Company? company}) {
+    state = state.copyWith(user: user, company: company);
+  }
 }
 
 final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {

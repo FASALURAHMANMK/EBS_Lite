@@ -10,8 +10,9 @@ class AuthRepository {
   final SharedPreferences _prefs;
 
   static const _deviceKey = 'device_id';
-  static const _accessTokenKey = 'access_token';
-  static const _refreshTokenKey = 'refresh_token';
+  static const accessTokenKey = 'access_token';
+  static const refreshTokenKey = 'refresh_token';
+  static const sessionIdKey = 'session_id';
 
   Future<String> _getDeviceId() async {
     var id = _prefs.getString(_deviceKey);
@@ -41,8 +42,9 @@ class AuthRepository {
     final response = await _dio.post('/auth/login', data: payload);
     final data =
         LoginResponse.fromJson(response.data['data'] as Map<String, dynamic>);
-    await _prefs.setString(_accessTokenKey, data.accessToken);
-    await _prefs.setString(_refreshTokenKey, data.refreshToken);
+    await _prefs.setString(accessTokenKey, data.accessToken);
+    await _prefs.setString(refreshTokenKey, data.refreshToken);
+    await _prefs.setString(sessionIdKey, data.sessionId);
     return data;
   }
 
@@ -72,11 +74,22 @@ class AuthRepository {
   }
 
   Future<Company> createCompany({required String name, String? email}) async {
-    final token = _prefs.getString(_accessTokenKey);
+    final token = _prefs.getString(accessTokenKey);
     final response = await _dio.post('/companies',
         data: {'name': name, if (email != null) 'email': email},
         options: Options(headers: {'Authorization': 'Bearer $token'}));
     return Company.fromJson(
         response.data['data'] as Map<String, dynamic>);
+  }
+
+  Future<MeResponse> me() async {
+    final token = _prefs.getString(accessTokenKey);
+    final response = await _dio.get(
+      '/auth/me',
+      options: Options(headers: {'Authorization': 'Bearer $token'}),
+    );
+    return MeResponse.fromJson(
+      response.data['data'] as Map<String, dynamic>,
+    );
   }
 }
