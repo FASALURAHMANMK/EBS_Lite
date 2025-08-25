@@ -173,7 +173,6 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                         await ref
                             .read(authNotifierProvider.notifier)
                             .logout(context);
-                        Navigator.pop(context);
                       }
                     },
                   ),
