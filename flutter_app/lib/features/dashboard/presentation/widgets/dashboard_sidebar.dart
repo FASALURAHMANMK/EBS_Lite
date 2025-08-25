@@ -156,8 +156,8 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                         context: context,
                         builder: (context) => AlertDialog(
                           title: const Text('Logout'),
-                          content: const Text(
-                              'Are you sure you want to logout?'),
+                          content:
+                              const Text('Are you sure you want to logout?'),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(context, false),
