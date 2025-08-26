@@ -13,6 +13,8 @@ Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
   - data (object)
+    - status (string)
+    - message (string)
   - error (string, optional)
   - meta (object, optional)
 
@@ -84,7 +86,7 @@ Standard `APIResponse` with fields:
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-  - data (object)
+  - data (empty object)
   - error (string, optional)
   - meta (object, optional)
 
@@ -102,7 +104,7 @@ Standard `APIResponse` with fields:
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-  - data (object)
+  - data (empty object)
   - error (string, optional)
   - meta (object, optional)
 
@@ -156,7 +158,9 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-  - data (object)
+  - data (AuthMeResponse)
+    - user (UserResponse)
+    - company (Company, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -172,7 +176,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-  - data (object)
+  - data (empty object)
   - error (string, optional)
   - meta (object, optional)
 
@@ -242,7 +246,13 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-  - data (object)
+  - data (DashboardMetrics)
+    - credit_outstanding (number)
+    - inventory_value (number)
+    - today_sales (number)
+    - today_purchases (number)
+    - cash_in (number)
+    - cash_out (number)
   - error (string, optional)
   - meta (object, optional)
 
@@ -258,7 +268,14 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-  - data (object)
+  - data (QuickActionCounts)
+    - sales_today (int)
+    - purchases_today (int)
+    - collections_today (int)
+    - payments_today (int)
+    - receipts_today (int)
+    - journals_today (int)
+    - low_stock_items (int)
   - error (string, optional)
   - meta (object, optional)
 
