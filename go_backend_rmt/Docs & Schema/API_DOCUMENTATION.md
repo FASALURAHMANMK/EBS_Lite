@@ -728,7 +728,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-- data (Permission)
+- data ([]Permission)
     - permission_id (int)
     - name (string)
     - description (string)
