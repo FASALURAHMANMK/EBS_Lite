@@ -119,7 +119,7 @@ Standard `APIResponse` with fields:
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-- data (RefreshTokenResponse)
+ - data (RefreshTokenResponse)
     - access_token (string)
   - error (string, optional)
   - meta (object, optional)
@@ -136,8 +136,11 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-- data (RefreshTokenResponse)
-    - access_token (string)
+ - data ([]Language)
+    - language_code (string)
+    - language_name (string)
+    - is_active (bool)
+    - created_at (time.Time)
   - error (string, optional)
   - meta (object, optional)
 
@@ -278,7 +281,6 @@ Standard `APIResponse` with fields:
     - role_id,omitempty (*int)
     - username (string)
     - email (string)
-    - - (string)
     - first_name,omitempty (*string)
     - last_name,omitempty (*string)
     - phone,omitempty (*string)
@@ -322,7 +324,6 @@ Standard `APIResponse` with fields:
     - role_id,omitempty (*int)
     - username (string)
     - email (string)
-    - - (string)
     - first_name,omitempty (*string)
     - last_name,omitempty (*string)
     - phone,omitempty (*string)
@@ -364,7 +365,6 @@ Standard `APIResponse` with fields:
     - role_id,omitempty (*int)
     - username (string)
     - email (string)
-    - - (string)
     - first_name,omitempty (*string)
     - last_name,omitempty (*string)
     - phone,omitempty (*string)
@@ -396,7 +396,6 @@ Standard `APIResponse` with fields:
     - role_id,omitempty (*int)
     - username (string)
     - email (string)
-    - - (string)
     - first_name,omitempty (*string)
     - last_name,omitempty (*string)
     - phone,omitempty (*string)
@@ -489,80 +488,6 @@ Standard `APIResponse` with fields:
   - data (object)
   - error (string, optional)
   - meta (object, optional)
-
-## GET /api/v1/companies
-
-### Headers
-- Authorization: Bearer <token>
-
-### Request Body
-None
-
-### Response
-Standard `APIResponse` with fields:
-  - success (bool)
-  - message (string)
-  - data (object)
-  - error (string, optional)
-  - meta (object, optional)
-
-## POST /api/v1/companies
-
-### Headers
-- Authorization: Bearer <token>
-
-### Request Body
-None
-
-### Response
-Standard `APIResponse` with fields:
-  - success (bool)
-  - message (string)
-  - data (object)
-  - error (string, optional)
-  - meta (object, optional)
-
-## PUT /api/v1/companies/:id
-
-### Headers
-- Authorization: Bearer <token>
-- Content-Type: application/json
-
-### Request Body
-**UpdateCompanyRequest**
-  - Name       *string
-  - Logo       *string
-  - Address    *string
-  - Phone      *string
-  - Email      *string
-  - TaxNumber  *string
-  - CurrencyID *int
-  - IsActive   *bool
-
-### Response
-Standard `APIResponse` with fields:
-  - success (bool)
-  - message (string)
-  - data (object)
-  - error (string, optional)
-  - meta (object, optional)
-
-## DELETE /api/v1/companies/:id
-
-### Headers
-- Authorization: Bearer <token>
-
-### Request Body
-None
-
-### Response
-Standard `APIResponse` with fields:
-  - success (bool)
-  - message (string)
-  - data (object)
-  - error (string, optional)
-  - meta (object, optional)
-
 ## GET /api/v1/locations
 
 ### Headers
