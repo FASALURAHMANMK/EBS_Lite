@@ -151,11 +151,6 @@ paths:
         required: true
         schema:
           type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenericObject'
   /dashboard/metrics:
     get:
       summary: GET /api/v1/dashboard/metrics
