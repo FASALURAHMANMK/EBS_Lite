@@ -263,7 +263,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreateCompanyRequest'
   /companies/{id}:
     put:
       summary: PUT /api/v1/companies/{id}
@@ -284,7 +284,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/UpdateCompanyRequest'
     delete:
       summary: DELETE /api/v1/companies/{id}
       responses:
@@ -300,11 +300,6 @@ paths:
         required: true
         schema:
           type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenericObject'
   /locations:
     get:
       summary: GET /api/v1/locations
@@ -328,7 +323,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreateLocationRequest'
   /locations/{id}:
     put:
       summary: PUT /api/v1/locations/{id}
@@ -349,7 +344,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/UpdateLocationRequest'
     delete:
       summary: DELETE /api/v1/locations/{id}
       responses:
@@ -365,11 +360,6 @@ paths:
         required: true
         schema:
           type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenericObject'
   /roles:
     get:
       summary: GET /api/v1/roles
@@ -393,7 +383,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreateRoleRequest'
   /roles/{id}:
     put:
       summary: PUT /api/v1/roles/{id}
@@ -414,7 +404,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/UpdateRoleRequest'
     delete:
       summary: DELETE /api/v1/roles/{id}
       responses:
@@ -430,11 +420,6 @@ paths:
         required: true
         schema:
           type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenericObject'
   /roles/{id}/permissions:
     get:
       summary: GET /api/v1/roles/{id}/permissions
@@ -470,7 +455,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/AssignPermissionsRequest'
   /permissions:
     get:
       summary: GET /api/v1/permissions
@@ -604,7 +589,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreateCategoryRequest'
   /categories/{id}:
     put:
       summary: PUT /api/v1/categories/{id}
@@ -625,7 +610,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/UpdateCategoryRequest'
     delete:
       summary: DELETE /api/v1/categories/{id}
       responses:
@@ -641,11 +626,6 @@ paths:
         required: true
         schema:
           type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenericObject'
   /brands:
     get:
       summary: GET /api/v1/brands
@@ -669,7 +649,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreateBrandRequest'
   /units:
     get:
       summary: GET /api/v1/units
@@ -693,7 +673,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreateUnitRequest'
   /product-attribute-definitions:
     get:
       summary: GET /api/v1/product-attribute-definitions
@@ -717,7 +697,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreateProductAttributeDefinitionRequest'
   /product-attribute-definitions/{id}:
     put:
       summary: PUT /api/v1/product-attribute-definitions/{id}
@@ -738,7 +718,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/UpdateProductAttributeDefinitionRequest'
     delete:
       summary: DELETE /api/v1/product-attribute-definitions/{id}
       responses:
@@ -754,11 +734,6 @@ paths:
         required: true
         schema:
           type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenericObject'
   /inventory/stock:
     get:
       summary: Get stock for a location
@@ -4157,3 +4132,196 @@ components:
         created_at:
           type: string
           format: date-time
+
+    CreateCompanyRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        logo:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        tax_number:
+          type: string
+          nullable: true
+        currency_id:
+          type: integer
+          nullable: true
+
+    UpdateCompanyRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        logo:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        tax_number:
+          type: string
+          nullable: true
+        currency_id:
+          type: integer
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
+
+    CreateLocationRequest:
+      type: object
+      properties:
+        company_id:
+          type: integer
+        name:
+          type: string
+        address:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+
+    UpdateLocationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
+
+    CreateRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+
+    UpdateRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+
+    AssignPermissionsRequest:
+      type: object
+      properties:
+        permission_ids:
+          type: array
+          items:
+            type: integer
+
+    CreateCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        parent_id:
+          type: integer
+          nullable: true
+
+    UpdateCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        parent_id:
+          type: integer
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
+
+    CreateBrandRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+
+    CreateUnitRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        symbol:
+          type: string
+          nullable: true
+        base_unit_id:
+          type: integer
+          nullable: true
+        conversion_factor:
+          type: number
+          format: float
+          nullable: true
+
+    CreateProductAttributeDefinitionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        is_required:
+          type: boolean
+        options:
+          type: string
+          nullable: true
+
+    UpdateProductAttributeDefinitionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        type:
+          type: string
+          nullable: true
+        is_required:
+          type: boolean
+          nullable: true
+        options:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
