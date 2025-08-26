@@ -3,7 +3,7 @@ info:
   title: EBS Lite API
   version: 1.0.0
 servers:
-- url: /api
+- url: /api/v1
 paths:
   /health:
     get:
@@ -15,82 +15,87 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/auth/login:
+  /auth/login:
     post:
-      summary: POST /api/v1/auth/login
+      summary: Authenticate a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
       responses:
         '200':
-          description: Successful response
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+  /auth/register:
+    post:
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+  /auth/forgot-password:
+    post:
+      summary: Request password reset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Instructions sent
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
+  /auth/reset-password:
+    post:
+      summary: Reset user password
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
-  /api/v1/auth/register:
-    post:
-      summary: POST /api/v1/auth/register
+              $ref: '#/components/schemas/ResetPasswordRequest'
       responses:
         '200':
-          description: Successful response
+          description: Password reset successful
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
+  /auth/refresh-token:
+    post:
+      summary: Refresh authentication token
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
-  /api/v1/auth/forgot-password:
-    post:
-      summary: POST /api/v1/auth/forgot-password
+              $ref: '#/components/schemas/RefreshTokenRequest'
       responses:
         '200':
-          description: Successful response
+          description: Token refreshed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenericObject'
-  /api/v1/auth/reset-password:
-    post:
-      summary: POST /api/v1/auth/reset-password
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/APIResponse'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenericObject'
-  /api/v1/auth/refresh-token:
-    post:
-      summary: POST /api/v1/auth/refresh-token
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/APIResponse'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenericObject'
-  /api/v1/languages:
+                $ref: '#/components/schemas/RefreshTokenResponse'
+  /languages:
     get:
       summary: GET /api/v1/languages
       responses:
@@ -100,32 +105,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/auth/me:
+  /auth/me:
     get:
-      summary: GET /api/v1/auth/me
+      summary: Retrieve current user
       responses:
         '200':
-          description: Successful response
+          description: Current user details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
-  /api/v1/auth/logout:
+                $ref: '#/components/schemas/AuthMeResponse'
+  /auth/logout:
     post:
-      summary: POST /api/v1/auth/logout
+      summary: Logout current user
       responses:
         '200':
-          description: Successful response
+          description: Logout successful
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenericObject'
-  /api/v1/device-sessions:
+  /device-sessions:
     get:
       summary: GET /api/v1/device-sessions
       responses:
@@ -135,7 +135,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/device-sessions/{session_id}:
+  /device-sessions/{session_id}:
     delete:
       summary: DELETE /api/v1/device-sessions/{session_id}
       responses:
@@ -156,7 +156,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/dashboard/metrics:
+  /dashboard/metrics:
     get:
       summary: GET /api/v1/dashboard/metrics
       responses:
@@ -166,7 +166,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/dashboard/quick-actions:
+  /dashboard/quick-actions:
     get:
       summary: GET /api/v1/dashboard/quick-actions
       responses:
@@ -176,72 +176,71 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/users:
+  /users:
     get:
-      summary: GET /api/v1/users
+      summary: List users
       responses:
         '200':
-          description: Successful response
+          description: List of users
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserResponse'
     post:
-      summary: POST /api/v1/users
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/APIResponse'
+      summary: Create a user
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
-  /api/v1/users/{id}:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+  /users/{id}:
     put:
-      summary: PUT /api/v1/users/{id}
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/APIResponse'
+      summary: Update a user
       parameters:
       - name: id
         in: path
         required: true
         schema:
-          type: string
+          type: integer
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
     delete:
-      summary: DELETE /api/v1/users/{id}
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/APIResponse'
+      summary: Delete a user
       parameters:
       - name: id
         in: path
         required: true
         schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenericObject'
-  /api/v1/companies:
+          type: integer
+      responses:
+        '200':
+          description: Deletion successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /companies:
     get:
       summary: GET /api/v1/companies
       responses:
@@ -265,7 +264,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/companies/{id}:
+  /companies/{id}:
     put:
       summary: PUT /api/v1/companies/{id}
       responses:
@@ -306,7 +305,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/locations:
+  /locations:
     get:
       summary: GET /api/v1/locations
       responses:
@@ -330,7 +329,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/locations/{id}:
+  /locations/{id}:
     put:
       summary: PUT /api/v1/locations/{id}
       responses:
@@ -371,7 +370,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/roles:
+  /roles:
     get:
       summary: GET /api/v1/roles
       responses:
@@ -395,7 +394,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/roles/{id}:
+  /roles/{id}:
     put:
       summary: PUT /api/v1/roles/{id}
       responses:
@@ -436,7 +435,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/roles/{id}/permissions:
+  /roles/{id}/permissions:
     get:
       summary: GET /api/v1/roles/{id}/permissions
       responses:
@@ -472,7 +471,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/permissions:
+  /permissions:
     get:
       summary: GET /api/v1/permissions
       responses:
@@ -482,103 +481,102 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/products:
+  /products:
     get:
-      summary: GET /api/v1/products
+      summary: List products
       responses:
         '200':
-          description: Successful response
+          description: List of products
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
     post:
-      summary: POST /api/v1/products
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/APIResponse'
+      summary: Create a product
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
-  /api/v1/products/{id}:
-    get:
-      summary: GET /api/v1/products/{id}
+              $ref: '#/components/schemas/CreateProductRequest'
       responses:
-        '200':
-          description: Successful response
+        '201':
+          description: Product created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                $ref: '#/components/schemas/Product'
+  /products/{id}:
+    get:
+      summary: Get a product
       parameters:
       - name: id
         in: path
         required: true
         schema:
-          type: string
+          type: integer
+      responses:
+        '200':
+          description: Product details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
     put:
-      summary: PUT /api/v1/products/{id}
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/APIResponse'
+      summary: Update a product
       parameters:
       - name: id
         in: path
         required: true
         schema:
-          type: string
+          type: integer
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/UpdateProductRequest'
+      responses:
+        '200':
+          description: Product updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
     delete:
-      summary: DELETE /api/v1/products/{id}
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/APIResponse'
+      summary: Delete a product
       parameters:
       - name: id
         in: path
         required: true
         schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenericObject'
-  /api/v1/products/{id}/summary:
+          type: integer
+      responses:
+        '200':
+          description: Deletion successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /products/{id}/summary:
     get:
-      summary: GET /api/v1/products/{id}/summary
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/APIResponse'
+      summary: Get product summary
       parameters:
       - name: id
         in: path
         required: true
         schema:
-          type: string
-  /api/v1/categories:
+          type: integer
+      responses:
+        '200':
+          description: Product summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+  /categories:
     get:
       summary: GET /api/v1/categories
       responses:
@@ -602,7 +600,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/categories/{id}:
+  /categories/{id}:
     put:
       summary: PUT /api/v1/categories/{id}
       responses:
@@ -643,7 +641,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/brands:
+  /brands:
     get:
       summary: GET /api/v1/brands
       responses:
@@ -667,7 +665,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/units:
+  /units:
     get:
       summary: GET /api/v1/units
       responses:
@@ -691,7 +689,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/product-attribute-definitions:
+  /product-attribute-definitions:
     get:
       summary: GET /api/v1/product-attribute-definitions
       responses:
@@ -715,7 +713,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/product-attribute-definitions/{id}:
+  /product-attribute-definitions/{id}:
     put:
       summary: PUT /api/v1/product-attribute-definitions/{id}
       responses:
@@ -756,42 +754,56 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/inventory/stock:
+  /inventory/stock:
     get:
-      summary: GET /api/v1/inventory/stock
+      summary: Get stock for a location
+      parameters:
+      - name: location_id
+        in: query
+        schema:
+          type: integer
+      - name: product_id
+        in: query
+        schema:
+          type: integer
       responses:
         '200':
-          description: Successful response
+          description: Stock list
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
-  /api/v1/inventory/stock-adjustment:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Stock'
+  /inventory/stock-adjustment:
     post:
-      summary: POST /api/v1/inventory/stock-adjustment
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/APIResponse'
+      summary: Adjust stock levels
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
-  /api/v1/inventory/stock-adjustments:
-    get:
-      summary: GET /api/v1/inventory/stock-adjustments
+              $ref: '#/components/schemas/CreateStockAdjustmentRequest'
       responses:
         '200':
-          description: Successful response
+          description: Adjustment recorded
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/inventory/summary:
+  /inventory/stock-adjustments:
+    get:
+      summary: List stock adjustments
+      responses:
+        '200':
+          description: Stock adjustments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StockAdjustment'
+  /inventory/summary:
     get:
       summary: GET /api/v1/inventory/summary
       responses:
@@ -801,7 +813,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/inventory/import:
+  /inventory/import:
     post:
       summary: POST /api/v1/inventory/import
       responses:
@@ -816,7 +828,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/inventory/export:
+  /inventory/export:
     get:
       summary: GET /api/v1/inventory/export
       responses:
@@ -826,7 +838,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/inventory/barcode:
+  /inventory/barcode:
     post:
       summary: POST /api/v1/inventory/barcode
       responses:
@@ -841,7 +853,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/inventory/transfers:
+  /inventory/transfers:
     get:
       summary: GET /api/v1/inventory/transfers
       responses:
@@ -865,7 +877,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/inventory/transfers/{id}:
+  /inventory/transfers/{id}:
     get:
       summary: GET /api/v1/inventory/transfers/{id}
       responses:
@@ -901,7 +913,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/inventory/transfers/{id}/approve:
+  /inventory/transfers/{id}/approve:
     put:
       summary: PUT /api/v1/inventory/transfers/{id}/approve
       responses:
@@ -922,7 +934,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/inventory/transfers/{id}/complete:
+  /inventory/transfers/{id}/complete:
     put:
       summary: PUT /api/v1/inventory/transfers/{id}/complete
       responses:
@@ -943,7 +955,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/sales:
+  /sales:
     get:
       summary: GET /api/v1/sales
       responses:
@@ -967,7 +979,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/sales/history:
+  /sales/history:
     get:
       summary: GET /api/v1/sales/history
       responses:
@@ -977,7 +989,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/sales/history/export:
+  /sales/history/export:
     get:
       summary: GET /api/v1/sales/history/export
       responses:
@@ -987,7 +999,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/sales/{id}:
+  /sales/{id}:
     get:
       summary: GET /api/v1/sales/{id}
       responses:
@@ -1043,7 +1055,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/sales/{id}/hold:
+  /sales/{id}/hold:
     post:
       summary: POST /api/v1/sales/{id}/hold
       responses:
@@ -1064,7 +1076,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/sales/{id}/resume:
+  /sales/{id}/resume:
     post:
       summary: POST /api/v1/sales/{id}/resume
       responses:
@@ -1085,7 +1097,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/sales/quick:
+  /sales/quick:
     post:
       summary: POST /api/v1/sales/quick
       responses:
@@ -1100,7 +1112,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/sales/quotes:
+  /sales/quotes:
     get:
       summary: GET /api/v1/sales/quotes
       responses:
@@ -1124,7 +1136,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/sales/quotes/export:
+  /sales/quotes/export:
     get:
       summary: GET /api/v1/sales/quotes/export
       responses:
@@ -1134,7 +1146,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/sales/quotes/{id}:
+  /sales/quotes/{id}:
     get:
       summary: GET /api/v1/sales/quotes/{id}
       responses:
@@ -1190,7 +1202,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/sales/quotes/{id}/print:
+  /sales/quotes/{id}/print:
     post:
       summary: POST /api/v1/sales/quotes/{id}/print
       responses:
@@ -1211,7 +1223,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/sales/quotes/{id}/share:
+  /sales/quotes/{id}/share:
     post:
       summary: POST /api/v1/sales/quotes/{id}/share
       responses:
@@ -1232,7 +1244,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/pos/products:
+  /pos/products:
     get:
       summary: GET /api/v1/pos/products
       responses:
@@ -1242,7 +1254,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/pos/customers:
+  /pos/customers:
     get:
       summary: GET /api/v1/pos/customers
       responses:
@@ -1252,7 +1264,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/pos/checkout:
+  /pos/checkout:
     post:
       summary: POST /api/v1/pos/checkout
       responses:
@@ -1267,7 +1279,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/pos/print:
+  /pos/print:
     post:
       summary: POST /api/v1/pos/print
       responses:
@@ -1282,7 +1294,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/pos/held-sales:
+  /pos/held-sales:
     get:
       summary: GET /api/v1/pos/held-sales
       responses:
@@ -1292,7 +1304,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/pos/payment-methods:
+  /pos/payment-methods:
     get:
       summary: GET /api/v1/pos/payment-methods
       responses:
@@ -1302,7 +1314,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/pos/sales-summary:
+  /pos/sales-summary:
     get:
       summary: GET /api/v1/pos/sales-summary
       responses:
@@ -1312,7 +1324,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/pos/receipt/{id}:
+  /pos/receipt/{id}:
     get:
       summary: GET /api/v1/pos/receipt/{id}
       responses:
@@ -1328,7 +1340,7 @@ paths:
         required: true
         schema:
           type: string
-  /api/v1/loyalty-programs:
+  /loyalty-programs:
     get:
       summary: GET /api/v1/loyalty-programs
       responses:
@@ -1338,7 +1350,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/loyalty-programs/{customer_id}:
+  /loyalty-programs/{customer_id}:
     get:
       summary: GET /api/v1/loyalty-programs/{customer_id}
       responses:
@@ -1354,7 +1366,7 @@ paths:
         required: true
         schema:
           type: string
-  /api/v1/loyalty-redemptions:
+  /loyalty-redemptions:
     get:
       summary: GET /api/v1/loyalty-redemptions
       responses:
@@ -1378,7 +1390,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/loyalty/settings:
+  /loyalty/settings:
     get:
       summary: GET /api/v1/loyalty/settings
       responses:
@@ -1388,7 +1400,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/loyalty/award-points:
+  /loyalty/award-points:
     post:
       summary: POST /api/v1/loyalty/award-points
       responses:
@@ -1403,7 +1415,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/promotions:
+  /promotions:
     get:
       summary: GET /api/v1/promotions
       responses:
@@ -1427,7 +1439,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/promotions/{id}:
+  /promotions/{id}:
     put:
       summary: PUT /api/v1/promotions/{id}
       responses:
@@ -1468,7 +1480,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/promotions/check-eligibility:
+  /promotions/check-eligibility:
     post:
       summary: POST /api/v1/promotions/check-eligibility
       responses:
@@ -1483,7 +1495,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/sale-returns:
+  /sale-returns:
     get:
       summary: GET /api/v1/sale-returns
       responses:
@@ -1507,7 +1519,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/sale-returns/{id}:
+  /sale-returns/{id}:
     get:
       summary: GET /api/v1/sale-returns/{id}
       responses:
@@ -1563,7 +1575,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/sale-returns/summary:
+  /sale-returns/summary:
     get:
       summary: GET /api/v1/sale-returns/summary
       responses:
@@ -1573,7 +1585,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/sale-returns/search/{sale_id}:
+  /sale-returns/search/{sale_id}:
     get:
       summary: GET /api/v1/sale-returns/search/{sale_id}
       responses:
@@ -1589,7 +1601,7 @@ paths:
         required: true
         schema:
           type: string
-  /api/v1/sale-returns/process/{sale_id}:
+  /sale-returns/process/{sale_id}:
     post:
       summary: POST /api/v1/sale-returns/process/{sale_id}
       responses:
@@ -1610,7 +1622,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/purchases:
+  /purchases:
     get:
       summary: GET /api/v1/purchases
       responses:
@@ -1634,7 +1646,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/purchases/history:
+  /purchases/history:
     get:
       summary: GET /api/v1/purchases/history
       responses:
@@ -1644,7 +1656,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/purchases/pending:
+  /purchases/pending:
     get:
       summary: GET /api/v1/purchases/pending
       responses:
@@ -1654,7 +1666,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/purchases/{id}:
+  /purchases/{id}:
     get:
       summary: GET /api/v1/purchases/{id}
       responses:
@@ -1710,7 +1722,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/purchases/quick:
+  /purchases/quick:
     post:
       summary: POST /api/v1/purchases/quick
       responses:
@@ -1725,7 +1737,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/purchases/{id}/receive:
+  /purchases/{id}/receive:
     put:
       summary: PUT /api/v1/purchases/{id}/receive
       responses:
@@ -1746,7 +1758,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/purchase-orders:
+  /purchase-orders:
     post:
       summary: POST /api/v1/purchase-orders
       responses:
@@ -1761,7 +1773,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/purchase-orders/{id}:
+  /purchase-orders/{id}:
     put:
       summary: PUT /api/v1/purchase-orders/{id}
       responses:
@@ -1802,7 +1814,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/purchase-orders/{id}/approve:
+  /purchase-orders/{id}/approve:
     put:
       summary: PUT /api/v1/purchase-orders/{id}/approve
       responses:
@@ -1823,7 +1835,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/goods-receipts:
+  /goods-receipts:
     post:
       summary: POST /api/v1/goods-receipts
       responses:
@@ -1838,7 +1850,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/purchase-returns:
+  /purchase-returns:
     get:
       summary: GET /api/v1/purchase-returns
       responses:
@@ -1862,7 +1874,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/purchase-returns/{id}:
+  /purchase-returns/{id}:
     get:
       summary: GET /api/v1/purchase-returns/{id}
       responses:
@@ -1918,7 +1930,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/customers:
+  /customers:
     get:
       summary: GET /api/v1/customers
       responses:
@@ -1942,7 +1954,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/customers/{id}/summary:
+  /customers/{id}/summary:
     get:
       summary: GET /api/v1/customers/{id}/summary
       responses:
@@ -1958,7 +1970,7 @@ paths:
         required: true
         schema:
           type: string
-  /api/v1/customers/import:
+  /customers/import:
     post:
       summary: POST /api/v1/customers/import
       responses:
@@ -1973,7 +1985,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/customers/export:
+  /customers/export:
     get:
       summary: GET /api/v1/customers/export
       responses:
@@ -1983,7 +1995,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/customers/{id}:
+  /customers/{id}:
     put:
       summary: PUT /api/v1/customers/{id}
       responses:
@@ -2024,7 +2036,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/customers/{id}/credit:
+  /customers/{id}/credit:
     get:
       summary: GET /api/v1/customers/{id}/credit
       responses:
@@ -2060,7 +2072,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/employees:
+  /employees:
     get:
       summary: GET /api/v1/employees
       responses:
@@ -2084,7 +2096,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/employees/{id}:
+  /employees/{id}:
     put:
       summary: PUT /api/v1/employees/{id}
       responses:
@@ -2125,7 +2137,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/attendance/check-in:
+  /attendance/check-in:
     post:
       summary: POST /api/v1/attendance/check-in
       responses:
@@ -2140,7 +2152,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/attendance/check-out:
+  /attendance/check-out:
     post:
       summary: POST /api/v1/attendance/check-out
       responses:
@@ -2155,7 +2167,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/attendance/leave:
+  /attendance/leave:
     post:
       summary: POST /api/v1/attendance/leave
       responses:
@@ -2170,7 +2182,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/attendance/holidays:
+  /attendance/holidays:
     get:
       summary: GET /api/v1/attendance/holidays
       responses:
@@ -2180,7 +2192,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/attendance/records:
+  /attendance/records:
     get:
       summary: GET /api/v1/attendance/records
       responses:
@@ -2190,7 +2202,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/payrolls:
+  /payrolls:
     get:
       summary: GET /api/v1/payrolls
       responses:
@@ -2214,7 +2226,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/payrolls/{id}/mark-paid:
+  /payrolls/{id}/mark-paid:
     put:
       summary: PUT /api/v1/payrolls/{id}/mark-paid
       responses:
@@ -2235,7 +2247,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/payrolls/{id}/components:
+  /payrolls/{id}/components:
     post:
       summary: POST /api/v1/payrolls/{id}/components
       responses:
@@ -2256,7 +2268,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/payrolls/{id}/advances:
+  /payrolls/{id}/advances:
     post:
       summary: POST /api/v1/payrolls/{id}/advances
       responses:
@@ -2277,7 +2289,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/payrolls/{id}/deductions:
+  /payrolls/{id}/deductions:
     post:
       summary: POST /api/v1/payrolls/{id}/deductions
       responses:
@@ -2298,7 +2310,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/payrolls/{id}/payslip:
+  /payrolls/{id}/payslip:
     get:
       summary: GET /api/v1/payrolls/{id}/payslip
       responses:
@@ -2314,7 +2326,7 @@ paths:
         required: true
         schema:
           type: string
-  /api/v1/collections:
+  /collections:
     get:
       summary: GET /api/v1/collections
       responses:
@@ -2338,7 +2350,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/collections/outstanding:
+  /collections/outstanding:
     get:
       summary: GET /api/v1/collections/outstanding
       responses:
@@ -2348,7 +2360,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/collections/{id}/receipt:
+  /collections/{id}/receipt:
     get:
       summary: GET /api/v1/collections/{id}/receipt
       responses:
@@ -2364,7 +2376,7 @@ paths:
         required: true
         schema:
           type: string
-  /api/v1/collections/{id}:
+  /collections/{id}:
     delete:
       summary: DELETE /api/v1/collections/{id}
       responses:
@@ -2385,7 +2397,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/expenses:
+  /expenses:
     get:
       summary: GET /api/v1/expenses
       responses:
@@ -2409,7 +2421,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/expenses/{id}:
+  /expenses/{id}:
     get:
       summary: GET /api/v1/expenses/{id}
       responses:
@@ -2425,7 +2437,7 @@ paths:
         required: true
         schema:
           type: string
-  /api/v1/expenses/categories:
+  /expenses/categories:
     get:
       summary: GET /api/v1/expenses/categories
       responses:
@@ -2449,7 +2461,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/expenses/categories/{id}:
+  /expenses/categories/{id}:
     put:
       summary: PUT /api/v1/expenses/categories/{id}
       responses:
@@ -2490,7 +2502,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/vouchers:
+  /vouchers:
     get:
       summary: GET /api/v1/vouchers
       responses:
@@ -2500,7 +2512,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/vouchers/{id}:
+  /vouchers/{id}:
     get:
       summary: GET /api/v1/vouchers/{id}
       responses:
@@ -2516,7 +2528,7 @@ paths:
         required: true
         schema:
           type: string
-  /api/v1/vouchers/{type}:
+  /vouchers/{type}:
     post:
       summary: POST /api/v1/vouchers/{type}
       responses:
@@ -2537,7 +2549,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/ledgers:
+  /ledgers:
     get:
       summary: GET /api/v1/ledgers
       responses:
@@ -2547,7 +2559,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/ledgers/{account_id}/entries:
+  /ledgers/{account_id}/entries:
     get:
       summary: GET /api/v1/ledgers/{account_id}/entries
       responses:
@@ -2563,7 +2575,7 @@ paths:
         required: true
         schema:
           type: string
-  /api/v1/cash-registers:
+  /cash-registers:
     get:
       summary: GET /api/v1/cash-registers
       responses:
@@ -2573,7 +2585,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/cash-registers/open:
+  /cash-registers/open:
     post:
       summary: POST /api/v1/cash-registers/open
       responses:
@@ -2588,7 +2600,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/cash-registers/close:
+  /cash-registers/close:
     post:
       summary: POST /api/v1/cash-registers/close
       responses:
@@ -2603,7 +2615,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/cash-registers/tally:
+  /cash-registers/tally:
     post:
       summary: POST /api/v1/cash-registers/tally
       responses:
@@ -2618,7 +2630,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/reports/sales-summary:
+  /reports/sales-summary:
     get:
       summary: GET /api/v1/reports/sales-summary
       responses:
@@ -2628,7 +2640,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/reports/stock-summary:
+  /reports/stock-summary:
     get:
       summary: GET /api/v1/reports/stock-summary
       responses:
@@ -2638,7 +2650,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/reports/top-products:
+  /reports/top-products:
     get:
       summary: GET /api/v1/reports/top-products
       responses:
@@ -2648,7 +2660,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/reports/customer-balances:
+  /reports/customer-balances:
     get:
       summary: GET /api/v1/reports/customer-balances
       responses:
@@ -2658,7 +2670,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/reports/expenses-summary:
+  /reports/expenses-summary:
     get:
       summary: GET /api/v1/reports/expenses-summary
       responses:
@@ -2668,7 +2680,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/reports/item-movement:
+  /reports/item-movement:
     get:
       summary: GET /api/v1/reports/item-movement
       responses:
@@ -2678,7 +2690,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/reports/valuation:
+  /reports/valuation:
     get:
       summary: GET /api/v1/reports/valuation
       responses:
@@ -2688,7 +2700,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/reports/purchase-vs-returns:
+  /reports/purchase-vs-returns:
     get:
       summary: GET /api/v1/reports/purchase-vs-returns
       responses:
@@ -2698,7 +2710,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/reports/supplier:
+  /reports/supplier:
     get:
       summary: GET /api/v1/reports/supplier
       responses:
@@ -2708,7 +2720,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/reports/daily-cash:
+  /reports/daily-cash:
     get:
       summary: GET /api/v1/reports/daily-cash
       responses:
@@ -2718,7 +2730,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/reports/income-expense:
+  /reports/income-expense:
     get:
       summary: GET /api/v1/reports/income-expense
       responses:
@@ -2728,7 +2740,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/reports/general-ledger:
+  /reports/general-ledger:
     get:
       summary: GET /api/v1/reports/general-ledger
       responses:
@@ -2738,7 +2750,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/reports/trial-balance:
+  /reports/trial-balance:
     get:
       summary: GET /api/v1/reports/trial-balance
       responses:
@@ -2748,7 +2760,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/reports/profit-loss:
+  /reports/profit-loss:
     get:
       summary: GET /api/v1/reports/profit-loss
       responses:
@@ -2758,7 +2770,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/reports/balance-sheet:
+  /reports/balance-sheet:
     get:
       summary: GET /api/v1/reports/balance-sheet
       responses:
@@ -2768,7 +2780,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/reports/outstanding:
+  /reports/outstanding:
     get:
       summary: GET /api/v1/reports/outstanding
       responses:
@@ -2778,7 +2790,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/reports/tax:
+  /reports/tax:
     get:
       summary: GET /api/v1/reports/tax
       responses:
@@ -2788,7 +2800,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/reports/top-performers:
+  /reports/top-performers:
     get:
       summary: GET /api/v1/reports/top-performers
       responses:
@@ -2798,7 +2810,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/suppliers:
+  /suppliers:
     get:
       summary: GET /api/v1/suppliers
       responses:
@@ -2822,7 +2834,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/suppliers/import:
+  /suppliers/import:
     post:
       summary: POST /api/v1/suppliers/import
       responses:
@@ -2837,7 +2849,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/suppliers/export:
+  /suppliers/export:
     get:
       summary: GET /api/v1/suppliers/export
       responses:
@@ -2847,7 +2859,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/suppliers/{id}/summary:
+  /suppliers/{id}/summary:
     get:
       summary: GET /api/v1/suppliers/{id}/summary
       responses:
@@ -2863,7 +2875,7 @@ paths:
         required: true
         schema:
           type: string
-  /api/v1/suppliers/{id}:
+  /suppliers/{id}:
     get:
       summary: GET /api/v1/suppliers/{id}
       responses:
@@ -2919,7 +2931,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/currencies:
+  /currencies:
     get:
       summary: GET /api/v1/currencies
       responses:
@@ -2943,7 +2955,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/currencies/{id}:
+  /currencies/{id}:
     put:
       summary: PUT /api/v1/currencies/{id}
       responses:
@@ -3004,7 +3016,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/taxes:
+  /taxes:
     get:
       summary: GET /api/v1/taxes
       responses:
@@ -3028,7 +3040,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/taxes/{id}:
+  /taxes/{id}:
     put:
       summary: PUT /api/v1/taxes/{id}
       responses:
@@ -3069,7 +3081,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/settings:
+  /settings:
     get:
       summary: GET /api/v1/settings
       responses:
@@ -3093,7 +3105,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/settings/company:
+  /settings/company:
     get:
       summary: GET /api/v1/settings/company
       responses:
@@ -3117,7 +3129,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/settings/invoice:
+  /settings/invoice:
     get:
       summary: GET /api/v1/settings/invoice
       responses:
@@ -3141,7 +3153,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/settings/tax:
+  /settings/tax:
     get:
       summary: GET /api/v1/settings/tax
       responses:
@@ -3165,7 +3177,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/settings/device-control:
+  /settings/device-control:
     get:
       summary: GET /api/v1/settings/device-control
       responses:
@@ -3189,7 +3201,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/settings/session-limit:
+  /settings/session-limit:
     get:
       summary: GET /api/v1/settings/session-limit
       responses:
@@ -3241,7 +3253,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/settings/payment-methods:
+  /settings/payment-methods:
     get:
       summary: GET /api/v1/settings/payment-methods
       responses:
@@ -3265,7 +3277,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/settings/payment-methods/{id}:
+  /settings/payment-methods/{id}:
     put:
       summary: PUT /api/v1/settings/payment-methods/{id}
       responses:
@@ -3306,7 +3318,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/settings/printer:
+  /settings/printer:
     get:
       summary: GET /api/v1/settings/printer
       responses:
@@ -3330,7 +3342,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/settings/printer/{id}:
+  /settings/printer/{id}:
     put:
       summary: PUT /api/v1/settings/printer/{id}
       responses:
@@ -3371,7 +3383,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/audit-logs:
+  /audit-logs:
     get:
       summary: GET /api/v1/audit-logs
       responses:
@@ -3381,7 +3393,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /api/v1/languages/{code}:
+  /languages/{code}:
     put:
       summary: PUT /api/v1/languages/{code}
       responses:
@@ -3402,7 +3414,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/translations:
+  /translations:
     get:
       summary: GET /api/v1/translations
       responses:
@@ -3426,7 +3438,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/user-preferences:
+  /user-preferences:
     get:
       summary: GET /api/v1/user-preferences
       responses:
@@ -3464,7 +3476,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/user-preferences/{key}:
+  /user-preferences/{key}:
     delete:
       summary: DELETE /api/v1/user-preferences/{key}
       responses:
@@ -3485,7 +3497,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/numbering-sequences:
+  /numbering-sequences:
     get:
       summary: GET /api/v1/numbering-sequences
       responses:
@@ -3509,7 +3521,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/numbering-sequences/{id}:
+  /numbering-sequences/{id}:
     get:
       summary: GET /api/v1/numbering-sequences/{id}
       responses:
@@ -3565,7 +3577,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/invoice-templates:
+  /invoice-templates:
     get:
       summary: GET /api/v1/invoice-templates
       responses:
@@ -3589,7 +3601,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/invoice-templates/{id}:
+  /invoice-templates/{id}:
     get:
       summary: GET /api/v1/invoice-templates/{id}
       responses:
@@ -3645,7 +3657,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/print/receipt:
+  /print/receipt:
     post:
       summary: POST /api/v1/print/receipt
       responses:
@@ -3660,7 +3672,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/workflow-requests:
+  /workflow-requests:
     get:
       summary: GET /api/v1/workflow-requests
       responses:
@@ -3684,7 +3696,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/workflow-requests/{id}/approve:
+  /workflow-requests/{id}/approve:
     put:
       summary: PUT /api/v1/workflow-requests/{id}/approve
       responses:
@@ -3705,7 +3717,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
-  /api/v1/workflow-requests/{id}/reject:
+  /workflow-requests/{id}/reject:
     put:
       summary: PUT /api/v1/workflow-requests/{id}/reject
       responses:
@@ -3746,3 +3758,387 @@ components:
     GenericObject:
       type: object
       additionalProperties: true
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        device_id:
+          type: string
+        device_name:
+          type: string
+          nullable: true
+        include_preferences:
+          type: boolean
+    LoginResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        session_id:
+          type: string
+        user:
+          $ref: '#/components/schemas/UserResponse'
+        company:
+          type: object
+          nullable: true
+    RegisterRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        first_name:
+          type: string
+          nullable: true
+        last_name:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        preferred_language:
+          type: string
+          nullable: true
+        secondary_language:
+          type: string
+          nullable: true
+    RegisterResponse:
+      type: object
+      properties:
+        user_id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        message:
+          type: string
+    ForgotPasswordRequest:
+      type: object
+      properties:
+        email:
+          type: string
+    ResetPasswordRequest:
+      type: object
+      properties:
+        token:
+          type: string
+        new_password:
+          type: string
+    RefreshTokenRequest:
+      type: object
+      properties:
+        refresh_token:
+          type: string
+    RefreshTokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+    AuthMeResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserResponse'
+        company:
+          type: object
+          nullable: true
+    UserResponse:
+      type: object
+      properties:
+        user_id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        first_name:
+          type: string
+          nullable: true
+        last_name:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        role_id:
+          type: integer
+          nullable: true
+        location_id:
+          type: integer
+          nullable: true
+        company_id:
+          type: integer
+          nullable: true
+        is_active:
+          type: boolean
+        is_locked:
+          type: boolean
+        preferred_language:
+          type: string
+          nullable: true
+        secondary_language:
+          type: string
+          nullable: true
+        last_login:
+          type: string
+          format: date-time
+          nullable: true
+        permissions:
+          type: array
+          items:
+            type: string
+          nullable: true
+        preferences:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+    CreateUserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        first_name:
+          type: string
+          nullable: true
+        last_name:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        role_id:
+          type: integer
+          nullable: true
+        location_id:
+          type: integer
+          nullable: true
+        company_id:
+          type: integer
+        preferred_language:
+          type: string
+          nullable: true
+        secondary_language:
+          type: string
+          nullable: true
+    UpdateUserRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+          nullable: true
+        last_name:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
+        is_locked:
+          type: boolean
+          nullable: true
+        role_id:
+          type: integer
+          nullable: true
+        location_id:
+          type: integer
+          nullable: true
+        preferred_language:
+          type: string
+          nullable: true
+        secondary_language:
+          type: string
+          nullable: true
+    Product:
+      type: object
+      properties:
+        product_id:
+          type: integer
+        company_id:
+          type: integer
+        category_id:
+          type: integer
+          nullable: true
+        brand_id:
+          type: integer
+          nullable: true
+        unit_id:
+          type: integer
+          nullable: true
+        name:
+          type: string
+        sku:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        cost_price:
+          type: number
+          format: float
+          nullable: true
+        selling_price:
+          type: number
+          format: float
+          nullable: true
+        reorder_level:
+          type: integer
+        weight:
+          type: number
+          format: float
+          nullable: true
+        dimensions:
+          type: string
+          nullable: true
+        is_serialized:
+          type: boolean
+        is_active:
+          type: boolean
+    CreateProductRequest:
+      type: object
+      properties:
+        category_id:
+          type: integer
+          nullable: true
+        brand_id:
+          type: integer
+          nullable: true
+        unit_id:
+          type: integer
+          nullable: true
+        name:
+          type: string
+        sku:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        cost_price:
+          type: number
+          format: float
+          nullable: true
+        selling_price:
+          type: number
+          format: float
+          nullable: true
+        reorder_level:
+          type: integer
+        weight:
+          type: number
+          format: float
+          nullable: true
+        dimensions:
+          type: string
+          nullable: true
+        is_serialized:
+          type: boolean
+    UpdateProductRequest:
+      type: object
+      properties:
+        category_id:
+          type: integer
+          nullable: true
+        brand_id:
+          type: integer
+          nullable: true
+        unit_id:
+          type: integer
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        sku:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        cost_price:
+          type: number
+          format: float
+          nullable: true
+        selling_price:
+          type: number
+          format: float
+          nullable: true
+        reorder_level:
+          type: integer
+          nullable: true
+        weight:
+          type: number
+          format: float
+          nullable: true
+        dimensions:
+          type: string
+          nullable: true
+        is_serialized:
+          type: boolean
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
+    Stock:
+      type: object
+      properties:
+        stock_id:
+          type: integer
+        location_id:
+          type: integer
+        product_id:
+          type: integer
+        quantity:
+          type: number
+          format: float
+        reserved_quantity:
+          type: number
+          format: float
+        last_updated:
+          type: string
+          format: date-time
+    CreateStockAdjustmentRequest:
+      type: object
+      properties:
+        product_id:
+          type: integer
+        adjustment:
+          type: number
+          format: float
+        reason:
+          type: string
+    StockAdjustment:
+      type: object
+      properties:
+        adjustment_id:
+          type: integer
+        location_id:
+          type: integer
+        product_id:
+          type: integer
+        adjustment:
+          type: number
+          format: float
+        reason:
+          type: string
+        created_by:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
