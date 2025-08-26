@@ -192,7 +192,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-- data (DeviceSession)
+ - data ([]DeviceSession)
     - session_id (string)
     - user_id (int)
     - device_id (string)
@@ -291,7 +291,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-- data (User)
+ - data ([]User)
     - user_id (int)
     - company_id,omitempty (*int)
     - location_id,omitempty (*int)
@@ -437,7 +437,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-  - data (object)
+  - data ([]Company)
   - error (string, optional)
   - meta (object, optional)
 
@@ -517,7 +517,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-- data (Location)
+ - data ([]Location)
     - location_id (int)
     - company_id (int)
     - name (string)
@@ -615,7 +615,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-- data (Role)
+ - data ([]Role)
     - role_id (int)
     - name (string)
     - description (string)
@@ -701,7 +701,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-- data (Permission)
+ - data ([]Permission)
     - permission_id (int)
     - name (string)
     - description (string)
@@ -766,7 +766,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-- data (Product)
+ - data ([]Product)
     - product_id (int)
     - company_id (int)
     - category_id,omitempty (*int)
@@ -988,7 +988,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-- data (Category)
+ - data ([]Category)
     - category_id (int)
     - company_id (int)
     - name (string)
@@ -1093,7 +1093,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-- data (Brand)
+ - data ([]Brand)
     - brand_id (int)
     - company_id (int)
     - name (string)
@@ -1142,7 +1142,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-- data (Unit)
+ - data ([]Unit)
     - unit_id (int)
     - name (string)
     - symbol,omitempty (*string)
@@ -2048,7 +2048,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-- data (Customer)
+ - data ([]Customer)
     - customer_id (int)
     - company_id (int)
     - name (string)
@@ -3887,7 +3887,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-- data (Collection)
+ - data ([]Collection)
     - collection_id (int)
     - collection_number (string)
     - customer_id (int)
