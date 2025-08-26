@@ -25,12 +25,12 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **LoginRequest**
-  - Username           string
-  - Email              string
-  - Password           string
-  - DeviceID           string
-  - DeviceName         *string
-  - IncludePreferences bool
+  - username (string)
+  - email (string)
+  - password (string)
+  - device_id (string)
+  - device_name (string, optional)
+  - include_preferences (bool)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -41,7 +41,7 @@ Standard `APIResponse` with fields:
     - refresh_token (string)
     - session_id (string)
     - user (UserResponse)
-    - company,omitempty (*Company)
+    - company (Company, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -52,14 +52,14 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **RegisterRequest**
-  - Username          string
-  - Email             string
-  - Password          string
-  - FirstName         *string
-  - LastName          *string
-  - Phone             *string
-  - PreferredLanguage *string
-  - SecondaryLanguage *string
+  - username (string)
+  - email (string)
+  - password (string)
+  - first_name (string, optional)
+  - last_name (string, optional)
+  - phone (string, optional)
+  - preferred_language (string, optional)
+  - secondary_language (string, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -80,7 +80,7 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **ForgotPasswordRequest**
-  - Email string
+  - email (string)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -97,8 +97,8 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **ResetPasswordRequest**
-  - Token       string
-  - NewPassword string
+  - token (string)
+  - new_password (string)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -115,7 +115,7 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **RefreshTokenRequest**
-  - RefreshToken string
+  - refresh_token (string)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -138,11 +138,11 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
- - data ([]Language)
+ - data (array of Language)
     - language_code (string)
     - language_name (string)
     - is_active (bool)
-    - created_at (time.Time)
+    - created_at (string (RFC3339 timestamp))
   - error (string, optional)
   - meta (object, optional)
 
@@ -192,18 +192,18 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
- - data ([]DeviceSession)
+ - data (array of DeviceSession)
     - session_id (string)
     - user_id (int)
     - device_id (string)
-    - device_name,omitempty (*string)
-    - ip_address,omitempty (*string)
-    - user_agent,omitempty (*string)
-    - last_seen (time.Time)
-    - last_sync_time,omitempty (*time.Time)
+    - device_name (string, optional)
+    - ip_address (string, optional)
+    - user_agent (string, optional)
+    - last_seen (string (RFC3339 timestamp))
+    - last_sync_time (string (RFC3339 timestamp), optional)
     - is_active (bool)
     - is_stale (bool)
-    - created_at (time.Time)
+    - created_at (string (RFC3339 timestamp))
   - error (string, optional)
   - meta (object, optional)
 
@@ -223,14 +223,14 @@ Standard `APIResponse` with fields:
     - session_id (string)
     - user_id (int)
     - device_id (string)
-    - device_name,omitempty (*string)
-    - ip_address,omitempty (*string)
-    - user_agent,omitempty (*string)
-    - last_seen (time.Time)
-    - last_sync_time,omitempty (*time.Time)
+    - device_name (string, optional)
+    - ip_address (string, optional)
+    - user_agent (string, optional)
+    - last_seen (string (RFC3339 timestamp))
+    - last_sync_time (string (RFC3339 timestamp), optional)
     - is_active (bool)
     - is_stale (bool)
-    - created_at (time.Time)
+    - created_at (string (RFC3339 timestamp))
   - error (string, optional)
   - meta (object, optional)
 
@@ -291,22 +291,22 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
- - data ([]User)
+ - data (array of User)
     - user_id (int)
-    - company_id,omitempty (*int)
-    - location_id,omitempty (*int)
-    - role_id,omitempty (*int)
+    - company_id (int, optional)
+    - location_id (int, optional)
+    - role_id (int, optional)
     - username (string)
     - email (string)
-    - first_name,omitempty (*string)
-    - last_name,omitempty (*string)
-    - phone,omitempty (*string)
-    - preferred_language,omitempty (*string)
-    - secondary_language,omitempty (*string)
+    - first_name (string, optional)
+    - last_name (string, optional)
+    - phone (string, optional)
+    - preferred_language (string, optional)
+    - secondary_language (string, optional)
     - max_allowed_devices (int)
     - is_locked (bool)
     - is_active (bool)
-    - last_login,omitempty (*time.Time)
+    - last_login (string (RFC3339 timestamp), optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -318,17 +318,17 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateUserRequest**
-  - Username          string
-  - Email             string
-  - Password          string
-  - FirstName         *string
-  - LastName          *string
-  - Phone             *string
-  - RoleID            *int
-  - LocationID        *int
-  - CompanyID         int
-  - PreferredLanguage *string
-  - SecondaryLanguage *string
+  - username (string)
+  - email (string)
+  - password (string)
+  - first_name (string, optional)
+  - last_name (string, optional)
+  - phone (string, optional)
+  - role_id (int, optional)
+  - location_id (int, optional)
+  - company_id (int)
+  - preferred_language (string, optional)
+  - secondary_language (string, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -336,20 +336,20 @@ Standard `APIResponse` with fields:
   - message (string)
 - data (User)
     - user_id (int)
-    - company_id,omitempty (*int)
-    - location_id,omitempty (*int)
-    - role_id,omitempty (*int)
+    - company_id (int, optional)
+    - location_id (int, optional)
+    - role_id (int, optional)
     - username (string)
     - email (string)
-    - first_name,omitempty (*string)
-    - last_name,omitempty (*string)
-    - phone,omitempty (*string)
-    - preferred_language,omitempty (*string)
-    - secondary_language,omitempty (*string)
+    - first_name (string, optional)
+    - last_name (string, optional)
+    - phone (string, optional)
+    - preferred_language (string, optional)
+    - secondary_language (string, optional)
     - max_allowed_devices (int)
     - is_locked (bool)
     - is_active (bool)
-    - last_login,omitempty (*time.Time)
+    - last_login (string (RFC3339 timestamp), optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -361,15 +361,15 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdateUserRequest**
-  - FirstName         *string
-  - LastName          *string
-  - Phone             *string
-  - IsActive          *bool
-  - IsLocked          *bool
-  - RoleID            *int
-  - LocationID        *int
-  - PreferredLanguage *string
-  - SecondaryLanguage *string
+  - first_name (string, optional)
+  - last_name (string, optional)
+  - phone (string, optional)
+  - is_active (bool, optional)
+  - is_locked (bool, optional)
+  - role_id (int, optional)
+  - location_id (int, optional)
+  - preferred_language (string, optional)
+  - secondary_language (string, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -377,20 +377,20 @@ Standard `APIResponse` with fields:
   - message (string)
 - data (User)
     - user_id (int)
-    - company_id,omitempty (*int)
-    - location_id,omitempty (*int)
-    - role_id,omitempty (*int)
+    - company_id (int, optional)
+    - location_id (int, optional)
+    - role_id (int, optional)
     - username (string)
     - email (string)
-    - first_name,omitempty (*string)
-    - last_name,omitempty (*string)
-    - phone,omitempty (*string)
-    - preferred_language,omitempty (*string)
-    - secondary_language,omitempty (*string)
+    - first_name (string, optional)
+    - last_name (string, optional)
+    - phone (string, optional)
+    - preferred_language (string, optional)
+    - secondary_language (string, optional)
     - max_allowed_devices (int)
     - is_locked (bool)
     - is_active (bool)
-    - last_login,omitempty (*time.Time)
+    - last_login (string (RFC3339 timestamp), optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -408,20 +408,20 @@ Standard `APIResponse` with fields:
   - message (string)
 - data (User)
     - user_id (int)
-    - company_id,omitempty (*int)
-    - location_id,omitempty (*int)
-    - role_id,omitempty (*int)
+    - company_id (int, optional)
+    - location_id (int, optional)
+    - role_id (int, optional)
     - username (string)
     - email (string)
-    - first_name,omitempty (*string)
-    - last_name,omitempty (*string)
-    - phone,omitempty (*string)
-    - preferred_language,omitempty (*string)
-    - secondary_language,omitempty (*string)
+    - first_name (string, optional)
+    - last_name (string, optional)
+    - phone (string, optional)
+    - preferred_language (string, optional)
+    - secondary_language (string, optional)
     - max_allowed_devices (int)
     - is_locked (bool)
     - is_active (bool)
-    - last_login,omitempty (*time.Time)
+    - last_login (string (RFC3339 timestamp), optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -437,7 +437,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-  - data ([]Company)
+  - data (array of Company)
   - error (string, optional)
   - meta (object, optional)
 
@@ -449,13 +449,13 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateCompanyRequest**
-  - Name       string
-  - Logo       *string
-  - Address    *string
-  - Phone      *string
-  - Email      *string
-  - TaxNumber  *string
-  - CurrencyID *int
+  - name (string)
+  - logo (string, optional)
+  - address (string, optional)
+  - phone (string, optional)
+  - email (string, optional)
+  - tax_number (string, optional)
+  - currency_id (int, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -473,14 +473,14 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdateCompanyRequest**
-  - Name       *string
-  - Logo       *string
-  - Address    *string
-  - Phone      *string
-  - Email      *string
-  - TaxNumber  *string
-  - CurrencyID *int
-  - IsActive   *bool
+  - name (string, optional)
+  - logo (string, optional)
+  - address (string, optional)
+  - phone (string, optional)
+  - email (string, optional)
+  - tax_number (string, optional)
+  - currency_id (int, optional)
+  - is_active (bool, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -517,12 +517,12 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
- - data ([]Location)
+ - data (array of Location)
     - location_id (int)
     - company_id (int)
     - name (string)
-    - address,omitempty (*string)
-    - phone,omitempty (*string)
+    - address (string, optional)
+    - phone (string, optional)
     - is_active (bool)
   - error (string, optional)
   - meta (object, optional)
@@ -535,10 +535,10 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateLocationRequest**
-  - CompanyID int
-  - Name      string
-  - Address   *string
-  - Phone     *string
+  - company_id (int)
+  - name (string)
+  - address (string, optional)
+  - phone (string, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -548,8 +548,8 @@ Standard `APIResponse` with fields:
     - location_id (int)
     - company_id (int)
     - name (string)
-    - address,omitempty (*string)
-    - phone,omitempty (*string)
+    - address (string, optional)
+    - phone (string, optional)
     - is_active (bool)
   - error (string, optional)
   - meta (object, optional)
@@ -562,10 +562,10 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdateLocationRequest**
-  - Name     *string
-  - Address  *string
-  - Phone    *string
-  - IsActive *bool
+  - name (string, optional)
+  - address (string, optional)
+  - phone (string, optional)
+  - is_active (bool, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -575,8 +575,8 @@ Standard `APIResponse` with fields:
     - location_id (int)
     - company_id (int)
     - name (string)
-    - address,omitempty (*string)
-    - phone,omitempty (*string)
+    - address (string, optional)
+    - phone (string, optional)
     - is_active (bool)
   - error (string, optional)
   - meta (object, optional)
@@ -597,8 +597,8 @@ Standard `APIResponse` with fields:
     - location_id (int)
     - company_id (int)
     - name (string)
-    - address,omitempty (*string)
-    - phone,omitempty (*string)
+    - address (string, optional)
+    - phone (string, optional)
     - is_active (bool)
   - error (string, optional)
   - meta (object, optional)
@@ -615,7 +615,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
- - data ([]Role)
+ - data (array of Role)
     - role_id (int)
     - name (string)
     - description (string)
@@ -631,8 +631,8 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateRoleRequest**
-  - Name        string
-  - Description string
+  - name (string)
+  - description (string)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -654,8 +654,8 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdateRoleRequest**
-  - Name        *string
-  - Description *string
+  - name (string, optional)
+  - description (string, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -701,7 +701,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
- - data ([]Permission)
+ - data (array of Permission)
     - permission_id (int)
     - name (string)
     - description (string)
@@ -718,7 +718,7 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **AssignPermissionsRequest**
-  - PermissionIDs []int
+  - permission_ids (array of int)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -745,7 +745,7 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
-- data ([]Permission)
+- data (array of Permission)
     - permission_id (int)
     - name (string)
     - description (string)
@@ -766,26 +766,26 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
- - data ([]Product)
+ - data (array of Product)
     - product_id (int)
     - company_id (int)
-    - category_id,omitempty (*int)
-    - brand_id,omitempty (*int)
-    - unit_id,omitempty (*int)
+    - category_id (int, optional)
+    - brand_id (int, optional)
+    - unit_id (int, optional)
     - name (string)
-    - sku,omitempty (*string)
-    - barcodes,omitempty ([]ProductBarcode)
-    - description,omitempty (*string)
-    - cost_price,omitempty (*float64)
-    - selling_price,omitempty (*float64)
+    - sku (string, optional)
+    - barcodes (array of ProductBarcode, optional)
+    - description (string, optional)
+    - cost_price (number, optional)
+    - selling_price (number, optional)
     - reorder_level (int)
-    - weight,omitempty (*float64)
-    - dimensions,omitempty (*string)
+    - weight (number, optional)
+    - dimensions (string, optional)
     - is_serialized (bool)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - attributes,omitempty ([]ProductAttributeValue)
+    - updated_by (int, optional)
+    - attributes (array of ProductAttributeValue, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -804,23 +804,23 @@ Standard `APIResponse` with fields:
 - data (Product)
     - product_id (int)
     - company_id (int)
-    - category_id,omitempty (*int)
-    - brand_id,omitempty (*int)
-    - unit_id,omitempty (*int)
+    - category_id (int, optional)
+    - brand_id (int, optional)
+    - unit_id (int, optional)
     - name (string)
-    - sku,omitempty (*string)
-    - barcodes,omitempty ([]ProductBarcode)
-    - description,omitempty (*string)
-    - cost_price,omitempty (*float64)
-    - selling_price,omitempty (*float64)
+    - sku (string, optional)
+    - barcodes (array of ProductBarcode, optional)
+    - description (string, optional)
+    - cost_price (number, optional)
+    - selling_price (number, optional)
     - reorder_level (int)
-    - weight,omitempty (*float64)
-    - dimensions,omitempty (*string)
+    - weight (number, optional)
+    - dimensions (string, optional)
     - is_serialized (bool)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - attributes,omitempty ([]ProductAttributeValue)
+    - updated_by (int, optional)
+    - attributes (array of ProductAttributeValue, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -848,20 +848,20 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateProductRequest**
-  - CategoryID   *int
-  - BrandID      *int
-  - UnitID       *int
-  - Name         string
-  - SKU          *string
-  - Barcodes     []ProductBarcode
-  - Description  *string
-  - CostPrice    *float64
-  - SellingPrice *float64
-  - ReorderLevel int
-  - Weight       *float64
-  - Dimensions   *string
-  - IsSerialized bool
-  - Attributes   map[int]string
+  - category_id (int, optional)
+  - brand_id (int, optional)
+  - unit_id (int, optional)
+  - name (string)
+  - sku (string, optional)
+  - barcodes (array of ProductBarcode)
+  - description (string, optional)
+  - cost_price (number, optional)
+  - selling_price (number, optional)
+  - reorder_level (int)
+  - weight (number, optional)
+  - dimensions (string, optional)
+  - is_serialized (bool)
+  - attributes (object mapping int to string)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -870,23 +870,23 @@ Standard `APIResponse` with fields:
 - data (Product)
     - product_id (int)
     - company_id (int)
-    - category_id,omitempty (*int)
-    - brand_id,omitempty (*int)
-    - unit_id,omitempty (*int)
+    - category_id (int, optional)
+    - brand_id (int, optional)
+    - unit_id (int, optional)
     - name (string)
-    - sku,omitempty (*string)
-    - barcodes,omitempty ([]ProductBarcode)
-    - description,omitempty (*string)
-    - cost_price,omitempty (*float64)
-    - selling_price,omitempty (*float64)
+    - sku (string, optional)
+    - barcodes (array of ProductBarcode, optional)
+    - description (string, optional)
+    - cost_price (number, optional)
+    - selling_price (number, optional)
     - reorder_level (int)
-    - weight,omitempty (*float64)
-    - dimensions,omitempty (*string)
+    - weight (number, optional)
+    - dimensions (string, optional)
     - is_serialized (bool)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - attributes,omitempty ([]ProductAttributeValue)
+    - updated_by (int, optional)
+    - attributes (array of ProductAttributeValue, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -898,21 +898,21 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdateProductRequest**
-  - CategoryID   *int
-  - BrandID      *int
-  - UnitID       *int
-  - Name         *string
-  - SKU          *string
-  - Barcodes     []ProductBarcode
-  - Description  *string
-  - CostPrice    *float64
-  - SellingPrice *float64
-  - ReorderLevel *int
-  - Weight       *float64
-  - Dimensions   *string
-  - IsSerialized *bool
-  - IsActive     *bool
-  - Attributes   map[int]string
+  - category_id (int, optional)
+  - brand_id (int, optional)
+  - unit_id (int, optional)
+  - name (string, optional)
+  - sku (string, optional)
+  - barcodes (array of ProductBarcode)
+  - description (string, optional)
+  - cost_price (number, optional)
+  - selling_price (number, optional)
+  - reorder_level (int, optional)
+  - weight (number, optional)
+  - dimensions (string, optional)
+  - is_serialized (bool, optional)
+  - is_active (bool, optional)
+  - attributes (object mapping int to string)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -921,23 +921,23 @@ Standard `APIResponse` with fields:
 - data (Product)
     - product_id (int)
     - company_id (int)
-    - category_id,omitempty (*int)
-    - brand_id,omitempty (*int)
-    - unit_id,omitempty (*int)
+    - category_id (int, optional)
+    - brand_id (int, optional)
+    - unit_id (int, optional)
     - name (string)
-    - sku,omitempty (*string)
-    - barcodes,omitempty ([]ProductBarcode)
-    - description,omitempty (*string)
-    - cost_price,omitempty (*float64)
-    - selling_price,omitempty (*float64)
+    - sku (string, optional)
+    - barcodes (array of ProductBarcode, optional)
+    - description (string, optional)
+    - cost_price (number, optional)
+    - selling_price (number, optional)
     - reorder_level (int)
-    - weight,omitempty (*float64)
-    - dimensions,omitempty (*string)
+    - weight (number, optional)
+    - dimensions (string, optional)
     - is_serialized (bool)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - attributes,omitempty ([]ProductAttributeValue)
+    - updated_by (int, optional)
+    - attributes (array of ProductAttributeValue, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -956,23 +956,23 @@ Standard `APIResponse` with fields:
 - data (Product)
     - product_id (int)
     - company_id (int)
-    - category_id,omitempty (*int)
-    - brand_id,omitempty (*int)
-    - unit_id,omitempty (*int)
+    - category_id (int, optional)
+    - brand_id (int, optional)
+    - unit_id (int, optional)
     - name (string)
-    - sku,omitempty (*string)
-    - barcodes,omitempty ([]ProductBarcode)
-    - description,omitempty (*string)
-    - cost_price,omitempty (*float64)
-    - selling_price,omitempty (*float64)
+    - sku (string, optional)
+    - barcodes (array of ProductBarcode, optional)
+    - description (string, optional)
+    - cost_price (number, optional)
+    - selling_price (number, optional)
     - reorder_level (int)
-    - weight,omitempty (*float64)
-    - dimensions,omitempty (*string)
+    - weight (number, optional)
+    - dimensions (string, optional)
     - is_serialized (bool)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - attributes,omitempty ([]ProductAttributeValue)
+    - updated_by (int, optional)
+    - attributes (array of ProductAttributeValue, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -988,15 +988,15 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
- - data ([]Category)
+ - data (array of Category)
     - category_id (int)
     - company_id (int)
     - name (string)
-    - description,omitempty (*string)
-    - parent_id,omitempty (*int)
+    - description (string, optional)
+    - parent_id (int, optional)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
+    - updated_by (int, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1008,9 +1008,9 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateCategoryRequest**
-  - Name        string
-  - Description *string
-  - ParentID    *int
+  - name (string)
+  - description (string, optional)
+  - parent_id (int, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -1020,11 +1020,11 @@ Standard `APIResponse` with fields:
     - category_id (int)
     - company_id (int)
     - name (string)
-    - description,omitempty (*string)
-    - parent_id,omitempty (*int)
+    - description (string, optional)
+    - parent_id (int, optional)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
+    - updated_by (int, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1036,10 +1036,10 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdateCategoryRequest**
-  - Name        *string
-  - Description *string
-  - ParentID    *int
-  - IsActive    *bool
+  - name (string, optional)
+  - description (string, optional)
+  - parent_id (int, optional)
+  - is_active (bool, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -1049,11 +1049,11 @@ Standard `APIResponse` with fields:
     - category_id (int)
     - company_id (int)
     - name (string)
-    - description,omitempty (*string)
-    - parent_id,omitempty (*int)
+    - description (string, optional)
+    - parent_id (int, optional)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
+    - updated_by (int, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1073,11 +1073,11 @@ Standard `APIResponse` with fields:
     - category_id (int)
     - company_id (int)
     - name (string)
-    - description,omitempty (*string)
-    - parent_id,omitempty (*int)
+    - description (string, optional)
+    - parent_id (int, optional)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
+    - updated_by (int, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1093,14 +1093,14 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
- - data ([]Brand)
+ - data (array of Brand)
     - brand_id (int)
     - company_id (int)
     - name (string)
-    - description,omitempty (*string)
+    - description (string, optional)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
+    - updated_by (int, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1112,8 +1112,8 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateBrandRequest**
-  - Name        string
-  - Description *string
+  - name (string)
+  - description (string, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -1123,10 +1123,10 @@ Standard `APIResponse` with fields:
     - brand_id (int)
     - company_id (int)
     - name (string)
-    - description,omitempty (*string)
+    - description (string, optional)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
+    - updated_by (int, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1142,12 +1142,12 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
- - data ([]Unit)
+ - data (array of Unit)
     - unit_id (int)
     - name (string)
-    - symbol,omitempty (*string)
-    - base_unit_id,omitempty (*int)
-    - conversion_factor,omitempty (*float64)
+    - symbol (string, optional)
+    - base_unit_id (int, optional)
+    - conversion_factor (number, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1159,10 +1159,10 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateUnitRequest**
-  - Name             string
-  - Symbol           *string
-  - BaseUnitID       *int
-  - ConversionFactor *float64
+  - name (string)
+  - symbol (string, optional)
+  - base_unit_id (int, optional)
+  - conversion_factor (number, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -1171,9 +1171,9 @@ Standard `APIResponse` with fields:
 - data (Unit)
     - unit_id (int)
     - name (string)
-    - symbol,omitempty (*string)
-    - base_unit_id,omitempty (*int)
-    - conversion_factor,omitempty (*float64)
+    - symbol (string, optional)
+    - base_unit_id (int, optional)
+    - conversion_factor (number, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1195,7 +1195,7 @@ Standard `APIResponse` with fields:
     - name (string)
     - type (string)
     - is_required (bool)
-    - options,omitempty (*string)
+    - options (string, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1217,7 +1217,7 @@ Standard `APIResponse` with fields:
     - name (string)
     - type (string)
     - is_required (bool)
-    - options,omitempty (*string)
+    - options (string, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1239,7 +1239,7 @@ Standard `APIResponse` with fields:
     - name (string)
     - type (string)
     - is_required (bool)
-    - options,omitempty (*string)
+    - options (string, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1261,7 +1261,7 @@ Standard `APIResponse` with fields:
     - name (string)
     - type (string)
     - is_required (bool)
-    - options,omitempty (*string)
+    - options (string, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1281,9 +1281,9 @@ Standard `APIResponse` with fields:
     - stock_id (int)
     - location_id (int)
     - product_id (int)
-    - quantity (float64)
-    - reserved_quantity (float64)
-    - last_updated (time.Time)
+    - quantity (number)
+    - reserved_quantity (number)
+    - last_updated (string (RFC3339 timestamp))
   - error (string, optional)
   - meta (object, optional)
 
@@ -1295,9 +1295,9 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateStockAdjustmentRequest**
-  - ProductID  int
-  - Adjustment float64
-  - Reason     string
+  - product_id (int)
+  - adjustment (number)
+  - reason (string)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -1307,10 +1307,10 @@ Standard `APIResponse` with fields:
     - adjustment_id (int)
     - location_id (int)
     - product_id (int)
-    - adjustment (float64)
+    - adjustment (number)
     - reason (string)
     - created_by (int)
-    - created_at (time.Time)
+    - created_at (string (RFC3339 timestamp))
   - error (string, optional)
   - meta (object, optional)
 
@@ -1330,10 +1330,10 @@ Standard `APIResponse` with fields:
     - adjustment_id (int)
     - location_id (int)
     - product_id (int)
-    - adjustment (float64)
+    - adjustment (number)
     - reason (string)
     - created_by (int)
-    - created_at (time.Time)
+    - created_at (string (RFC3339 timestamp))
   - error (string, optional)
   - meta (object, optional)
 
@@ -1393,7 +1393,7 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **BarcodeRequest**
-  - ProductIDs []int
+  - product_ids (array of int)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -1443,9 +1443,9 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateStockTransferRequest**
-  - ToLocationID int
-  - Notes        *string
-  - Items        []CreateStockTransferDetailRequest
+  - to_location_id (int)
+  - notes (string, optional)
+  - items (array of CreateStockTransferDetailRequest)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -1519,24 +1519,24 @@ Standard `APIResponse` with fields:
     - sale_id (int)
     - sale_number (string)
     - location_id (int)
-    - customer_id,omitempty (*int)
-    - sale_date (time.Time)
-    - sale_time,omitempty (*time.Time)
-    - subtotal (float64)
-    - tax_amount (float64)
-    - discount_amount (float64)
-    - total_amount (float64)
-    - paid_amount (float64)
-    - payment_method_id,omitempty (*int)
+    - customer_id (int, optional)
+    - sale_date (string (RFC3339 timestamp))
+    - sale_time (string (RFC3339 timestamp), optional)
+    - subtotal (number)
+    - tax_amount (number)
+    - discount_amount (number)
+    - total_amount (number)
+    - paid_amount (number)
+    - payment_method_id (int, optional)
     - status (string)
     - pos_status (string)
     - is_quick_sale (bool)
-    - notes,omitempty (*string)
+    - notes (string, optional)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - items,omitempty ([]SaleDetail)
-    - customer,omitempty (*Customer)
-    - payment_method,omitempty (*PaymentMethod)
+    - updated_by (int, optional)
+    - items (array of SaleDetail, optional)
+    - customer (Customer, optional)
+    - payment_method (PaymentMethod, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1588,24 +1588,24 @@ Standard `APIResponse` with fields:
     - sale_id (int)
     - sale_number (string)
     - location_id (int)
-    - customer_id,omitempty (*int)
-    - sale_date (time.Time)
-    - sale_time,omitempty (*time.Time)
-    - subtotal (float64)
-    - tax_amount (float64)
-    - discount_amount (float64)
-    - total_amount (float64)
-    - paid_amount (float64)
-    - payment_method_id,omitempty (*int)
+    - customer_id (int, optional)
+    - sale_date (string (RFC3339 timestamp))
+    - sale_time (string (RFC3339 timestamp), optional)
+    - subtotal (number)
+    - tax_amount (number)
+    - discount_amount (number)
+    - total_amount (number)
+    - paid_amount (number)
+    - payment_method_id (int, optional)
     - status (string)
     - pos_status (string)
     - is_quick_sale (bool)
-    - notes,omitempty (*string)
+    - notes (string, optional)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - items,omitempty ([]SaleDetail)
-    - customer,omitempty (*Customer)
-    - payment_method,omitempty (*PaymentMethod)
+    - updated_by (int, optional)
+    - items (array of SaleDetail, optional)
+    - customer (Customer, optional)
+    - payment_method (PaymentMethod, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1617,12 +1617,12 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateSaleRequest**
-  - CustomerID      *int
-  - Items           []CreateSaleDetailRequest
-  - PaymentMethodID *int
-  - PaidAmount      float64
-  - DiscountAmount  float64
-  - Notes           *string
+  - customer_id (int, optional)
+  - items (array of CreateSaleDetailRequest)
+  - payment_method_id (int, optional)
+  - paid_amount (number)
+  - discount_amount (number)
+  - notes (string, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -1632,24 +1632,24 @@ Standard `APIResponse` with fields:
     - sale_id (int)
     - sale_number (string)
     - location_id (int)
-    - customer_id,omitempty (*int)
-    - sale_date (time.Time)
-    - sale_time,omitempty (*time.Time)
-    - subtotal (float64)
-    - tax_amount (float64)
-    - discount_amount (float64)
-    - total_amount (float64)
-    - paid_amount (float64)
-    - payment_method_id,omitempty (*int)
+    - customer_id (int, optional)
+    - sale_date (string (RFC3339 timestamp))
+    - sale_time (string (RFC3339 timestamp), optional)
+    - subtotal (number)
+    - tax_amount (number)
+    - discount_amount (number)
+    - total_amount (number)
+    - paid_amount (number)
+    - payment_method_id (int, optional)
     - status (string)
     - pos_status (string)
     - is_quick_sale (bool)
-    - notes,omitempty (*string)
+    - notes (string, optional)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - items,omitempty ([]SaleDetail)
-    - customer,omitempty (*Customer)
-    - payment_method,omitempty (*PaymentMethod)
+    - updated_by (int, optional)
+    - items (array of SaleDetail, optional)
+    - customer (Customer, optional)
+    - payment_method (PaymentMethod, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1661,9 +1661,9 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdateSaleRequest**
-  - PaymentMethodID *int
-  - Notes           *string
-  - Status          *string
+  - payment_method_id (int, optional)
+  - notes (string, optional)
+  - status (string, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -1673,24 +1673,24 @@ Standard `APIResponse` with fields:
     - sale_id (int)
     - sale_number (string)
     - location_id (int)
-    - customer_id,omitempty (*int)
-    - sale_date (time.Time)
-    - sale_time,omitempty (*time.Time)
-    - subtotal (float64)
-    - tax_amount (float64)
-    - discount_amount (float64)
-    - total_amount (float64)
-    - paid_amount (float64)
-    - payment_method_id,omitempty (*int)
+    - customer_id (int, optional)
+    - sale_date (string (RFC3339 timestamp))
+    - sale_time (string (RFC3339 timestamp), optional)
+    - subtotal (number)
+    - tax_amount (number)
+    - discount_amount (number)
+    - total_amount (number)
+    - paid_amount (number)
+    - payment_method_id (int, optional)
     - status (string)
     - pos_status (string)
     - is_quick_sale (bool)
-    - notes,omitempty (*string)
+    - notes (string, optional)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - items,omitempty ([]SaleDetail)
-    - customer,omitempty (*Customer)
-    - payment_method,omitempty (*PaymentMethod)
+    - updated_by (int, optional)
+    - items (array of SaleDetail, optional)
+    - customer (Customer, optional)
+    - payment_method (PaymentMethod, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1710,24 +1710,24 @@ Standard `APIResponse` with fields:
     - sale_id (int)
     - sale_number (string)
     - location_id (int)
-    - customer_id,omitempty (*int)
-    - sale_date (time.Time)
-    - sale_time,omitempty (*time.Time)
-    - subtotal (float64)
-    - tax_amount (float64)
-    - discount_amount (float64)
-    - total_amount (float64)
-    - paid_amount (float64)
-    - payment_method_id,omitempty (*int)
+    - customer_id (int, optional)
+    - sale_date (string (RFC3339 timestamp))
+    - sale_time (string (RFC3339 timestamp), optional)
+    - subtotal (number)
+    - tax_amount (number)
+    - discount_amount (number)
+    - total_amount (number)
+    - paid_amount (number)
+    - payment_method_id (int, optional)
     - status (string)
     - pos_status (string)
     - is_quick_sale (bool)
-    - notes,omitempty (*string)
+    - notes (string, optional)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - items,omitempty ([]SaleDetail)
-    - customer,omitempty (*Customer)
-    - payment_method,omitempty (*PaymentMethod)
+    - updated_by (int, optional)
+    - items (array of SaleDetail, optional)
+    - customer (Customer, optional)
+    - payment_method (PaymentMethod, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1771,7 +1771,7 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **QuickSaleRequest**
-  - Items []CreateSaleDetailRequest
+  - items (array of CreateSaleDetailRequest)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -1797,19 +1797,19 @@ Standard `APIResponse` with fields:
     - quote_id (int)
     - quote_number (string)
     - location_id (int)
-    - customer_id,omitempty (*int)
-    - quote_date (time.Time)
-    - valid_until,omitempty (*time.Time)
-    - subtotal (float64)
-    - tax_amount (float64)
-    - discount_amount (float64)
-    - total_amount (float64)
+    - customer_id (int, optional)
+    - quote_date (string (RFC3339 timestamp))
+    - valid_until (string (RFC3339 timestamp), optional)
+    - subtotal (number)
+    - tax_amount (number)
+    - discount_amount (number)
+    - total_amount (number)
     - status (string)
-    - notes,omitempty (*string)
+    - notes (string, optional)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - items,omitempty ([]QuoteItem)
-    - customer,omitempty (*Customer)
+    - updated_by (int, optional)
+    - items (array of QuoteItem, optional)
+    - customer (Customer, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1845,19 +1845,19 @@ Standard `APIResponse` with fields:
     - quote_id (int)
     - quote_number (string)
     - location_id (int)
-    - customer_id,omitempty (*int)
-    - quote_date (time.Time)
-    - valid_until,omitempty (*time.Time)
-    - subtotal (float64)
-    - tax_amount (float64)
-    - discount_amount (float64)
-    - total_amount (float64)
+    - customer_id (int, optional)
+    - quote_date (string (RFC3339 timestamp))
+    - valid_until (string (RFC3339 timestamp), optional)
+    - subtotal (number)
+    - tax_amount (number)
+    - discount_amount (number)
+    - total_amount (number)
     - status (string)
-    - notes,omitempty (*string)
+    - notes (string, optional)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - items,omitempty ([]QuoteItem)
-    - customer,omitempty (*Customer)
+    - updated_by (int, optional)
+    - items (array of QuoteItem, optional)
+    - customer (Customer, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1869,11 +1869,11 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateQuoteRequest**
-  - CustomerID     *int
-  - Items          []CreateQuoteItemRequest
-  - DiscountAmount float64
-  - ValidUntil     time.Time
-  - Notes          *string
+  - customer_id (int, optional)
+  - items (array of CreateQuoteItemRequest)
+  - discount_amount (number)
+  - valid_until (string (RFC3339 timestamp))
+  - notes (string, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -1883,19 +1883,19 @@ Standard `APIResponse` with fields:
     - quote_id (int)
     - quote_number (string)
     - location_id (int)
-    - customer_id,omitempty (*int)
-    - quote_date (time.Time)
-    - valid_until,omitempty (*time.Time)
-    - subtotal (float64)
-    - tax_amount (float64)
-    - discount_amount (float64)
-    - total_amount (float64)
+    - customer_id (int, optional)
+    - quote_date (string (RFC3339 timestamp))
+    - valid_until (string (RFC3339 timestamp), optional)
+    - subtotal (number)
+    - tax_amount (number)
+    - discount_amount (number)
+    - total_amount (number)
     - status (string)
-    - notes,omitempty (*string)
+    - notes (string, optional)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - items,omitempty ([]QuoteItem)
-    - customer,omitempty (*Customer)
+    - updated_by (int, optional)
+    - items (array of QuoteItem, optional)
+    - customer (Customer, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1907,9 +1907,9 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdateQuoteRequest**
-  - Status     *string
-  - Notes      *string
-  - ValidUntil *time.Time
+  - status (string, optional)
+  - notes (string, optional)
+  - valid_until (string (RFC3339 timestamp), optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -1919,19 +1919,19 @@ Standard `APIResponse` with fields:
     - quote_id (int)
     - quote_number (string)
     - location_id (int)
-    - customer_id,omitempty (*int)
-    - quote_date (time.Time)
-    - valid_until,omitempty (*time.Time)
-    - subtotal (float64)
-    - tax_amount (float64)
-    - discount_amount (float64)
-    - total_amount (float64)
+    - customer_id (int, optional)
+    - quote_date (string (RFC3339 timestamp))
+    - valid_until (string (RFC3339 timestamp), optional)
+    - subtotal (number)
+    - tax_amount (number)
+    - discount_amount (number)
+    - total_amount (number)
     - status (string)
-    - notes,omitempty (*string)
+    - notes (string, optional)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - items,omitempty ([]QuoteItem)
-    - customer,omitempty (*Customer)
+    - updated_by (int, optional)
+    - items (array of QuoteItem, optional)
+    - customer (Customer, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1951,19 +1951,19 @@ Standard `APIResponse` with fields:
     - quote_id (int)
     - quote_number (string)
     - location_id (int)
-    - customer_id,omitempty (*int)
-    - quote_date (time.Time)
-    - valid_until,omitempty (*time.Time)
-    - subtotal (float64)
-    - tax_amount (float64)
-    - discount_amount (float64)
-    - total_amount (float64)
+    - customer_id (int, optional)
+    - quote_date (string (RFC3339 timestamp))
+    - valid_until (string (RFC3339 timestamp), optional)
+    - subtotal (number)
+    - tax_amount (number)
+    - discount_amount (number)
+    - total_amount (number)
     - status (string)
-    - notes,omitempty (*string)
+    - notes (string, optional)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - items,omitempty ([]QuoteItem)
-    - customer,omitempty (*Customer)
+    - updated_by (int, optional)
+    - items (array of QuoteItem, optional)
+    - customer (Customer, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -1991,7 +1991,7 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **ShareQuoteRequest**
-  - Email string
+  - email (string)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -2016,23 +2016,23 @@ Standard `APIResponse` with fields:
 - data (Product)
     - product_id (int)
     - company_id (int)
-    - category_id,omitempty (*int)
-    - brand_id,omitempty (*int)
-    - unit_id,omitempty (*int)
+    - category_id (int, optional)
+    - brand_id (int, optional)
+    - unit_id (int, optional)
     - name (string)
-    - sku,omitempty (*string)
-    - barcodes,omitempty ([]ProductBarcode)
-    - description,omitempty (*string)
-    - cost_price,omitempty (*float64)
-    - selling_price,omitempty (*float64)
+    - sku (string, optional)
+    - barcodes (array of ProductBarcode, optional)
+    - description (string, optional)
+    - cost_price (number, optional)
+    - selling_price (number, optional)
     - reorder_level (int)
-    - weight,omitempty (*float64)
-    - dimensions,omitempty (*string)
+    - weight (number, optional)
+    - dimensions (string, optional)
     - is_serialized (bool)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - attributes,omitempty ([]ProductAttributeValue)
+    - updated_by (int, optional)
+    - attributes (array of ProductAttributeValue, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2048,21 +2048,21 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
- - data ([]Customer)
+ - data (array of Customer)
     - customer_id (int)
     - company_id (int)
     - name (string)
-    - phone,omitempty (*string)
-    - email,omitempty (*string)
-    - address,omitempty (*string)
-    - tax_number,omitempty (*string)
-    - credit_limit (float64)
+    - phone (string, optional)
+    - email (string, optional)
+    - address (string, optional)
+    - tax_number (string, optional)
+    - credit_limit (number)
     - payment_terms (int)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - credit_balance,omitempty (float64)
-    - invoices,omitempty ([]CustomerInvoiceReference)
+    - updated_by (int, optional)
+    - credit_balance (number, optional)
+    - invoices (array of CustomerInvoiceReference, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2074,11 +2074,11 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **POSCheckoutRequest**
-  - CustomerID      *int
-  - Items           []CreateSaleDetailRequest
-  - PaymentMethodID *int
-  - DiscountAmount  float64
-  - PaidAmount      float64
+  - customer_id (int, optional)
+  - items (array of CreateSaleDetailRequest)
+  - payment_method_id (int, optional)
+  - discount_amount (number)
+  - paid_amount (number)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -2096,7 +2096,7 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **POSPrintRequest**
-  - InvoiceID int
+  - invoice_id (int)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -2136,10 +2136,10 @@ Standard `APIResponse` with fields:
   - message (string)
 - data (PaymentMethod)
     - method_id (int)
-    - company_id,omitempty (*int)
+    - company_id (int, optional)
     - name (string)
     - type (string)
-    - external_integration,omitempty (*JSONB)
+    - external_integration (JSONB, optional)
     - is_active (bool)
   - error (string, optional)
   - meta (object, optional)
@@ -2158,9 +2158,9 @@ Standard `APIResponse` with fields:
   - message (string)
 - data (SalesSummary)
     - period (string)
-    - total_sales (float64)
+    - total_sales (number)
     - transactions (int)
-    - outstanding (float64)
+    - outstanding (number)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2195,11 +2195,11 @@ Standard `APIResponse` with fields:
 - data (LoyaltyProgram)
     - loyalty_id (int)
     - customer_id (int)
-    - points (float64)
-    - total_earned (float64)
-    - total_redeemed (float64)
-    - last_updated (time.Time)
-    - customer,omitempty (*Customer)
+    - points (number)
+    - total_earned (number)
+    - total_redeemed (number)
+    - last_updated (string (RFC3339 timestamp))
+    - customer (Customer, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2218,11 +2218,11 @@ Standard `APIResponse` with fields:
 - data (LoyaltyProgram)
     - loyalty_id (int)
     - customer_id (int)
-    - points (float64)
-    - total_earned (float64)
-    - total_redeemed (float64)
-    - last_updated (time.Time)
-    - customer,omitempty (*Customer)
+    - points (number)
+    - total_earned (number)
+    - total_redeemed (number)
+    - last_updated (string (RFC3339 timestamp))
+    - customer (Customer, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2240,13 +2240,13 @@ Standard `APIResponse` with fields:
   - message (string)
 - data (LoyaltyRedemption)
     - redemption_id (int)
-    - sale_id,omitempty (*int)
+    - sale_id (int, optional)
     - customer_id (int)
-    - points_used (float64)
-    - value_redeemed (float64)
-    - redeemed_at (time.Time)
-    - customer,omitempty (*Customer)
-    - sale,omitempty (*Sale)
+    - points_used (number)
+    - value_redeemed (number)
+    - redeemed_at (string (RFC3339 timestamp))
+    - customer (Customer, optional)
+    - sale (Sale, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2258,9 +2258,9 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateLoyaltyRedemptionRequest**
-  - CustomerID int
-  - PointsUsed float64
-  - Reference  *string
+  - customer_id (int)
+  - points_used (number)
+  - reference (string, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -2268,13 +2268,13 @@ Standard `APIResponse` with fields:
   - message (string)
 - data (LoyaltyRedemption)
     - redemption_id (int)
-    - sale_id,omitempty (*int)
+    - sale_id (int, optional)
     - customer_id (int)
-    - points_used (float64)
-    - value_redeemed (float64)
-    - redeemed_at (time.Time)
-    - customer,omitempty (*Customer)
-    - sale,omitempty (*Sale)
+    - points_used (number)
+    - value_redeemed (number)
+    - redeemed_at (string (RFC3339 timestamp))
+    - customer (Customer, optional)
+    - sale (Sale, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2293,13 +2293,13 @@ Standard `APIResponse` with fields:
 - data (Setting)
     - setting_id (int)
     - company_id (int)
-    - location_id,omitempty (*int)
+    - location_id (int, optional)
     - key (string)
     - value (JSONB)
-    - description,omitempty (*string)
+    - description (string, optional)
     - data_type (string)
-    - created_at (time.Time)
-    - updated_at (time.Time)
+    - created_at (string (RFC3339 timestamp))
+    - updated_at (string (RFC3339 timestamp))
   - error (string, optional)
   - meta (object, optional)
 
@@ -2335,14 +2335,14 @@ Standard `APIResponse` with fields:
     - promotion_id (int)
     - company_id (int)
     - name (string)
-    - description,omitempty (*string)
-    - discount_type,omitempty (*string)
-    - value,omitempty (*float64)
-    - min_amount,omitempty (*float64)
-    - start_date (time.Time)
-    - end_date (time.Time)
-    - applicable_to,omitempty (*string)
-    - conditions,omitempty (*JSONB)
+    - description (string, optional)
+    - discount_type (string, optional)
+    - value (number, optional)
+    - min_amount (number, optional)
+    - start_date (string (RFC3339 timestamp))
+    - end_date (string (RFC3339 timestamp))
+    - applicable_to (string, optional)
+    - conditions (JSONB, optional)
     - is_active (bool)
   - error (string, optional)
   - meta (object, optional)
@@ -2355,15 +2355,15 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreatePromotionRequest**
-  - Name         string
-  - Description  *string
-  - DiscountType *string
-  - Value        *float64
-  - MinAmount    *float64
-  - StartDate    string
-  - EndDate      string
-  - ApplicableTo *string
-  - Conditions   *JSONB
+  - name (string)
+  - description (string, optional)
+  - discount_type (string, optional)
+  - value (number, optional)
+  - min_amount (number, optional)
+  - start_date (string)
+  - end_date (string)
+  - applicable_to (string, optional)
+  - conditions (JSONB, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -2373,14 +2373,14 @@ Standard `APIResponse` with fields:
     - promotion_id (int)
     - company_id (int)
     - name (string)
-    - description,omitempty (*string)
-    - discount_type,omitempty (*string)
-    - value,omitempty (*float64)
-    - min_amount,omitempty (*float64)
-    - start_date (time.Time)
-    - end_date (time.Time)
-    - applicable_to,omitempty (*string)
-    - conditions,omitempty (*JSONB)
+    - description (string, optional)
+    - discount_type (string, optional)
+    - value (number, optional)
+    - min_amount (number, optional)
+    - start_date (string (RFC3339 timestamp))
+    - end_date (string (RFC3339 timestamp))
+    - applicable_to (string, optional)
+    - conditions (JSONB, optional)
     - is_active (bool)
   - error (string, optional)
   - meta (object, optional)
@@ -2393,16 +2393,16 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdatePromotionRequest**
-  - Name         *string
-  - Description  *string
-  - DiscountType *string
-  - Value        *float64
-  - MinAmount    *float64
-  - StartDate    *string
-  - EndDate      *string
-  - ApplicableTo *string
-  - Conditions   *JSONB
-  - IsActive     *bool
+  - name (string, optional)
+  - description (string, optional)
+  - discount_type (string, optional)
+  - value (number, optional)
+  - min_amount (number, optional)
+  - start_date (string, optional)
+  - end_date (string, optional)
+  - applicable_to (string, optional)
+  - conditions (JSONB, optional)
+  - is_active (bool, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -2412,14 +2412,14 @@ Standard `APIResponse` with fields:
     - promotion_id (int)
     - company_id (int)
     - name (string)
-    - description,omitempty (*string)
-    - discount_type,omitempty (*string)
-    - value,omitempty (*float64)
-    - min_amount,omitempty (*float64)
-    - start_date (time.Time)
-    - end_date (time.Time)
-    - applicable_to,omitempty (*string)
-    - conditions,omitempty (*JSONB)
+    - description (string, optional)
+    - discount_type (string, optional)
+    - value (number, optional)
+    - min_amount (number, optional)
+    - start_date (string (RFC3339 timestamp))
+    - end_date (string (RFC3339 timestamp))
+    - applicable_to (string, optional)
+    - conditions (JSONB, optional)
     - is_active (bool)
   - error (string, optional)
   - meta (object, optional)
@@ -2440,14 +2440,14 @@ Standard `APIResponse` with fields:
     - promotion_id (int)
     - company_id (int)
     - name (string)
-    - description,omitempty (*string)
-    - discount_type,omitempty (*string)
-    - value,omitempty (*float64)
-    - min_amount,omitempty (*float64)
-    - start_date (time.Time)
-    - end_date (time.Time)
-    - applicable_to,omitempty (*string)
-    - conditions,omitempty (*JSONB)
+    - description (string, optional)
+    - discount_type (string, optional)
+    - value (number, optional)
+    - min_amount (number, optional)
+    - start_date (string (RFC3339 timestamp))
+    - end_date (string (RFC3339 timestamp))
+    - applicable_to (string, optional)
+    - conditions (JSONB, optional)
     - is_active (bool)
   - error (string, optional)
   - meta (object, optional)
@@ -2460,22 +2460,22 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **PromotionEligibilityRequest**
-  - CustomerID  *int
-  - TotalAmount float64
-  - ProductIDs  []int
-  - CategoryIDs []int
+  - customer_id (int, optional)
+  - total_amount (number)
+  - product_ids (array of int)
+  - category_ids (array of int)
 
 ### Response
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
 - data (PromotionEligibilityResponse)
-    - EligiblePromotions ([]struct)
+    - eligible_promotions (array of struct)
     - promotion_id (int)
     - name (string)
     - discount_type (string)
-    - value (float64)
-    - discount_amount (float64)
+    - value (number)
+    - discount_amount (number)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2492,12 +2492,12 @@ Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
 - data (PromotionEligibilityResponse)
-    - EligiblePromotions ([]struct)
+    - eligible_promotions (array of struct)
     - promotion_id (int)
     - name (string)
     - discount_type (string)
-    - value (float64)
-    - discount_amount (float64)
+    - value (number)
+    - discount_amount (number)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2518,13 +2518,13 @@ Standard `APIResponse` with fields:
     - return_number (string)
     - sale_id (int)
     - location_id (int)
-    - customer_id,omitempty (*int)
-    - return_date (time.Time)
-    - total_amount (float64)
-    - reason,omitempty (*string)
+    - customer_id (int, optional)
+    - return_date (string (RFC3339 timestamp))
+    - total_amount (number)
+    - reason (string, optional)
     - status (string)
     - created_by (int)
-    - items,omitempty ([]SaleReturnDetail)
+    - items (array of SaleReturnDetail, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2536,9 +2536,9 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateSaleReturnRequest**
-  - SaleID int
-  - Items  []CreateSaleReturnItemRequest
-  - Reason *string
+  - sale_id (int)
+  - items (array of CreateSaleReturnItemRequest)
+  - reason (string, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -2549,13 +2549,13 @@ Standard `APIResponse` with fields:
     - return_number (string)
     - sale_id (int)
     - location_id (int)
-    - customer_id,omitempty (*int)
-    - return_date (time.Time)
-    - total_amount (float64)
-    - reason,omitempty (*string)
+    - customer_id (int, optional)
+    - return_date (string (RFC3339 timestamp))
+    - total_amount (number)
+    - reason (string, optional)
     - status (string)
     - created_by (int)
-    - items,omitempty ([]SaleReturnDetail)
+    - items (array of SaleReturnDetail, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2576,13 +2576,13 @@ Standard `APIResponse` with fields:
     - return_number (string)
     - sale_id (int)
     - location_id (int)
-    - customer_id,omitempty (*int)
-    - return_date (time.Time)
-    - total_amount (float64)
-    - reason,omitempty (*string)
+    - customer_id (int, optional)
+    - return_date (string (RFC3339 timestamp))
+    - total_amount (number)
+    - reason (string, optional)
     - status (string)
     - created_by (int)
-    - items,omitempty ([]SaleReturnDetail)
+    - items (array of SaleReturnDetail, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2603,13 +2603,13 @@ Standard `APIResponse` with fields:
     - return_number (string)
     - sale_id (int)
     - location_id (int)
-    - customer_id,omitempty (*int)
-    - return_date (time.Time)
-    - total_amount (float64)
-    - reason,omitempty (*string)
+    - customer_id (int, optional)
+    - return_date (string (RFC3339 timestamp))
+    - total_amount (number)
+    - reason (string, optional)
     - status (string)
     - created_by (int)
-    - items,omitempty ([]SaleReturnDetail)
+    - items (array of SaleReturnDetail, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2678,25 +2678,25 @@ Standard `APIResponse` with fields:
     - purchase_number (string)
     - location_id (int)
     - supplier_id (int)
-    - purchase_order_id,omitempty (*int)
-    - workflow_state_id,omitempty (*int)
-    - purchase_date (time.Time)
-    - subtotal (float64)
-    - tax_amount (float64)
-    - discount_amount (float64)
-    - total_amount (float64)
-    - paid_amount (float64)
+    - purchase_order_id (int, optional)
+    - workflow_state_id (int, optional)
+    - purchase_date (string (RFC3339 timestamp))
+    - subtotal (number)
+    - tax_amount (number)
+    - discount_amount (number)
+    - total_amount (number)
+    - paid_amount (number)
     - payment_terms (int)
-    - due_date,omitempty (*time.Time)
+    - due_date (string (RFC3339 timestamp), optional)
     - status (string)
-    - reference_number,omitempty (*string)
-    - notes,omitempty (*string)
+    - reference_number (string, optional)
+    - notes (string, optional)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - items,omitempty ([]PurchaseDetail)
-    - goods_receipts,omitempty ([]GoodsReceipt)
-    - supplier,omitempty (*Supplier)
-    - location,omitempty (*Location)
+    - updated_by (int, optional)
+    - items (array of PurchaseDetail, optional)
+    - goods_receipts (array of GoodsReceipt, optional)
+    - supplier (Supplier, optional)
+    - location (Location, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2749,25 +2749,25 @@ Standard `APIResponse` with fields:
     - purchase_number (string)
     - location_id (int)
     - supplier_id (int)
-    - purchase_order_id,omitempty (*int)
-    - workflow_state_id,omitempty (*int)
-    - purchase_date (time.Time)
-    - subtotal (float64)
-    - tax_amount (float64)
-    - discount_amount (float64)
-    - total_amount (float64)
-    - paid_amount (float64)
+    - purchase_order_id (int, optional)
+    - workflow_state_id (int, optional)
+    - purchase_date (string (RFC3339 timestamp))
+    - subtotal (number)
+    - tax_amount (number)
+    - discount_amount (number)
+    - total_amount (number)
+    - paid_amount (number)
     - payment_terms (int)
-    - due_date,omitempty (*time.Time)
+    - due_date (string (RFC3339 timestamp), optional)
     - status (string)
-    - reference_number,omitempty (*string)
-    - notes,omitempty (*string)
+    - reference_number (string, optional)
+    - notes (string, optional)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - items,omitempty ([]PurchaseDetail)
-    - goods_receipts,omitempty ([]GoodsReceipt)
-    - supplier,omitempty (*Supplier)
-    - location,omitempty (*Location)
+    - updated_by (int, optional)
+    - items (array of PurchaseDetail, optional)
+    - goods_receipts (array of GoodsReceipt, optional)
+    - supplier (Supplier, optional)
+    - location (Location, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2779,13 +2779,13 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreatePurchaseRequest**
-  - SupplierID      int
-  - LocationID      *int
-  - PurchaseDate    *time.Time
-  - ReferenceNumber *string
-  - PaymentTerms    *int
-  - Notes           *string
-  - Items           []CreatePurchaseDetailRequest
+  - supplier_id (int)
+  - location_id (int, optional)
+  - purchase_date (string (RFC3339 timestamp), optional)
+  - reference_number (string, optional)
+  - payment_terms (int, optional)
+  - notes (string, optional)
+  - items (array of CreatePurchaseDetailRequest)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -2796,25 +2796,25 @@ Standard `APIResponse` with fields:
     - purchase_number (string)
     - location_id (int)
     - supplier_id (int)
-    - purchase_order_id,omitempty (*int)
-    - workflow_state_id,omitempty (*int)
-    - purchase_date (time.Time)
-    - subtotal (float64)
-    - tax_amount (float64)
-    - discount_amount (float64)
-    - total_amount (float64)
-    - paid_amount (float64)
+    - purchase_order_id (int, optional)
+    - workflow_state_id (int, optional)
+    - purchase_date (string (RFC3339 timestamp))
+    - subtotal (number)
+    - tax_amount (number)
+    - discount_amount (number)
+    - total_amount (number)
+    - paid_amount (number)
     - payment_terms (int)
-    - due_date,omitempty (*time.Time)
+    - due_date (string (RFC3339 timestamp), optional)
     - status (string)
-    - reference_number,omitempty (*string)
-    - notes,omitempty (*string)
+    - reference_number (string, optional)
+    - notes (string, optional)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - items,omitempty ([]PurchaseDetail)
-    - goods_receipts,omitempty ([]GoodsReceipt)
-    - supplier,omitempty (*Supplier)
-    - location,omitempty (*Location)
+    - updated_by (int, optional)
+    - items (array of PurchaseDetail, optional)
+    - goods_receipts (array of GoodsReceipt, optional)
+    - supplier (Supplier, optional)
+    - location (Location, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2826,13 +2826,13 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreatePurchaseRequest**
-  - SupplierID      int
-  - LocationID      *int
-  - PurchaseDate    *time.Time
-  - ReferenceNumber *string
-  - PaymentTerms    *int
-  - Notes           *string
-  - Items           []CreatePurchaseDetailRequest
+  - supplier_id (int)
+  - location_id (int, optional)
+  - purchase_date (string (RFC3339 timestamp), optional)
+  - reference_number (string, optional)
+  - payment_terms (int, optional)
+  - notes (string, optional)
+  - items (array of CreatePurchaseDetailRequest)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -2850,11 +2850,11 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdatePurchaseRequest**
-  - ReferenceNumber *string
-  - PaymentTerms    *int
-  - Notes           *string
-  - Status          *string
-  - Items           []CreatePurchaseDetailRequest
+  - reference_number (string, optional)
+  - payment_terms (int, optional)
+  - notes (string, optional)
+  - status (string, optional)
+  - items (array of CreatePurchaseDetailRequest)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -2865,25 +2865,25 @@ Standard `APIResponse` with fields:
     - purchase_number (string)
     - location_id (int)
     - supplier_id (int)
-    - purchase_order_id,omitempty (*int)
-    - workflow_state_id,omitempty (*int)
-    - purchase_date (time.Time)
-    - subtotal (float64)
-    - tax_amount (float64)
-    - discount_amount (float64)
-    - total_amount (float64)
-    - paid_amount (float64)
+    - purchase_order_id (int, optional)
+    - workflow_state_id (int, optional)
+    - purchase_date (string (RFC3339 timestamp))
+    - subtotal (number)
+    - tax_amount (number)
+    - discount_amount (number)
+    - total_amount (number)
+    - paid_amount (number)
     - payment_terms (int)
-    - due_date,omitempty (*time.Time)
+    - due_date (string (RFC3339 timestamp), optional)
     - status (string)
-    - reference_number,omitempty (*string)
-    - notes,omitempty (*string)
+    - reference_number (string, optional)
+    - notes (string, optional)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - items,omitempty ([]PurchaseDetail)
-    - goods_receipts,omitempty ([]GoodsReceipt)
-    - supplier,omitempty (*Supplier)
-    - location,omitempty (*Location)
+    - updated_by (int, optional)
+    - items (array of PurchaseDetail, optional)
+    - goods_receipts (array of GoodsReceipt, optional)
+    - supplier (Supplier, optional)
+    - location (Location, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2895,7 +2895,7 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **ReceivePurchaseRequest**
-  - Items []ReceivePurchaseItemRequest
+  - items (array of ReceivePurchaseItemRequest)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -2922,25 +2922,25 @@ Standard `APIResponse` with fields:
     - purchase_number (string)
     - location_id (int)
     - supplier_id (int)
-    - purchase_order_id,omitempty (*int)
-    - workflow_state_id,omitempty (*int)
-    - purchase_date (time.Time)
-    - subtotal (float64)
-    - tax_amount (float64)
-    - discount_amount (float64)
-    - total_amount (float64)
-    - paid_amount (float64)
+    - purchase_order_id (int, optional)
+    - workflow_state_id (int, optional)
+    - purchase_date (string (RFC3339 timestamp))
+    - subtotal (number)
+    - tax_amount (number)
+    - discount_amount (number)
+    - total_amount (number)
+    - paid_amount (number)
     - payment_terms (int)
-    - due_date,omitempty (*time.Time)
+    - due_date (string (RFC3339 timestamp), optional)
     - status (string)
-    - reference_number,omitempty (*string)
-    - notes,omitempty (*string)
+    - reference_number (string, optional)
+    - notes (string, optional)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - items,omitempty ([]PurchaseDetail)
-    - goods_receipts,omitempty ([]GoodsReceipt)
-    - supplier,omitempty (*Supplier)
-    - location,omitempty (*Location)
+    - updated_by (int, optional)
+    - items (array of PurchaseDetail, optional)
+    - goods_receipts (array of GoodsReceipt, optional)
+    - supplier (Supplier, optional)
+    - location (Location, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2961,14 +2961,14 @@ Standard `APIResponse` with fields:
     - order_number (string)
     - location_id (int)
     - supplier_id (int)
-    - order_date (time.Time)
+    - order_date (string (RFC3339 timestamp))
     - status (string)
-    - total_amount (float64)
+    - total_amount (number)
     - created_by (int)
-    - workflow_state_id,omitempty (*int)
-    - items,omitempty ([]PurchaseOrderItem)
-    - supplier,omitempty (*Supplier)
-    - location,omitempty (*Location)
+    - workflow_state_id (int, optional)
+    - items (array of PurchaseOrderItem, optional)
+    - supplier (Supplier, optional)
+    - location (Location, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -2989,14 +2989,14 @@ Standard `APIResponse` with fields:
     - order_number (string)
     - location_id (int)
     - supplier_id (int)
-    - order_date (time.Time)
+    - order_date (string (RFC3339 timestamp))
     - status (string)
-    - total_amount (float64)
+    - total_amount (number)
     - created_by (int)
-    - workflow_state_id,omitempty (*int)
-    - items,omitempty ([]PurchaseOrderItem)
-    - supplier,omitempty (*Supplier)
-    - location,omitempty (*Location)
+    - workflow_state_id (int, optional)
+    - items (array of PurchaseOrderItem, optional)
+    - supplier (Supplier, optional)
+    - location (Location, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3017,14 +3017,14 @@ Standard `APIResponse` with fields:
     - order_number (string)
     - location_id (int)
     - supplier_id (int)
-    - order_date (time.Time)
+    - order_date (string (RFC3339 timestamp))
     - status (string)
-    - total_amount (float64)
+    - total_amount (number)
     - created_by (int)
-    - workflow_state_id,omitempty (*int)
-    - items,omitempty ([]PurchaseOrderItem)
-    - supplier,omitempty (*Supplier)
-    - location,omitempty (*Location)
+    - workflow_state_id (int, optional)
+    - items (array of PurchaseOrderItem, optional)
+    - supplier (Supplier, optional)
+    - location (Location, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3059,16 +3059,16 @@ Standard `APIResponse` with fields:
 - data (GoodsReceipt)
     - goods_receipt_id (int)
     - receipt_number (string)
-    - purchase_order_id,omitempty (*int)
-    - purchase_id,omitempty (*int)
+    - purchase_order_id (int, optional)
+    - purchase_id (int, optional)
     - location_id (int)
     - supplier_id (int)
-    - received_date (time.Time)
+    - received_date (string (RFC3339 timestamp))
     - received_by (int)
-    - workflow_state_id,omitempty (*int)
-    - items,omitempty ([]GoodsReceiptItem)
-    - supplier,omitempty (*Supplier)
-    - location,omitempty (*Location)
+    - workflow_state_id (int, optional)
+    - items (array of GoodsReceiptItem, optional)
+    - supplier (Supplier, optional)
+    - location (Location, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3090,16 +3090,16 @@ Standard `APIResponse` with fields:
     - purchase_id (int)
     - location_id (int)
     - supplier_id (int)
-    - return_date (time.Time)
-    - total_amount (float64)
-    - reason,omitempty (*string)
+    - return_date (string (RFC3339 timestamp))
+    - total_amount (number)
+    - reason (string, optional)
     - status (string)
     - created_by (int)
-    - approved_by,omitempty (*int)
-    - approved_at,omitempty (*time.Time)
-    - items,omitempty ([]PurchaseReturnDetail)
-    - purchase,omitempty (*Purchase)
-    - supplier,omitempty (*Supplier)
+    - approved_by (int, optional)
+    - approved_at (string (RFC3339 timestamp), optional)
+    - items (array of PurchaseReturnDetail, optional)
+    - purchase (Purchase, optional)
+    - supplier (Supplier, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3121,16 +3121,16 @@ Standard `APIResponse` with fields:
     - purchase_id (int)
     - location_id (int)
     - supplier_id (int)
-    - return_date (time.Time)
-    - total_amount (float64)
-    - reason,omitempty (*string)
+    - return_date (string (RFC3339 timestamp))
+    - total_amount (number)
+    - reason (string, optional)
     - status (string)
     - created_by (int)
-    - approved_by,omitempty (*int)
-    - approved_at,omitempty (*time.Time)
-    - items,omitempty ([]PurchaseReturnDetail)
-    - purchase,omitempty (*Purchase)
-    - supplier,omitempty (*Supplier)
+    - approved_by (int, optional)
+    - approved_at (string (RFC3339 timestamp), optional)
+    - items (array of PurchaseReturnDetail, optional)
+    - purchase (Purchase, optional)
+    - supplier (Supplier, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3142,9 +3142,9 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreatePurchaseReturnRequest**
-  - PurchaseID int
-  - Reason     *string
-  - Items      []CreatePurchaseReturnDetailRequest
+  - purchase_id (int)
+  - reason (string, optional)
+  - items (array of CreatePurchaseReturnDetailRequest)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -3156,16 +3156,16 @@ Standard `APIResponse` with fields:
     - purchase_id (int)
     - location_id (int)
     - supplier_id (int)
-    - return_date (time.Time)
-    - total_amount (float64)
-    - reason,omitempty (*string)
+    - return_date (string (RFC3339 timestamp))
+    - total_amount (number)
+    - reason (string, optional)
     - status (string)
     - created_by (int)
-    - approved_by,omitempty (*int)
-    - approved_at,omitempty (*time.Time)
-    - items,omitempty ([]PurchaseReturnDetail)
-    - purchase,omitempty (*Purchase)
-    - supplier,omitempty (*Supplier)
+    - approved_by (int, optional)
+    - approved_at (string (RFC3339 timestamp), optional)
+    - items (array of PurchaseReturnDetail, optional)
+    - purchase (Purchase, optional)
+    - supplier (Supplier, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3187,16 +3187,16 @@ Standard `APIResponse` with fields:
     - purchase_id (int)
     - location_id (int)
     - supplier_id (int)
-    - return_date (time.Time)
-    - total_amount (float64)
-    - reason,omitempty (*string)
+    - return_date (string (RFC3339 timestamp))
+    - total_amount (number)
+    - reason (string, optional)
     - status (string)
     - created_by (int)
-    - approved_by,omitempty (*int)
-    - approved_at,omitempty (*time.Time)
-    - items,omitempty ([]PurchaseReturnDetail)
-    - purchase,omitempty (*Purchase)
-    - supplier,omitempty (*Supplier)
+    - approved_by (int, optional)
+    - approved_at (string (RFC3339 timestamp), optional)
+    - items (array of PurchaseReturnDetail, optional)
+    - purchase (Purchase, optional)
+    - supplier (Supplier, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3218,16 +3218,16 @@ Standard `APIResponse` with fields:
     - purchase_id (int)
     - location_id (int)
     - supplier_id (int)
-    - return_date (time.Time)
-    - total_amount (float64)
-    - reason,omitempty (*string)
+    - return_date (string (RFC3339 timestamp))
+    - total_amount (number)
+    - reason (string, optional)
     - status (string)
     - created_by (int)
-    - approved_by,omitempty (*int)
-    - approved_at,omitempty (*time.Time)
-    - items,omitempty ([]PurchaseReturnDetail)
-    - purchase,omitempty (*Purchase)
-    - supplier,omitempty (*Supplier)
+    - approved_by (int, optional)
+    - approved_at (string (RFC3339 timestamp), optional)
+    - items (array of PurchaseReturnDetail, optional)
+    - purchase (Purchase, optional)
+    - supplier (Supplier, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3247,17 +3247,17 @@ Standard `APIResponse` with fields:
     - customer_id (int)
     - company_id (int)
     - name (string)
-    - phone,omitempty (*string)
-    - email,omitempty (*string)
-    - address,omitempty (*string)
-    - tax_number,omitempty (*string)
-    - credit_limit (float64)
+    - phone (string, optional)
+    - email (string, optional)
+    - address (string, optional)
+    - tax_number (string, optional)
+    - credit_limit (number)
     - payment_terms (int)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - credit_balance,omitempty (float64)
-    - invoices,omitempty ([]CustomerInvoiceReference)
+    - updated_by (int, optional)
+    - credit_balance (number, optional)
+    - invoices (array of CustomerInvoiceReference, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3285,13 +3285,13 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateCustomerRequest**
-  - Name         string
-  - Phone        *string
-  - Email        *string
-  - Address      *string
-  - TaxNumber    *string
-  - CreditLimit  float64
-  - PaymentTerms int
+  - name (string)
+  - phone (string, optional)
+  - email (string, optional)
+  - address (string, optional)
+  - tax_number (string, optional)
+  - credit_limit (number)
+  - payment_terms (int)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -3301,17 +3301,17 @@ Standard `APIResponse` with fields:
     - customer_id (int)
     - company_id (int)
     - name (string)
-    - phone,omitempty (*string)
-    - email,omitempty (*string)
-    - address,omitempty (*string)
-    - tax_number,omitempty (*string)
-    - credit_limit (float64)
+    - phone (string, optional)
+    - email (string, optional)
+    - address (string, optional)
+    - tax_number (string, optional)
+    - credit_limit (number)
     - payment_terms (int)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - credit_balance,omitempty (float64)
-    - invoices,omitempty ([]CustomerInvoiceReference)
+    - updated_by (int, optional)
+    - credit_balance (number, optional)
+    - invoices (array of CustomerInvoiceReference, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3355,14 +3355,14 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdateCustomerRequest**
-  - Name         *string
-  - Phone        *string
-  - Email        *string
-  - Address      *string
-  - TaxNumber    *string
-  - CreditLimit  *float64
-  - PaymentTerms *int
-  - IsActive     *bool
+  - name (string, optional)
+  - phone (string, optional)
+  - email (string, optional)
+  - address (string, optional)
+  - tax_number (string, optional)
+  - credit_limit (number, optional)
+  - payment_terms (int, optional)
+  - is_active (bool, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -3372,17 +3372,17 @@ Standard `APIResponse` with fields:
     - customer_id (int)
     - company_id (int)
     - name (string)
-    - phone,omitempty (*string)
-    - email,omitempty (*string)
-    - address,omitempty (*string)
-    - tax_number,omitempty (*string)
-    - credit_limit (float64)
+    - phone (string, optional)
+    - email (string, optional)
+    - address (string, optional)
+    - tax_number (string, optional)
+    - credit_limit (number)
     - payment_terms (int)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - credit_balance,omitempty (float64)
-    - invoices,omitempty ([]CustomerInvoiceReference)
+    - updated_by (int, optional)
+    - credit_balance (number, optional)
+    - invoices (array of CustomerInvoiceReference, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3402,17 +3402,17 @@ Standard `APIResponse` with fields:
     - customer_id (int)
     - company_id (int)
     - name (string)
-    - phone,omitempty (*string)
-    - email,omitempty (*string)
-    - address,omitempty (*string)
-    - tax_number,omitempty (*string)
-    - credit_limit (float64)
+    - phone (string, optional)
+    - email (string, optional)
+    - address (string, optional)
+    - tax_number (string, optional)
+    - credit_limit (number)
     - payment_terms (int)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - credit_balance,omitempty (float64)
-    - invoices,omitempty ([]CustomerInvoiceReference)
+    - updated_by (int, optional)
+    - credit_balance (number, optional)
+    - invoices (array of CustomerInvoiceReference, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3440,9 +3440,9 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreditTransactionRequest**
-  - Amount      float64
-  - Type        string
-  - Description *string
+  - amount (number)
+  - type (string)
+  - description (string, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -3467,22 +3467,22 @@ Standard `APIResponse` with fields:
 - data (Employee)
     - employee_id (int)
     - company_id (int)
-    - location_id,omitempty (*int)
-    - employee_code,omitempty (*string)
+    - location_id (int, optional)
+    - employee_code (string, optional)
     - name (string)
-    - phone,omitempty (*string)
-    - email,omitempty (*string)
-    - address,omitempty (*string)
-    - position,omitempty (*string)
-    - department,omitempty (*string)
-    - salary,omitempty (*float64)
-    - hire_date,omitempty (*time.Time)
+    - phone (string, optional)
+    - email (string, optional)
+    - address (string, optional)
+    - position (string, optional)
+    - department (string, optional)
+    - salary (number, optional)
+    - hire_date (string (RFC3339 timestamp), optional)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - last_check_in,omitempty (*time.Time)
-    - last_check_out,omitempty (*time.Time)
-    - leave_balance,omitempty (*float64)
+    - updated_by (int, optional)
+    - last_check_in (string (RFC3339 timestamp), optional)
+    - last_check_out (string (RFC3339 timestamp), optional)
+    - leave_balance (number, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3494,18 +3494,18 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateEmployeeRequest**
-  - LocationID   *int
-  - EmployeeCode *string
-  - Name         string
-  - Phone        *string
-  - Email        *string
-  - Address      *string
-  - Position     *string
-  - Department   *string
-  - Salary       *float64
-  - HireDate     *time.Time
-  - IsActive     *bool
-  - LeaveBalance *float64
+  - location_id (int, optional)
+  - employee_code (string, optional)
+  - name (string)
+  - phone (string, optional)
+  - email (string, optional)
+  - address (string, optional)
+  - position (string, optional)
+  - department (string, optional)
+  - salary (number, optional)
+  - hire_date (string (RFC3339 timestamp), optional)
+  - is_active (bool, optional)
+  - leave_balance (number, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -3514,22 +3514,22 @@ Standard `APIResponse` with fields:
 - data (Employee)
     - employee_id (int)
     - company_id (int)
-    - location_id,omitempty (*int)
-    - employee_code,omitempty (*string)
+    - location_id (int, optional)
+    - employee_code (string, optional)
     - name (string)
-    - phone,omitempty (*string)
-    - email,omitempty (*string)
-    - address,omitempty (*string)
-    - position,omitempty (*string)
-    - department,omitempty (*string)
-    - salary,omitempty (*float64)
-    - hire_date,omitempty (*time.Time)
+    - phone (string, optional)
+    - email (string, optional)
+    - address (string, optional)
+    - position (string, optional)
+    - department (string, optional)
+    - salary (number, optional)
+    - hire_date (string (RFC3339 timestamp), optional)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - last_check_in,omitempty (*time.Time)
-    - last_check_out,omitempty (*time.Time)
-    - leave_balance,omitempty (*float64)
+    - updated_by (int, optional)
+    - last_check_in (string (RFC3339 timestamp), optional)
+    - last_check_out (string (RFC3339 timestamp), optional)
+    - leave_balance (number, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3541,18 +3541,18 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdateEmployeeRequest**
-  - LocationID   *int
-  - EmployeeCode *string
-  - Name         *string
-  - Phone        *string
-  - Email        *string
-  - Address      *string
-  - Position     *string
-  - Department   *string
-  - Salary       *float64
-  - HireDate     *time.Time
-  - IsActive     *bool
-  - LeaveBalance *float64
+  - location_id (int, optional)
+  - employee_code (string, optional)
+  - name (string, optional)
+  - phone (string, optional)
+  - email (string, optional)
+  - address (string, optional)
+  - position (string, optional)
+  - department (string, optional)
+  - salary (number, optional)
+  - hire_date (string (RFC3339 timestamp), optional)
+  - is_active (bool, optional)
+  - leave_balance (number, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -3561,22 +3561,22 @@ Standard `APIResponse` with fields:
 - data (Employee)
     - employee_id (int)
     - company_id (int)
-    - location_id,omitempty (*int)
-    - employee_code,omitempty (*string)
+    - location_id (int, optional)
+    - employee_code (string, optional)
     - name (string)
-    - phone,omitempty (*string)
-    - email,omitempty (*string)
-    - address,omitempty (*string)
-    - position,omitempty (*string)
-    - department,omitempty (*string)
-    - salary,omitempty (*float64)
-    - hire_date,omitempty (*time.Time)
+    - phone (string, optional)
+    - email (string, optional)
+    - address (string, optional)
+    - position (string, optional)
+    - department (string, optional)
+    - salary (number, optional)
+    - hire_date (string (RFC3339 timestamp), optional)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - last_check_in,omitempty (*time.Time)
-    - last_check_out,omitempty (*time.Time)
-    - leave_balance,omitempty (*float64)
+    - updated_by (int, optional)
+    - last_check_in (string (RFC3339 timestamp), optional)
+    - last_check_out (string (RFC3339 timestamp), optional)
+    - leave_balance (number, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3595,22 +3595,22 @@ Standard `APIResponse` with fields:
 - data (Employee)
     - employee_id (int)
     - company_id (int)
-    - location_id,omitempty (*int)
-    - employee_code,omitempty (*string)
+    - location_id (int, optional)
+    - employee_code (string, optional)
     - name (string)
-    - phone,omitempty (*string)
-    - email,omitempty (*string)
-    - address,omitempty (*string)
-    - position,omitempty (*string)
-    - department,omitempty (*string)
-    - salary,omitempty (*float64)
-    - hire_date,omitempty (*time.Time)
+    - phone (string, optional)
+    - email (string, optional)
+    - address (string, optional)
+    - position (string, optional)
+    - department (string, optional)
+    - salary (number, optional)
+    - hire_date (string (RFC3339 timestamp), optional)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
-    - last_check_in,omitempty (*time.Time)
-    - last_check_out,omitempty (*time.Time)
-    - leave_balance,omitempty (*float64)
+    - updated_by (int, optional)
+    - last_check_in (string (RFC3339 timestamp), optional)
+    - last_check_out (string (RFC3339 timestamp), optional)
+    - leave_balance (number, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3622,7 +3622,7 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CheckInRequest**
-  - EmployeeID int
+  - employee_id (int)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -3640,7 +3640,7 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CheckOutRequest**
-  - EmployeeID int
+  - employee_id (int)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -3658,10 +3658,10 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **LeaveRequest**
-  - EmployeeID int
-  - StartDate  string
-  - EndDate    string
-  - Reason     string
+  - employee_id (int)
+  - start_date (string)
+  - end_date (string)
+  - reason (string)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -3670,8 +3670,8 @@ Standard `APIResponse` with fields:
 - data (Leave)
     - leave_id (int)
     - employee_id (int)
-    - start_date (time.Time)
-    - end_date (time.Time)
+    - start_date (string (RFC3339 timestamp))
+    - end_date (string (RFC3339 timestamp))
     - reason (string)
     - status (string)
   - error (string, optional)
@@ -3692,7 +3692,7 @@ Standard `APIResponse` with fields:
 - data (Holiday)
     - holiday_id (int)
     - company_id (int)
-    - date (time.Time)
+    - date (string (RFC3339 timestamp))
     - name (string)
   - error (string, optional)
   - meta (object, optional)
@@ -3728,14 +3728,14 @@ Standard `APIResponse` with fields:
 - data (Payroll)
     - payroll_id (int)
     - employee_id (int)
-    - pay_period_start (time.Time)
-    - pay_period_end (time.Time)
-    - basic_salary (float64)
-    - gross_salary (float64)
-    - total_deductions (float64)
-    - net_salary (float64)
+    - pay_period_start (string (RFC3339 timestamp))
+    - pay_period_end (string (RFC3339 timestamp))
+    - basic_salary (number)
+    - gross_salary (number)
+    - total_deductions (number)
+    - net_salary (number)
     - status (string)
-    - processed_by,omitempty (*int)
+    - processed_by (int, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3747,11 +3747,11 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreatePayrollRequest**
-  - EmployeeID  int
-  - Month       string
-  - BasicSalary float64
-  - Allowances  float64
-  - Deductions  float64
+  - employee_id (int)
+  - month (string)
+  - basic_salary (number)
+  - allowances (number)
+  - deductions (number)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -3760,14 +3760,14 @@ Standard `APIResponse` with fields:
 - data (Payroll)
     - payroll_id (int)
     - employee_id (int)
-    - pay_period_start (time.Time)
-    - pay_period_end (time.Time)
-    - basic_salary (float64)
-    - gross_salary (float64)
-    - total_deductions (float64)
-    - net_salary (float64)
+    - pay_period_start (string (RFC3339 timestamp))
+    - pay_period_end (string (RFC3339 timestamp))
+    - basic_salary (number)
+    - gross_salary (number)
+    - total_deductions (number)
+    - net_salary (number)
     - status (string)
-    - processed_by,omitempty (*int)
+    - processed_by (int, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3795,8 +3795,8 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **AddComponentRequest**
-  - Type   string
-  - Amount float64
+  - type (string)
+  - amount (number)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -3814,8 +3814,8 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **AdvanceRequest**
-  - Amount float64
-  - Date   string
+  - amount (number)
+  - date (string)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -3824,8 +3824,8 @@ Standard `APIResponse` with fields:
 - data (Advance)
     - advance_id (int)
     - payroll_id (int)
-    - amount (float64)
-    - date (time.Time)
+    - amount (number)
+    - date (string (RFC3339 timestamp))
   - error (string, optional)
   - meta (object, optional)
 
@@ -3837,9 +3837,9 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **DeductionRequest**
-  - Type   string
-  - Amount float64
-  - Date   string
+  - type (string)
+  - amount (number)
+  - date (string)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -3849,8 +3849,8 @@ Standard `APIResponse` with fields:
     - deduction_id (int)
     - payroll_id (int)
     - type (string)
-    - amount (float64)
-    - date (time.Time)
+    - amount (number)
+    - date (string (RFC3339 timestamp))
   - error (string, optional)
   - meta (object, optional)
 
@@ -3868,10 +3868,10 @@ Standard `APIResponse` with fields:
   - message (string)
 - data (Payslip)
     - payroll (Payroll)
-    - components ([]SalaryComponent)
-    - advances ([]Advance)
-    - deductions ([]Deduction)
-    - net_pay (float64)
+    - components (array of SalaryComponent)
+    - advances (array of Advance)
+    - deductions (array of Deduction)
+    - net_pay (number)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3887,22 +3887,22 @@ None
 Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
- - data ([]Collection)
+ - data (array of Collection)
     - collection_id (int)
     - collection_number (string)
     - customer_id (int)
     - location_id (int)
-    - amount (float64)
-    - collection_date (time.Time)
-    - payment_method_id,omitempty (*int)
-    - payment_method,omitempty (*string)
-    - reference_number,omitempty (*string)
-    - notes,omitempty (*string)
+    - amount (number)
+    - collection_date (string (RFC3339 timestamp))
+    - payment_method_id (int, optional)
+    - payment_method (string, optional)
+    - reference_number (string, optional)
+    - notes (string, optional)
     - created_by (int)
     - sync_status (string)
-    - created_at (time.Time)
-    - updated_at (time.Time)
-    - invoices,omitempty ([]CollectionInvoice)
+    - created_at (string (RFC3339 timestamp))
+    - updated_at (string (RFC3339 timestamp))
+    - invoices (array of CollectionInvoice, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3914,13 +3914,13 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateCollectionRequest**
-  - CustomerID      int
-  - Amount          float64
-  - PaymentMethodID *int
-  - ReceivedDate    *string
-  - ReferenceNumber *string
-  - Notes           *string
-  - Invoices        []CollectionInvoiceRequest
+  - customer_id (int)
+  - amount (number)
+  - payment_method_id (int, optional)
+  - received_date (string, optional)
+  - reference_number (string, optional)
+  - notes (string, optional)
+  - invoices (array of CollectionInvoiceRequest)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -3931,17 +3931,17 @@ Standard `APIResponse` with fields:
     - collection_number (string)
     - customer_id (int)
     - location_id (int)
-    - amount (float64)
-    - collection_date (time.Time)
-    - payment_method_id,omitempty (*int)
-    - payment_method,omitempty (*string)
-    - reference_number,omitempty (*string)
-    - notes,omitempty (*string)
+    - amount (number)
+    - collection_date (string (RFC3339 timestamp))
+    - payment_method_id (int, optional)
+    - payment_method (string, optional)
+    - reference_number (string, optional)
+    - notes (string, optional)
     - created_by (int)
     - sync_status (string)
-    - created_at (time.Time)
-    - updated_at (time.Time)
-    - invoices,omitempty ([]CollectionInvoice)
+    - created_at (string (RFC3339 timestamp))
+    - updated_at (string (RFC3339 timestamp))
+    - invoices (array of CollectionInvoice, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -3994,17 +3994,17 @@ Standard `APIResponse` with fields:
     - collection_number (string)
     - customer_id (int)
     - location_id (int)
-    - amount (float64)
-    - collection_date (time.Time)
-    - payment_method_id,omitempty (*int)
-    - payment_method,omitempty (*string)
-    - reference_number,omitempty (*string)
-    - notes,omitempty (*string)
+    - amount (number)
+    - collection_date (string (RFC3339 timestamp))
+    - payment_method_id (int, optional)
+    - payment_method (string, optional)
+    - reference_number (string, optional)
+    - notes (string, optional)
     - created_by (int)
     - sync_status (string)
-    - created_at (time.Time)
-    - updated_at (time.Time)
-    - invoices,omitempty ([]CollectionInvoice)
+    - created_at (string (RFC3339 timestamp))
+    - updated_at (string (RFC3339 timestamp))
+    - invoices (array of CollectionInvoice, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -4024,9 +4024,9 @@ Standard `APIResponse` with fields:
     - expense_id (int)
     - category_id (int)
     - location_id (int)
-    - amount (float64)
-    - notes,omitempty (*string)
-    - expense_date (time.Time)
+    - amount (number)
+    - notes (string, optional)
+    - expense_date (string (RFC3339 timestamp))
     - created_by (int)
   - error (string, optional)
   - meta (object, optional)
@@ -4047,9 +4047,9 @@ Standard `APIResponse` with fields:
     - expense_id (int)
     - category_id (int)
     - location_id (int)
-    - amount (float64)
-    - notes,omitempty (*string)
-    - expense_date (time.Time)
+    - amount (number)
+    - notes (string, optional)
+    - expense_date (string (RFC3339 timestamp))
     - created_by (int)
   - error (string, optional)
   - meta (object, optional)
@@ -4062,10 +4062,10 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateExpenseRequest**
-  - CategoryID  int
-  - Amount      float64
-  - Notes       *string
-  - ExpenseDate time.Time
+  - category_id (int)
+  - amount (number)
+  - notes (string, optional)
+  - expense_date (string (RFC3339 timestamp))
 
 ### Response
 Standard `APIResponse` with fields:
@@ -4075,9 +4075,9 @@ Standard `APIResponse` with fields:
     - expense_id (int)
     - category_id (int)
     - location_id (int)
-    - amount (float64)
-    - notes,omitempty (*string)
-    - expense_date (time.Time)
+    - amount (number)
+    - notes (string, optional)
+    - expense_date (string (RFC3339 timestamp))
     - created_by (int)
   - error (string, optional)
   - meta (object, optional)
@@ -4106,7 +4106,7 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateExpenseCategoryRequest**
-  - Name string
+  - name (string)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -4164,11 +4164,11 @@ Standard `APIResponse` with fields:
     - voucher_id (int)
     - company_id (int)
     - type (string)
-    - amount (float64)
-    - date (time.Time)
+    - amount (number)
+    - date (string (RFC3339 timestamp))
     - account_id (int)
     - reference (string)
-    - description,omitempty (*string)
+    - description (string, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -4188,11 +4188,11 @@ Standard `APIResponse` with fields:
     - voucher_id (int)
     - company_id (int)
     - type (string)
-    - amount (float64)
-    - date (time.Time)
+    - amount (number)
+    - date (string (RFC3339 timestamp))
     - account_id (int)
     - reference (string)
-    - description,omitempty (*string)
+    - description (string, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -4204,10 +4204,10 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateVoucherRequest**
-  - AccountID   int
-  - Amount      float64
-  - Reference   string
-  - Description *string
+  - account_id (int)
+  - amount (number)
+  - reference (string)
+  - description (string, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -4217,11 +4217,11 @@ Standard `APIResponse` with fields:
     - voucher_id (int)
     - company_id (int)
     - type (string)
-    - amount (float64)
-    - date (time.Time)
+    - amount (number)
+    - date (string (RFC3339 timestamp))
     - account_id (int)
     - reference (string)
-    - description,omitempty (*string)
+    - description (string, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -4272,15 +4272,15 @@ Standard `APIResponse` with fields:
 - data (CashRegister)
     - register_id (int)
     - location_id (int)
-    - date (time.Time)
-    - opening_balance (float64)
-    - closing_balance,omitempty (*float64)
-    - expected_balance (float64)
-    - cash_in (float64)
-    - cash_out (float64)
-    - variance (float64)
-    - opened_by,omitempty (*int)
-    - closed_by,omitempty (*int)
+    - date (string (RFC3339 timestamp))
+    - opening_balance (number)
+    - closing_balance (number, optional)
+    - expected_balance (number)
+    - cash_in (number)
+    - cash_out (number)
+    - variance (number)
+    - opened_by (int, optional)
+    - closed_by (int, optional)
     - status (string)
   - error (string, optional)
   - meta (object, optional)
@@ -4347,9 +4347,9 @@ Standard `APIResponse` with fields:
   - message (string)
 - data (SalesSummary)
     - period (string)
-    - total_sales (float64)
+    - total_sales (number)
     - transactions (int)
-    - outstanding (float64)
+    - outstanding (number)
   - error (string, optional)
   - meta (object, optional)
 
@@ -4368,8 +4368,8 @@ Standard `APIResponse` with fields:
 - data (StockSummary)
     - product_id (int)
     - location_id (int)
-    - quantity (float64)
-    - stock_value (float64)
+    - quantity (number)
+    - stock_value (number)
   - error (string, optional)
   - meta (object, optional)
 
@@ -4386,10 +4386,10 @@ Standard `APIResponse` with fields:
   - success (bool)
   - message (string)
 - data (TopProduct)
-    - product_id,omitempty (*int)
+    - product_id (int, optional)
     - product_name (string)
-    - quantity_sold (float64)
-    - revenue (float64)
+    - quantity_sold (number)
+    - revenue (number)
   - error (string, optional)
   - meta (object, optional)
 
@@ -4408,7 +4408,7 @@ Standard `APIResponse` with fields:
 - data (CustomerBalance)
     - customer_id (int)
     - name (string)
-    - total_due (float64)
+    - total_due (number)
   - error (string, optional)
   - meta (object, optional)
 
@@ -4426,8 +4426,8 @@ Standard `APIResponse` with fields:
   - message (string)
 - data (ExpensesSummary)
     - category (string)
-    - total_amount (float64)
-    - period,omitempty (*string)
+    - total_amount (number)
+    - period (string, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -4495,16 +4495,16 @@ Standard `APIResponse` with fields:
     - supplier_id (int)
     - company_id (int)
     - name (string)
-    - contact_person,omitempty (*string)
-    - phone,omitempty (*string)
-    - email,omitempty (*string)
-    - address,omitempty (*string)
-    - tax_number,omitempty (*string)
+    - contact_person (string, optional)
+    - phone (string, optional)
+    - email (string, optional)
+    - address (string, optional)
+    - tax_number (string, optional)
     - payment_terms (int)
-    - credit_limit (float64)
+    - credit_limit (number)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
+    - updated_by (int, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -4636,7 +4636,7 @@ Standard `APIResponse` with fields:
     - tax_id (int)
     - company_id (int)
     - name (string)
-    - percentage (float64)
+    - percentage (number)
     - is_compound (bool)
     - is_active (bool)
   - error (string, optional)
@@ -4674,16 +4674,16 @@ Standard `APIResponse` with fields:
     - supplier_id (int)
     - company_id (int)
     - name (string)
-    - contact_person,omitempty (*string)
-    - phone,omitempty (*string)
-    - email,omitempty (*string)
-    - address,omitempty (*string)
-    - tax_number,omitempty (*string)
+    - contact_person (string, optional)
+    - phone (string, optional)
+    - email (string, optional)
+    - address (string, optional)
+    - tax_number (string, optional)
     - payment_terms (int)
-    - credit_limit (float64)
+    - credit_limit (number)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
+    - updated_by (int, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -4751,16 +4751,16 @@ Standard `APIResponse` with fields:
     - supplier_id (int)
     - company_id (int)
     - name (string)
-    - contact_person,omitempty (*string)
-    - phone,omitempty (*string)
-    - email,omitempty (*string)
-    - address,omitempty (*string)
-    - tax_number,omitempty (*string)
+    - contact_person (string, optional)
+    - phone (string, optional)
+    - email (string, optional)
+    - address (string, optional)
+    - tax_number (string, optional)
     - payment_terms (int)
-    - credit_limit (float64)
+    - credit_limit (number)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
+    - updated_by (int, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -4772,14 +4772,14 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateSupplierRequest**
-  - Name          string
-  - ContactPerson *string
-  - Phone         *string
-  - Email         *string
-  - Address       *string
-  - TaxNumber     *string
-  - PaymentTerms  *int
-  - CreditLimit   *float64
+  - name (string)
+  - contact_person (string, optional)
+  - phone (string, optional)
+  - email (string, optional)
+  - address (string, optional)
+  - tax_number (string, optional)
+  - payment_terms (int, optional)
+  - credit_limit (number, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -4789,16 +4789,16 @@ Standard `APIResponse` with fields:
     - supplier_id (int)
     - company_id (int)
     - name (string)
-    - contact_person,omitempty (*string)
-    - phone,omitempty (*string)
-    - email,omitempty (*string)
-    - address,omitempty (*string)
-    - tax_number,omitempty (*string)
+    - contact_person (string, optional)
+    - phone (string, optional)
+    - email (string, optional)
+    - address (string, optional)
+    - tax_number (string, optional)
     - payment_terms (int)
-    - credit_limit (float64)
+    - credit_limit (number)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
+    - updated_by (int, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -4810,15 +4810,15 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdateSupplierRequest**
-  - Name          *string
-  - ContactPerson *string
-  - Phone         *string
-  - Email         *string
-  - Address       *string
-  - TaxNumber     *string
-  - PaymentTerms  *int
-  - CreditLimit   *float64
-  - IsActive      *bool
+  - name (string, optional)
+  - contact_person (string, optional)
+  - phone (string, optional)
+  - email (string, optional)
+  - address (string, optional)
+  - tax_number (string, optional)
+  - payment_terms (int, optional)
+  - credit_limit (number, optional)
+  - is_active (bool, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -4828,16 +4828,16 @@ Standard `APIResponse` with fields:
     - supplier_id (int)
     - company_id (int)
     - name (string)
-    - contact_person,omitempty (*string)
-    - phone,omitempty (*string)
-    - email,omitempty (*string)
-    - address,omitempty (*string)
-    - tax_number,omitempty (*string)
+    - contact_person (string, optional)
+    - phone (string, optional)
+    - email (string, optional)
+    - address (string, optional)
+    - tax_number (string, optional)
     - payment_terms (int)
-    - credit_limit (float64)
+    - credit_limit (number)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
+    - updated_by (int, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -4857,16 +4857,16 @@ Standard `APIResponse` with fields:
     - supplier_id (int)
     - company_id (int)
     - name (string)
-    - contact_person,omitempty (*string)
-    - phone,omitempty (*string)
-    - email,omitempty (*string)
-    - address,omitempty (*string)
-    - tax_number,omitempty (*string)
+    - contact_person (string, optional)
+    - phone (string, optional)
+    - email (string, optional)
+    - address (string, optional)
+    - tax_number (string, optional)
     - payment_terms (int)
-    - credit_limit (float64)
+    - credit_limit (number)
     - is_active (bool)
     - created_by (int)
-    - updated_by,omitempty (*int)
+    - updated_by (int, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -4894,11 +4894,11 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateCurrencyRequest**
-  - Code           string
-  - Name           string
-  - Symbol         *string
-  - ExchangeRate   float64
-  - IsBaseCurrency bool
+  - code (string)
+  - name (string)
+  - symbol (string, optional)
+  - exchange_rate (number)
+  - is_base_currency (bool)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -4916,11 +4916,11 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdateCurrencyRequest**
-  - Code           *string
-  - Name           *string
-  - Symbol         *string
-  - ExchangeRate   *float64
-  - IsBaseCurrency *bool
+  - code (string, optional)
+  - name (string, optional)
+  - symbol (string, optional)
+  - exchange_rate (number, optional)
+  - is_base_currency (bool, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -4938,11 +4938,11 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdateCurrencyRequest**
-  - Code           *string
-  - Name           *string
-  - Symbol         *string
-  - ExchangeRate   *float64
-  - IsBaseCurrency *bool
+  - code (string, optional)
+  - name (string, optional)
+  - symbol (string, optional)
+  - exchange_rate (number, optional)
+  - is_base_currency (bool, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -4992,10 +4992,10 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateTaxRequest**
-  - Name       string
-  - Percentage float64
-  - IsCompound bool
-  - IsActive   bool
+  - name (string)
+  - percentage (number)
+  - is_compound (bool)
+  - is_active (bool)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -5013,10 +5013,10 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdateTaxRequest**
-  - Name       *string
-  - Percentage *float64
-  - IsCompound *bool
-  - IsActive   *bool
+  - name (string, optional)
+  - percentage (number, optional)
+  - is_compound (bool, optional)
+  - is_active (bool, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -5057,13 +5057,13 @@ Standard `APIResponse` with fields:
 - data (Setting)
     - setting_id (int)
     - company_id (int)
-    - location_id,omitempty (*int)
+    - location_id (int, optional)
     - key (string)
     - value (JSONB)
-    - description,omitempty (*string)
+    - description (string, optional)
     - data_type (string)
-    - created_at (time.Time)
-    - updated_at (time.Time)
+    - created_at (string (RFC3339 timestamp))
+    - updated_at (string (RFC3339 timestamp))
   - error (string, optional)
   - meta (object, optional)
 
@@ -5075,7 +5075,7 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdateSettingsRequest**
-  - Settings map[string]JSONB
+  - settings (map[string]JSONB)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -5084,13 +5084,13 @@ Standard `APIResponse` with fields:
 - data (Setting)
     - setting_id (int)
     - company_id (int)
-    - location_id,omitempty (*int)
+    - location_id (int, optional)
     - key (string)
     - value (JSONB)
-    - description,omitempty (*string)
+    - description (string, optional)
     - data_type (string)
-    - created_at (time.Time)
-    - updated_at (time.Time)
+    - created_at (string (RFC3339 timestamp))
+    - updated_at (string (RFC3339 timestamp))
   - error (string, optional)
   - meta (object, optional)
 
@@ -5109,12 +5109,12 @@ Standard `APIResponse` with fields:
 - data (Company)
     - company_id (int)
     - name (string)
-    - logo,omitempty (*string)
-    - address,omitempty (*string)
-    - phone,omitempty (*string)
-    - email,omitempty (*string)
-    - tax_number,omitempty (*string)
-    - currency_id,omitempty (*int)
+    - logo (string, optional)
+    - address (string, optional)
+    - phone (string, optional)
+    - email (string, optional)
+    - tax_number (string, optional)
+    - currency_id (int, optional)
     - is_active (bool)
   - error (string, optional)
   - meta (object, optional)
@@ -5127,10 +5127,10 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CompanySettings**
-  - Name    string
-  - Address *string
-  - Phone   *string
-  - Email   *string
+  - name (string)
+  - address (string, optional)
+  - phone (string, optional)
+  - email (string, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -5139,12 +5139,12 @@ Standard `APIResponse` with fields:
 - data (Company)
     - company_id (int)
     - name (string)
-    - logo,omitempty (*string)
-    - address,omitempty (*string)
-    - phone,omitempty (*string)
-    - email,omitempty (*string)
-    - tax_number,omitempty (*string)
-    - currency_id,omitempty (*int)
+    - logo (string, optional)
+    - address (string, optional)
+    - phone (string, optional)
+    - email (string, optional)
+    - tax_number (string, optional)
+    - currency_id (int, optional)
     - is_active (bool)
   - error (string, optional)
   - meta (object, optional)
@@ -5173,9 +5173,9 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **InvoiceSettings**
-  - Prefix     *string
-  - NextNumber *int
-  - Notes      *string
+  - prefix (string, optional)
+  - next_number (int, optional)
+  - notes (string, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -5201,7 +5201,7 @@ Standard `APIResponse` with fields:
     - tax_id (int)
     - company_id (int)
     - name (string)
-    - percentage (float64)
+    - percentage (number)
     - is_compound (bool)
     - is_active (bool)
   - error (string, optional)
@@ -5215,8 +5215,8 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **TaxSettings**
-  - TaxName    *string
-  - TaxPercent *float64
+  - tax_name (string, optional)
+  - tax_percent (number, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -5226,7 +5226,7 @@ Standard `APIResponse` with fields:
     - tax_id (int)
     - company_id (int)
     - name (string)
-    - percentage (float64)
+    - percentage (number)
     - is_compound (bool)
     - is_active (bool)
   - error (string, optional)
@@ -5256,7 +5256,7 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **DeviceControlSettings**
-  - AllowRemote bool
+  - allow_remote (bool)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -5290,7 +5290,7 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **SessionLimitRequest**
-  - MaxSessions int
+  - max_sessions (int)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -5308,7 +5308,7 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **SessionLimitRequest**
-  - MaxSessions int
+  - max_sessions (int)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -5348,10 +5348,10 @@ Standard `APIResponse` with fields:
   - message (string)
 - data (PaymentMethod)
     - method_id (int)
-    - company_id,omitempty (*int)
+    - company_id (int, optional)
     - name (string)
     - type (string)
-    - external_integration,omitempty (*JSONB)
+    - external_integration (JSONB, optional)
     - is_active (bool)
   - error (string, optional)
   - meta (object, optional)
@@ -5364,10 +5364,10 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **PaymentMethodRequest**
-  - Name                string
-  - Type                string
-  - ExternalIntegration *JSONB
-  - IsActive            bool
+  - name (string)
+  - type (string)
+  - external_integration (JSONB, optional)
+  - is_active (bool)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -5375,10 +5375,10 @@ Standard `APIResponse` with fields:
   - message (string)
 - data (PaymentMethod)
     - method_id (int)
-    - company_id,omitempty (*int)
+    - company_id (int, optional)
     - name (string)
     - type (string)
-    - external_integration,omitempty (*JSONB)
+    - external_integration (JSONB, optional)
     - is_active (bool)
   - error (string, optional)
   - meta (object, optional)
@@ -5391,10 +5391,10 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **PaymentMethodRequest**
-  - Name                string
-  - Type                string
-  - ExternalIntegration *JSONB
-  - IsActive            bool
+  - name (string)
+  - type (string)
+  - external_integration (JSONB, optional)
+  - is_active (bool)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -5402,10 +5402,10 @@ Standard `APIResponse` with fields:
   - message (string)
 - data (PaymentMethod)
     - method_id (int)
-    - company_id,omitempty (*int)
+    - company_id (int, optional)
     - name (string)
     - type (string)
-    - external_integration,omitempty (*JSONB)
+    - external_integration (JSONB, optional)
     - is_active (bool)
   - error (string, optional)
   - meta (object, optional)
@@ -5424,10 +5424,10 @@ Standard `APIResponse` with fields:
   - message (string)
 - data (PaymentMethod)
     - method_id (int)
-    - company_id,omitempty (*int)
+    - company_id (int, optional)
     - name (string)
     - type (string)
-    - external_integration,omitempty (*JSONB)
+    - external_integration (JSONB, optional)
     - is_active (bool)
   - error (string, optional)
   - meta (object, optional)
@@ -5456,15 +5456,15 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **PrinterProfile**
-  - PrinterID    int
-  - CompanyID    int
-  - LocationID   *int
-  - Name         string
-  - PrinterType  string
-  - PaperSize    *string
-  - Connectivity *JSONB
-  - IsDefault    bool
-  - IsActive     bool
+  - printer_id (int)
+  - company_id (int)
+  - location_id (int, optional)
+  - name (string)
+  - printer_type (string)
+  - paper_size (string, optional)
+  - connectivity (JSONB, optional)
+  - is_default (bool)
+  - is_active (bool)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -5482,15 +5482,15 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **PrinterProfile**
-  - PrinterID    int
-  - CompanyID    int
-  - LocationID   *int
-  - Name         string
-  - PrinterType  string
-  - PaperSize    *string
-  - Connectivity *JSONB
-  - IsDefault    bool
-  - IsActive     bool
+  - printer_id (int)
+  - company_id (int)
+  - location_id (int, optional)
+  - name (string)
+  - printer_type (string)
+  - paper_size (string, optional)
+  - connectivity (JSONB, optional)
+  - is_default (bool)
+  - is_active (bool)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -5530,16 +5530,16 @@ Standard `APIResponse` with fields:
   - message (string)
 - data (AuditLog)
     - log_id (int)
-    - user_id,omitempty (*int)
+    - user_id (int, optional)
     - action (string)
     - table_name (string)
-    - record_id,omitempty (*int)
-    - old_value,omitempty (*JSONB)
-    - new_value,omitempty (*JSONB)
-    - field_changes,omitempty (*JSONB)
-    - ip_address,omitempty (*string)
-    - user_agent,omitempty (*string)
-    - timestamp (time.Time)
+    - record_id (int, optional)
+    - old_value (JSONB, optional)
+    - new_value (JSONB, optional)
+    - field_changes (JSONB, optional)
+    - ip_address (string, optional)
+    - user_agent (string, optional)
+    - timestamp (string (RFC3339 timestamp))
   - error (string, optional)
   - meta (object, optional)
 
@@ -5559,7 +5559,7 @@ Standard `APIResponse` with fields:
     - language_code (string)
     - language_name (string)
     - is_active (bool)
-    - created_at (time.Time)
+    - created_at (string (RFC3339 timestamp))
   - error (string, optional)
   - meta (object, optional)
 
@@ -5580,8 +5580,8 @@ Standard `APIResponse` with fields:
     - key (string)
     - language_code (string)
     - value (string)
-    - context,omitempty (*string)
-    - created_at (time.Time)
+    - context (string, optional)
+    - created_at (string (RFC3339 timestamp))
   - error (string, optional)
   - meta (object, optional)
 
@@ -5593,8 +5593,8 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **UpdateTranslationsRequest**
-  - Lang    string
-  - Strings map[string]string
+  - lang (string)
+  - strings (map[string]string)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -5605,8 +5605,8 @@ Standard `APIResponse` with fields:
     - key (string)
     - language_code (string)
     - value (string)
-    - context,omitempty (*string)
-    - created_at (time.Time)
+    - context (string, optional)
+    - created_at (string (RFC3339 timestamp))
   - error (string, optional)
   - meta (object, optional)
 
@@ -5705,9 +5705,9 @@ Standard `APIResponse` with fields:
 - data (NumberingSequence)
     - sequence_id (int)
     - company_id (int)
-    - location_id,omitempty (*int)
+    - location_id (int, optional)
     - name (string)
-    - prefix,omitempty (*string)
+    - prefix (string, optional)
     - sequence_length (int)
     - current_number (int)
   - error (string, optional)
@@ -5728,9 +5728,9 @@ Standard `APIResponse` with fields:
 - data (NumberingSequence)
     - sequence_id (int)
     - company_id (int)
-    - location_id,omitempty (*int)
+    - location_id (int, optional)
     - name (string)
-    - prefix,omitempty (*string)
+    - prefix (string, optional)
     - sequence_length (int)
     - current_number (int)
   - error (string, optional)
@@ -5751,9 +5751,9 @@ Standard `APIResponse` with fields:
 - data (NumberingSequence)
     - sequence_id (int)
     - company_id (int)
-    - location_id,omitempty (*int)
+    - location_id (int, optional)
     - name (string)
-    - prefix,omitempty (*string)
+    - prefix (string, optional)
     - sequence_length (int)
     - current_number (int)
   - error (string, optional)
@@ -5774,9 +5774,9 @@ Standard `APIResponse` with fields:
 - data (NumberingSequence)
     - sequence_id (int)
     - company_id (int)
-    - location_id,omitempty (*int)
+    - location_id (int, optional)
     - name (string)
-    - prefix,omitempty (*string)
+    - prefix (string, optional)
     - sequence_length (int)
     - current_number (int)
   - error (string, optional)
@@ -5797,9 +5797,9 @@ Standard `APIResponse` with fields:
 - data (NumberingSequence)
     - sequence_id (int)
     - company_id (int)
-    - location_id,omitempty (*int)
+    - location_id (int, optional)
     - name (string)
-    - prefix,omitempty (*string)
+    - prefix (string, optional)
     - sequence_length (int)
     - current_number (int)
   - error (string, optional)
@@ -5823,8 +5823,8 @@ Standard `APIResponse` with fields:
     - name (string)
     - template_type (string)
     - layout (JSONB)
-    - primary_language,omitempty (*string)
-    - secondary_language,omitempty (*string)
+    - primary_language (string, optional)
+    - secondary_language (string, optional)
     - is_default (bool)
     - is_active (bool)
   - error (string, optional)
@@ -5848,8 +5848,8 @@ Standard `APIResponse` with fields:
     - name (string)
     - template_type (string)
     - layout (JSONB)
-    - primary_language,omitempty (*string)
-    - secondary_language,omitempty (*string)
+    - primary_language (string, optional)
+    - secondary_language (string, optional)
     - is_default (bool)
     - is_active (bool)
   - error (string, optional)
@@ -5873,8 +5873,8 @@ Standard `APIResponse` with fields:
     - name (string)
     - template_type (string)
     - layout (JSONB)
-    - primary_language,omitempty (*string)
-    - secondary_language,omitempty (*string)
+    - primary_language (string, optional)
+    - secondary_language (string, optional)
     - is_default (bool)
     - is_active (bool)
   - error (string, optional)
@@ -5898,8 +5898,8 @@ Standard `APIResponse` with fields:
     - name (string)
     - template_type (string)
     - layout (JSONB)
-    - primary_language,omitempty (*string)
-    - secondary_language,omitempty (*string)
+    - primary_language (string, optional)
+    - secondary_language (string, optional)
     - is_default (bool)
     - is_active (bool)
   - error (string, optional)
@@ -5923,8 +5923,8 @@ Standard `APIResponse` with fields:
     - name (string)
     - template_type (string)
     - layout (JSONB)
-    - primary_language,omitempty (*string)
-    - secondary_language,omitempty (*string)
+    - primary_language (string, optional)
+    - secondary_language (string, optional)
     - is_default (bool)
     - is_active (bool)
   - error (string, optional)
@@ -5938,8 +5938,8 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **PrintReceiptRequest**
-  - Type        string
-  - ReferenceID int
+  - type (string)
+  - reference_id (int)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -5966,10 +5966,10 @@ Standard `APIResponse` with fields:
     - state_id (int)
     - approver_role_id (int)
     - status (string)
-    - remarks,omitempty (*string)
-    - approved_at,omitempty (*time.Time)
+    - remarks (string, optional)
+    - approved_at (string (RFC3339 timestamp), optional)
     - created_by (int)
-    - updated_by,omitempty (*int)
+    - updated_by (int, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -5981,8 +5981,8 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **CreateWorkflowRequest**
-  - StateID        int
-  - ApproverRoleID int
+  - state_id (int)
+  - approver_role_id (int)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -5993,10 +5993,10 @@ Standard `APIResponse` with fields:
     - state_id (int)
     - approver_role_id (int)
     - status (string)
-    - remarks,omitempty (*string)
-    - approved_at,omitempty (*time.Time)
+    - remarks (string, optional)
+    - approved_at (string (RFC3339 timestamp), optional)
     - created_by (int)
-    - updated_by,omitempty (*int)
+    - updated_by (int, optional)
   - error (string, optional)
   - meta (object, optional)
 
@@ -6008,7 +6008,7 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **DecisionRequest**
-  - Remarks *string
+  - remarks (string, optional)
 
 ### Response
 Standard `APIResponse` with fields:
@@ -6026,7 +6026,7 @@ Standard `APIResponse` with fields:
 
 ### Request Body
 **DecisionRequest**
-  - Remarks *string
+  - remarks (string, optional)
 
 ### Response
 Standard `APIResponse` with fields:
