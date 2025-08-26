@@ -181,13 +181,13 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/APIResponse'
-                  - type: object
-                    properties:
-                      data:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/UserResponse'
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/UserResponse'
     post:
       summary: Create a user
       requestBody:
@@ -249,16 +249,44 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Company'
+                  error:
+                    type: string
+                    nullable: true
+                  meta:
+                    type: object
+                    nullable: true
     post:
       summary: POST /api/v1/companies
       responses:
-        '200':
-          description: Successful response
+        '201':
+          description: Company created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Company'
+                  error:
+                    type: string
+                    nullable: true
+                  meta:
+                    type: object
+                    nullable: true
       requestBody:
         content:
           application/json:
@@ -273,7 +301,20 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Company'
+                  error:
+                    type: string
+                    nullable: true
+                  meta:
+                    type: object
+                    nullable: true
       parameters:
       - name: id
         in: path
@@ -293,7 +334,21 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Company'
+                    nullable: true
+                  error:
+                    type: string
+                    nullable: true
+                  meta:
+                    type: object
+                    nullable: true
       parameters:
       - name: id
         in: path
@@ -476,13 +531,13 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/APIResponse'
-                  - type: object
-                    properties:
-                      data:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/Product'
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Product'
     post:
       summary: Create a product
       requestBody:
@@ -753,13 +808,13 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/APIResponse'
-                  - type: object
-                    properties:
-                      data:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/Stock'
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Stock'
   /inventory/stock-adjustment:
     post:
       summary: Adjust stock levels
@@ -786,13 +841,13 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/APIResponse'
-                  - type: object
-                    properties:
-                      data:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/StockAdjustment'
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/StockAdjustment'
   /inventory/summary:
     get:
       summary: GET /api/v1/inventory/summary
@@ -4323,5 +4378,42 @@ components:
           type: string
           nullable: true
         is_active:
+          type: boolean
+          nullable: true
+    Company:
+      type: object
+      properties:
+        company_id:
+          type: integer
+        name:
+          type: string
+        logo:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        tax_number:
+          type: string
+          nullable: true
+        currency_id:
+          type: integer
+          nullable: true
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_deleted:
           type: boolean
           nullable: true
