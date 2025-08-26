@@ -1034,6 +1034,111 @@ Standard `APIResponse` with fields:
   - error (string, optional)
   - meta (object, optional)
 
+## GET /api/v1/categories
+
+### Headers
+- Authorization: Bearer <token>
+
+### Request Body
+None
+
+### Response
+Standard `APIResponse` with fields:
+  - success (bool)
+  - message (string)
+- data (Category)
+    - category_id (int)
+    - company_id (int)
+    - name (string)
+    - description,omitempty (*string)
+    - parent_id,omitempty (*int)
+    - is_active (bool)
+    - created_by (int)
+    - updated_by,omitempty (*int)
+  - error (string, optional)
+  - meta (object, optional)
+
+## POST /api/v1/categories
+
+### Headers
+- Authorization: Bearer <token>
+- Content-Type: application/json
+
+### Request Body
+**CreateCategoryRequest**
+  - Name        string
+  - Description *string
+  - ParentID    *int
+
+### Response
+Standard `APIResponse` with fields:
+  - success (bool)
+  - message (string)
+- data (Category)
+    - category_id (int)
+    - company_id (int)
+    - name (string)
+    - description,omitempty (*string)
+    - parent_id,omitempty (*int)
+    - is_active (bool)
+    - created_by (int)
+    - updated_by,omitempty (*int)
+  - error (string, optional)
+  - meta (object, optional)
+
+## PUT /api/v1/categories/:id
+
+### Headers
+- Authorization: Bearer <token>
+- Content-Type: application/json
+
+### Request Body
+**UpdateCategoryRequest**
+  - Name        *string
+  - Description *string
+  - ParentID    *int
+  - IsActive    *bool
+
+### Response
+Standard `APIResponse` with fields:
+  - success (bool)
+  - message (string)
+- data (Category)
+    - category_id (int)
+    - company_id (int)
+    - name (string)
+    - description,omitempty (*string)
+    - parent_id,omitempty (*int)
+    - is_active (bool)
+    - created_by (int)
+    - updated_by,omitempty (*int)
+  - error (string, optional)
+  - meta (object, optional)
+
+## DELETE /api/v1/categories/:id
+
+### Headers
+- Authorization: Bearer <token>
+
+### Request Body
+None
+
+### Response
+Standard `APIResponse` with fields:
+  - success (bool)
+  - message (string)
+- data (Category)
+    - category_id (int)
+    - company_id (int)
+    - name (string)
+    - description,omitempty (*string)
+    - parent_id,omitempty (*int)
+    - is_active (bool)
+    - created_by (int)
+    - updated_by,omitempty (*int)
+  - error (string, optional)
+  - meta (object, optional)
+
 ## GET /api/v1/expenses/categories
 
 ### Headers
