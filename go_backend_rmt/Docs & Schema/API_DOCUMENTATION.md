@@ -209,6 +209,9 @@ Standard `APIResponse` with fields:
 
 ## DELETE /api/v1/device-sessions/:session_id
 
+### Path Parameters
+- session_id (string): string identifier of the device session.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -355,6 +358,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/users/:id
 
+### Path Parameters
+- id (int): integer identifier of the user.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -395,6 +401,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/users/:id
+
+### Path Parameters
+- id (int): integer identifier of the user.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -467,6 +476,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/companies/:id
 
+### Path Parameters
+- id (int): integer identifier of the company.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -491,6 +503,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/companies/:id
+
+### Path Parameters
+- id (int): integer identifier of the company.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -556,6 +571,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/locations/:id
 
+### Path Parameters
+- id (int): integer identifier of the location.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -582,6 +600,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/locations/:id
+
+### Path Parameters
+- id (int): integer identifier of the location.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -648,6 +669,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/roles/:id
 
+### Path Parameters
+- id (int): integer identifier of the role.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -671,6 +695,9 @@ Standard `APIResponse` with fields:
 
 ## DELETE /api/v1/roles/:id
 
+### Path Parameters
+- id (int): integer identifier of the role.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -690,6 +717,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## GET /api/v1/roles/:id/permissions
+
+### Path Parameters
+- id (int): integer identifier of the role.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -711,6 +741,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## POST /api/v1/roles/:id/permissions
+
+### Path Parameters
+- id (int): integer identifier of the role.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -791,6 +824,9 @@ Standard `APIResponse` with fields:
 
 ## GET /api/v1/products/:id
 
+### Path Parameters
+- id (int): integer identifier of the product.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -825,6 +861,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## GET /api/v1/products/:id/summary
+
+### Path Parameters
+- id (int): integer identifier of the product.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -892,6 +931,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/products/:id
 
+### Path Parameters
+- id (int): integer identifier of the product.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -942,6 +984,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/products/:id
+
+### Path Parameters
+- id (int): integer identifier of the product.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -1030,6 +1075,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/categories/:id
 
+### Path Parameters
+- id (int): integer identifier of the category.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -1058,6 +1106,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/categories/:id
+
+### Path Parameters
+- id (int): integer identifier of the category.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -1223,6 +1274,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/product-attribute-definitions/:id
 
+### Path Parameters
+- id (int): integer identifier of the product attribute definition.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -1244,6 +1298,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/product-attribute-definitions/:id
+
+### Path Parameters
+- id (int): integer identifier of the product attribute definition.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -1421,6 +1478,9 @@ Standard `APIResponse` with fields:
 
 ## GET /api/v1/inventory/transfers/:id
 
+### Path Parameters
+- id (int): integer identifier of the transfer.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -1457,6 +1517,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/inventory/transfers/:id/approve
 
+### Path Parameters
+- id (int): integer identifier of the transfer.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -1473,6 +1536,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/inventory/transfers/:id/complete
 
+### Path Parameters
+- id (int): integer identifier of the transfer.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -1488,6 +1554,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/inventory/transfers/:id
+
+### Path Parameters
+- id (int): integer identifier of the transfer.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -1574,6 +1643,9 @@ Standard `APIResponse` with fields:
 
 ## GET /api/v1/sales/:id
 
+### Path Parameters
+- id (int): integer identifier of the sale.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -1655,6 +1727,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/sales/:id
 
+### Path Parameters
+- id (int): integer identifier of the sale.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -1696,6 +1771,9 @@ Standard `APIResponse` with fields:
 
 ## DELETE /api/v1/sales/:id
 
+### Path Parameters
+- id (int): integer identifier of the sale.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -1733,6 +1811,9 @@ Standard `APIResponse` with fields:
 
 ## POST /api/v1/sales/:id/hold
 
+### Path Parameters
+- id (int): integer identifier of the sale.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -1748,6 +1829,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## POST /api/v1/sales/:id/resume
+
+### Path Parameters
+- id (int): integer identifier of the sale.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -1831,6 +1915,9 @@ Standard `APIResponse` with fields:
 
 ## GET /api/v1/sales/quotes/:id
 
+### Path Parameters
+- id (int): integer identifier of the quote.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -1901,6 +1988,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/sales/quotes/:id
 
+### Path Parameters
+- id (int): integer identifier of the quote.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -1937,6 +2027,9 @@ Standard `APIResponse` with fields:
 
 ## DELETE /api/v1/sales/quotes/:id
 
+### Path Parameters
+- id (int): integer identifier of the quote.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -1969,6 +2062,9 @@ Standard `APIResponse` with fields:
 
 ## POST /api/v1/sales/quotes/:id/print
 
+### Path Parameters
+- id (int): integer identifier of the quote.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -1984,6 +2080,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## POST /api/v1/sales/quotes/:id/share
+
+### Path Parameters
+- id (int): integer identifier of the quote.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -2166,6 +2265,9 @@ Standard `APIResponse` with fields:
 
 ## GET /api/v1/pos/receipt/:id
 
+### Path Parameters
+- id (int): integer identifier of the receipt.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -2204,6 +2306,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## GET /api/v1/loyalty-programs/:customer_id
+
+### Path Parameters
+- customer_id (int): integer identifier of the customer.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -2387,6 +2492,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/promotions/:id
 
+### Path Parameters
+- id (int): integer identifier of the promotion.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -2425,6 +2533,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/promotions/:id
+
+### Path Parameters
+- id (int): integer identifier of the promotion.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -2503,6 +2614,9 @@ Standard `APIResponse` with fields:
 
 ## GET /api/v1/sale-returns/:id
 
+### Path Parameters
+- id (int): integer identifier of the sale return.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -2561,6 +2675,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/sale-returns/:id
 
+### Path Parameters
+- id (int): integer identifier of the sale return.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -2587,6 +2704,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/sale-returns/:id
+
+### Path Parameters
+- id (int): integer identifier of the sale return.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -2631,6 +2751,9 @@ Standard `APIResponse` with fields:
 
 ## GET /api/v1/sale-returns/search/:sale_id
 
+### Path Parameters
+- sale_id (int): integer identifier of the sale.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -2646,6 +2769,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## POST /api/v1/sale-returns/process/:sale_id
+
+### Path Parameters
+- sale_id (int): integer identifier of the sale.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -2733,6 +2859,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## GET /api/v1/purchases/:id
+
+### Path Parameters
+- id (int): integer identifier of the purchase.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -2844,6 +2973,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/purchases/:id
 
+### Path Parameters
+- id (int): integer identifier of the purchase.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -2889,6 +3021,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/purchases/:id/receive
 
+### Path Parameters
+- id (int): integer identifier of the purchase.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -2906,6 +3041,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/purchases/:id
+
+### Path Parameters
+- id (int): integer identifier of the purchase.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -2974,6 +3112,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/purchase-orders/:id
 
+### Path Parameters
+- id (int): integer identifier of the purchase order.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -3002,6 +3143,9 @@ Standard `APIResponse` with fields:
 
 ## DELETE /api/v1/purchase-orders/:id
 
+### Path Parameters
+- id (int): integer identifier of the purchase order.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -3029,6 +3173,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## PUT /api/v1/purchase-orders/:id/approve
+
+### Path Parameters
+- id (int): integer identifier of the purchase order.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -3105,6 +3252,9 @@ Standard `APIResponse` with fields:
 
 ## GET /api/v1/purchase-returns/:id
 
+### Path Parameters
+- id (int): integer identifier of the purchase return.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -3171,6 +3321,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/purchase-returns/:id
 
+### Path Parameters
+- id (int): integer identifier of the purchase return.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -3201,6 +3354,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/purchase-returns/:id
+
+### Path Parameters
+- id (int): integer identifier of the purchase return.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -3262,6 +3418,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## GET /api/v1/customers/:id/summary
+
+### Path Parameters
+- id (int): integer identifier of the customer.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -3349,6 +3508,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/customers/:id
 
+### Path Parameters
+- id (int): integer identifier of the customer.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -3388,6 +3550,9 @@ Standard `APIResponse` with fields:
 
 ## DELETE /api/v1/customers/:id
 
+### Path Parameters
+- id (int): integer identifier of the customer.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -3418,6 +3583,9 @@ Standard `APIResponse` with fields:
 
 ## GET /api/v1/customers/:id/credit
 
+### Path Parameters
+- id (int): integer identifier of the customer.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -3433,6 +3601,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## POST /api/v1/customers/:id/credit
+
+### Path Parameters
+- id (int): integer identifier of the customer.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -3535,6 +3706,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/employees/:id
 
+### Path Parameters
+- id (int): integer identifier of the employee.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -3581,6 +3755,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/employees/:id
+
+### Path Parameters
+- id (int): integer identifier of the employee.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -3773,6 +3950,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/payrolls/:id/mark-paid
 
+### Path Parameters
+- id (int): integer identifier of the payroll.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -3788,6 +3968,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## POST /api/v1/payrolls/:id/components
+
+### Path Parameters
+- id (int): integer identifier of the payroll.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -3807,6 +3990,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## POST /api/v1/payrolls/:id/advances
+
+### Path Parameters
+- id (int): integer identifier of the payroll.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -3830,6 +4016,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## POST /api/v1/payrolls/:id/deductions
+
+### Path Parameters
+- id (int): integer identifier of the payroll.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -3855,6 +4044,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## GET /api/v1/payrolls/:id/payslip
+
+### Path Parameters
+- id (int): integer identifier of the payroll.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -3963,6 +4155,9 @@ Standard `APIResponse` with fields:
 
 ## GET /api/v1/collections/:id/receipt
 
+### Path Parameters
+- id (int): integer identifier of the collection.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -3978,6 +4173,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/collections/:id
+
+### Path Parameters
+- id (int): integer identifier of the collection.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -4032,6 +4230,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## GET /api/v1/expenses/:id
+
+### Path Parameters
+- id (int): integer identifier of the expense.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -4118,6 +4319,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/expenses/categories/:id
 
+### Path Parameters
+- id (int): integer identifier of the category.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -4133,6 +4337,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/expenses/categories/:id
+
+### Path Parameters
+- id (int): integer identifier of the category.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -4174,6 +4381,9 @@ Standard `APIResponse` with fields:
 
 ## GET /api/v1/vouchers/:id
 
+### Path Parameters
+- id (int): integer identifier of the voucher.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -4197,6 +4407,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## POST /api/v1/vouchers/:type
+
+### Path Parameters
+- type (string): type of the voucher.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -4242,6 +4455,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## GET /api/v1/ledgers/:account_id/entries
+
+### Path Parameters
+- account_id (int): integer identifier of the account.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -4721,6 +4937,9 @@ Standard `APIResponse` with fields:
 
 ## GET /api/v1/suppliers/:id/summary
 
+### Path Parameters
+- id (int): integer identifier of the supplier.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -4736,6 +4955,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## GET /api/v1/suppliers/:id
+
+### Path Parameters
+- id (int): integer identifier of the supplier.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -4804,6 +5026,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/suppliers/:id
 
+### Path Parameters
+- id (int): integer identifier of the supplier.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -4842,6 +5067,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/suppliers/:id
+
+### Path Parameters
+- id (int): integer identifier of the supplier.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -4910,6 +5138,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/currencies/:id
 
+### Path Parameters
+- id (int): integer identifier of the currency.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -4932,6 +5163,9 @@ Standard `APIResponse` with fields:
 
 ## PATCH /api/v1/currencies/:id
 
+### Path Parameters
+- id (int): integer identifier of the currency.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -4953,6 +5187,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/currencies/:id
+
+### Path Parameters
+- id (int): integer identifier of the currency.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -5007,6 +5244,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/taxes/:id
 
+### Path Parameters
+- id (int): integer identifier of the taxe.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -5027,6 +5267,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/taxes/:id
+
+### Path Parameters
+- id (int): integer identifier of the taxe.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -5385,6 +5628,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/settings/payment-methods/:id
 
+### Path Parameters
+- id (int): integer identifier of the payment method.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -5411,6 +5657,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/settings/payment-methods/:id
+
+### Path Parameters
+- id (int): integer identifier of the payment method.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -5476,6 +5725,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/settings/printer/:id
 
+### Path Parameters
+- id (int): integer identifier of the printer.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -5501,6 +5753,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/settings/printer/:id
+
+### Path Parameters
+- id (int): integer identifier of the printer.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -5544,6 +5799,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## PUT /api/v1/languages/:code
+
+### Path Parameters
+- code (string): code of the language.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -5672,6 +5930,9 @@ Standard `APIResponse` with fields:
 
 ## DELETE /api/v1/user-preferences/:key
 
+### Path Parameters
+- key (string): key of the user preference.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -5714,6 +5975,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## GET /api/v1/numbering-sequences/:id
+
+### Path Parameters
+- id (int): integer identifier of the numbering sequence.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -5761,6 +6025,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/numbering-sequences/:id
 
+### Path Parameters
+- id (int): integer identifier of the numbering sequence.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -5783,6 +6050,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/numbering-sequences/:id
+
+### Path Parameters
+- id (int): integer identifier of the numbering sequence.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -5831,6 +6101,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## GET /api/v1/invoice-templates/:id
+
+### Path Parameters
+- id (int): integer identifier of the invoice template.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -5882,6 +6155,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/invoice-templates/:id
 
+### Path Parameters
+- id (int): integer identifier of the invoice template.
+
 ### Headers
 - Authorization: Bearer <token>
 
@@ -5906,6 +6182,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## DELETE /api/v1/invoice-templates/:id
+
+### Path Parameters
+- id (int): integer identifier of the invoice template.
 
 ### Headers
 - Authorization: Bearer <token>
@@ -6002,6 +6281,9 @@ Standard `APIResponse` with fields:
 
 ## PUT /api/v1/workflow-requests/:id/approve
 
+### Path Parameters
+- id (int): integer identifier of the workflow request.
+
 ### Headers
 - Authorization: Bearer <token>
 - Content-Type: application/json
@@ -6019,6 +6301,9 @@ Standard `APIResponse` with fields:
   - meta (object, optional)
 
 ## PUT /api/v1/workflow-requests/:id/reject
+
+### Path Parameters
+- id (int): integer identifier of the workflow request.
 
 ### Headers
 - Authorization: Bearer <token>
