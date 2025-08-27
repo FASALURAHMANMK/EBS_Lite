@@ -6,7 +6,6 @@ import { useAuth } from './AuthContext';
 export const SYNC_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
 const initialState: AppState = {
-  currentView: 'dashboard',
   selectedCategory: 'All',
   isLoading: false,
   isInitialized: false,
@@ -43,8 +42,6 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
       return { ...state, isInitialized: action.payload };
     case 'SET_ERROR':
       return { ...state, error: action.payload };
-    case 'SET_VIEW':
-      return { ...state, currentView: action.payload };
     case 'SET_CATEGORY':
       return { ...state, selectedCategory: action.payload };
     case 'SET_PRODUCTS':
