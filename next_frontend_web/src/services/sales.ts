@@ -47,6 +47,12 @@ export const updateQuote = (id: string, payload: Partial<Quote>) =>
 export const deleteQuote = (id: string) =>
   api.delete<void>(`/api/v1/sales/quotes/${id}`);
 
+export const printQuote = (id: string, payload: Record<string, any> = {}) =>
+  api.post<void>(`/api/v1/sales/quotes/${id}/print`, payload);
+
+export const shareQuote = (id: string, payload: Record<string, any> = {}) =>
+  api.post<void>(`/api/v1/sales/quotes/${id}/share`, payload);
+
 export const getSalesHistory = (filters: Record<string, any> = {}) =>
   api.get<Sale[]>(`/api/v1/sales/history${buildQuery(filters)}`);
 
