@@ -592,9 +592,6 @@ export type {
   Customer as CustomerType,
   Sale as SaleType,
   Supplier as SupplierType,
-  Brand,
-  Unit,
-  DeviceSession,
   AuthAction,
   AppAction,
 };
