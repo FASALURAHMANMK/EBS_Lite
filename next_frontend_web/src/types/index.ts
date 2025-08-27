@@ -413,9 +413,8 @@ export interface UserSettings {
 // API Response Types
 export interface ApiResponse<T> {
   success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
+  message: string;
+  data: T;
 }
 
 export interface PaginatedResponse<T> {

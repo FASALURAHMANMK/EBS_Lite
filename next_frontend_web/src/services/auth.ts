@@ -1,5 +1,5 @@
 import api, { setAuthTokens, clearAuthTokens } from './apiClient';
-import { User, Company, Location } from '../types';
+import { User, Company, Location, ApiResponse } from '../types';
 
 /**
  * Payload sent to the backend when a user attempts to log in.
@@ -90,11 +90,12 @@ export const login = async (
   deviceId: string
 ): Promise<{ user: User; company: Company; sessionId: string }> => {
   const payload: LoginPayload = { email, password, deviceId };
-  const data = await api.post<AuthResponse>(
+  const resp = await api.post<ApiResponse<AuthResponse>>(
     '/api/v1/auth/login',
     payload,
     { auth: false }
   );
+  const { data } = resp;
   setAuthTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
   return { user: mapUser(data.user), company: mapCompany(data.company), sessionId: data.sessionId };
 };
@@ -109,7 +110,10 @@ export const register = async (
   );
 
 export const getProfile = async () => {
-  const data = await api.get<{ user: any; company: any }>('/api/v1/auth/me');
+  const resp = await api.get<ApiResponse<{ user: any; company: any }>>(
+    '/api/v1/auth/me'
+  );
+  const { data } = resp;
   return { user: mapUser(data.user), company: mapCompany(data.company) };
 };
 
