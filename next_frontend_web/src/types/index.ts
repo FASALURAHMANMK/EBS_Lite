@@ -224,6 +224,29 @@ export interface Sale extends AuditFields {
   date: string;
 }
 
+export interface Quote extends AuditFields {
+  _id: string;
+  quoteNumber: string;
+  customerId?: string;
+  items: Array<{
+    productId: string;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+    discount?: number;
+  }>;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  status?: 'draft' | 'sent' | 'accepted';
+  companyId: string;
+  locationId: string;
+  userId: string;
+  date: string;
+}
+
 export interface Supplier extends AuditFields {
   _id: string;
   name: string;
@@ -267,6 +290,7 @@ export type SidebarView =
   | 'dashboard'
   | 'sales'
   | 'sales-invoice'
+  | 'sales-quotes'
   | 'sales-returns'
   | 'sales-history'
   | 'purchase-entry'

@@ -1,15 +1,24 @@
-import React from 'react';
-import { useAppState } from '../../../context/MainContext';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
+import { getInvoice } from '../../../services/sales';
+import { Sale } from '../../../types';
 
 const InvoiceView: React.FC = () => {
-  const state = useAppState(s => s);
-  const total = state.cart.reduce(
-    (sum, item) => sum + item.product.price * item.quantity,
-    0
-  );
+  const router = useRouter();
+  const { id } = router.query;
+  const [invoice, setInvoice] = useState<Sale | null>(null);
+
+  useEffect(() => {
+    if (typeof id === 'string') {
+      getInvoice(id)
+        .then(data => setInvoice(data))
+        .catch(() => setInvoice(null));
+    }
+  }, [id]);
 
   const shareInvoice = (method: 'print' | 'whatsapp' | 'sms' | 'email') => {
-    const message = `Invoice Total: ${total.toFixed(2)}`;
+    if (!invoice) return;
+    const message = `Invoice ${invoice.saleNumber} Total: ${invoice.total.toFixed(2)}`;
     switch (method) {
       case 'print':
         window.print();
@@ -26,20 +35,22 @@ const InvoiceView: React.FC = () => {
     }
   };
 
+  if (!invoice) return <div>Loading...</div>;
+
   return (
     <div className="p-4 space-y-4">
-      <h2 className="text-xl font-semibold">Invoice</h2>
+      <h2 className="text-xl font-semibold">Invoice #{invoice.saleNumber}</h2>
       <ul className="border p-2 divide-y">
-        {state.cart.map(item => (
-          <li key={item.product._id} className="py-1 flex justify-between">
+        {invoice.items.map(item => (
+          <li key={item.productId} className="py-1 flex justify-between">
             <span>
-              {item.product.name} x{item.quantity}
+              {item.productName} x{item.quantity}
             </span>
-            <span>{(item.product.price * item.quantity).toFixed(2)}</span>
+            <span>{(item.unitPrice * item.quantity).toFixed(2)}</span>
           </li>
         ))}
       </ul>
-      <div className="font-bold">Total: {total.toFixed(2)}</div>
+      <div className="font-bold">Total: {invoice.total.toFixed(2)}</div>
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => shareInvoice('print')}
@@ -71,3 +82,4 @@ const InvoiceView: React.FC = () => {
 };
 
 export default InvoiceView;
+

@@ -70,6 +70,7 @@ const Sidebar: React.FC = () => {
       subItems: [
         { label: 'POS', view: 'sales', icon: ShoppingCart },
         { label: 'Invoice', view: 'sales-invoice', icon: FileText },
+        { label: 'Quotes', view: 'sales-quotes', icon: FileText },
         { label: 'Returns', view: 'sales-returns', icon: Undo2 },
         { label: 'Sale History', view: 'sales-history', icon: History },
       ],
@@ -160,6 +161,7 @@ const Sidebar: React.FC = () => {
     dashboard: '/dashboard',
     sales: '/sales',
     'sales-invoice': '/sales/invoice',
+    'sales-quotes': '/sales/quotes',
     'sales-returns': '/sales/returns',
     'sales-history': '/sales/history',
     'purchase-entry': '/purchases/grn',
