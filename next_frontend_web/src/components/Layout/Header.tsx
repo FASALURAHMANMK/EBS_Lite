@@ -51,7 +51,7 @@ const Header: React.FC = () => {
     dispatch({ type: 'TOGGLE_THEME' });
   };
 
- const handleLocationChange = async (locationId: string) => {
+ const handleLocationChange = async (locationId: number) => {
   if (state.isLoading) return;
   
   try {
@@ -86,7 +86,7 @@ const Header: React.FC = () => {
     };
   }, []);
 
-  const currentLocation = authState.company?.locations?.find((loc: Location) => loc._id === state.currentLocationId);
+  const currentLocation = authState.company?.locations?.find((loc: Location) => loc.locationId === state.currentLocationId);
 
 
   return (
@@ -146,18 +146,18 @@ const Header: React.FC = () => {
     <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg z-50 min-w-48">
       {authState.company.locations.map((location: Location) => (
         <button
-          key={location._id}
-          onClick={() => handleLocationChange(location._id)}
+          key={location.locationId}
+          onClick={() => handleLocationChange(location.locationId)}
           disabled={state.isLoading}
           className={`w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 first:rounded-t-lg last:rounded-b-lg transition-colors disabled:opacity-50 ${
-            location._id === state.currentLocationId 
-              ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' 
+            location.locationId === state.currentLocationId
+              ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
               : 'text-gray-800 dark:text-white'
           }`}
         >
           <div className="font-medium">{location.name}</div>
           <div className="text-xs text-gray-500 dark:text-gray-400">{location.address}</div>
-          {location._id === state.currentLocationId && (
+          {location.locationId === state.currentLocationId && (
             <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">Current Location</div>
           )}
         </button>
@@ -276,7 +276,7 @@ const Header: React.FC = () => {
           <div className="flex items-center space-x-2">
             <div className="hidden md:block text-right">
               <div className="text-sm font-medium text-gray-800 dark:text-white">
-                {authState.user?.fullName}
+                {authState.user?.username}
               </div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
                 {authState.user?.roleName || authState.user?.roleId}

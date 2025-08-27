@@ -10,14 +10,14 @@ export enum ROLES {
 }
 
 export interface User {
-  _id: string;
+  userId: number;
   username: string;
   email: string;
-  fullName: string;
   // 1=Super Admin, 2=Admin, 3=Manager, 4=Sales, 5=Inventory, 6=Accountant, 7=Cashier, 8=HR
   roleId: number;
   roleName?: string;
-  companyId: string;
+  companyId: number;
+  locationId?: number;
   isActive: boolean;
   permissions: string[];
   primaryLanguage?: string;
@@ -27,14 +27,14 @@ export interface User {
 }
 
 export interface Location {
-  _id: string;
+  locationId: number;
   name: string;
   address: string;
   phone?: string;
   email?: string;
   code: string; // Unique location code
   isActive: boolean;
-  companyId: string;
+  companyId: number;
   settings?: {
     timezone?: string;
     currency?: string;
@@ -44,7 +44,7 @@ export interface Location {
 }
 
 export interface Company {
-  _id: string;
+  companyId: number;
   name: string;
   code: string;
   address: string;
@@ -283,8 +283,8 @@ export interface AppState {
   isLoading: boolean;
   isInitialized: boolean;
   error: string | null;
-  currentCompanyId: string | null;
-  currentLocationId: string | null;
+  currentCompanyId: number | null;
+  currentLocationId: number | null;
   
   // Cart State
   cart: CartItem[];
@@ -466,15 +466,15 @@ export interface SupplierFormData {
   email: string;
   address: string;
   notes: string;
-  companyId: string;
-  locationId: string;
+  companyId: number;
+  locationId: number;
 }
 
 export interface CategoryFormData {
   name: string;
   description: string;
-  companyId: string;
-  locationId: string;
+  companyId: number;
+  locationId: number;
 }
 // Utility Types
 export type EntityId = string;
@@ -483,8 +483,8 @@ export type Currency = number;
 
 // Action Types for Reducers
 type AppAction =
-  | { type: 'SET_CURRENT_COMPANY'; payload: string }
-  | { type: 'SET_CURRENT_LOCATION'; payload: string }
+  | { type: 'SET_CURRENT_COMPANY'; payload: number }
+  | { type: 'SET_CURRENT_LOCATION'; payload: number }
   | { type: 'LOAD_ALL_DATA' }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_INITIALIZED'; payload: boolean }

@@ -27,7 +27,7 @@ const MainApp: React.FC = () => {
             Loading your workspace...
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
-            Welcome {authState.user?.fullName}
+            Welcome {authState.user?.username}
           </p>
         </div>
       </div>
@@ -82,9 +82,9 @@ const MainApp: React.FC = () => {
           <div className="space-y-2">
             {locations.map((location: Location) => (
               <button
-                key={location._id}
+                key={location.locationId}
                 // onClick={() => {
-                //   dispatch({ type: 'SET_CURRENT_LOCATION', payload: location._id });
+                //   dispatch({ type: 'SET_CURRENT_LOCATION', payload: location.locationId });
                 // }}
                 className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >

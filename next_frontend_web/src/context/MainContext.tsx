@@ -465,14 +465,14 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const setCurrentCompany = useCallback(
-    (companyId: string) => {
+    (companyId: number) => {
       dispatch({ type: 'SET_CURRENT_COMPANY', payload: companyId });
     },
     [dispatch]
   );
 
   const setCurrentLocation = useCallback(
-    (locationId: string) => {
+    (locationId: number) => {
       dispatch({ type: 'SET_CURRENT_LOCATION', payload: locationId });
     },
     [dispatch]
@@ -494,8 +494,8 @@ export const MainProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (authState.isAuthenticated && authState.company) {
-      const companyId = authState.company._id;
-      const locationId = authState.company.locations?.[0]?._id;
+      const companyId = authState.company.companyId;
+      const locationId = authState.company.locations?.[0]?.locationId;
       if (companyId && companyId !== state.currentCompanyId) {
         setCurrentCompany(companyId);
       }
