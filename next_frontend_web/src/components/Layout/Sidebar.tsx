@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/MainContext';
 import { useAuth } from '../../context/AuthContext';
+import { useRouter } from 'next/router';
 import { ROLES } from '../../types';
 import {
   ShoppingCart,
@@ -43,8 +44,9 @@ interface MenuItem {
 }
 
 const Sidebar: React.FC = () => {
-  const { state, dispatch } = useApp();
+  const { state } = useApp();
   const { hasRole } = useAuth();
+  const router = useRouter();
   const [expandedItems, setExpandedItems] = useState<string[]>(['Sales']);
 
   const lowStockCount = state.products.filter(
@@ -176,11 +178,56 @@ const Sidebar: React.FC = () => {
     );
   };
 
-  const handleItemClick = (view: SidebarView) => {
-    dispatch({ type: 'SET_VIEW', payload: view });
+  const pathMap: Record<SidebarView, string> = {
+    dashboard: '/dashboard',
+    sales: '/sales',
+    'sales-invoice': '/sales/invoice',
+    'sales-returns': '/sales/returns',
+    'sales-history': '/sales/history',
+    collectionss: '/collections',
+    customers: '/customers',
+    customers_management: '/customers/management',
+    'purchase-entry': '/purchases/grn',
+    'purchase-orders': '/purchases/order',
+    'purchase-returns': '/purchases/returns',
+    suppliers: '/purchases/suppliers',
+    inventory: '/inventory',
+    'inventory-products': '/inventory',
+    'inventory-stock-transfers': '/inventory/transfer',
+    'inventory-low-stock': '/inventory/low-stock',
+    'inventory-suppliers': '/inventory/suppliers',
+    'cash-register': '/accounting/cash-register',
+    vouchers: '/accounting/voucher-entry',
+    ledgers: '/accounting/ledger',
+    banking: '/accounting/banking',
+    'sales-reports': '/reports/sales',
+    'inventory-reports': '/reports/inventory',
+    'customer-reports': '/reports/customers',
+    'supplier-reports': '/reports/suppliers',
+    'purchase-reports': '/reports/purchases',
+    'accounts-reports': '/reports/accounts',
+    'general-reports': '/reports/general',
+    employees: '/hr',
+    attendance: '/hr/clock',
+    payroll: '/hr/payroll',
+    'leave-management': '/hr/leave',
+    'settings-general': '/settings',
+    'settings-company': '/settings/company',
+    'settings-users': '/settings/users',
+    'settings-devices': '/settings/devices',
+    'settings-backup': '/settings/backup',
+    'settings-integrations': '/settings/integrations',
+    'settings-pos-printer': '/settings/pos',
   };
 
-  const isActive = (view: SidebarView) => state.currentView === view;
+  const handleItemClick = (view: SidebarView) => {
+    const path = pathMap[view];
+    if (path) {
+      router.push(path);
+    }
+  };
+
+  const isActive = (view: SidebarView) => router.pathname === pathMap[view];
 
   const isItemActive = (item: MenuItem): boolean => {
     if (item.view && isActive(item.view)) return true;
