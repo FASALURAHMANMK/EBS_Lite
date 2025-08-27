@@ -1,5 +1,5 @@
 import api, { accessToken } from './apiClient';
-import { Sale } from '../types';
+import { Sale, Quote } from '../types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -28,6 +28,24 @@ export const applyPromotion = (id: string, code: string) =>
 
 export const applyLoyaltyPoints = (id: string, points: number) =>
   api.post<Sale>(`/api/v1/sales/${id}/loyalty`, { points });
+
+// Invoice CRUD
+export const getInvoice = (id: string) => api.get<Sale>(`/api/v1/sales/${id}`);
+export const updateInvoice = (id: string, payload: Partial<Sale>) =>
+  api.put<Sale>(`/api/v1/sales/${id}`, payload);
+export const deleteInvoice = (id: string) =>
+  api.delete<void>(`/api/v1/sales/${id}`);
+
+// Quote CRUD
+export const getQuotes = () => api.get<Quote[]>('/api/v1/sales/quotes');
+export const getQuote = (id: string) =>
+  api.get<Quote>(`/api/v1/sales/quotes/${id}`);
+export const createQuote = (payload: Partial<Quote>) =>
+  api.post<Quote>('/api/v1/sales/quotes', payload);
+export const updateQuote = (id: string, payload: Partial<Quote>) =>
+  api.put<Quote>(`/api/v1/sales/quotes/${id}`, payload);
+export const deleteQuote = (id: string) =>
+  api.delete<void>(`/api/v1/sales/quotes/${id}`);
 
 export const getSalesHistory = (filters: Record<string, any> = {}) =>
   api.get<Sale[]>(`/api/v1/sales/history${buildQuery(filters)}`);
