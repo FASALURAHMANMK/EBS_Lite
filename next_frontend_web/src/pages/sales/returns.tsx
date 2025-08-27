@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
 import MainLayout from '../../components/Layout/MainLayout';
-import ModernPOS from '../../components/ERP/Sales/ModernPOS';
+import SaleReturn from '../../components/ERP/Sales/SaleReturn';
 import { ROLES } from '../../types';
 
 const ReturnsPage: React.FC = () => {
@@ -21,7 +21,7 @@ const ReturnsPage: React.FC = () => {
 
   return (
     <MainLayout>
-      <ModernPOS mode="return" />
+      <SaleReturn />
     </MainLayout>
   );
 };

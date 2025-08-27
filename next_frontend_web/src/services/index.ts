@@ -5,6 +5,7 @@ export * as categories from './categories';
 export * as customers from './customers';
 export * as companies from './companies';
 export * as sales from './sales';
+export * as returns from './returns';
 export * as dashboard from './dashboard';
 export * as inventory from './inventory';
 export * as purchases from './purchases';
