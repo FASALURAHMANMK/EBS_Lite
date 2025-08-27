@@ -83,7 +83,7 @@ const ProductManagement: React.FC = () => {
 
   const getStockForLocation = (product: Product) => {
     if (product.stockLevels && state.currentLocationId) {
-      const level = product.stockLevels.find(l => l.locationId === state.currentLocationId);
+      const level = product.stockLevels.find(l => l.locationId === state.currentLocationId?.toString());
       return level ? level.quantity : 0;
     }
     return product.stock;
@@ -110,8 +110,8 @@ const ProductManagement: React.FC = () => {
     if (state.currentLocationId) {
       filtered = filtered.filter(p =>
         p.stockLevels
-          ? p.stockLevels.some(l => l.locationId === state.currentLocationId)
-          : p.locationId === state.currentLocationId
+          ? p.stockLevels.some(l => l.locationId === state.currentLocationId?.toString())
+          : p.locationId === state.currentLocationId?.toString()
       );
     }
 
@@ -157,7 +157,7 @@ const ProductManagement: React.FC = () => {
     brand: '',
     model: '',
     sku: '',
-    locationId: state.currentLocationId || '', // Default to current location
+    locationId: state.currentLocationId?.toString() || '', // Default to current location
     supplierId: '',
     description: '',
     warranty: '',
@@ -280,7 +280,7 @@ const ProductManagement: React.FC = () => {
       brand: product.brand || '',
       model: product.model || '',
       sku: product.sku,
-      locationId: product.locationId || state.currentLocationId || '', // Add this
+      locationId: product.locationId || state.currentLocationId?.toString() || '', // Add this
       supplierId: product.supplierId || '',
       description: product.description || '',
       warranty: product.warranty || '',
@@ -867,7 +867,7 @@ const ProductManagement: React.FC = () => {
   >
     <option value="">Select Location</option>
     {authState.company?.locations?.filter((loc: Location) => loc.isActive).map((location: Location) => (
-      <option key={location._id} value={location._id}>
+      <option key={location.locationId} value={location.locationId}>
         {location.name}
       </option>
     ))}
@@ -1114,7 +1114,7 @@ const ProductManagement: React.FC = () => {
   >
     <option value="">Select Location</option>
     {authState.company?.locations?.filter((loc: Location) => loc.isActive).map((location: Location) => (
-      <option key={location._id} value={location._id}>
+      <option key={location.locationId} value={location.locationId}>
         {location.name}
       </option>
     ))}
@@ -1232,7 +1232,7 @@ const ProductManagement: React.FC = () => {
   >
     <option value="">Select Location</option>
     {authState.company?.locations?.filter((loc: Location) => loc.isActive).map((location: Location) => (
-      <option key={location._id} value={location._id}>
+      <option key={location.locationId} value={location.locationId}>
         {location.name}
       </option>
     ))}

@@ -15,7 +15,6 @@ const RegisterPage: React.FC = () => {
   email: '',
   password: '',
   confirmPassword: '',
-  fullName: '',
   
   // Company Information
   companyName: '',
@@ -77,7 +76,7 @@ const RegisterPage: React.FC = () => {
     const isStepValid = () => {
   switch (currentStep) {
     case 1:
-      return formData.fullName && formData.username && formData.email;
+      return formData.username && formData.email;
     case 2:
       return formData.password && formData.confirmPassword && formData.password === formData.confirmPassword;
     case 3:
@@ -93,22 +92,6 @@ const RegisterPage: React.FC = () => {
         case 1:
           return (
             <div className="space-y-6">
-              <div>
-                <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Full Name
-                </label>
-                <input
-                  id="fullName"
-                  name="fullName"
-                  type="text"
-                  required
-                  value={formData.fullName}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-800 dark:text-white"
-                  placeholder="Enter your full name"
-                />
-              </div>
-  
               <div>
                 <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Username

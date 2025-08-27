@@ -73,7 +73,7 @@ const Dashboard: React.FC = () => {
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-2">Dashboard</h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Welcome back, {authState.user?.fullName}! 
+            Welcome back, {authState.user?.username}!
           </p>
         </div>
         
@@ -225,7 +225,7 @@ const Dashboard: React.FC = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-2">Dashboard</h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Welcome back, {authState.user?.fullName}! Here's how your business is doing today.
+              Welcome back, {authState.user?.username}! Here's how your business is doing today.
             </p>
           </div>
         </div>
