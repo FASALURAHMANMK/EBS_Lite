@@ -17,8 +17,8 @@ const QuotesView: React.FC = () => {
 
   const load = async () => {
     try {
-      const data = await getQuotes();
-      setQuotes(data);
+      const quotes = await getQuotes();
+      setQuotes(quotes);
     } catch {
       setQuotes([]);
     }
