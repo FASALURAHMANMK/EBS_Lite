@@ -19,10 +19,10 @@ const SaleReturn: React.FC = () => {
   const lookupSale = async () => {
     if (!invoice) return;
     try {
-      const { data } = await returns.searchSale(invoice);
-      setSale(data);
+      const sale = await returns.searchSale(invoice);
+      setSale(sale);
       setItems(
-        data.items.map(i => ({
+        sale.items.map(i => ({
           productId: i.productId,
           productName: i.productName,
           quantity: i.quantity,
