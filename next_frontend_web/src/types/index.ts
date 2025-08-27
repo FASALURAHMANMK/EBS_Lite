@@ -101,6 +101,34 @@ export interface ProductStockLevel {
   quantity: number;
 }
 
+export interface Brand {
+  brandId: number;
+  name: string;
+  description?: string;
+  isActive?: boolean;
+}
+
+export interface Unit {
+  unitId: number;
+  name: string;
+  symbol?: string;
+  baseUnitId?: number;
+  conversionFactor?: number;
+}
+
+export interface DeviceSession {
+  sessionId: string;
+  deviceId: string;
+  deviceName?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  lastSeen: string;
+  lastSyncTime?: string;
+  isActive: boolean;
+  isStale: boolean;
+  createdAt: string;
+}
+
 export interface Product extends AuditFields {
   _id: string;
   name: string;
@@ -540,6 +568,9 @@ export type {
   Customer as CustomerType,
   Sale as SaleType,
   Supplier as SupplierType,
+  Brand,
+  Unit,
+  DeviceSession,
   AuthAction,
   AppAction,
 };

@@ -15,3 +15,7 @@ export * as roles from './roles';
 export * as locations from './locations';
 export * as employees from './employees';
 export * as attendance from './attendance';
+export * as deviceSessions from './deviceSessions';
+export * as brands from './brands';
+export * as units from './units';
+export * as productAttributes from './productAttributes';
