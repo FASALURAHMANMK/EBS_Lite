@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useAppDispatch } from '../../../context/MainContext';
 import { ShoppingCart, ShoppingBag, Banknote, CreditCard, Zap } from 'lucide-react';
 import { QuickActionCounts } from '../../../types';
 
@@ -57,7 +56,6 @@ interface QuickActionMenuProps {
 }
 
 const QuickActionMenu: React.FC<QuickActionMenuProps> = ({ counts }) => {
-  const dispatch = useAppDispatch();
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -66,7 +64,7 @@ const QuickActionMenu: React.FC<QuickActionMenuProps> = ({ counts }) => {
         <QuickActionButton
           icon={<ShoppingCart className="w-5 h-5 text-white" />}
           label="Sale"
-          onClick={() => dispatch({ type: 'SET_VIEW', payload: 'sales' })}
+          onClick={() => {}}
           color="bg-gradient-to-r from-red-500 to-red-600"
           position={0}
           isVisible={isOpen}
@@ -76,7 +74,7 @@ const QuickActionMenu: React.FC<QuickActionMenuProps> = ({ counts }) => {
         <QuickActionButton
           icon={<ShoppingBag className="w-5 h-5 text-white" />}
           label="Purchase"
-          onClick={() => dispatch({ type: 'SET_VIEW', payload: 'purchase-entry' })}
+          onClick={() => {}}
           color="bg-gradient-to-r from-blue-500 to-blue-600"
           position={1}
           isVisible={isOpen}
@@ -86,7 +84,7 @@ const QuickActionMenu: React.FC<QuickActionMenuProps> = ({ counts }) => {
         <QuickActionButton
           icon={<Banknote className="w-5 h-5 text-white" />}
           label="Collection"
-          onClick={() => dispatch({ type: 'SET_VIEW', payload: 'collectionss' })}
+          onClick={() => {}}
           color="bg-gradient-to-r from-green-500 to-green-600"
           position={2}
           isVisible={isOpen}
@@ -96,7 +94,7 @@ const QuickActionMenu: React.FC<QuickActionMenuProps> = ({ counts }) => {
         <QuickActionButton
           icon={<CreditCard className="w-5 h-5 text-white" />}
           label="Expense"
-          onClick={() => dispatch({ type: 'SET_VIEW', payload: 'cash-register' })}
+          onClick={() => {}}
           color="bg-gradient-to-r from-purple-500 to-purple-600"
           position={3}
           isVisible={isOpen}

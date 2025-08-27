@@ -278,7 +278,6 @@ export type SidebarView =
 
 export interface AppState {
   // UI State
-  currentView: SidebarView;
   selectedCategory: string;
   isLoading: boolean;
   isInitialized: boolean;
@@ -488,7 +487,6 @@ type AppAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_INITIALIZED'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'SET_VIEW'; payload: SidebarView }
   | { type: 'SET_CATEGORY'; payload: string }
   | { type: 'SET_PRODUCTS'; payload: Product[] }
   | { type: 'ADD_PRODUCT'; payload: Product }
