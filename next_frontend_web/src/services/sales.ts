@@ -37,21 +37,42 @@ export const deleteInvoice = (id: string) =>
   api.delete<void>(`/api/v1/sales/${id}`);
 
 // Quote CRUD
-export const getQuotes = () => api.get<Quote[]>('/api/v1/sales/quotes');
+export const getQuotes = () =>
+  api
+    .get<{ data: Quote[] }>("/api/v1/sales/quotes")
+    .then((res) => res.data);
 export const getQuote = (id: string) =>
-  api.get<Quote>(`/api/v1/sales/quotes/${id}`);
+  api
+    .get<{ data: Quote }>(`/api/v1/sales/quotes/${id}`)
+    .then((res) => res.data);
 export const createQuote = (payload: Partial<Quote>) =>
-  api.post<Quote>('/api/v1/sales/quotes', payload);
+  api
+    .post<{ data: Quote }>("/api/v1/sales/quotes", payload)
+    .then((res) => res.data);
 export const updateQuote = (id: string, payload: Partial<Quote>) =>
-  api.put<Quote>(`/api/v1/sales/quotes/${id}`, payload);
+  api
+    .put<{ data: Quote }>(`/api/v1/sales/quotes/${id}`, payload)
+    .then((res) => res.data);
 export const deleteQuote = (id: string) =>
-  api.delete<void>(`/api/v1/sales/quotes/${id}`);
+  api
+    .delete<{ data: void }>(`/api/v1/sales/quotes/${id}`)
+    .then((res) => res.data);
 
-export const printQuote = (id: string, payload: Record<string, any> = {}) =>
-  api.post<void>(`/api/v1/sales/quotes/${id}/print`, payload);
+export const printQuote = (
+  id: string,
+  payload: Record<string, any> = {}
+) =>
+  api
+    .post<{ data: void }>(`/api/v1/sales/quotes/${id}/print`, payload)
+    .then((res) => res.data);
 
-export const shareQuote = (id: string, payload: Record<string, any> = {}) =>
-  api.post<void>(`/api/v1/sales/quotes/${id}/share`, payload);
+export const shareQuote = (
+  id: string,
+  payload: Record<string, any> = {}
+) =>
+  api
+    .post<{ data: void }>(`/api/v1/sales/quotes/${id}/share`, payload)
+    .then((res) => res.data);
 
 export const getSalesHistory = (filters: Record<string, any> = {}) =>
   api.get<Sale[]>(`/api/v1/sales/history${buildQuery(filters)}`);
