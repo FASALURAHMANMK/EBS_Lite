@@ -10,14 +10,14 @@ export enum ROLES {
 }
 
 export interface User {
-  _id: string;
+  userId: number;
   username: string;
   email: string;
-  fullName: string;
   // 1=Super Admin, 2=Admin, 3=Manager, 4=Sales, 5=Inventory, 6=Accountant, 7=Cashier, 8=HR
   roleId: number;
   roleName?: string;
-  companyId: string;
+  companyId: number;
+  locationId?: number;
   isActive: boolean;
   permissions: string[];
   primaryLanguage?: string;
@@ -27,14 +27,14 @@ export interface User {
 }
 
 export interface Location {
-  _id: string;
+  locationId: number;
   name: string;
   address: string;
   phone?: string;
   email?: string;
   code: string; // Unique location code
   isActive: boolean;
-  companyId: string;
+  companyId: number;
   settings?: {
     timezone?: string;
     currency?: string;
@@ -44,7 +44,7 @@ export interface Location {
 }
 
 export interface Company {
-  _id: string;
+  companyId: number;
   name: string;
   code: string;
   address: string;
@@ -99,6 +99,34 @@ export interface ProductBarcode {
 export interface ProductStockLevel {
   locationId: string;
   quantity: number;
+}
+
+export interface Brand {
+  brandId: number;
+  name: string;
+  description?: string;
+  isActive?: boolean;
+}
+
+export interface Unit {
+  unitId: number;
+  name: string;
+  symbol?: string;
+  baseUnitId?: number;
+  conversionFactor?: number;
+}
+
+export interface DeviceSession {
+  sessionId: string;
+  deviceId: string;
+  deviceName?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  lastSeen: string;
+  lastSyncTime?: string;
+  isActive: boolean;
+  isStale: boolean;
+  createdAt: string;
 }
 
 export interface Product extends AuditFields {
@@ -196,6 +224,29 @@ export interface Sale extends AuditFields {
   date: string;
 }
 
+export interface Quote extends AuditFields {
+  _id: string;
+  quoteNumber: string;
+  customerId?: string;
+  items: Array<{
+    productId: string;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+    discount?: number;
+  }>;
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  status?: 'draft' | 'sent' | 'accepted';
+  companyId: string;
+  locationId: string;
+  userId: string;
+  date: string;
+}
+
 export interface Supplier extends AuditFields {
   _id: string;
   name: string;
@@ -239,11 +290,9 @@ export type SidebarView =
   | 'dashboard'
   | 'sales'
   | 'sales-invoice'
+  | 'sales-quotes'
   | 'sales-returns'
   | 'sales-history'
-  | 'collectionss'
-  | 'customers'
-  | 'customers_management'
   | 'purchase-entry'
   | 'purchase-orders'
   | 'purchase-returns'
@@ -251,19 +300,12 @@ export type SidebarView =
   | 'inventory'
   | 'inventory-products'
   | 'inventory-stock-transfers'
-  | 'inventory-low-stock'
-  | 'inventory-suppliers'
   | 'cash-register'
   | 'vouchers'
   | 'ledgers'
-  | 'banking'
   | 'sales-reports'
   | 'inventory-reports'
   | 'customer-reports'
-  | 'supplier-reports'
-  | 'purchase-reports'
-  | 'accounts-reports'
-  | 'general-reports'
   | 'employees'
   | 'attendance'
   | 'payroll'
@@ -278,13 +320,12 @@ export type SidebarView =
 
 export interface AppState {
   // UI State
-  currentView: SidebarView;
   selectedCategory: string;
   isLoading: boolean;
   isInitialized: boolean;
   error: string | null;
-  currentCompanyId: string | null;
-  currentLocationId: string | null;
+  currentCompanyId: number | null;
+  currentLocationId: number | null;
   
   // Cart State
   cart: CartItem[];
@@ -413,9 +454,8 @@ export interface UserSettings {
 // API Response Types
 export interface ApiResponse<T> {
   success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
+  message: string;
+  data: T;
 }
 
 export interface PaginatedResponse<T> {
@@ -466,15 +506,15 @@ export interface SupplierFormData {
   email: string;
   address: string;
   notes: string;
-  companyId: string;
-  locationId: string;
+  companyId: number;
+  locationId: number;
 }
 
 export interface CategoryFormData {
   name: string;
   description: string;
-  companyId: string;
-  locationId: string;
+  companyId: number;
+  locationId: number;
 }
 // Utility Types
 export type EntityId = string;
@@ -483,13 +523,12 @@ export type Currency = number;
 
 // Action Types for Reducers
 type AppAction =
-  | { type: 'SET_CURRENT_COMPANY'; payload: string }
-  | { type: 'SET_CURRENT_LOCATION'; payload: string }
+  | { type: 'SET_CURRENT_COMPANY'; payload: number }
+  | { type: 'SET_CURRENT_LOCATION'; payload: number }
   | { type: 'LOAD_ALL_DATA' }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_INITIALIZED'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'SET_VIEW'; payload: SidebarView }
   | { type: 'SET_CATEGORY'; payload: string }
   | { type: 'SET_PRODUCTS'; payload: Product[] }
   | { type: 'ADD_PRODUCT'; payload: Product }

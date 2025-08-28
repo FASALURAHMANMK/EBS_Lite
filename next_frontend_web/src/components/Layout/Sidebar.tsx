@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/MainContext';
 import { useAuth } from '../../context/AuthContext';
+import { useRouter } from 'next/router';
 import { ROLES } from '../../types';
 import {
   ShoppingCart,
@@ -21,7 +22,6 @@ import {
   History,
   Undo2,
   Banknote,
-  UserRoundCog,
   Building2,
   Eye,
   ArrowDownUp,
@@ -31,7 +31,7 @@ import {
   Blocks,
   Printer,
 } from 'lucide-react';
-import { SidebarView, Product } from '../../types';
+import { SidebarView } from '../../types';
 
 interface MenuItem {
   icon?: React.ElementType;
@@ -43,13 +43,10 @@ interface MenuItem {
 }
 
 const Sidebar: React.FC = () => {
-  const { state, dispatch } = useApp();
+  const { state } = useApp();
   const { hasRole } = useAuth();
+  const router = useRouter();
   const [expandedItems, setExpandedItems] = useState<string[]>(['Sales']);
-
-  const lowStockCount = state.products.filter(
-    (p: Product) => typeof p.minStock === 'number' && p.stock <= p.minStock!
-  ).length;
 
   const menuItems: MenuItem[] = [
     {
@@ -73,18 +70,9 @@ const Sidebar: React.FC = () => {
       subItems: [
         { label: 'POS', view: 'sales', icon: ShoppingCart },
         { label: 'Invoice', view: 'sales-invoice', icon: FileText },
+        { label: 'Quotes', view: 'sales-quotes', icon: FileText },
         { label: 'Returns', view: 'sales-returns', icon: Undo2 },
         { label: 'Sale History', view: 'sales-history', icon: History },
-      ],
-    },
-    {
-      icon: Users,
-      label: 'Customers',
-      roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.SALES],
-      subItems: [
-        { label: 'Collections', view: 'collectionss', icon: Banknote },
-        { label: 'Customers', view: 'customers', icon: Users },
-        { label: 'Customer Management', view: 'customers_management', icon: UserRoundCog },
       ],
     },
     {
@@ -110,10 +98,8 @@ const Sidebar: React.FC = () => {
           icon: Warehouse,
           subItems: [
             { label: 'Stock Transfers', view: 'inventory-stock-transfers', icon: ArrowDownUp },
-            { label: 'Low Stock', view: 'inventory-low-stock', icon: Package, badge: lowStockCount },
           ],
         },
-        { label: 'Suppliers', view: 'inventory-suppliers', icon: Truck },
       ],
     },
     {
@@ -124,7 +110,6 @@ const Sidebar: React.FC = () => {
         { label: 'Cash Register', view: 'cash-register', icon: DollarSign },
         { label: 'Vouchers', view: 'vouchers', icon: CreditCard },
         { label: 'Ledgers', view: 'ledgers', icon: FileText },
-        { label: 'Banking', view: 'banking', icon: Banknote },
       ],
     },
     {
@@ -135,10 +120,6 @@ const Sidebar: React.FC = () => {
         { label: 'Sales Reports', view: 'sales-reports', icon: BarChart3 },
         { label: 'Inventory Reports', view: 'inventory-reports', icon: Package },
         { label: 'Customer Reports', view: 'customer-reports', icon: Users },
-        { label: 'Supplier Reports', view: 'supplier-reports', icon: Truck },
-        { label: 'Purchase Reports', view: 'purchase-reports', icon: ShoppingBag },
-        { label: 'Accounts Reports', view: 'accounts-reports', icon: DollarSign },
-        { label: 'General Reports', view: 'general-reports', icon: FileText },
       ],
     },
     {
@@ -176,11 +157,47 @@ const Sidebar: React.FC = () => {
     );
   };
 
-  const handleItemClick = (view: SidebarView) => {
-    dispatch({ type: 'SET_VIEW', payload: view });
+  const pathMap: Record<SidebarView, string> = {
+    dashboard: '/dashboard',
+    sales: '/sales',
+    'sales-invoice': '/sales/invoice',
+    'sales-quotes': '/sales/quotes',
+    'sales-returns': '/sales/returns',
+    'sales-history': '/sales/history',
+    'purchase-entry': '/purchases/grn',
+    'purchase-orders': '/purchases/order',
+    'purchase-returns': '/purchases/returns',
+    suppliers: '/purchases/suppliers',
+    inventory: '/inventory',
+    'inventory-products': '/inventory',
+    'inventory-stock-transfers': '/inventory/transfer',
+    'cash-register': '/accounting/cash-register',
+    vouchers: '/accounting/voucher-entry',
+    ledgers: '/accounting/ledger',
+    'sales-reports': '/reports/sales',
+    'inventory-reports': '/reports/inventory',
+    'customer-reports': '/reports/customers',
+    employees: '/hr',
+    attendance: '/hr/clock',
+    payroll: '/hr/payroll',
+    'leave-management': '/hr/leave',
+    'settings-general': '/settings',
+    'settings-company': '/settings/company',
+    'settings-users': '/settings/users',
+    'settings-devices': '/settings/devices',
+    'settings-backup': '/settings/backup',
+    'settings-integrations': '/settings/integrations',
+    'settings-pos-printer': '/settings/pos',
   };
 
-  const isActive = (view: SidebarView) => state.currentView === view;
+  const handleItemClick = (view: SidebarView) => {
+    const path = pathMap[view];
+    if (path) {
+      router.push(path);
+    }
+  };
+
+  const isActive = (view: SidebarView) => router.pathname === pathMap[view];
 
   const isItemActive = (item: MenuItem): boolean => {
     if (item.view && isActive(item.view)) return true;

@@ -12,8 +12,8 @@ const Login: React.FC = () => {
 
   useEffect(() => {
     if (state.isAuthenticated && state.company) {
-      setCurrentCompany(state.company._id);
-      const defaultLocation = state.company.locations?.[0]?._id;
+      setCurrentCompany(state.company.companyId);
+      const defaultLocation = state.company.locations?.[0]?.locationId;
       if (defaultLocation) {
         setCurrentLocation(defaultLocation);
       }

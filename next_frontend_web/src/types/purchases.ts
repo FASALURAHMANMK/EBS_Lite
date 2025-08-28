@@ -19,6 +19,15 @@ export interface PurchaseOrder {
   items: PurchaseOrderItemPayload[];
 }
 
+export interface Purchase {
+  purchaseId: number;
+  supplierId: number;
+  status: string;
+  totalAmount: number;
+  items?: PurchaseOrderItemPayload[];
+  [key: string]: any;
+}
+
 export interface GoodsReceiptItemPayload {
   purchaseDetailId: number;
   receivedQuantity: number;

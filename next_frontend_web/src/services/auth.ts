@@ -1,5 +1,5 @@
 import api, { setAuthTokens, clearAuthTokens } from './apiClient';
-import { User, Company } from '../types';
+import { User, Company, Location, ApiResponse } from '../types';
 
 /**
  * Payload sent to the backend when a user attempts to log in.
@@ -37,19 +37,67 @@ export interface RegisterResponse {
   message: string;
 }
 
+const mapLocation = (loc: any): Location => ({
+  locationId: loc.locationId,
+  name: loc.name,
+  address: loc.address,
+  phone: loc.phone,
+  email: loc.email,
+  code: loc.code,
+  isActive: loc.isActive,
+  companyId: loc.companyId,
+  settings: loc.settings,
+  createdAt: loc.createdAt,
+  updatedAt: loc.updatedAt,
+});
+
+const mapCompany = (company: any): Company => ({
+  companyId: company.companyId,
+  name: company.name,
+  code: company.code,
+  address: company.address,
+  phone: company.phone,
+  email: company.email,
+  taxNumber: company.taxNumber,
+  website: company.website,
+  logo: company.logo,
+  isActive: company.isActive,
+  locations: company.locations?.map(mapLocation) ?? [],
+  settings: company.settings,
+  createdAt: company.createdAt,
+  updatedAt: company.updatedAt,
+});
+
+const mapUser = (user: any): User => ({
+  userId: user.userId,
+  username: user.username,
+  email: user.email,
+  roleId: user.roleId,
+  roleName: user.roleName,
+  companyId: user.companyId,
+  locationId: user.locationId,
+  isActive: user.isActive,
+  permissions: user.permissions,
+  primaryLanguage: user.primaryLanguage,
+  secondaryLanguage: user.secondaryLanguage,
+  createdAt: user.createdAt,
+  updatedAt: user.updatedAt,
+});
+
 export const login = async (
   email: string,
   password: string,
   deviceId: string
 ): Promise<{ user: User; company: Company; sessionId: string }> => {
   const payload: LoginPayload = { email, password, deviceId };
-  const data = await api.post<AuthResponse>(
+  const resp = await api.post<ApiResponse<AuthResponse>>(
     '/api/v1/auth/login',
     payload,
     { auth: false }
   );
+  const { data } = resp;
   setAuthTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
-  return { user: data.user, company: data.company, sessionId: data.sessionId };
+  return { user: mapUser(data.user), company: mapCompany(data.company), sessionId: data.sessionId };
 };
 
 export const register = async (
@@ -61,8 +109,13 @@ export const register = async (
     { auth: false }
   );
 
-export const getProfile = () =>
-  api.get<{ user: User; company: Company }>('/api/v1/auth/me');
+export const getProfile = async () => {
+  const resp = await api.get<ApiResponse<{ user: any; company: any }>>(
+    '/api/v1/auth/me'
+  );
+  const { data } = resp;
+  return { user: mapUser(data.user), company: mapCompany(data.company) };
+};
 
 export const logout = async () => {
   await api.post('/api/v1/auth/logout');

@@ -6,7 +6,7 @@ import {
   getProfile,
   logout as logoutService,
 } from '../services/auth';
-import { accessToken } from '../services/apiClient';
+import { getStoredAuthTokens } from '../services/apiClient';
 
 interface AuthContextValue {
   state: AuthState;
@@ -88,16 +88,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const initialize = async () => {
       dispatch({ type: 'AUTH_INIT_START' });
-      try {
-        if (accessToken) {
+      const token = getStoredAuthTokens().accessToken;
+      if (token) {
+        try {
           const session = await getProfile();
           dispatch({ type: 'LOGIN_SUCCESS', payload: session });
+        } catch (err) {
+          // not authenticated
         }
-      } catch (err) {
-        // not authenticated
-      } finally {
-        dispatch({ type: 'AUTH_INIT_COMPLETE' });
       }
+      dispatch({ type: 'AUTH_INIT_COMPLETE' });
     };
     initialize();
   }, []);

@@ -156,7 +156,7 @@ const ProductAddDialog: React.FC<{
     {authState.company?.locations
       ?.filter((loc: any) => loc.isActive)
       .map((location: any) => (
-        <option key={location._id} value={location._id}>
+        <option key={location.locationId} value={location.locationId}>
           {location.name}
         </option>
       ))}

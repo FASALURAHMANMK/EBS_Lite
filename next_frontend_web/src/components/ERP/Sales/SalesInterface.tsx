@@ -16,8 +16,11 @@ import {
   AlertCircle,
   Calculator,
   Receipt,
-  UserPlus
+  UserPlus,
+  PauseCircle,
+  PlayCircle
 } from 'lucide-react';
+import { holdSale, resumeSale } from '../../../services/sales';
 
 const SalesInterface: React.FC = () => {
   const state = useAppState(s => s);
@@ -42,6 +45,11 @@ const SalesInterface: React.FC = () => {
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [barcode, setBarcode] = useState('');
+  const [loyaltyPointsUsed, setLoyaltyPointsUsed] = useState(0);
+  const [promotionCode, setPromotionCode] = useState('');
+  const [warranty, setWarranty] = useState('');
+  const [currentSaleId, setCurrentSaleId] = useState('');
   
   const [newCustomerForm, setNewCustomerForm] = useState({
     name: '',
@@ -208,7 +216,11 @@ const SalesInterface: React.FC = () => {
         paymentMethod: selectedPaymentMethod,
         paymentStatus: selectedPaymentMethod === 'credit' ? 'pending' as const : 'paid' as const,
         notes: notes.trim() || undefined,
-        date: new Date().toISOString()
+        date: new Date().toISOString(),
+        loyaltyPoints: loyaltyPointsUsed || undefined,
+        promotionCode: promotionCode.trim() || undefined,
+        warranty: warranty.trim() || undefined,
+        barcode: barcode.trim() || undefined
       };
 
       await createSale(saleData);
@@ -225,6 +237,60 @@ const SalesInterface: React.FC = () => {
     } catch (error: any) {
       console.error('Error processing sale:', error);
       alert('Error processing sale: ' + error.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const holdCurrentSale = async () => {
+    setIsProcessing(true);
+    try {
+      const saleData = {
+        customerId: state.customer._id,
+        items: state.cart.map(item => ({
+          productId: item.product._id,
+          productName: item.product.name,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+          discount: item.discount || 0
+        })),
+        subtotal: getSubtotal(),
+        discount: getDiscountAmount(),
+        tax: getTax(),
+        total: getTotal(),
+        paymentMethod: selectedPaymentMethod,
+        paymentStatus: 'pending' as const,
+        notes: notes.trim() || undefined,
+        date: new Date().toISOString(),
+        loyaltyPoints: loyaltyPointsUsed || undefined,
+        promotionCode: promotionCode.trim() || undefined,
+        warranty: warranty.trim() || undefined,
+        barcode: barcode.trim() || undefined
+      };
+
+      const held = await createSale(saleData);
+      setCurrentSaleId((held as any)._id);
+      await holdSale((held as any)._id);
+      dispatch({ type: 'CLEAR_CART' });
+      alert('Sale held successfully!');
+    } catch (error: any) {
+      console.error('Error holding sale:', error);
+      alert('Error holding sale: ' + error.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const resumeHeldSale = async () => {
+    if (!currentSaleId) return;
+    setIsProcessing(true);
+    try {
+      await resumeSale(currentSaleId);
+      alert('Sale resumed successfully!');
+    } catch (error: any) {
+      console.error('Error resuming sale:', error);
+      alert('Error resuming sale: ' + error.message);
     } finally {
       setIsProcessing(false);
     }
@@ -265,14 +331,23 @@ const SalesInterface: React.FC = () => {
 
         {/* Product Search */}
         <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={productSearchTerm}
+                onChange={(e) => setProductSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-800 dark:text-white"
+              />
+            </div>
             <input
               type="text"
-              placeholder="Search products..."
-              value={productSearchTerm}
-              onChange={(e) => setProductSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-800 dark:text-white"
+              placeholder="Scan barcode"
+              value={barcode}
+              onChange={(e) => setBarcode(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-800 dark:text-white"
             />
           </div>
         </div>
@@ -702,6 +777,34 @@ const SalesInterface: React.FC = () => {
                     <span className="text-red-600 dark:text-red-400">-{formatCurrency(getDiscountAmount())}</span>
                   </div>
                 </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 dark:text-gray-400">Loyalty Points:</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={loyaltyPointsUsed}
+                    onChange={(e) => setLoyaltyPointsUsed(parseFloat(e.target.value) || 0)}
+                    className="w-24 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-red-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 dark:text-gray-400">Promotion Code:</span>
+                  <input
+                    type="text"
+                    value={promotionCode}
+                    onChange={(e) => setPromotionCode(e.target.value)}
+                    className="w-32 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-red-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600 dark:text-gray-400">Warranty:</span>
+                  <input
+                    type="text"
+                    value={warranty}
+                    onChange={(e) => setWarranty(e.target.value)}
+                    className="w-32 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-red-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Tax (10%):</span>
                   <span className="text-gray-800 dark:text-white">{formatCurrency(getTax())}</span>
@@ -795,6 +898,25 @@ const SalesInterface: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-800 dark:text-white"
                 placeholder="Add any notes for this sale..."
               />
+            </div>
+            {/* Hold/Resume Buttons */}
+            <div className="flex space-x-2 mb-4">
+              <button
+                onClick={holdCurrentSale}
+                disabled={isProcessing}
+                className="flex-1 bg-yellow-500 text-white py-2 rounded-lg flex items-center justify-center space-x-1 hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <PauseCircle className="w-4 h-4" />
+                <span>Hold Sale</span>
+              </button>
+              <button
+                onClick={resumeHeldSale}
+                disabled={!currentSaleId || isProcessing}
+                className="flex-1 bg-green-600 text-white py-2 rounded-lg flex items-center justify-center space-x-1 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <PlayCircle className="w-4 h-4" />
+                <span>Resume Sale</span>
+              </button>
             </div>
 
             {/* Process Sale Button */}

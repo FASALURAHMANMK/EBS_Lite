@@ -5,7 +5,7 @@ The table below tracks whether each backend route group in `routes.go` has a cor
 | Route Group | Frontend Module | Notes |
 |-------------|----------------|-------|
 | `/auth` | `src/services/auth.ts` | |
-| `/device-sessions` | — | Not used in frontend yet |
+| `/device-sessions` | `src/services/deviceSessions.ts` | |
 | `/dashboard` | `src/services/dashboard.ts` | |
 | `/users` | `src/services/users.ts` | Added for parity |
 | `/companies` | `src/services/companies.ts` | |
@@ -14,9 +14,9 @@ The table below tracks whether each backend route group in `routes.go` has a cor
 | `/permissions` | `src/services/roles.ts` | Exposed via getPermissions |
 | `/products` | `src/services/products.ts` | |
 | `/categories` | `src/services/categories.ts` | |
-| `/brands` | — | Not currently used |
-| `/units` | — | Not currently used |
-| `/product-attribute-definitions` | — | Not currently used |
+| `/brands` | `src/services/brands.ts` | |
+| `/units` | `src/services/units.ts` | |
+| `/product-attribute-definitions` | `src/services/productAttributes.ts` | |
 | `/inventory` | `src/services/inventory.ts` | |
 | `/sales` | `src/services/sales.ts` | Quote helpers pending |
 | `/pos` | — | POS UI not implemented |
@@ -25,31 +25,31 @@ The table below tracks whether each backend route group in `routes.go` has a cor
 | `/loyalty` | — | Reserved for future feature |
 | `/promotions` | — | Reserved for future feature |
 | `/sale-returns` | — | Reserved for future feature |
-| `/purchases` | `src/services/purchases.ts` | Listing endpoints not used |
+| `/purchases` | `src/services/purchases.ts` | |
 | `/purchase-orders` | `src/services/purchases.ts` | |
 | `/goods-receipts` | `src/services/purchases.ts` | |
 | `/purchase-returns` | `src/services/purchases.ts` | |
 | `/customers` | `src/services/customers.ts` | |
 | `/employees` | `src/services/employees.ts` | Added for parity |
 | `/attendance` | `src/services/attendance.ts` | Added for parity |
-| `/payrolls` | — | Not currently used |
-| `/collections` | — | Not currently used |
-| `/expenses` | — | Not currently used |
+| `/payrolls` | — | Intentionally unused |
+| `/collections` | — | Intentionally unused |
+| `/expenses` | — | Intentionally unused |
 | `/vouchers` | `src/services/accounting.ts` | |
 | `/ledgers` | `src/services/accounting.ts` | |
 | `/cash-registers` | `src/services/accounting.ts` | |
-| `/reports` | — | Not currently used |
+| `/reports` | — | Intentionally unused |
 | `/suppliers` | `src/services/suppliers.ts` | |
-| `/currencies` | — | Not currently used |
-| `/taxes` | — | Not currently used |
-| `/settings` | — | Not currently used |
-| `/audit-logs` | — | Not currently used |
-| `/languages` | — | Not currently used |
-| `/translations` | — | Not currently used |
-| `/user-preferences` | — | Not currently used |
-| `/numbering-sequences` | — | Not currently used |
-| `/invoice-templates` | — | Not currently used |
-| `/print` | — | Not currently used |
-| `/workflow-requests` | — | Not currently used |
+| `/currencies` | — | Intentionally unused |
+| `/taxes` | — | Intentionally unused |
+| `/settings` | — | Intentionally unused |
+| `/audit-logs` | — | Intentionally unused |
+| `/languages` | — | Intentionally unused |
+| `/translations` | — | Intentionally unused |
+| `/user-preferences` | — | Intentionally unused |
+| `/numbering-sequences` | — | Intentionally unused |
+| `/invoice-templates` | — | Intentionally unused |
+| `/print` | — | Intentionally unused |
+| `/workflow-requests` | — | Intentionally unused |
 
 This document should be updated whenever new service modules are created or an unused endpoint becomes active.

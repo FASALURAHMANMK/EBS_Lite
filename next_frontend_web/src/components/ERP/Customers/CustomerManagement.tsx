@@ -61,7 +61,7 @@ const CustomerManagement: React.FC = () => {
       phone: '',
       email: '',
       address: '',
-      locationId: state.currentLocationId || '',
+      locationId: state.currentLocationId?.toString() || '',
       creditLimit: 0,
       notes: ''
     });
@@ -262,7 +262,7 @@ const CustomerManagement: React.FC = () => {
                 <select required value={formData.locationId} onChange={e => setFormData(prev => ({ ...prev, locationId: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-800 dark:text-white">
                   <option value="">Select Location</option>
                   {authState.company?.locations?.map((loc: Location) => (
-                    <option key={loc._id} value={loc._id}>{loc.name}</option>
+                    <option key={loc.locationId} value={loc.locationId}>{loc.name}</option>
                   ))}
                 </select>
               </div>
@@ -315,7 +315,7 @@ const CustomerManagement: React.FC = () => {
                 <select required value={formData.locationId} onChange={e => setFormData(prev => ({ ...prev, locationId: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-800 dark:text-white">
                   <option value="">Select Location</option>
                   {authState.company?.locations?.map((loc: Location) => (
-                    <option key={loc._id} value={loc._id}>{loc.name}</option>
+                    <option key={loc.locationId} value={loc.locationId}>{loc.name}</option>
                   ))}
                 </select>
               </div>
