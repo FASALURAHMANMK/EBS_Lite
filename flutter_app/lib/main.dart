@@ -3,16 +3,19 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart';
 
 import 'core/theme_notifier.dart';
 import 'core/app_theme.dart';
 import 'core/api_client.dart';
+import 'core/secure_storage.dart';
 
 import 'features/auth/controllers/auth_notifier.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/presentation/splash_screen.dart';
+import 'features/auth/presentation/create_company_screen.dart';
 import 'features/auth/data/models.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/dashboard/controllers/location_notifier.dart';
@@ -24,16 +27,19 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final prefs = await SharedPreferences.getInstance();
-  final apiClient = ApiClient(prefs);
+  const secureStorage = FlutterSecureStorage();
+  final apiClient = ApiClient(prefs, secureStorage);
 
   // 1) Determine if we *really* have a session
-  final hasTokens = prefs.getString(AuthRepository.accessTokenKey) != null &&
-      prefs.getString(AuthRepository.refreshTokenKey) != null &&
-      prefs.getString(AuthRepository.sessionIdKey) != null;
+  final hasTokens =
+      (await secureStorage.read(key: AuthRepository.accessTokenKey)) != null &&
+          (await secureStorage.read(key: AuthRepository.refreshTokenKey)) !=
+              null &&
+          (await secureStorage.read(key: AuthRepository.sessionIdKey)) != null;
 
   // 2) If tokens are incomplete, hard-reset all auth-related persisted data
   if (!hasTokens) {
-    await _purgeAllAuthPrefs(prefs);
+    await _purgeAllAuthPrefs(prefs, secureStorage);
   }
 
   // NOTE: Do NOT trust persisted user/company here anymore.
@@ -44,6 +50,7 @@ Future<void> main() async {
       overrides: [
         dioProvider.overrideWithValue(apiClient.dio),
         sharedPreferencesProvider.overrideWithValue(prefs),
+        secureStorageProvider.overrideWithValue(secureStorage),
       ],
       child: const MyApp(needsValidation: true),
     ),
@@ -75,14 +82,18 @@ class _MyAppState extends ConsumerState<MyApp> {
   Future<void> _validate() async {
     final authRepo = ref.read(authRepositoryProvider);
     final prefs = ref.read(sharedPreferencesProvider);
+    final secureStorage = ref.read(secureStorageProvider);
 
-    final hasTokens = prefs.getString(AuthRepository.accessTokenKey) != null &&
-        prefs.getString(AuthRepository.refreshTokenKey) != null &&
-        prefs.getString(AuthRepository.sessionIdKey) != null;
+    final hasTokens =
+        (await secureStorage.read(key: AuthRepository.accessTokenKey)) != null &&
+            (await secureStorage.read(key: AuthRepository.refreshTokenKey)) !=
+                null &&
+            (await secureStorage.read(key: AuthRepository.sessionIdKey)) !=
+                null;
 
     if (!hasTokens) {
       // Ensure clean state when there are no tokens.
-      await _purgeAllAuthPrefs(prefs);
+      await _purgeAllAuthPrefs(prefs, secureStorage);
       ref.read(authNotifierProvider.notifier).state = const AuthState();
       if (mounted) setState(() => _validating = false);
       return;
@@ -118,19 +129,19 @@ class _MyAppState extends ConsumerState<MyApp> {
     } on DioException catch (e) {
       // Any 401 => session is invalid. Purge everything and show Login.
       if (e.response?.statusCode == 401) {
-        await _purgeAllAuthPrefs(prefs);
+        await _purgeAllAuthPrefs(prefs, secureStorage);
         ref.read(authNotifierProvider.notifier).state = const AuthState();
       } else {
         // Non-auth errors shouldn't keep a stale session around.
         // Be safe: treat as logged out if we cannot confirm.
         debugPrint('authRepo.me error: $e');
-        await _purgeAllAuthPrefs(prefs);
+        await _purgeAllAuthPrefs(prefs, secureStorage);
         ref.read(authNotifierProvider.notifier).state = const AuthState();
       }
     } catch (e) {
       // Any unexpected error -> safe fallback: logged out
       debugPrint('authRepo.me error: $e');
-      await _purgeAllAuthPrefs(prefs);
+      await _purgeAllAuthPrefs(prefs, secureStorage);
       ref.read(authNotifierProvider.notifier).state = const AuthState();
     } finally {
       if (mounted) setState(() => _validating = false);
@@ -144,9 +155,11 @@ class _MyAppState extends ConsumerState<MyApp> {
 
     final home = _validating
         ? const SplashScreen()
-        : (authState.user != null
-            ? const DashboardScreen()
-            : const LoginScreen());
+        : (authState.user == null
+            ? const LoginScreen()
+            : (authState.company == null
+                ? const CreateCompanyScreen()
+                : const DashboardScreen()));
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -159,10 +172,11 @@ class _MyAppState extends ConsumerState<MyApp> {
   }
 }
 
-Future<void> _purgeAllAuthPrefs(SharedPreferences prefs) async {
-  await prefs.remove(AuthRepository.accessTokenKey);
-  await prefs.remove(AuthRepository.refreshTokenKey);
-  await prefs.remove(AuthRepository.sessionIdKey);
+Future<void> _purgeAllAuthPrefs(
+    SharedPreferences prefs, FlutterSecureStorage secureStorage) async {
+  await secureStorage.delete(key: AuthRepository.accessTokenKey);
+  await secureStorage.delete(key: AuthRepository.refreshTokenKey);
+  await secureStorage.delete(key: AuthRepository.sessionIdKey);
   await prefs.remove(_userKey);
   await prefs.remove(AuthRepository.companyKey);
 }

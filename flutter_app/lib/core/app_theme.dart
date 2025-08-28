@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// Brand palette derived from the logo
-const Color _brandRed = Color(0xFFE6003A); // punchy crimson (logo red)
+const Color _brandRed = Colors.red; // punchy crimson (logo red)
 const Color _brandGray = Color(0xFFB5B8BD); // light logo gray
 const Color _brandGrayDark = Color(0xFF8F9398); // darker logo gray
 
@@ -78,10 +78,15 @@ final ThemeData lightTheme = () {
       foregroundColor: scheme.onBackground,
       elevation: 0,
       centerTitle: true,
-      titleTextStyle:
-          const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+      titleTextStyle: TextStyle(
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
+        color: scheme.onBackground,
+      ),
       toolbarHeight: 56,
       surfaceTintColor: Colors.transparent,
+      iconTheme: IconThemeData(color: scheme.onBackground),
+      actionsIconTheme: IconThemeData(color: scheme.onBackground),
     ),
 
     // Cards
@@ -184,9 +189,19 @@ final ThemeData lightTheme = () {
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: scheme.surface,
       elevation: 0,
-      indicatorColor: scheme.primary.withOpacity(0.12),
-      labelTextStyle: MaterialStatePropertyAll(
-          TextStyle(fontWeight: FontWeight.w600, color: scheme.onSurface)),
+      // Remove the selected indicator “chip”
+      indicatorColor: Colors.transparent,
+      // Smaller labels; fill selected label with primary color
+      labelTextStyle: MaterialStateProperty.resolveWith(
+        (states) => TextStyle(
+          fontSize: 12,
+          fontWeight:
+              states.contains(MaterialState.selected) ? FontWeight.w700 : FontWeight.w600,
+          color: states.contains(MaterialState.selected)
+              ? scheme.primary
+              : scheme.onSurface.withOpacity(.70),
+        ),
+      ),
       iconTheme: MaterialStateProperty.resolveWith(
         (s) => IconThemeData(
             color: s.contains(MaterialState.selected)
@@ -204,6 +219,23 @@ final ThemeData lightTheme = () {
           borderSide: BorderSide(color: scheme.primary, width: 2)),
       labelStyle: const TextStyle(fontWeight: FontWeight.w700),
     ),
+    // NavigationRail (desktop/tablet sidebar)
+    navigationRailTheme: NavigationRailThemeData(
+      backgroundColor: scheme.surface,
+      selectedIconTheme: IconThemeData(color: scheme.primary),
+      unselectedIconTheme:
+          IconThemeData(color: scheme.onSurface.withOpacity(.70)),
+      selectedLabelTextStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: scheme.primary,
+      ),
+      unselectedLabelTextStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: scheme.onSurface.withOpacity(.70),
+      ),
+    ),
 
     // Dividers & Lists
     dividerTheme:
@@ -213,13 +245,18 @@ final ThemeData lightTheme = () {
       tileColor: scheme.surface,
       selectedTileColor: scheme.primary.withOpacity(0.06),
       iconColor: scheme.onSurface.withOpacity(.8),
+      titleTextStyle: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: scheme.onSurface,
+      ),
     ),
 
     // FAB
     floatingActionButtonTheme: FloatingActionButtonThemeData(
       backgroundColor: scheme.primary,
       foregroundColor: scheme.onPrimary,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: const CircleBorder(),
       elevation: 0,
     ),
 
@@ -261,9 +298,14 @@ final ThemeData darkTheme = () {
       foregroundColor: scheme.onBackground,
       elevation: 0,
       centerTitle: true,
-      titleTextStyle:
-          const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+      titleTextStyle: TextStyle(
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
+        color: scheme.onBackground,
+      ),
       surfaceTintColor: Colors.transparent,
+      iconTheme: IconThemeData(color: scheme.onBackground),
+      actionsIconTheme: IconThemeData(color: scheme.onBackground),
     ),
     cardTheme: CardThemeData(
       color: scheme.surface,
@@ -354,9 +396,19 @@ final ThemeData darkTheme = () {
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: scheme.surface,
       elevation: 0,
-      indicatorColor: scheme.primary.withOpacity(0.18),
-      labelTextStyle: MaterialStatePropertyAll(
-          TextStyle(fontWeight: FontWeight.w600, color: scheme.onSurface)),
+      // Remove the selected indicator “chip”
+      indicatorColor: Colors.transparent,
+      // Smaller labels; fill selected label with primary color
+      labelTextStyle: MaterialStateProperty.resolveWith(
+        (states) => TextStyle(
+          fontSize: 12,
+          fontWeight:
+              states.contains(MaterialState.selected) ? FontWeight.w700 : FontWeight.w600,
+          color: states.contains(MaterialState.selected)
+              ? scheme.primary
+              : scheme.onSurface.withOpacity(.75),
+        ),
+      ),
       iconTheme: MaterialStateProperty.resolveWith(
         (s) => IconThemeData(
             color: s.contains(MaterialState.selected)
@@ -372,6 +424,22 @@ final ThemeData darkTheme = () {
           borderSide: BorderSide(color: scheme.primary, width: 2)),
       labelStyle: const TextStyle(fontWeight: FontWeight.w700),
     ),
+    navigationRailTheme: NavigationRailThemeData(
+      backgroundColor: scheme.surface,
+      selectedIconTheme: IconThemeData(color: scheme.primary),
+      unselectedIconTheme:
+          IconThemeData(color: scheme.onSurface.withOpacity(.75)),
+      selectedLabelTextStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: scheme.primary,
+      ),
+      unselectedLabelTextStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: scheme.onSurface.withOpacity(.75),
+      ),
+    ),
     dividerTheme:
         DividerThemeData(color: scheme.outline, thickness: 1, space: 24),
     listTileTheme: ListTileThemeData(
@@ -379,11 +447,16 @@ final ThemeData darkTheme = () {
       tileColor: scheme.surface,
       selectedTileColor: scheme.primary.withOpacity(0.09),
       iconColor: scheme.onSurface.withOpacity(.9),
+      titleTextStyle: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: scheme.onSurface,
+      ),
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
       backgroundColor: scheme.primary,
       foregroundColor: scheme.onPrimary,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: const CircleBorder(),
       elevation: 0,
     ),
     bottomSheetTheme: BottomSheetThemeData(

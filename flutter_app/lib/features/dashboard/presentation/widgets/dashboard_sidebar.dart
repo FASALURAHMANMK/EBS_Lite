@@ -110,25 +110,22 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
-                  _item(context, Icons.dashboard_rounded, 'Dashboard'),
-                  _item(context, Icons.point_of_sale_rounded, 'Sales'),
-                  _item(context, Icons.people_alt_rounded, 'Customers'),
-                  _item(context, Icons.shopping_cart_rounded, 'Purchases'),
-                  _item(context, Icons.inventory_2_rounded, 'Inventory'),
-                  _item(context, Icons.account_balance_wallet_rounded,
-                      'Accounting'),
-                  _item(context, Icons.bar_chart_rounded, 'Reports'),
-                  _item(context, Icons.group_rounded, 'HR'),
+                  _section(context, Icons.account_balance_wallet_rounded, 'Accounts', const [
+                    'Cash Register', 'Day Open/Close', 'Vouchers', 'Ledgers', 'Audit'
+                  ]),
+                  _section(context, Icons.group_rounded, 'HR', const [
+                    'Attendance Register', 'Payroll Management'
+                  ]),
+                  _section(context, Icons.bar_chart_rounded, 'Reports', const [
+                    'Sales', 'Purchase', 'Accounts', 'Inventory'
+                  ]),
                   const Divider(height: 24),
                   _item(context, Icons.settings_rounded, 'Settings'),
+                  const Divider(height: 24),
                   ListTile(
                     leading: Icon(Icons.help_outline_rounded,
                         color: theme.colorScheme.primary),
-                    title: Text(
-                      'Help & support',
-                      style: theme.textTheme.bodyLarge
-                          ?.copyWith(fontWeight: FontWeight.w500),
-                    ),
+                    title: const Text('Help & support'),
                     horizontalTitleGap: 12,
                     onTap: () {
                       Navigator.pop(context);
@@ -144,11 +141,7 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                   ListTile(
                     leading: Icon(Icons.logout_rounded,
                         color: theme.colorScheme.primary),
-                    title: Text(
-                      'Logout',
-                      style: theme.textTheme.bodyLarge
-                          ?.copyWith(fontWeight: FontWeight.w500),
-                    ),
+                    title: const Text('Logout'),
                     horizontalTitleGap: 12,
                     onTap: () async {
                       final confirm = await showDialog<bool>(
@@ -201,15 +194,42 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
 
     return ListTile(
       leading: Icon(icon, color: theme.colorScheme.primary),
-      title: Text(
-        label,
-        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
-      ),
+      title: Text(label),
       horizontalTitleGap: 12,
       onTap: () {
         Navigator.pop(context);
         widget.onSelect?.call(label);
       },
+    );
+  }
+
+  Widget _section(
+      BuildContext context, IconData icon, String title, List<String> children) {
+    final theme = Theme.of(context);
+    return Theme(
+      data: theme.copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        leading: Icon(icon, color: theme.colorScheme.primary),
+        title: Text(title),
+        childrenPadding: const EdgeInsets.only(left: 16),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        children: children
+            .map(
+              (label) => ListTile(
+                leading:
+                    const SizedBox(width: 24, child: Icon(Icons.circle, size: 6)),
+                title: Text(label),
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                contentPadding: const EdgeInsets.only(left: 8, right: 16),
+                onTap: () {
+                  Navigator.pop(context);
+                  widget.onSelect?.call(label);
+                },
+              ),
+            )
+            .toList(),
+      ),
     );
   }
 }

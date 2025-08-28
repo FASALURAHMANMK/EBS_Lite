@@ -40,6 +40,7 @@ dependencies:
   shared_preferences: ^2.2.2
   uuid: ^3.0.7
   flutter_secure_storage: ^9.2.2 
+  phosphor_flutter: ^2.0.1
 
 dev_dependencies:
   flutter_test:

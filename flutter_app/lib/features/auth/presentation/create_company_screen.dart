@@ -63,12 +63,8 @@ class _CreateCompanyScreenState extends ConsumerState<CreateCompanyScreen> {
 
     if (!mounted) return;
 
-    if (company != null) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const DashboardScreen()),
-        (route) => false,
-      );
-    }
+    // Navigation is now controlled by MyApp (it will switch to Dashboard
+    // when company is present). No explicit Navigator calls here.
   }
 
   @override

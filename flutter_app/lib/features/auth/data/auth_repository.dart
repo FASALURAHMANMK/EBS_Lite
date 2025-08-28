@@ -1,15 +1,17 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import 'models.dart';
 
 class AuthRepository {
-  AuthRepository(this._dio, this._prefs);
+  AuthRepository(this._dio, this._prefs, this._secureStorage);
   final Dio _dio;
   final SharedPreferences _prefs;
+  final FlutterSecureStorage _secureStorage;
 
   static const _deviceKey = 'device_id';
   static const accessTokenKey = 'access_token';
@@ -46,9 +48,9 @@ class AuthRepository {
       final response = await _dio.post('/auth/login', data: payload);
       final data =
           LoginResponse.fromJson(response.data['data'] as Map<String, dynamic>);
-      await _prefs.setString(accessTokenKey, data.accessToken);
-      await _prefs.setString(refreshTokenKey, data.refreshToken);
-      await _prefs.setString(sessionIdKey, data.sessionId);
+      await _secureStorage.write(key: accessTokenKey, value: data.accessToken);
+      await _secureStorage.write(key: refreshTokenKey, value: data.refreshToken);
+      await _secureStorage.write(key: sessionIdKey, value: data.sessionId);
       if (data.company != null) {
         await _prefs.setString(
           companyKey,
@@ -114,9 +116,9 @@ class AuthRepository {
     try {
       await _dio.post('/auth/logout');
     } finally {
-      await _prefs.remove(accessTokenKey);
-      await _prefs.remove(refreshTokenKey);
-      await _prefs.remove(sessionIdKey);
+      await _secureStorage.delete(key: accessTokenKey);
+      await _secureStorage.delete(key: refreshTokenKey);
+      await _secureStorage.delete(key: sessionIdKey);
       await _prefs.remove(companyKey);
     }
   }
