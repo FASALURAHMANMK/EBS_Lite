@@ -80,17 +80,10 @@ class ApiClient {
       );
       final data = res.data['data'] as Map<String, dynamic>;
       final newAccess = data['access_token'] as String;
-      final newRefresh = data['refresh_token'] as String;
-
+      // Backend returns only access_token for refresh. Keep existing
+      // refresh token and session id unchanged.
       await _secureStorage.write(
           key: AuthRepository.accessTokenKey, value: newAccess);
-      await _secureStorage.write(
-          key: AuthRepository.refreshTokenKey, value: newRefresh);
-      final sessionId = data['session_id'] as String?;
-      if (sessionId != null) {
-        await _secureStorage.write(
-            key: AuthRepository.sessionIdKey, value: sessionId);
-      }
     } catch (e) {
       await _purgeTokens();
       rethrow;

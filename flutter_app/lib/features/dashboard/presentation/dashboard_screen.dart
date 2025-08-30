@@ -9,6 +9,8 @@ import 'widgets/dashboard_sidebar.dart';
 import 'widgets/quick_action_button.dart';
 import '../controllers/dashboard_notifier.dart';
 import '../controllers/ui_prefs_notifier.dart';
+import '../data/models.dart';
+import '../controllers/location_notifier.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/sales_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/purchases_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/inventory_page.dart';
@@ -28,6 +30,12 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  bool _promptedLocation = false;
+
+  @override
+  void initState() {
+    super.initState();
+  }
   // Primary tabs for bottom navigation
   static const _primaryTabs = <_NavItem>[
     _NavItem('Dashboard', Icons.dashboard_rounded),
@@ -74,6 +82,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Reload dashboard data when selected location changes
+    ref.listen<LocationState>(locationNotifierProvider, (prev, next) {
+      final prevId = prev?.selected?.locationId;
+      final nextId = next.selected?.locationId;
+      if (nextId != null && nextId != prevId) {
+        // fire-and-forget
+        // ignore: unawaited_futures
+        ref.read(dashboardNotifierProvider.notifier).load();
+      }
+    });
+
+    // Prompt for location selection if user has multiple locations and none selected
+    final locState = ref.watch(locationNotifierProvider);
+    if (!_promptedLocation && locState.selected == null &&
+        locState.locations.length > 1) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _promptedLocation = true;
+        _showLocationPicker(locState.locations);
+      });
+    }
     final themeNotifier = ref.read(themeNotifierProvider.notifier);
     final media = MediaQuery.of(context);
     final width = media.size.width;
@@ -201,6 +230,42 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               },
             )
           : null,
+    );
+  }
+
+  Future<void> _showLocationPicker(List<Location> locations) async {
+    final notifier = ref.read(locationNotifierProvider.notifier);
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Select Location'),
+          content: SizedBox(
+            width: 360,
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: locations.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final loc = locations[index];
+                return ListTile(
+                  title: Text(loc.name),
+                  onTap: () async {
+                    await notifier.select(loc);
+                    if (mounted) Navigator.of(context).pop();
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -6,6 +6,7 @@ import '../data/models.dart';
 import '../../auth/controllers/auth_notifier.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../../core/error_handler.dart';
+import 'location_notifier.dart';
 
 class DashboardState {
   final DashboardMetrics? metrics;
@@ -36,7 +37,8 @@ class DashboardState {
 }
 
 class DashboardNotifier extends StateNotifier<DashboardState> {
-  DashboardNotifier(this._repository, this._ref) : super(const DashboardState());
+  DashboardNotifier(this._repository, this._ref)
+      : super(const DashboardState());
 
   final DashboardRepository _repository;
   final Ref _ref;
@@ -44,8 +46,14 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
   Future<void> load() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final metrics = await _repository.getMetrics();
-      final actions = await _repository.getQuickActions();
+      // Use selected location if available; some endpoints require it.
+      final locState = _ref.read(locationNotifierProvider);
+      final selectedLocationId = locState.selected?.locationId;
+
+      final metrics =
+          await _repository.getMetrics(locationId: selectedLocationId);
+      final actions =
+          await _repository.getQuickActions(locationId: selectedLocationId);
       state = state.copyWith(
         isLoading: false,
         metrics: metrics,

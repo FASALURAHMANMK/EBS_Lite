@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../dashboard/controllers/location_notifier.dart';
 import '../controllers/auth_notifier.dart';
-import '../../dashboard/presentation/dashboard_screen.dart';
 import '../../../core/theme_notifier.dart';
 
 class CreateCompanyScreen extends ConsumerStatefulWidget {
@@ -63,8 +63,12 @@ class _CreateCompanyScreenState extends ConsumerState<CreateCompanyScreen> {
 
     if (!mounted) return;
 
-    // Navigation is now controlled by MyApp (it will switch to Dashboard
-    // when company is present). No explicit Navigator calls here.
+    // After company creation, prime locations and selection.
+    if (company != null) {
+      // fire-and-forget
+      // ignore: unawaited_futures
+      ref.read(locationNotifierProvider.notifier).load(company.companyId);
+    }
   }
 
   @override
@@ -110,7 +114,7 @@ class _CreateCompanyScreenState extends ConsumerState<CreateCompanyScreen> {
         ),
         body: SafeArea(
           child: Align(
-            alignment: Alignment.topCenter,
+            alignment: Alignment.center,
             child: SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(horizontalPadding, verticalPadding,
                   horizontalPadding, media.viewPadding.bottom + 24),
@@ -147,8 +151,7 @@ class _CreateCompanyScreenState extends ConsumerState<CreateCompanyScreen> {
                             focusNode: _nameFocus,
                             textInputAction: TextInputAction.next,
                             decoration: InputDecoration(
-                              labelText: 'Company name',
-                              hintText: 'e.g. Acme Inc.',
+                              hintText: 'Company name',
                               prefixIcon: const Icon(Icons.apartment_rounded),
                             ),
                             validator: _validateName,
@@ -162,8 +165,7 @@ class _CreateCompanyScreenState extends ConsumerState<CreateCompanyScreen> {
                             keyboardType: TextInputType.emailAddress,
                             textInputAction: TextInputAction.done,
                             decoration: InputDecoration(
-                              labelText: 'Contact email (optional)',
-                              hintText: 'name@company.com',
+                              hintText: 'Contact email (optional)',
                               prefixIcon: const Icon(Icons.email_rounded),
                             ),
                             validator: _validateEmail,

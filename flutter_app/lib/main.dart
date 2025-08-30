@@ -162,6 +162,7 @@ class _MyAppState extends ConsumerState<MyApp> {
                 : const DashboardScreen()));
 
     return MaterialApp(
+      key: ValueKey('auth:${authState.user != null}:${authState.company != null}'),
       debugShowCheckedModeBanner: false,
       title: 'EBS Lite',
       theme: lightTheme,

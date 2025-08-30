@@ -109,6 +109,19 @@ class AuthRepository {
         'name': company.name,
       }),
     );
+    // Important: refresh access token so JWT claims include company_id
+    try {
+      final refresh = await _secureStorage.read(key: refreshTokenKey);
+      if (refresh != null && refresh.isNotEmpty) {
+        final res = await _dio.post('/auth/refresh-token',
+            data: {'refresh_token': refresh});
+        final data = res.data['data'] as Map<String, dynamic>;
+        final newAccess = data['access_token'] as String;
+        await _secureStorage.write(key: accessTokenKey, value: newAccess);
+      }
+    } catch (_) {
+      // If refresh fails, leave tokens as-is; the app can still navigate.
+    }
     return company;
   }
 

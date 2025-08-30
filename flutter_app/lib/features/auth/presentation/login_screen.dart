@@ -3,11 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../controllers/auth_notifier.dart';
-import '../../dashboard/presentation/dashboard_screen.dart';
 import '../../dashboard/controllers/location_notifier.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
-import 'create_company_screen.dart';
 import '../../../core/theme_notifier.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -222,33 +220,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          if (state.error != null) ...[
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.errorContainer,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.error_outline_rounded,
-                                      color:
-                                          theme.colorScheme.onErrorContainer),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      state.error!,
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                              color: theme.colorScheme
-                                                  .onErrorContainer),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                          ],
                           SizedBox(
                             height: 52,
                             child: FilledButton(

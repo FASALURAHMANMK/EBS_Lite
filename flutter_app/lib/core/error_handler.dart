@@ -62,14 +62,25 @@ class ErrorHandler {
   static String? _extractMessage(DioException e) {
     final data = e.response?.data;
     if (data is Map<String, dynamic>) {
-      if (data['message'] is String) return data['message'] as String;
-      if (data['error'] is String) return data['error'] as String;
-      final errors = data['errors'];
-      if (errors is List) {
-        return errors.join(', ');
+      // Prefer 'error' for more specific DB/validation messages; fallback to 'message'
+      if (data['error'] is String && (data['error'] as String).isNotEmpty) {
+        return data['error'] as String;
+      }
+      if (data['message'] is String && (data['message'] as String).isNotEmpty) {
+        return data['message'] as String;
+      }
+      // Backend validation returns a map in `data` with field->message
+      final validation = data['data'];
+      if (validation is Map) {
+        try {
+          final parts = <String>[];
+          validation.forEach((k, v) {
+            parts.add(v.toString());
+          });
+          if (parts.isNotEmpty) return parts.join('\n');
+        } catch (_) {}
       }
     }
     return null;
   }
 }
-

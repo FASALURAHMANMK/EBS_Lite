@@ -8,14 +8,20 @@ class DashboardRepository {
   DashboardRepository(this._dio);
   final Dio _dio;
 
-  Future<DashboardMetrics> getMetrics() async {
-    final res = await _dio.get('/dashboard/metrics');
+  Future<DashboardMetrics> getMetrics({int? locationId}) async {
+    final res = await _dio.get(
+      '/dashboard/metrics',
+      queryParameters: locationId != null ? {'location_id': locationId} : null,
+    );
     return DashboardMetrics.fromJson(
         res.data['data'] as Map<String, dynamic>);
   }
 
-  Future<QuickActionCounts> getQuickActions() async {
-    final res = await _dio.get('/dashboard/quick-actions');
+  Future<QuickActionCounts> getQuickActions({int? locationId}) async {
+    final res = await _dio.get(
+      '/dashboard/quick-actions',
+      queryParameters: locationId != null ? {'location_id': locationId} : null,
+    );
     return QuickActionCounts.fromJson(
         res.data['data'] as Map<String, dynamic>);
   }

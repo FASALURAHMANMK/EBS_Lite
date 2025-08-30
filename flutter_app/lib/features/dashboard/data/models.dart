@@ -11,12 +11,27 @@ class DashboardMetrics {
     required this.dailyCashSummary,
   });
 
-  factory DashboardMetrics.fromJson(Map<String, dynamic> json) => DashboardMetrics(
-        creditOutstanding: (json['credit_outstanding'] as num?)?.toDouble() ?? 0,
-        inventoryValue: (json['inventory_value'] as num?)?.toDouble() ?? 0,
-        todaySales: (json['today_sales'] as num?)?.toDouble() ?? 0,
-        dailyCashSummary: (json['daily_cash_summary'] as num?)?.toDouble() ?? 0,
-      );
+  factory DashboardMetrics.fromJson(Map<String, dynamic> json) {
+    final creditOutstanding =
+        (json['credit_outstanding'] as num?)?.toDouble() ?? 0;
+    final inventoryValue = (json['inventory_value'] as num?)?.toDouble() ?? 0;
+    final todaySales = (json['today_sales'] as num?)?.toDouble() ?? 0;
+
+    // Backend exposes cash_in and cash_out. If daily_cash_summary is not
+    // present, compute it as (cash_in - cash_out).
+    final dailyCash = (json['daily_cash_summary'] as num?)?.toDouble();
+    final cashIn = (json['cash_in'] as num?)?.toDouble();
+    final cashOut = (json['cash_out'] as num?)?.toDouble();
+    final dailyCashSummary = dailyCash ??
+        ((cashIn != null && cashOut != null) ? (cashIn - cashOut) : 0);
+
+    return DashboardMetrics(
+      creditOutstanding: creditOutstanding,
+      inventoryValue: inventoryValue,
+      todaySales: todaySales,
+      dailyCashSummary: dailyCashSummary,
+    );
+  }
 }
 
 class QuickActionCounts {
@@ -32,12 +47,23 @@ class QuickActionCounts {
     required this.expenses,
   });
 
-  factory QuickActionCounts.fromJson(Map<String, dynamic> json) => QuickActionCounts(
-        sales: json['sales'] as int? ?? 0,
-        purchases: json['purchases'] as int? ?? 0,
-        collections: json['collections'] as int? ?? 0,
-        expenses: json['expenses'] as int? ?? 0,
-      );
+  factory QuickActionCounts.fromJson(Map<String, dynamic> json) {
+    // Map from backend fields: sales_today, purchases_today, collections_today,
+    // and use payments_today as a proxy for expenses (UI currently not using it).
+    final sales = json['sales_today'] as int? ?? json['sales'] as int? ?? 0;
+    final purchases =
+        json['purchases_today'] as int? ?? json['purchases'] as int? ?? 0;
+    final collections = json['collections_today'] as int? ??
+        json['collections'] as int? ?? 0;
+    final expenses = json['payments_today'] as int? ?? json['expenses'] as int? ?? 0;
+
+    return QuickActionCounts(
+      sales: sales,
+      purchases: purchases,
+      collections: collections,
+      expenses: expenses,
+    );
+  }
 }
 
 class Location {

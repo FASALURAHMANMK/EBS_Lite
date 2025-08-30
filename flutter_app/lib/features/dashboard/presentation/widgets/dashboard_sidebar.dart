@@ -165,7 +165,7 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                       if (confirm == true) {
                         await ref
                             .read(authNotifierProvider.notifier)
-                            .logout(context);
+                            .logout();
                       }
                     },
                   ),
