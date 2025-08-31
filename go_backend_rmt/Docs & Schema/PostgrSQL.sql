@@ -180,7 +180,12 @@ CREATE TABLE product_attributes (
     name VARCHAR(100) NOT NULL,
     type VARCHAR(50) NOT NULL CHECK (type IN ('TEXT', 'NUMBER', 'DATE', 'BOOLEAN', 'SELECT')),
     is_required BOOLEAN DEFAULT FALSE,
-    options JSONB -- For SELECT type attributes
+    options JSONB, -- For SELECT type attributes
+    is_active BOOLEAN DEFAULT TRUE,
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE
 );
 
 -- Products Table
