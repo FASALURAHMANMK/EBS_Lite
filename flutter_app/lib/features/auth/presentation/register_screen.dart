@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../controllers/auth_notifier.dart';
 import '../../../core/theme_notifier.dart';
@@ -253,9 +254,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                             : 'Hide password',
                                         onPressed: () => setInner(
                                             () => _obscure = !_obscure),
-                                        icon: Icon(_obscure
-                                            ? Icons.visibility_rounded
-                                            : Icons.visibility_off_rounded),
+                                        icon: Icon(
+                                          _obscure
+                                              ? PhosphorIconsBold.eye
+                                              : PhosphorIconsBold.eyeSlash,
+                                        ),
                                       ),
                                     ),
                                     validator: _validatePassword,
@@ -307,9 +310,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                     : 'Hide password',
                                 onPressed: () => setState(
                                     () => _obscureConfirm = !_obscureConfirm),
-                                icon: Icon(_obscureConfirm
-                                    ? Icons.visibility_rounded
-                                    : Icons.visibility_off_rounded),
+                                icon: Icon(
+                                  _obscureConfirm
+                                      ? PhosphorIconsBold.eye
+                                      : PhosphorIconsBold.eyeSlash,
+                                ),
                               ),
                             ),
                             validator: _validateConfirm,

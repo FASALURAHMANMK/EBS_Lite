@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../controllers/auth_notifier.dart';
-import '../../dashboard/presentation/dashboard_screen.dart';
 import '../../dashboard/controllers/location_notifier.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
-import 'create_company_screen.dart';
 import '../../../core/theme_notifier.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -65,25 +64,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     FocusScope.of(context).unfocus();
 
+    final identifier = _emailController.text.trim();
+    final isEmail = identifier.contains('@');
+
     final res = await ref.read(authNotifierProvider.notifier).login(
-          email: _emailController.text.trim(),
+          email: isEmail ? identifier : null,
+          username: isEmail ? null : identifier,
           password: _passwordController.text,
         );
 
     if (!mounted) return;
 
     if (res != null) {
-      if (res.company == null) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const CreateCompanyScreen()),
-        );
-      } else {
-        await ref
-            .read(locationNotifierProvider.notifier)
-            .load(res.company!.companyId);
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const DashboardScreen()),
-        );
+      // Navigation is now controlled by MyApp based on auth state
+      // Trigger initial location load if company exists, but do not await
+      final company = res.company;
+      if (company != null) {
+        // fire-and-forget; no context use here
+        // ignore: unawaited_futures
+        ref.read(locationNotifierProvider.notifier).load(company.companyId);
       }
     }
   }
@@ -196,9 +195,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     : 'Hide password',
                                 onPressed: () =>
                                     setState(() => _obscure = !_obscure),
-                                icon: Icon(_obscure
-                                    ? Icons.visibility_rounded
-                                    : Icons.visibility_off_rounded),
+                                icon: Icon(
+                                  _obscure
+                                      ? PhosphorIconsBold.eye
+                                      : PhosphorIconsBold.eyeSlash,
+                                ),
                               ),
                             ),
                             validator: _validatePassword,
@@ -219,33 +220,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          if (state.error != null) ...[
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.errorContainer,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.error_outline_rounded,
-                                      color:
-                                          theme.colorScheme.onErrorContainer),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      state.error!,
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                              color: theme.colorScheme
-                                                  .onErrorContainer),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                          ],
                           SizedBox(
                             height: 52,
                             child: FilledButton(

@@ -8,6 +8,19 @@ import 'widgets/dashboard_header.dart';
 import 'widgets/dashboard_sidebar.dart';
 import 'widgets/quick_action_button.dart';
 import '../controllers/dashboard_notifier.dart';
+import '../controllers/ui_prefs_notifier.dart';
+import '../data/models.dart';
+import '../controllers/location_notifier.dart';
+import 'package:ebs_lite/features/sales/presentation/pages/sales_page.dart';
+import 'package:ebs_lite/features/purchases/presentation/pages/purchases_page.dart';
+import 'package:ebs_lite/features/inventory/presentation/pages/inventory_page.dart';
+import 'package:ebs_lite/features/reports/presentation/pages/reports_page.dart';
+import 'package:ebs_lite/features/customers/presentation/pages/customers_page.dart';
+import 'package:ebs_lite/features/accounts/presentation/pages/accounting_page.dart';
+import 'package:ebs_lite/features/hr/presentation/pages/hr_page.dart';
+import 'pages/settings_page.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:ebs_lite/features/notifications/presentation/pages/notifications_page.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -17,33 +30,79 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  int _selectedIndex = 0;
+  bool _promptedLocation = false;
 
-  static const _destinations = <_NavItem>[
+  @override
+  void initState() {
+    super.initState();
+  }
+  // Primary tabs for bottom navigation
+  static const _primaryTabs = <_NavItem>[
     _NavItem('Dashboard', Icons.dashboard_rounded),
     _NavItem('Sales', Icons.point_of_sale_rounded),
-    _NavItem('Customers', Icons.people_alt_rounded),
     _NavItem('Purchases', Icons.shopping_cart_rounded),
     _NavItem('Inventory', Icons.inventory_2_rounded),
-    _NavItem('Accounting', Icons.account_balance_wallet_rounded),
+    _NavItem('Customers', Icons.people_alt_rounded),
+  ];
+
+  // Secondary items kept in sidebar/rail
+  static const _secondaryItems = <_NavItem>[
     _NavItem('Reports', Icons.bar_chart_rounded),
+    _NavItem('Accounting', Icons.account_balance_wallet_rounded),
     _NavItem('HR', Icons.group_rounded),
     _NavItem('Settings', Icons.settings_rounded),
   ];
 
-  void _onSelectByLabel(String label) {
-    final idx = _destinations.indexWhere((e) => e.label == label);
-    if (idx != -1) {
-      setState(() => _selectedIndex = idx);
-    }
-  }
+  int _bottomIndex = 0;
 
-  void _onSelectByIndex(int index) {
-    setState(() => _selectedIndex = index);
+  void _onSelectSecondaryByLabel(BuildContext context, String label) {
+    // Push a sample page for secondary items to keep primary tabs persistent
+    Widget page;
+    switch (label) {
+      case 'Reports':
+        page = const ReportsPage();
+        break;
+      case 'Accounting':
+        page = const AccountingPage();
+        break;
+      case 'HR':
+        page = const HRPage();
+        break;
+      case 'Settings':
+        page = const SettingsPage();
+        break;
+      default:
+        page = Scaffold(
+          appBar: AppBar(title: Text(label)),
+          body: Center(child: Text('$label page')),
+        );
+    }
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
   }
 
   @override
   Widget build(BuildContext context) {
+    // Reload dashboard data when selected location changes
+    ref.listen<LocationState>(locationNotifierProvider, (prev, next) {
+      final prevId = prev?.selected?.locationId;
+      final nextId = next.selected?.locationId;
+      if (nextId != null && nextId != prevId) {
+        // fire-and-forget
+        // ignore: unawaited_futures
+        ref.read(dashboardNotifierProvider.notifier).load();
+      }
+    });
+
+    // Prompt for location selection if user has multiple locations and none selected
+    final locState = ref.watch(locationNotifierProvider);
+    if (!_promptedLocation && locState.selected == null &&
+        locState.locations.length > 1) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _promptedLocation = true;
+        _showLocationPicker(locState.locations);
+      });
+    }
     final themeNotifier = ref.read(themeNotifierProvider.notifier);
     final media = MediaQuery.of(context);
     final width = media.size.width;
@@ -56,28 +115,42 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final theme = Theme.of(context);
 
-    // (Optional) Swap the main content based on _selectedIndex.
-    // For now, show DashboardContent for all to keep it runnable.
-    final Widget content = const DashboardContent();
+    // Primary tab pages (kept alive via IndexedStack)
+    final pages = <Widget>[
+      const DashboardContent(key: PageStorageKey('tab_dashboard')),
+      const SalesPage(key: PageStorageKey('tab_sales')),
+      const PurchasesPage(key: PageStorageKey('tab_purchases')),
+      const InventoryPage(key: PageStorageKey('tab_inventory')),
+      const CustomersPage(key: PageStorageKey('tab_customers')),
+    ];
+
+    final currentTitle = _primaryTabs[_bottomIndex].label;
+
+    final showQuick = ref.watch(quickActionVisibilityProvider);
 
     return Scaffold(
       appBar: DashboardHeader(
         onToggleTheme: () => themeNotifier.toggle(),
         isOnline: true,
+        title: currentTitle,
+        onNotifications: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const NotificationsPage()),
+          );
+        },
       ),
       drawer: isWide
           ? null
           : DashboardSidebar(
               onSelect: (label) {
                 Navigator.of(context).maybePop();
-                _onSelectByLabel(label);
+                _onSelectSecondaryByLabel(context, label);
               },
             ),
       body: Row(
         children: [
           if (isWide)
             NavigationRail(
-              selectedIndex: _selectedIndex,
               extended: railExtended,
               groupAlignment: -0.9,
               minWidth: 72,
@@ -95,7 +168,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                 ),
               ),
-              destinations: _destinations
+              destinations: _secondaryItems
                   .map(
                     (e) => NavigationRailDestination(
                       icon: Icon(e.icon,
@@ -106,30 +179,93 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                   )
                   .toList(),
-              onDestinationSelected: _onSelectByIndex,
+              onDestinationSelected: (i) =>
+                  _onSelectSecondaryByLabel(context, _secondaryItems[i].label),
+              selectedIndex: null,
             ),
-          Expanded(child: content),
+          Expanded(
+            child: IndexedStack(
+              index: _bottomIndex,
+              children: pages,
+            ),
+          ),
         ],
       ),
-      floatingActionButton: QuickActionButton(
-        actions: [
-          QuickAction(
-              icon: Icons.point_of_sale_rounded,
-              label: 'Sale (${quickCounts?.sales ?? 0})'),
-          QuickAction(
-              icon: Icons.shopping_cart_rounded,
-              label: 'Purchase (${quickCounts?.purchases ?? 0})'),
-          QuickAction(
-              icon: Icons.payments_rounded,
-              label: 'Collection (${quickCounts?.collections ?? 0})'),
-          QuickAction(
-              icon: Icons.money_off_rounded,
-              label: 'Expense (${quickCounts?.expenses ?? 0})'),
-        ],
-        onOpenChanged: (open) {
-          // Example: dim app bar or log analytics here.
-        },
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _bottomIndex,
+        onDestinationSelected: (i) => setState(() => _bottomIndex = i),
+        height: 68,
+        elevation: 0,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        // No chip/indicator around the icon
+        indicatorColor: Colors.transparent,
+        // Only show label for the selected tab
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+        destinations: _primaryTabs
+            .map((e) =>
+                NavigationDestination(icon: Icon(e.icon), label: e.label))
+            .toList(),
       ),
+      floatingActionButton: showQuick
+          ? QuickActionButton(
+              openIcon: Icons.close_rounded,
+              closedIcon: Icons.bolt_rounded,
+              useExtendedLabelsOnWide: false,
+              actions: [
+                QuickAction(
+                    icon: Icons.point_of_sale_rounded,
+                    label: 'Sale (${quickCounts?.sales ?? 0})'),
+                QuickAction(
+                    icon: Icons.shopping_cart_rounded,
+                    label: 'Purchase (${quickCounts?.purchases ?? 0})'),
+                QuickAction(
+                    icon: Icons.payments_rounded,
+                    label: 'Collection (${quickCounts?.collections ?? 0})'),
+                QuickAction(
+                    icon: Icons.money_off_rounded,
+                    label: 'Expense (${quickCounts?.expenses ?? 0})'),
+              ],
+              onOpenChanged: (open) {
+                // Example: dim app bar or log analytics here.
+              },
+            )
+          : null,
+    );
+  }
+
+  Future<void> _showLocationPicker(List<Location> locations) async {
+    final notifier = ref.read(locationNotifierProvider.notifier);
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Select Location'),
+          content: SizedBox(
+            width: 360,
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: locations.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final loc = locations[index];
+                return ListTile(
+                  title: Text(loc.name),
+                  onTap: () async {
+                    await notifier.select(loc);
+                    if (mounted) Navigator.of(context).pop();
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

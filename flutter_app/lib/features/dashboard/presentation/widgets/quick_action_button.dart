@@ -30,7 +30,7 @@ class QuickActionButton extends StatefulWidget {
     super.key,
     this.actions = const [],
     this.openIcon = Icons.close_rounded,
-    this.closedIcon = Icons.add_rounded,
+    this.closedIcon = Icons.bolt_rounded,
     this.primaryColor,
     this.distance = 100, // how far actions fly out from the main FAB
     this.startAngleDegrees = 15, // where the fan starts (relative to +X axis)
@@ -164,7 +164,7 @@ class _QuickActionButtonState extends State<QuickActionButton>
               final t = (count == 1) ? 0.5 : i / (count - 1);
               final angleDeg =
                   widget.startAngleDegrees + t * widget.sweepAngleDegrees;
-              final angleRad = angleDeg * math.pi / 224.0;
+              final angleRad = angleDeg * math.pi / 180.0;
 
               final dx = math.cos(angleRad) * widget.distance;
               final dy = math.sin(angleRad) * widget.distance;
@@ -177,6 +177,13 @@ class _QuickActionButtonState extends State<QuickActionButton>
               );
 
               final scale = Tween(begin: 0.6, end: 1.0).animate(base);
+              final fly = Tween(begin: 0.0, end: 1.0).animate(
+                CurvedAnimation(
+                  parent: _controller,
+                  curve: Interval(0.0, 0.8, curve: Curves.easeOutBack),
+                  reverseCurve: Curves.easeIn,
+                ),
+              );
               final opacity = Tween(begin: 0.0, end: 1.0).animate(
                 CurvedAnimation(
                   parent: _controller,
@@ -195,40 +202,52 @@ class _QuickActionButtonState extends State<QuickActionButton>
               return Positioned(
                 right: dx,
                 bottom: dy + bottomPadding,
-                child: FadeTransition(
-                  opacity: opacity,
-                  child: ScaleTransition(
-                    scale: scale,
-                    child: Semantics(
-                      button: true,
-                      label: action.label,
-                      child: showExtended
-                          ? _ExtendedMiniFab(
-                              heroTag: heroTag,
-                              icon: action.icon,
-                              label: action.label,
-                              backgroundColor: action.backgroundColor ??
-                                  theme.colorScheme.surfaceContainerHighest,
-                              foregroundColor: action.foregroundColor ??
-                                  theme.colorScheme.onSurface,
-                              onTap: () {
-                                _toggle();
-                                action.onTap?.call();
-                              },
-                            )
-                          : FloatingActionButton.small(
-                              heroTag: heroTag,
-                              tooltip: action.label,
-                              backgroundColor: action.backgroundColor ??
-                                  theme.colorScheme.surfaceContainerHighest,
-                              foregroundColor: action.foregroundColor ??
-                                  theme.colorScheme.onSurface,
-                              onPressed: () {
-                                _toggle();
-                                action.onTap?.call();
-                              },
-                              child: Icon(action.icon),
-                            ),
+                child: AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, child) {
+                    final offX = -(1 - fly.value) * dx;
+                    final offY = -(1 - fly.value) * dy;
+                    return Transform.translate(
+                      offset: Offset(offX, offY),
+                      child: child,
+                    );
+                  },
+                  child: FadeTransition(
+                    opacity: opacity,
+                    child: ScaleTransition(
+                      scale: scale,
+                      child: Semantics(
+                        button: true,
+                        label: action.label,
+                        child: showExtended
+                            ? _ExtendedMiniFab(
+                                heroTag: heroTag,
+                                icon: action.icon,
+                                label: action.label,
+                                backgroundColor: action.backgroundColor ??
+                                    theme.colorScheme.surfaceContainerHighest,
+                                foregroundColor: action.foregroundColor ??
+                                    theme.colorScheme.onSurface,
+                                onTap: () {
+                                  _toggle();
+                                  action.onTap?.call();
+                                },
+                              )
+                            : FloatingActionButton.small(
+                                heroTag: heroTag,
+                                tooltip: action.label,
+                                backgroundColor: action.backgroundColor ??
+                                    theme.colorScheme.surface,
+                                foregroundColor: action.foregroundColor ??
+                                    theme.colorScheme.onSurface,
+                                onPressed: () {
+                                  _toggle();
+                                  action.onTap?.call();
+                                },
+                                shape: const CircleBorder(),
+                                child: Icon(action.icon),
+                              ),
+                      ),
                     ),
                   ),
                 ),
@@ -255,6 +274,7 @@ class _QuickActionButtonState extends State<QuickActionButton>
                           child: FadeTransition(opacity: anim, child: child)),
                       child: Icon(icon, key: ValueKey<bool>(_open)),
                     ),
+                    shape: const CircleBorder(),
                   );
                 },
               ),

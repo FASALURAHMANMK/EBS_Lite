@@ -9,6 +9,7 @@ class DashboardHeader extends ConsumerStatefulWidget
     this.isOnline = true,
     this.onToggleTheme,
     this.onNotifications,
+    this.title = 'Dashboard',
   });
 
   /// Realtime/Sync status
@@ -17,6 +18,7 @@ class DashboardHeader extends ConsumerStatefulWidget
   /// Callbacks
   final VoidCallback? onToggleTheme;
   final VoidCallback? onNotifications;
+  final String title;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -39,8 +41,8 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
       elevation: 0,
       centerTitle: false,
       automaticallyImplyLeading: true,
-      title: const Text('Dashboard',
-          style: TextStyle(fontWeight: FontWeight.w600)),
+      title: Text(widget.title,
+          style: const TextStyle(fontWeight: FontWeight.w600)),
       actions: [
         // Online/Sync status chip
         Padding(
