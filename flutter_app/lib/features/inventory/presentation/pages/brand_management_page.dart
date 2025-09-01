@@ -1,0 +1,280 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../controllers/category_brand_notifiers.dart';
+import '../../data/inventory_repository.dart';
+import '../../controllers/inventory_notifier.dart';
+import '../../data/models.dart';
+
+class BrandManagementPage extends ConsumerWidget {
+  const BrandManagementPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(brandManagementProvider);
+    final notifier = ref.read(brandManagementProvider.notifier);
+    final theme = Theme.of(context);
+
+    final filtered = state.items
+        .where((b) => b.name.toLowerCase().contains(state.query.toLowerCase()))
+        .toList();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Brand Management'),
+        actions: [
+          IconButton(
+            tooltip: 'New Brand',
+            icon: const Icon(Icons.add_rounded),
+            onPressed: () async {
+              final created = await _showBrandDialog(context, ref: ref);
+              if (created == true) ref.read(brandManagementProvider.notifier).load();
+            },
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    decoration: const InputDecoration(
+                      hintText: 'Search brands',
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                    onChanged: notifier.setQuery,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: state.viewMode == InventoryViewMode.grid
+                      ? 'Switch to list view'
+                      : 'Switch to grid view',
+                  onPressed: () => notifier.setViewMode(
+                    state.viewMode == InventoryViewMode.grid
+                        ? InventoryViewMode.list
+                        : InventoryViewMode.grid,
+                  ),
+                  icon: Icon(state.viewMode == InventoryViewMode.grid
+                      ? Icons.view_list_rounded
+                      : Icons.grid_view_rounded),
+                ),
+              ],
+            ),
+          ),
+          if (state.isLoading) const LinearProgressIndicator(minHeight: 2),
+          if (state.error != null)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(state.error!,
+                  style: TextStyle(color: theme.colorScheme.error)),
+            ),
+          Expanded(
+            child: filtered.isEmpty
+                ? const _EmptyState(message: 'No brands found')
+                : (state.viewMode == InventoryViewMode.grid
+                    ? _BrandGrid(items: filtered)
+                    : _BrandList(items: filtered)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(child: Text(message));
+  }
+}
+
+class _BrandGrid extends StatelessWidget {
+  const _BrandGrid({required this.items});
+  final List<BrandDto> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        int crossAxisCount;
+        if (width >= 1200) {
+          crossAxisCount = 4;
+        } else if (width >= 900) {
+          crossAxisCount = 3;
+        } else if (width >= 600) {
+          crossAxisCount = 2;
+        } else {
+          crossAxisCount = 2;
+        }
+        final childAspectRatio = width < 600 ? 0.95 : 1.4;
+        return GridView.builder(
+          padding: const EdgeInsets.all(12),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: childAspectRatio,
+          ),
+          itemCount: items.length,
+          itemBuilder: (context, i) => _BrandCard(item: items[i]),
+        );
+      },
+    );
+  }
+}
+
+class _BrandCard extends ConsumerWidget {
+  const _BrandCard({required this.item});
+  final BrandDto item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: () async {
+        final updated = await _showBrandDialog(context, ref: ref, existing: item);
+        if (updated == true) ref.read(brandManagementProvider.notifier).load();
+      },
+      child: Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              item.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'ID: ${item.brandId}',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            const Spacer(),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: Text(
+                item.isActive ? 'Active' : 'Inactive',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: item.isActive
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      ),
+    );
+  }
+}
+
+class _BrandList extends ConsumerWidget {
+  const _BrandList({required this.items});
+  final List<BrandDto> items;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ListView.separated(
+      padding: const EdgeInsets.all(12),
+      itemCount: items.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, i) {
+        final b = items[i];
+        return ListTile(
+          tileColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Text(b.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+          subtitle: Text('ID: ${b.brandId}'),
+          trailing: Text(
+            b.isActive ? 'Active' : 'Inactive',
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
+          onTap: () async {
+            final updated = await _showBrandDialog(context, ref: ref, existing: b);
+            if (updated == true) ref.read(brandManagementProvider.notifier).load();
+          },
+        );
+      },
+    );
+  }
+}
+
+Future<bool?> _showBrandDialog(BuildContext context, {required WidgetRef ref, BrandDto? existing}) async {
+  final isEdit = existing != null;
+  final controller = TextEditingController(text: existing?.name ?? '');
+  final repo = ref.read(inventoryRepositoryProvider);
+  bool active = existing?.isActive ?? true;
+  bool saving = false;
+  return showDialog<bool>(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: Text(isEdit ? 'Edit Brand' : 'New Brand'),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(labelText: 'Name'),
+                textInputAction: TextInputAction.next,
+              ),
+              if (isEdit)
+                SwitchListTile.adaptive(
+                  value: active,
+                  onChanged: (v) => setState(() => active = v),
+                  title: const Text('Active'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: saving ? null : () => Navigator.of(context).maybePop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: saving || controller.text.trim().isEmpty
+                ? null
+                : () async {
+                    setState(() => saving = true);
+                    try {
+                      if (isEdit) {
+                        await repo.updateBrand(id: existing!.brandId, name: controller.text.trim(), isActive: active);
+                      } else {
+                        await repo.createBrand(name: controller.text.trim());
+                      }
+                      Navigator.of(context).pop(true);
+                    } finally {
+                      setState(() => saving = false);
+                    }
+                  },
+            child: saving
+                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2.4))
+                : Text(isEdit ? 'Save' : 'Create'),
+          ),
+        ],
+      ),
+    ),
+  );
+}

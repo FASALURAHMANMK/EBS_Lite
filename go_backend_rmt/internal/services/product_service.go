@@ -628,6 +628,69 @@ func (s *ProductService) CreateBrand(companyID, userID int, req *models.CreateBr
 	return &brand, nil
 }
 
+func (s *ProductService) UpdateBrand(companyID, brandID, userID int, req *models.UpdateBrandRequest) (*models.Brand, error) {
+    setParts := []string{}
+    args := []interface{}{}
+    argCount := 1
+
+    if req.Name != nil {
+        setParts = append(setParts, fmt.Sprintf("name = $%d", argCount))
+        args = append(args, *req.Name)
+        argCount++
+    }
+    if req.Description != nil {
+        setParts = append(setParts, fmt.Sprintf("description = $%d", argCount))
+        args = append(args, *req.Description)
+        argCount++
+    }
+    if req.IsActive != nil {
+        setParts = append(setParts, fmt.Sprintf("is_active = $%d", argCount))
+        args = append(args, *req.IsActive)
+        argCount++
+    }
+
+    if len(setParts) == 0 {
+        return nil, fmt.Errorf("no fields to update")
+    }
+
+    setParts = append(setParts, fmt.Sprintf("updated_by = $%d", argCount))
+    args = append(args, userID)
+    argCount++
+
+    query := fmt.Sprintf(`UPDATE brands SET %s, updated_at = CURRENT_TIMESTAMP WHERE brand_id = $%d AND company_id = $%d RETURNING brand_id, company_id, name, description, is_active, created_by, updated_by, created_at, updated_at`, strings.Join(setParts, ", "), argCount, argCount+1)
+    args = append(args, brandID, companyID)
+
+    var brand models.Brand
+    err := s.db.QueryRow(query, args...).Scan(
+        &brand.BrandID, &brand.CompanyID, &brand.Name, &brand.Description,
+        &brand.IsActive, &brand.CreatedBy, &brand.UpdatedBy, &brand.CreatedAt, &brand.UpdatedAt,
+    )
+    if err != nil {
+        if err == sql.ErrNoRows {
+            return nil, fmt.Errorf("brand not found")
+        }
+        return nil, fmt.Errorf("failed to update brand: %w", err)
+    }
+
+    return &brand, nil
+}
+
+func (s *ProductService) DeleteBrand(companyID, brandID, userID int) error {
+    query := `UPDATE brands SET is_active = FALSE, updated_by = $3, updated_at = CURRENT_TIMESTAMP WHERE brand_id = $1 AND company_id = $2 AND is_active = TRUE`
+    res, err := s.db.Exec(query, brandID, companyID, userID)
+    if err != nil {
+        return fmt.Errorf("failed to delete brand: %w", err)
+    }
+    rows, err := res.RowsAffected()
+    if err != nil {
+        return fmt.Errorf("failed to get rows affected: %w", err)
+    }
+    if rows == 0 {
+        return fmt.Errorf("brand not found")
+    }
+    return nil
+}
+
 // Units
 func (s *ProductService) GetUnits() ([]models.Unit, error) {
 	query := `

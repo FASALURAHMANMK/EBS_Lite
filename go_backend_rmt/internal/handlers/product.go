@@ -368,6 +368,70 @@ func (h *ProductHandler) CreateBrand(c *gin.Context) {
 	utils.CreatedResponse(c, "Brand created successfully", brand)
 }
 
+// PUT /brands/:id
+func (h *ProductHandler) UpdateBrand(c *gin.Context) {
+    companyID := c.GetInt("company_id")
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
+    userID := c.GetInt("user_id")
+
+    id, err := strconv.Atoi(c.Param("id"))
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid brand ID", err)
+        return
+    }
+
+    var req models.UpdateBrandRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+        return
+    }
+    if err := utils.ValidateStruct(&req); err != nil {
+        validationErrors := utils.GetValidationErrors(err)
+        utils.ValidationErrorResponse(c, validationErrors)
+        return
+    }
+
+    brand, err := h.productService.UpdateBrand(companyID, id, userID, &req)
+    if err != nil {
+        if err.Error() == "brand not found" {
+            utils.NotFoundResponse(c, "Brand not found")
+            return
+        }
+        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update brand", err)
+        return
+    }
+    utils.SuccessResponse(c, "Brand updated successfully", brand)
+}
+
+// DELETE /brands/:id
+func (h *ProductHandler) DeleteBrand(c *gin.Context) {
+    companyID := c.GetInt("company_id")
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
+    userID := c.GetInt("user_id")
+
+    id, err := strconv.Atoi(c.Param("id"))
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid brand ID", err)
+        return
+    }
+
+    if err := h.productService.DeleteBrand(companyID, id, userID); err != nil {
+        if err.Error() == "brand not found" {
+            utils.NotFoundResponse(c, "Brand not found")
+            return
+        }
+        utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to delete brand", err)
+        return
+    }
+    utils.SuccessResponse(c, "Brand deleted successfully", nil)
+}
+
 // GET /units
 func (h *ProductHandler) GetUnits(c *gin.Context) {
 	units, err := h.productService.GetUnits()

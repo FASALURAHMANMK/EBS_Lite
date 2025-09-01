@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
 import '../../../../shared/pages/feature_detail_page.dart';
 import 'inventory_management_page.dart';
+import 'category_management_page.dart';
+import 'brand_management_page.dart';
 
 class InventoryPage extends StatelessWidget {
   const InventoryPage({super.key});
@@ -11,15 +13,15 @@ class InventoryPage extends StatelessWidget {
     final items = [
       FeatureItem(
         icon: Icons.inventory_2_rounded,
-        label: 'Inventory View',
+        label: 'Product View',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
-              builder: (_) => const FeatureDetailPage(title: 'Inventory View')),
+              builder: (_) => const FeatureDetailPage(title: 'Product View')),
         ),
       ),
       FeatureItem(
         icon: Icons.inventory_rounded,
-        label: 'Inventory Management',
+        label: 'Product Management',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const InventoryManagementPage()),
         ),
@@ -39,6 +41,20 @@ class InventoryPage extends StatelessWidget {
           MaterialPageRoute(
               builder: (_) =>
                   const FeatureDetailPage(title: 'Stock Adjustments')),
+        ),
+      ),
+      FeatureItem(
+        icon: Icons.category_rounded,
+        label: 'Category Management',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const CategoryManagementPage()),
+        ),
+      ),
+      FeatureItem(
+        icon: Icons.branding_watermark_rounded,
+        label: 'Brand Management',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const BrandManagementPage()),
         ),
       ),
     ];

@@ -196,6 +196,8 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			{
 				brands.GET("", middleware.RequirePermission("VIEW_PRODUCTS"), productHandler.GetBrands)
 				brands.POST("", middleware.RequirePermission("CREATE_PRODUCTS"), productHandler.CreateBrand)
+				brands.PUT("/:id", middleware.RequirePermission("UPDATE_PRODUCTS"), productHandler.UpdateBrand)
+				brands.DELETE("/:id", middleware.RequirePermission("DELETE_PRODUCTS"), productHandler.DeleteBrand)
 			}
 
 			// Unit management routes (global)

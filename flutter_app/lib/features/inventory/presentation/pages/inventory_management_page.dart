@@ -10,17 +10,20 @@ class InventoryManagementPage extends ConsumerStatefulWidget {
   const InventoryManagementPage({super.key});
 
   @override
-  ConsumerState<InventoryManagementPage> createState() => _InventoryManagementPageState();
+  ConsumerState<InventoryManagementPage> createState() =>
+      _InventoryManagementPageState();
 }
 
-class _InventoryManagementPageState extends ConsumerState<InventoryManagementPage> {
+class _InventoryManagementPageState
+    extends ConsumerState<InventoryManagementPage> {
   String _sort = 'name_asc';
 
   List<InventoryListItem> _applySort(List<InventoryListItem> list) {
     final items = [...list];
     switch (_sort) {
       case 'name_desc':
-        items.sort((a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+        items.sort(
+            (a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()));
         break;
       case 'stock_asc':
         items.sort((a, b) => a.stock.compareTo(b.stock));
@@ -30,9 +33,175 @@ class _InventoryManagementPageState extends ConsumerState<InventoryManagementPag
         break;
       case 'name_asc':
       default:
-        items.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        items.sort(
+            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     }
     return items;
+  }
+
+  Future<void> _openSortDialog() async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Sort by'),
+        children: [
+          RadioListTile<String>(
+            value: 'name_asc',
+            groupValue: _sort,
+            onChanged: (v) => Navigator.of(context).pop(v),
+            title: const Text('Name (A–Z)'),
+          ),
+          RadioListTile<String>(
+            value: 'name_desc',
+            groupValue: _sort,
+            onChanged: (v) => Navigator.of(context).pop(v),
+            title: const Text('Name (Z–A)'),
+          ),
+          RadioListTile<String>(
+            value: 'stock_desc',
+            groupValue: _sort,
+            onChanged: (v) => Navigator.of(context).pop(v),
+            title: const Text('Stock (High→Low)'),
+          ),
+          RadioListTile<String>(
+            value: 'stock_asc',
+            groupValue: _sort,
+            onChanged: (v) => Navigator.of(context).pop(v),
+            title: const Text('Stock (Low→High)'),
+          ),
+        ],
+      ),
+    );
+    if (choice != null) {
+      setState(() => _sort = choice);
+    }
+  }
+
+  Future<void> _openCategoryDialog({
+    required List<CategoryDto> categories,
+    required int? selectedId,
+    required ValueChanged<int?> onApply,
+  }) async {
+    final result = await showDialog<int?>(
+      context: context,
+      builder: (context) {
+        int? current = selectedId;
+        String query = '';
+        List<CategoryDto> filtered = categories;
+        return StatefulBuilder(
+          builder: (context, setInner) => AlertDialog(
+            title: const Text('Select Category'),
+            content: SizedBox(
+              width: 500,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    decoration: const InputDecoration(
+                      hintText: 'Search categories',
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                    onChanged: (v) {
+                      query = v.toLowerCase();
+                      setInner(() {
+                        filtered = categories
+                            .where((c) => c.name.toLowerCase().contains(query))
+                            .toList();
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Flexible(
+                    child: filtered.isEmpty
+                        ? const Center(child: Text('No categories'))
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filtered.length,
+                            itemBuilder: (context, i) {
+                              final c = filtered[i];
+                              final checked = current == c.categoryId;
+                              return CheckboxListTile(
+                                title: Text(c.name),
+                                value: checked,
+                                onChanged: (v) {
+                                  setInner(() {
+                                    if (v == true) {
+                                      current = c.categoryId;
+                                    } else if (checked) {
+                                      current = null;
+                                    }
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(null),
+                child: const Text('Clear'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).maybePop(selectedId),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(current),
+                child: const Text('Apply'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (result != selectedId) {
+      onApply(result);
+    }
+  }
+
+  Future<void> _openFilterDialog({
+    required bool onlyLowStock,
+    required ValueChanged<bool> onApply,
+  }) async {
+    bool low = onlyLowStock;
+    final applied = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setInner) => AlertDialog(
+          title: const Text('Filters'),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CheckboxListTile(
+                  value: low,
+                  onChanged: (v) => setInner(() => low = v ?? false),
+                  title: const Text('Low stock only'),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (applied == true) {
+      onApply(low);
+    }
   }
 
   @override
@@ -60,7 +229,7 @@ class _InventoryManagementPageState extends ConsumerState<InventoryManagementPag
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Inventory Management'),
+        title: const Text('Product Management'),
         actions: [
           IconButton(
             tooltip: 'New Product',
@@ -89,76 +258,83 @@ class _InventoryManagementPageState extends ConsumerState<InventoryManagementPag
                 Expanded(
                   child: TextField(
                     decoration: const InputDecoration(
-                      hintText: 'Search products by name, SKU or barcode',
+                      hintText: 'Search products',
                       prefixIcon: Icon(Icons.search_rounded),
                     ),
                     onChanged: notifier.setQuery,
                   ),
                 ),
-                const SizedBox(width: 12),
-                PopupMenuButton<String>(
-                  tooltip: 'Sort',
-                  initialValue: _sort,
-                  onSelected: (v) => setState(() => _sort = v),
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(value: 'name_asc', child: Text('Name (A–Z)')),
-                    PopupMenuItem(value: 'name_desc', child: Text('Name (Z–A)')),
-                    PopupMenuItem(value: 'stock_desc', child: Text('Stock (High→Low)')),
-                    PopupMenuItem(value: 'stock_asc', child: Text('Stock (Low→High)')),
-                  ],
-                  icon: const Icon(Icons.sort_rounded),
-                ),
               ],
             ),
           ),
+          const SizedBox(height: 4),
           // Row 2: Category (70) + Filters (30)
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
             child: Row(
               children: [
                 Expanded(
-                  flex: 7,
-                  child: _CategoryPicker(
-                    categories: state.categories,
-                    selectedId: state.selectedCategoryId,
-                    onChanged: (id) => notifier.setCategory(id),
+                  flex: 8, // give more width to category field
+                  child: _CategoryField(
+                    label: 'Category',
+                    valueText: state.selectedCategoryId == null
+                        ? 'All categories'
+                        : state.categories
+                            .firstWhere(
+                              (c) => c.categoryId == state.selectedCategoryId,
+                              orElse: () =>
+                                  CategoryDto(categoryId: -1, name: ''),
+                            )
+                            .name,
+                    onTap: () => _openCategoryDialog(
+                      categories: state.categories,
+                      selectedId: state.selectedCategoryId,
+                      onApply: (id) => notifier.setCategory(id),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 3,
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        FilterChip(
-                          label: const Text('Low stock'),
-                          selected: state.onlyLowStock,
-                          onSelected: (v) => notifier.setOnlyLowStock(v),
-                        ),
-                      ],
-                    ),
+                const SizedBox(width: 16), // spacing between category and sort
+                IconButton(
+                  tooltip: 'Sort',
+                  icon: const Icon(Icons.sort_rounded),
+                  onPressed: _openSortDialog,
+                ),
+                const SizedBox(
+                    width: 4), // controlled spacing between sort and filter
+                IconButton(
+                  tooltip: 'Filters',
+                  icon: const Icon(Icons.filter_list_rounded),
+                  onPressed: () => _openFilterDialog(
+                    onlyLowStock: state.onlyLowStock,
+                    onApply: (low) => notifier.setOnlyLowStock(low),
                   ),
                 ),
               ],
             ),
           ),
-          if (state.isLoading)
-            const LinearProgressIndicator(minHeight: 2),
+          if (state.isLoading) const LinearProgressIndicator(minHeight: 2),
           if (state.error != null)
             Padding(
               padding: const EdgeInsets.all(8.0),
-              child: Text(state.error!, style: TextStyle(color: theme.colorScheme.error)),
+              child: Text(state.error!,
+                  style: TextStyle(color: theme.colorScheme.error)),
             ),
           // Row 3: Right-aligned view toggle with a vertical divider
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
             child: Row(
               children: [
-                const Spacer(),
-                Container(width: 1, height: 24, color: theme.dividerColor.withOpacity(0.5)),
+                const Expanded(
+                  child: Divider(
+                    thickness: 1,
+                    color: Colors.grey,
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 20,
+                  color: Colors.grey,
+                ),
                 const SizedBox(width: 8),
                 IconButton(
                   tooltip: state.viewMode == InventoryViewMode.grid
@@ -169,9 +345,11 @@ class _InventoryManagementPageState extends ConsumerState<InventoryManagementPag
                         ? InventoryViewMode.list
                         : InventoryViewMode.grid,
                   ),
-                  icon: Icon(state.viewMode == InventoryViewMode.grid
-                      ? Icons.view_list_rounded
-                      : Icons.grid_view_rounded),
+                  icon: Icon(
+                    state.viewMode == InventoryViewMode.grid
+                        ? Icons.view_list_rounded
+                        : Icons.grid_view_rounded,
+                  ),
                 ),
               ],
             ),
@@ -184,26 +362,51 @@ class _InventoryManagementPageState extends ConsumerState<InventoryManagementPag
     );
   }
 
-  Widget _buildListingOrEmpty(BuildContext context, List<InventoryListItem> items) {
+  Widget _buildListingOrEmpty(
+      BuildContext context, List<InventoryListItem> items) {
     final state = ref.watch(inventoryNotifierProvider);
     if (items.isEmpty) {
       return Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            const Text('No products available'),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () async {
-                final created = await Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ProductFormPage()),
-                );
-                if (created == true && mounted) {
-                  await ref.read(inventoryNotifierProvider.notifier).refreshList();
-                }
-              },
-              child: const Text('Create one'),
-            ),
+            if ((state.query).trim().isNotEmpty) ...[
+              Text("No results for '${state.query.trim()}'"),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                icon: const Icon(Icons.add_rounded),
+                onPressed: () async {
+                  final created = await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          ProductFormPage(initialName: state.query.trim()),
+                    ),
+                  );
+                  if (created == true && mounted) {
+                    await ref
+                        .read(inventoryNotifierProvider.notifier)
+                        .refreshList();
+                  }
+                },
+                label: Text("Create product '${state.query.trim()}'"),
+              ),
+            ] else ...[
+              const Text('No products available'),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () async {
+                  final created = await Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ProductFormPage()),
+                  );
+                  if (created == true && mounted) {
+                    await ref
+                        .read(inventoryNotifierProvider.notifier)
+                        .refreshList();
+                  }
+                },
+                child: const Text('Create one'),
+              ),
+            ],
           ],
         ),
       );
@@ -214,56 +417,47 @@ class _InventoryManagementPageState extends ConsumerState<InventoryManagementPag
   }
 }
 
-class _CategoryPicker extends StatefulWidget {
-  const _CategoryPicker({
-    required this.categories,
-    required this.selectedId,
-    required this.onChanged,
+// Field-like button to open category dialog
+class _CategoryField extends StatelessWidget {
+  const _CategoryField({
+    required this.label,
+    required this.valueText,
+    required this.onTap,
   });
-  final List<CategoryDto> categories;
-  final int? selectedId;
-  final ValueChanged<int?> onChanged;
-
-  @override
-  State<_CategoryPicker> createState() => _CategoryPickerState();
-}
-
-class _CategoryPickerState extends State<_CategoryPicker> {
-  final _controller = TextEditingController();
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  final String label;
+  final String valueText;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final selected = widget.categories
-        .where((c) => c.categoryId == widget.selectedId)
-        .toList();
-    _controller.text = selected.isNotEmpty ? selected.first.name : '';
-    return Autocomplete<CategoryDto>(
-      initialValue: TextEditingValue(text: _controller.text),
-      displayStringForOption: (c) => c.name,
-      optionsBuilder: (text) {
-        final q = text.text.toLowerCase();
-        return widget.categories
-            .where((c) => c.name.toLowerCase().contains(q));
-      },
-      onSelected: (c) => widget.onChanged(c.categoryId),
-      fieldViewBuilder: (context, controller, focus, onSubmit) {
-        return TextField(
-          controller: controller,
-          focusNode: focus,
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.category_rounded),
-            hintText: 'Category',
-          ),
-        );
-      },
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          hintText: label,
+          prefixIcon: const Icon(Icons.category_rounded),
+          border: const OutlineInputBorder(),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                valueText.isEmpty ? label : valueText,
+                style: theme.textTheme.bodyMedium,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Icon(Icons.arrow_drop_down_rounded),
+          ],
+        ),
+      ),
     );
   }
 }
+
+// removed legacy dropdown/overlay implementations in favor of dialogs
 
 class _GridList extends StatelessWidget {
   const _GridList({required this.items});
@@ -271,25 +465,36 @@ class _GridList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final shortest = size.shortestSide;
-    final crossAxisCount = shortest >= 1100
-        ? 4
-        : shortest >= 900
-            ? 3
-            : shortest >= 600
-                ? 2
-                : 1;
-    return GridView.builder(
-      padding: const EdgeInsets.all(12),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 1.8,
-      ),
-      itemCount: items.length,
-      itemBuilder: (context, i) => _InventoryCard(item: items[i]),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        // Ensure a true multi-column grid even on phones.
+        int crossAxisCount;
+        if (width >= 1200) {
+          crossAxisCount = 4;
+        } else if (width >= 900) {
+          crossAxisCount = 3;
+        } else if (width >= 600) {
+          crossAxisCount = 2;
+        } else {
+          crossAxisCount = 2; // force 2 columns on narrow screens
+        }
+
+        // Slightly denser aspect ratio for smaller widths
+        final childAspectRatio = width < 600 ? 0.95 : 1.4;
+
+        return GridView.builder(
+          padding: const EdgeInsets.all(12),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: childAspectRatio,
+          ),
+          itemCount: items.length,
+          itemBuilder: (context, i) => _InventoryCard(item: items[i]),
+        );
+      },
     );
   }
 }
@@ -370,14 +575,26 @@ class _InventoryCard extends ConsumerWidget {
               ),
               const Spacer(),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Stock: ${item.stock.toStringAsFixed(2)}'),
-                  Text(
-                    item.price != null ? 'Price: ${item.price!.toStringAsFixed(2)}' : '',
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                  Expanded(
+                    child: Text(
+                      'Stock: ${item.stock.toStringAsFixed(2)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
+                  const SizedBox(width: 8),
+                  if (item.price != null)
+                    Expanded(
+                      child: Text(
+                        'Price: ${item.price!.toStringAsFixed(2)}',
+                        textAlign: TextAlign.right,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
                 ],
               ),
             ],
@@ -411,14 +628,15 @@ class _InventoryTile extends ConsumerWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       title: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
-        [(item.sku ?? '').isNotEmpty ? 'SKU: ${item.sku}' : null,
-                item.categoryName]
-            .whereType<String>()
-            .join(' • '),
+        [
+          (item.sku ?? '').isNotEmpty ? 'SKU: ${item.sku}' : null,
+          item.categoryName
+        ].whereType<String>().join(' • '),
       ),
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text('Stock: ${item.stock.toStringAsFixed(2)}'),
           if (low)

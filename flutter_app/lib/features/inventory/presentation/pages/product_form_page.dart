@@ -5,7 +5,9 @@ import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
 
 class ProductFormPage extends ConsumerStatefulWidget {
-  const ProductFormPage({super.key});
+  const ProductFormPage({super.key, this.initialName});
+
+  final String? initialName;
 
   @override
   ConsumerState<ProductFormPage> createState() => _ProductFormPageState();
@@ -64,6 +66,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   @override
   void initState() {
     super.initState();
+    if ((widget.initialName ?? '').trim().isNotEmpty) {
+      _name.text = widget.initialName!.trim();
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadDefs());
   }
 
@@ -86,7 +91,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           if (d.type == 'BOOLEAN') {
             _attrBool[d.attributeId] = false;
           } else if (d.type == 'SELECT') {
-            _attrSelect[d.attributeId] = (d.options?.isNotEmpty ?? false) ? d.options!.first : null;
+            _attrSelect[d.attributeId] =
+                (d.options?.isNotEmpty ?? false) ? d.options!.first : null;
           } else {
             _attrText[d.attributeId] = TextEditingController();
           }
@@ -98,7 +104,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     }
   }
 
-  String? _req(String? v) => (v == null || v.trim().isEmpty) ? 'Required' : null;
+  String? _req(String? v) =>
+      (v == null || v.trim().isEmpty) ? 'Required' : null;
 
   Future<void> _submit() async {
     if (_loading) return;
@@ -131,7 +138,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         unitId: _unitId,
         description: _desc.text.trim().isEmpty ? null : _desc.text.trim(),
         weight: double.tryParse(_weight.text.trim()),
-        dimensions: _dimensions.text.trim().isEmpty ? null : _dimensions.text.trim(),
+        dimensions:
+            _dimensions.text.trim().isEmpty ? null : _dimensions.text.trim(),
       );
       await repo.createProduct(payload);
       if (!mounted) return;
@@ -194,102 +202,114 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       validator: _req,
                       textInputAction: TextInputAction.next,
                     ),
-              TextFormField(
-                controller: _sku,
-                decoration: const InputDecoration(labelText: 'SKU (optional)'),
-                textInputAction: TextInputAction.next,
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _price,
-                      decoration: const InputDecoration(labelText: 'Selling Price'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _barcode,
+                      decoration: const InputDecoration(labelText: 'Barcode'),
+                      validator: _req,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _submit(),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _sku,
+                      decoration: const InputDecoration(labelText: 'SKU'),
                       textInputAction: TextInputAction.next,
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _cost,
-                      decoration: const InputDecoration(labelText: 'Cost Price'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _price,
+                            decoration: const InputDecoration(
+                                labelText: 'Selling Price'),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            textInputAction: TextInputAction.next,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _cost,
+                            decoration:
+                                const InputDecoration(labelText: 'Cost Price'),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            textInputAction: TextInputAction.next,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _reorder,
+                      decoration:
+                          const InputDecoration(labelText: 'Reorder Level'),
+                      keyboardType: TextInputType.number,
                       textInputAction: TextInputAction.next,
                     ),
-                  ),
-                ],
-              ),
-              TextFormField(
-                controller: _reorder,
-                decoration: const InputDecoration(labelText: 'Reorder Level'),
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.next,
-              ),
-              SwitchListTile.adaptive(
-                value: _serialized,
-                onChanged: (v) => setState(() => _serialized = v),
-                title: const Text('Serialized'),
-                contentPadding: EdgeInsets.zero,
-              ),
-              const SizedBox(height: 12),
-              _categoryBrandUnitPickers(),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _desc,
-                decoration: const InputDecoration(labelText: 'Description'),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _weight,
-                      decoration: const InputDecoration(labelText: 'Weight'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    const SizedBox(height: 12),
+                    SwitchListTile.adaptive(
+                      value: _serialized,
+                      onChanged: (v) => setState(() => _serialized = v),
+                      title: const Text('Serialized'),
+                      contentPadding: EdgeInsets.zero,
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _dimensions,
-                      decoration: const InputDecoration(labelText: 'Dimensions'),
+                    const SizedBox(height: 12),
+                    _categoryBrandUnitPickers(),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _desc,
+                      decoration:
+                          const InputDecoration(labelText: 'Description'),
+                      maxLines: 2,
                     ),
-                  ),
-                ],
-              ),
-              const Divider(height: 24),
-              if (_attrDefs.isNotEmpty) ...[
-                Text('Attributes', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 8),
-                ..._attrDefs.map((d) => _buildAttrField(d)).toList(),
-                const SizedBox(height: 8),
-                const Divider(height: 24),
-              ],
-              Text('Primary Barcode', style: theme.textTheme.titleMedium),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _barcode,
-                decoration: const InputDecoration(labelText: 'Barcode'),
-                validator: _req,
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) => _submit(),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                height: 52,
-                child: FilledButton(
-                  onPressed: _saving ? null : _submit,
-                  child: _saving
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2.4),
-                        )
-                      : const Text('Create'),
-                ),
-              ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _weight,
+                            decoration:
+                                const InputDecoration(labelText: 'Weight'),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _dimensions,
+                            decoration:
+                                const InputDecoration(labelText: 'Dimensions'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 24),
+                    if (_attrDefs.isNotEmpty) ...[
+                      Text('Attributes', style: theme.textTheme.titleMedium),
+                      const SizedBox(height: 8),
+                      ..._attrDefs.map((d) => _buildAttrField(d)).toList(),
+                      const SizedBox(height: 8),
+                      const Divider(height: 24),
+                    ],
+                    SizedBox(
+                      height: 52,
+                      child: FilledButton(
+                        onPressed: _saving ? null : _submit,
+                        child: _saving
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2.4),
+                              )
+                            : const Text('Create'),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -314,14 +334,17 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               .map((o) => DropdownMenuItem(value: o, child: Text(o)))
               .toList(),
           onChanged: (v) => setState(() => _attrSelect[d.attributeId] = v),
-          decoration: InputDecoration(labelText: d.name + (d.isRequired ? ' *' : '')),
+          decoration:
+              InputDecoration(labelText: d.name + (d.isRequired ? ' *' : '')),
         );
       case 'DATE':
-        final c = _attrText.putIfAbsent(d.attributeId, () => TextEditingController());
+        final c =
+            _attrText.putIfAbsent(d.attributeId, () => TextEditingController());
         return TextFormField(
           controller: c,
           readOnly: true,
-          decoration: InputDecoration(labelText: d.name + (d.isRequired ? ' *' : '')),
+          decoration:
+              InputDecoration(labelText: d.name + (d.isRequired ? ' *' : '')),
           onTap: () async {
             final now = DateTime.now();
             final picked = await showDatePicker(
@@ -331,7 +354,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               lastDate: DateTime(now.year + 10),
             );
             if (picked != null) {
-              final s = '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+              final s =
+                  '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
               c.text = s;
             }
           },
@@ -343,10 +367,12 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           },
         );
       default:
-        final c = _attrText.putIfAbsent(d.attributeId, () => TextEditingController());
+        final c =
+            _attrText.putIfAbsent(d.attributeId, () => TextEditingController());
         return TextFormField(
           controller: c,
-          decoration: InputDecoration(labelText: d.name + (d.isRequired ? ' *' : '')),
+          decoration:
+              InputDecoration(labelText: d.name + (d.isRequired ? ' *' : '')),
           keyboardType: d.type == 'NUMBER'
               ? const TextInputType.numberWithOptions(decimal: true)
               : TextInputType.text,
@@ -354,7 +380,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             if (d.isRequired && (v == null || v.trim().isEmpty)) {
               return 'Required';
             }
-            if ((v ?? '').isNotEmpty && d.type == 'NUMBER' && double.tryParse(v!.trim()) == null) {
+            if ((v ?? '').isNotEmpty &&
+                d.type == 'NUMBER' &&
+                double.tryParse(v!.trim()) == null) {
               return 'Enter a valid number';
             }
             // DATE format validation could be added here if needed
@@ -374,7 +402,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 displayStringForOption: (c) => c.name,
                 optionsBuilder: (text) {
                   final q = text.text.toLowerCase();
-                  return _categories.where((c) => c.name.toLowerCase().contains(q));
+                  return _categories
+                      .where((c) => c.name.toLowerCase().contains(q));
                 },
                 onSelected: (c) {
                   _categoryId = c.categoryId;
@@ -426,7 +455,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           items: _units
               .map((u) => DropdownMenuItem(
                     value: u.unitId,
-                    child: Text('${u.name}${u.symbol != null ? ' (${u.symbol})' : ''}'),
+                    child: Text(
+                        '${u.name}${u.symbol != null ? ' (${u.symbol})' : ''}'),
                   ))
               .toList(),
           onChanged: (v) => setState(() => _unitId = v),

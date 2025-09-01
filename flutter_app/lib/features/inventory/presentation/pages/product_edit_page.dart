@@ -72,14 +72,18 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       _desc.text = p.description ?? '';
       _weight.text = p.weight?.toString() ?? '';
       _dimensions.text = p.dimensions ?? '';
-      _categoryController.text = _categories.firstWhere(
-        (c) => c.categoryId == _categoryId,
-        orElse: () => CategoryDto(categoryId: -1, name: ''),
-      ).name;
-      _brandController.text = _brands.firstWhere(
-        (b) => b.brandId == _brandId,
-        orElse: () => BrandDto(brandId: -1, name: ''),
-      ).name;
+      _categoryController.text = _categories
+          .firstWhere(
+            (c) => c.categoryId == _categoryId,
+            orElse: () => CategoryDto(categoryId: -1, name: ''),
+          )
+          .name;
+      _brandController.text = _brands
+          .firstWhere(
+            (b) => b.brandId == _brandId,
+            orElse: () => BrandDto(brandId: -1, name: ''),
+          )
+          .name;
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -112,7 +116,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         sellingPrice: double.tryParse(_price.text.trim()),
         reorderLevel: int.tryParse(_reorder.text.trim()) ?? 0,
         weight: double.tryParse(_weight.text.trim()),
-        dimensions: _dimensions.text.trim().isEmpty ? null : _dimensions.text.trim(),
+        dimensions:
+            _dimensions.text.trim().isEmpty ? null : _dimensions.text.trim(),
         isSerialized: _serialized,
         isActive: _active,
         barcodes: p.barcodes,
@@ -137,14 +142,20 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         title: const Text('Delete Product'),
         content: const Text('Are you sure you want to delete this product?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete')),
         ],
       ),
     );
     if (ok != true) return;
     try {
-      await ref.read(inventoryRepositoryProvider).deleteProduct(widget.productId);
+      await ref
+          .read(inventoryRepositoryProvider)
+          .deleteProduct(widget.productId);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
@@ -181,21 +192,26 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                     TextFormField(
                       controller: _name,
                       decoration: const InputDecoration(labelText: 'Name'),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Required' : null,
                       textInputAction: TextInputAction.next,
                     ),
+                    const SizedBox(height: 12),
                     TextFormField(
                       controller: _sku,
-                      decoration: const InputDecoration(labelText: 'SKU (optional)'),
+                      decoration: const InputDecoration(labelText: 'SKU'),
                       textInputAction: TextInputAction.next,
                     ),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
                           child: TextFormField(
                             controller: _price,
-                            decoration: const InputDecoration(labelText: 'Selling Price'),
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                                labelText: 'Selling Price'),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
                             textInputAction: TextInputAction.next,
                           ),
                         ),
@@ -203,19 +219,24 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                         Expanded(
                           child: TextFormField(
                             controller: _cost,
-                            decoration: const InputDecoration(labelText: 'Cost Price'),
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration:
+                                const InputDecoration(labelText: 'Cost Price'),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
                             textInputAction: TextInputAction.next,
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 12),
                     TextFormField(
                       controller: _reorder,
-                      decoration: const InputDecoration(labelText: 'Reorder Level'),
+                      decoration:
+                          const InputDecoration(labelText: 'Reorder Level'),
                       keyboardType: TextInputType.number,
                       textInputAction: TextInputAction.next,
                     ),
+                    const SizedBox(height: 12),
                     SwitchListTile.adaptive(
                       value: _serialized,
                       onChanged: (v) => setState(() => _serialized = v),
@@ -237,13 +258,15 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                             displayStringForOption: (c) => c.name,
                             optionsBuilder: (text) {
                               final q = text.text.toLowerCase();
-                              return _categories.where((c) => c.name.toLowerCase().contains(q));
+                              return _categories.where(
+                                  (c) => c.name.toLowerCase().contains(q));
                             },
                             onSelected: (c) {
                               _categoryId = c.categoryId;
                               _categoryController.text = c.name;
                             },
-                            fieldViewBuilder: (context, controller, focus, onSubmit) {
+                            fieldViewBuilder:
+                                (context, controller, focus, onSubmit) {
                               controller.text = _categoryController.text;
                               return TextField(
                                 controller: controller,
@@ -262,13 +285,15 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                             displayStringForOption: (b) => b.name,
                             optionsBuilder: (text) {
                               final q = text.text.toLowerCase();
-                              return _brands.where((b) => b.name.toLowerCase().contains(q));
+                              return _brands.where(
+                                  (b) => b.name.toLowerCase().contains(q));
                             },
                             onSelected: (b) {
                               _brandId = b.brandId;
                               _brandController.text = b.name;
                             },
-                            fieldViewBuilder: (context, controller, focus, onSubmit) {
+                            fieldViewBuilder:
+                                (context, controller, focus, onSubmit) {
                               controller.text = _brandController.text;
                               return TextField(
                                 controller: controller,
@@ -289,7 +314,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                       items: _units
                           .map((u) => DropdownMenuItem(
                                 value: u.unitId,
-                                child: Text('${u.name}${u.symbol != null ? ' (${u.symbol})' : ''}'),
+                                child: Text(
+                                    '${u.name}${u.symbol != null ? ' (${u.symbol})' : ''}'),
                               ))
                           .toList(),
                       onChanged: (v) => setState(() => _unitId = v),
@@ -301,7 +327,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _desc,
-                      decoration: const InputDecoration(labelText: 'Description'),
+                      decoration:
+                          const InputDecoration(labelText: 'Description'),
                       maxLines: 2,
                     ),
                     const SizedBox(height: 12),
@@ -310,15 +337,18 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                         Expanded(
                           child: TextFormField(
                             controller: _weight,
-                            decoration: const InputDecoration(labelText: 'Weight'),
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration:
+                                const InputDecoration(labelText: 'Weight'),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: TextFormField(
                             controller: _dimensions,
-                            decoration: const InputDecoration(labelText: 'Dimensions'),
+                            decoration:
+                                const InputDecoration(labelText: 'Dimensions'),
                           ),
                         ),
                       ],
@@ -332,7 +362,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                             ? const SizedBox(
                                 height: 18,
                                 width: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2.4),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2.4),
                               )
                             : const Text('Save changes'),
                       ),
