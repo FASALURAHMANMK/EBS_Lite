@@ -22,36 +22,51 @@ func NewInventoryService() *InventoryService {
 }
 
 func (s *InventoryService) GetStock(companyID, locationID int, productID *int) ([]models.StockWithProduct, error) {
-	query := `
-		SELECT s.stock_id, s.location_id, s.product_id, s.quantity, s.reserved_quantity, s.last_updated,
-			   p.name as product_name, p.sku, p.reorder_level,
-			   c.name as category_name, b.name as brand_name, u.symbol as unit_symbol
-		FROM stock s
-		JOIN products p ON s.product_id = p.product_id
-		LEFT JOIN categories c ON p.category_id = c.category_id
-		LEFT JOIN brands b ON p.brand_id = b.brand_id
-		LEFT JOIN units u ON p.unit_id = u.unit_id
-		WHERE p.company_id = $1 AND s.location_id = $2 AND p.is_deleted = FALSE
-	`
+    // Select products in the company and left-join stock for the requested location.
+    // COALESCE stock fields to avoid NULL scans and to return zero-quantity rows.
+    query := `
+        SELECT
+            COALESCE(s.stock_id, 0) AS stock_id,
+            $2 AS location_id,
+            COALESCE(s.product_id, p.product_id) AS product_id,
+            COALESCE(s.quantity, 0) AS quantity,
+            COALESCE(s.reserved_quantity, 0) AS reserved_quantity,
+            COALESCE(s.last_updated, CURRENT_TIMESTAMP) AS last_updated,
+            p.name AS product_name,
+            p.sku,
+            p.reorder_level,
+            c.name AS category_name,
+            b.name AS brand_name,
+            u.symbol AS unit_symbol
+        FROM products p
+        LEFT JOIN stock s
+            ON s.product_id = p.product_id
+           AND s.location_id = $2
+        LEFT JOIN categories c ON p.category_id = c.category_id
+        LEFT JOIN brands b ON p.brand_id = b.brand_id
+        LEFT JOIN units u ON p.unit_id = u.unit_id
+        WHERE p.company_id = $1 AND p.is_deleted = FALSE
+    `
 
-	args := []interface{}{companyID, locationID}
-	argCount := 2
+    args := []interface{}{companyID, locationID}
+    argCount := 2
 
-	if productID != nil {
-		argCount++
-		query += fmt.Sprintf(" AND s.product_id = $%d", argCount)
-		args = append(args, *productID)
-	}
+    if productID != nil {
+        argCount++
+        query += fmt.Sprintf(" AND p.product_id = $%d", argCount)
+        args = append(args, *productID)
+    }
 
-	query += " ORDER BY p.name"
+    query += " ORDER BY p.name"
 
-	rows, err := s.db.Query(query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get stock: %w", err)
-	}
-	defer rows.Close()
+    rows, err := s.db.Query(query, args...)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get stock: %w", err)
+    }
+    defer rows.Close()
 
-	var stockItems []models.StockWithProduct
+    // Ensure empty slice ([]) instead of null when no rows
+    stockItems := make([]models.StockWithProduct, 0)
 	for rows.Next() {
 		var item models.StockWithProduct
 		err := rows.Scan(
