@@ -237,6 +237,7 @@ Future<bool?> _showBrandDialog(BuildContext context, {required WidgetRef ref, Br
                 controller: controller,
                 decoration: const InputDecoration(labelText: 'Name'),
                 textInputAction: TextInputAction.next,
+                onChanged: (_) => setState(() {}),
               ),
               if (isEdit)
                 SwitchListTile.adaptive(

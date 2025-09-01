@@ -233,6 +233,7 @@ Future<bool?> _showCategoryDialog(BuildContext context, {required WidgetRef ref,
             controller: controller,
             decoration: const InputDecoration(labelText: 'Name'),
             textInputAction: TextInputAction.done,
+            onChanged: (_) => setState(() {}),
             onSubmitted: (_) async {
               if (controller.text.trim().isEmpty) return;
               setState(() => saving = true);
