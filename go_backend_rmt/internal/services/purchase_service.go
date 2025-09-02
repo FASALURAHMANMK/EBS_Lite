@@ -1,13 +1,15 @@
 package services
 
 import (
-	"database/sql"
-	"fmt"
-	"strings"
-	"time"
+    "database/sql"
+    "fmt"
+    "strings"
+    "time"
 
-	"erp-backend/internal/database"
-	"erp-backend/internal/models"
+    "github.com/lib/pq"
+
+    "erp-backend/internal/database"
+    "erp-backend/internal/models"
 )
 
 type PurchaseService struct {
@@ -347,19 +349,49 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 
 		finalLineTotal := lineTotal + taxAmount
 
-		_, err = tx.Exec(`
-			INSERT INTO purchase_details (purchase_id, product_id, quantity, unit_price,
-										discount_percentage, discount_amount, tax_id, tax_amount,
-										line_total, received_quantity, serial_numbers, expiry_date, batch_number)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-		`,
-			purchase.PurchaseID, item.ProductID, item.Quantity, item.UnitPrice,
-			item.DiscountPercentage, discountAmount, item.TaxID, taxAmount,
-			finalLineTotal, 0, item.SerialNumbers, item.ExpiryDate, item.BatchNumber,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to insert purchase detail: %w", err)
-		}
+        // Validate serial numbers if product is serialized
+        var isSerialized bool
+        if err = tx.QueryRow("SELECT is_serialized FROM products WHERE product_id = $1 AND is_deleted = FALSE", item.ProductID).Scan(&isSerialized); err != nil {
+            if err == sql.ErrNoRows {
+                return nil, fmt.Errorf("product with ID %d not found", item.ProductID)
+            }
+            return nil, fmt.Errorf("failed to verify product: %w", err)
+        }
+        if isSerialized {
+            // quantity must be whole number and equal to serial count
+            if item.Quantity != float64(int(item.Quantity)) {
+                return nil, fmt.Errorf("quantity must be a whole number for serialized products (product_id=%d)", item.ProductID)
+            }
+            if len(item.SerialNumbers) != int(item.Quantity) {
+                return nil, fmt.Errorf("serial numbers count must equal quantity for serialized products (product_id=%d)", item.ProductID)
+            }
+            seen := make(map[string]struct{}, len(item.SerialNumbers))
+            for _, srl := range item.SerialNumbers {
+                if srl == "" {
+                    return nil, fmt.Errorf("serial numbers cannot be empty for serialized products (product_id=%d)", item.ProductID)
+                }
+                if _, ok := seen[srl]; ok {
+                    return nil, fmt.Errorf("duplicate serial number '%s' in purchase item (product_id=%d)", srl, item.ProductID)
+                }
+                seen[srl] = struct{}{}
+            }
+        } else if len(item.SerialNumbers) > 0 {
+            return nil, fmt.Errorf("serial numbers provided for a non-serialized product (product_id=%d)", item.ProductID)
+        }
+
+        _, err = tx.Exec(`
+            INSERT INTO purchase_details (purchase_id, product_id, quantity, unit_price,
+                                       discount_percentage, discount_amount, tax_id, tax_amount,
+                                       line_total, received_quantity, serial_numbers, expiry_date, batch_number)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        `,
+            purchase.PurchaseID, item.ProductID, item.Quantity, item.UnitPrice,
+            item.DiscountPercentage, discountAmount, item.TaxID, taxAmount,
+            finalLineTotal, 0, pq.Array(item.SerialNumbers), item.ExpiryDate, item.BatchNumber,
+        )
+        if err != nil {
+            return nil, fmt.Errorf("failed to insert purchase detail: %w", err)
+        }
 	}
 
 	// Commit transaction
@@ -458,6 +490,35 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 			return fmt.Errorf("failed to get product details: %w", err)
 		}
 
+		// Validate serial numbers for serialized products
+		var isSerialized bool
+		if err = tx.QueryRow("SELECT is_serialized FROM products WHERE product_id = $1 AND is_deleted = FALSE", productID).Scan(&isSerialized); err != nil {
+			if err == sql.ErrNoRows {
+				return fmt.Errorf("product not found")
+			}
+			return fmt.Errorf("failed to verify product: %w", err)
+		}
+		if isSerialized {
+			if item.ReceivedQuantity != float64(int(item.ReceivedQuantity)) {
+				return fmt.Errorf("received quantity must be a whole number for serialized products")
+			}
+			if len(item.SerialNumbers) != int(item.ReceivedQuantity) {
+				return fmt.Errorf("serial numbers count must equal received quantity for serialized products")
+			}
+			seen := make(map[string]struct{}, len(item.SerialNumbers))
+			for _, srl := range item.SerialNumbers {
+				if srl == "" {
+					return fmt.Errorf("serial numbers cannot be empty for serialized products")
+				}
+				if _, ok := seen[srl]; ok {
+					return fmt.Errorf("duplicate serial number '%s' in received items", srl)
+				}
+				seen[srl] = struct{}{}
+			}
+		} else if len(item.SerialNumbers) > 0 {
+			return fmt.Errorf("serial numbers provided for a non-serialized product")
+		}
+
 		// Update or insert stock
 		_, err = tx.Exec(`
 			INSERT INTO stock (location_id, product_id, quantity, last_updated)
@@ -473,21 +534,21 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 
 		// Create stock lot entry for FIFO tracking
 		if item.ReceivedQuantity > 0 {
-			_, err = tx.Exec(`
-				INSERT INTO stock_lots (product_id, location_id, supplier_id, purchase_id,
-									   quantity, remaining_quantity, cost_price, received_date,
-									   expiry_date, batch_number, serial_numbers)
-				SELECT pd.product_id, $1, p.supplier_id, p.purchase_id,
-					   $2, $2, pd.unit_price, CURRENT_DATE,
-					   $3, $4, $5
-				FROM purchase_details pd
-				JOIN purchases p ON pd.purchase_id = p.purchase_id
-				WHERE pd.purchase_detail_id = $6
-			`, locationID, item.ReceivedQuantity, item.ExpiryDate, item.BatchNumber,
-				item.SerialNumbers, item.PurchaseDetailID)
-			if err != nil {
-				return fmt.Errorf("failed to create stock lot: %w", err)
-			}
+        _, err = tx.Exec(`
+                INSERT INTO stock_lots (product_id, location_id, supplier_id, purchase_id,
+                                       quantity, remaining_quantity, cost_price, received_date,
+                                       expiry_date, batch_number, serial_numbers)
+                SELECT pd.product_id, $1, p.supplier_id, p.purchase_id,
+                       $2, $2, pd.unit_price, CURRENT_DATE,
+                       $3, $4, $5
+                FROM purchase_details pd
+                JOIN purchases p ON pd.purchase_id = p.purchase_id
+                WHERE pd.purchase_detail_id = $6
+            `, locationID, item.ReceivedQuantity, item.ExpiryDate, item.BatchNumber,
+                pq.Array(item.SerialNumbers), item.PurchaseDetailID)
+        if err != nil {
+            return fmt.Errorf("failed to create stock lot: %w", err)
+        }
 		}
 
 		// Update product cost price if this is a newer purchase
@@ -684,6 +745,35 @@ func (s *PurchaseService) UpdatePurchase(purchaseID, companyID, userID int, req 
 
 			finalLineTotal := lineTotal + taxAmount
 
+			// Validate serial numbers if product is serialized
+			var isSerialized bool
+			if err = tx.QueryRow("SELECT is_serialized FROM products WHERE product_id = $1 AND is_deleted = FALSE", item.ProductID).Scan(&isSerialized); err != nil {
+				if err == sql.ErrNoRows {
+					return fmt.Errorf("product with ID %d not found", item.ProductID)
+				}
+				return fmt.Errorf("failed to verify product: %w", err)
+			}
+			if isSerialized {
+				if item.Quantity != float64(int(item.Quantity)) {
+					return fmt.Errorf("quantity must be a whole number for serialized products (product_id=%d)", item.ProductID)
+				}
+				if len(item.SerialNumbers) != int(item.Quantity) {
+					return fmt.Errorf("serial numbers count must equal quantity for serialized products (product_id=%d)", item.ProductID)
+				}
+				seen := make(map[string]struct{}, len(item.SerialNumbers))
+				for _, srl := range item.SerialNumbers {
+					if srl == "" {
+						return fmt.Errorf("serial numbers cannot be empty for serialized products (product_id=%d)", item.ProductID)
+					}
+					if _, ok := seen[srl]; ok {
+						return fmt.Errorf("duplicate serial number '%s' in purchase item (product_id=%d)", srl, item.ProductID)
+					}
+					seen[srl] = struct{}{}
+				}
+			} else if len(item.SerialNumbers) > 0 {
+				return fmt.Errorf("serial numbers provided for a non-serialized product (product_id=%d)", item.ProductID)
+			}
+
 			_, err = tx.Exec(`
 				INSERT INTO purchase_details (purchase_id, product_id, quantity, unit_price,
 											discount_percentage, discount_amount, tax_id, tax_amount,
@@ -692,7 +782,7 @@ func (s *PurchaseService) UpdatePurchase(purchaseID, companyID, userID int, req 
 			`,
 				purchaseID, item.ProductID, item.Quantity, item.UnitPrice,
 				item.DiscountPercentage, discountAmount, item.TaxID, taxAmount,
-				finalLineTotal, 0, item.SerialNumbers, item.ExpiryDate, item.BatchNumber,
+				finalLineTotal, 0, pq.Array(item.SerialNumbers), item.ExpiryDate, item.BatchNumber,
 			)
 			if err != nil {
 				return fmt.Errorf("failed to insert purchase detail: %w", err)

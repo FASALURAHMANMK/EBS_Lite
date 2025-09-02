@@ -438,6 +438,40 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 			}
 		}
 
+		// Validate serial numbers for serialized products
+		if item.ProductID != nil {
+			var isSerialized bool
+			err = s.db.QueryRow("SELECT is_serialized FROM products WHERE product_id = $1 AND is_deleted = FALSE", *item.ProductID).Scan(&isSerialized)
+			if err != nil {
+				if err == sql.ErrNoRows {
+					return nil, fmt.Errorf("product not found")
+				}
+				return nil, fmt.Errorf("failed to verify product: %w", err)
+			}
+			if isSerialized {
+				if item.Quantity != float64(int(item.Quantity)) {
+					return nil, fmt.Errorf("quantity must be a whole number for serialized products")
+				}
+				if len(item.SerialNumbers) != int(item.Quantity) {
+					return nil, fmt.Errorf("serial numbers count must equal quantity for serialized products")
+				}
+				seen := make(map[string]struct{}, len(item.SerialNumbers))
+				for _, srl := range item.SerialNumbers {
+					if srl == "" {
+						return nil, fmt.Errorf("serial numbers cannot be empty for serialized products")
+					}
+					if _, ok := seen[srl]; ok {
+						return nil, fmt.Errorf("duplicate serial number '%s' in sale item", srl)
+					}
+					seen[srl] = struct{}{}
+				}
+			} else {
+				if len(item.SerialNumbers) > 0 {
+					return nil, fmt.Errorf("serial numbers provided for a non-serialized product")
+				}
+			}
+		}
+
 		// Insert sale detail
 		_, err = tx.Exec(`
 			INSERT INTO sale_details (sale_id, product_id, product_name, quantity, unit_price,
@@ -446,7 +480,7 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		`, saleID, item.ProductID, item.ProductName, item.Quantity, item.UnitPrice,
 			item.DiscountPercent, discountAmount, item.TaxID, taxAmount, lineTotal,
-			strings.Join(item.SerialNumbers, ","), item.Notes)
+			pq.Array(item.SerialNumbers), item.Notes)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to create sale item: %w", err)
@@ -723,26 +757,26 @@ func (s *SalesService) getSaleItems(saleID int) ([]models.SaleDetail, error) {
 	}
 	defer rows.Close()
 
-	var items []models.SaleDetail
-	for rows.Next() {
-		var item models.SaleDetail
-		var serialNumbers sql.NullString
-		var productNameFromTable sql.NullString
+    var items []models.SaleDetail
+    for rows.Next() {
+        var item models.SaleDetail
+        var serialNumbers pq.StringArray
+        var productNameFromTable sql.NullString
 
-		err := rows.Scan(
-			&item.SaleDetailID, &item.SaleID, &item.ProductID, &item.ProductName,
-			&item.Quantity, &item.UnitPrice, &item.DiscountPercent, &item.DiscountAmount,
-			&item.TaxID, &item.TaxAmount, &item.LineTotal, &serialNumbers, &item.Notes,
-			&productNameFromTable,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan sale item: %w", err)
-		}
+        err := rows.Scan(
+            &item.SaleDetailID, &item.SaleID, &item.ProductID, &item.ProductName,
+            &item.Quantity, &item.UnitPrice, &item.DiscountPercent, &item.DiscountAmount,
+            &item.TaxID, &item.TaxAmount, &item.LineTotal, &serialNumbers, &item.Notes,
+            &productNameFromTable,
+        )
+        if err != nil {
+            return nil, fmt.Errorf("failed to scan sale item: %w", err)
+        }
 
-		// Handle serial numbers
-		if serialNumbers.Valid && serialNumbers.String != "" {
-			item.SerialNumbers = strings.Split(serialNumbers.String, ",")
-		}
+        // Handle serial numbers (TEXT[])
+        if len(serialNumbers) > 0 {
+            item.SerialNumbers = []string(serialNumbers)
+        }
 
 		// Set product name from products table if available
 		if productNameFromTable.Valid {
