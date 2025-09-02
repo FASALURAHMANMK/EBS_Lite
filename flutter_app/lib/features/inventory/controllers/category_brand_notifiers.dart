@@ -138,3 +138,65 @@ final brandManagementProvider =
   return notifier;
 });
 
+class AttributeState {
+  final List<ProductAttributeDefinitionDto> items;
+  final String query;
+  final InventoryViewMode viewMode;
+  final bool isLoading;
+  final String? error;
+
+  const AttributeState({
+    this.items = const [],
+    this.query = '',
+    this.viewMode = InventoryViewMode.grid,
+    this.isLoading = false,
+    this.error,
+  });
+
+  AttributeState copyWith({
+    List<ProductAttributeDefinitionDto>? items,
+    String? query,
+    InventoryViewMode? viewMode,
+    bool? isLoading,
+    String? error,
+  }) {
+    return AttributeState(
+      items: items ?? this.items,
+      query: query ?? this.query,
+      viewMode: viewMode ?? this.viewMode,
+      isLoading: isLoading ?? this.isLoading,
+      error: error,
+    );
+  }
+}
+
+class AttributeManagementNotifier extends StateNotifier<AttributeState> {
+  AttributeManagementNotifier(this._repo) : super(const AttributeState());
+  final InventoryRepository _repo;
+
+  Future<void> load() async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final defs = await _repo.getAttributeDefinitions();
+      state = state.copyWith(isLoading: false, items: defs);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  void setViewMode(InventoryViewMode mode) {
+    state = state.copyWith(viewMode: mode);
+  }
+
+  void setQuery(String q) {
+    state = state.copyWith(query: q);
+  }
+}
+
+final attributeManagementProvider =
+    StateNotifierProvider<AttributeManagementNotifier, AttributeState>((ref) {
+  final repo = ref.watch(inventoryRepositoryProvider);
+  final notifier = AttributeManagementNotifier(repo);
+  notifier.load();
+  return notifier;
+});

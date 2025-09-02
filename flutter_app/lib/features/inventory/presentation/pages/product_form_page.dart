@@ -19,12 +19,14 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   final _sku = TextEditingController();
   final _price = TextEditingController();
   final _cost = TextEditingController();
-  final _barcode = TextEditingController();
+  final _itemCode = TextEditingController();
   final _reorder = TextEditingController(text: '0');
+  final _initialStock = TextEditingController(text: '0');
 
   bool _saving = false;
   bool _serialized = false;
   bool _loading = true;
+  bool _autoItemCode = false;
 
   List<ProductAttributeDefinitionDto> _attrDefs = const [];
   final Map<int, TextEditingController> _attrText = {};
@@ -40,9 +42,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   int? _unitId;
   final _categoryController = TextEditingController();
   final _brandController = TextEditingController();
-  final _desc = TextEditingController();
-  final _weight = TextEditingController();
-  final _dimensions = TextEditingController();
+  // Barcodes handled via dialog
+  List<ProductBarcodeDto> _barcodes = [];
 
   @override
   void dispose() {
@@ -50,16 +51,14 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _sku.dispose();
     _price.dispose();
     _cost.dispose();
-    _barcode.dispose();
+    _itemCode.dispose();
     _reorder.dispose();
+    _initialStock.dispose();
     for (final c in _attrText.values) {
       c.dispose();
     }
     _categoryController.dispose();
     _brandController.dispose();
-    _desc.dispose();
-    _weight.dispose();
-    _dimensions.dispose();
     super.dispose();
   }
 
@@ -69,7 +68,21 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     if ((widget.initialName ?? '').trim().isNotEmpty) {
       _name.text = widget.initialName!.trim();
     }
+    _maybeGenerateItemCode();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadDefs());
+  }
+
+  void _maybeGenerateItemCode() {
+    if (_autoItemCode) {
+      _itemCode.text = _generate12DigitCode();
+    }
+  }
+
+  String _generate12DigitCode() {
+    final millis = DateTime.now().millisecondsSinceEpoch.toString();
+    final seed = millis.substring(millis.length - 9);
+    final r = (100 + (DateTime.now().microsecondsSinceEpoch % 900)).toString();
+    return (r + seed).padLeft(12, '0').substring(0, 12);
   }
 
   Future<void> _loadDefs() async {
@@ -115,15 +128,32 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     setState(() => _saving = true);
     try {
       final repo = ref.read(inventoryRepositoryProvider);
-      final barcodes = [
-        ProductBarcodeDto(
-          barcode: _barcode.text.trim(),
-          sellingPrice: double.tryParse(_price.text.trim()),
-          costPrice: double.tryParse(_cost.text.trim()),
-          packSize: 1,
-          isPrimary: true,
-        ),
-      ];
+      final List<ProductBarcodeDto> barcodes = List.of(_barcodes);
+      final code = _itemCode.text.trim();
+      if (code.isNotEmpty) {
+        final idx = barcodes.indexWhere((b) => b.isPrimary);
+        if (idx >= 0) {
+          barcodes[idx] = ProductBarcodeDto(
+            barcodeId: barcodes[idx].barcodeId,
+            barcode: code,
+            packSize: barcodes[idx].packSize ?? 1,
+            costPrice: barcodes[idx].costPrice ?? double.tryParse(_cost.text.trim()),
+            sellingPrice: barcodes[idx].sellingPrice ?? double.tryParse(_price.text.trim()),
+            isPrimary: true,
+          );
+        } else {
+          barcodes.insert(
+            0,
+            ProductBarcodeDto(
+              barcode: code,
+              packSize: 1,
+              costPrice: double.tryParse(_cost.text.trim()),
+              sellingPrice: double.tryParse(_price.text.trim()),
+              isPrimary: true,
+            ),
+          );
+        }
+      }
       final payload = CreateProductPayload(
         name: _name.text.trim(),
         sku: _sku.text.trim().isEmpty ? null : _sku.text.trim(),
@@ -136,12 +166,19 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         categoryId: _categoryId,
         brandId: _brandId,
         unitId: _unitId,
-        description: _desc.text.trim().isEmpty ? null : _desc.text.trim(),
-        weight: double.tryParse(_weight.text.trim()),
-        dimensions:
-            _dimensions.text.trim().isEmpty ? null : _dimensions.text.trim(),
+        description: null,
+        weight: null,
+        dimensions: null,
       );
-      await repo.createProduct(payload);
+      final created = await repo.createProduct(payload);
+      final initQty = double.tryParse(_initialStock.text.trim()) ?? 0;
+      if (initQty != 0) {
+        await repo.adjustStock(
+          productId: created.productId,
+          adjustment: initQty,
+          reason: 'Initial stock',
+        );
+      }
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
@@ -203,13 +240,89 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       textInputAction: TextInputAction.next,
                     ),
                     const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _barcode,
-                      decoration: const InputDecoration(labelText: 'Barcode'),
-                      validator: _req,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _submit(),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _itemCode,
+                            decoration: const InputDecoration(labelText: 'Item Code (12-digit if auto)'),
+                            keyboardType: TextInputType.number,
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) return 'Required';
+                              final s = v.trim();
+                              if (!RegExp(r'^\d+$').hasMatch(s)) return 'Digits only';
+                              if (_autoItemCode && s.length != 12) return 'Must be 12 digits when auto';
+                              return null;
+                            },
+                            readOnly: _autoItemCode,
+                            onFieldSubmitted: (_) => _submit(),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          children: [
+                            const Text('Auto'),
+                            Switch(
+                              value: _autoItemCode,
+                              onChanged: (v) => setState(() {
+                                _autoItemCode = v;
+                                if (v) _itemCode.text = _generate12DigitCode();
+                              }),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final added = await _showBarcodeDialog(context);
+                          if (added != null) {
+                            setState(() => _barcodes.add(added));
+                          }
+                        },
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text('Add Barcode'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (_barcodes.isNotEmpty)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: _barcodes.asMap().entries.map((entry) {
+                          final i = entry.key;
+                          final b = entry.value;
+                          return Card(
+                            elevation: 0,
+                            child: ListTile(
+                              title: Text(b.barcode),
+                              subtitle: Text('Conversion: ${b.packSize ?? 1} • Selling: ${b.sellingPrice?.toStringAsFixed(2) ?? '-'}'),
+                              trailing: Wrap(
+                                spacing: 8,
+                                children: [
+                                  IconButton(
+                                    tooltip: 'Edit',
+                                    icon: const Icon(Icons.edit_outlined),
+                                    onPressed: () async {
+                                      final edited = await _showBarcodeDialog(context, initial: b);
+                                      if (edited != null) {
+                                        setState(() => _barcodes[i] = edited);
+                                      }
+                                    },
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Delete',
+                                    icon: const Icon(Icons.delete_outline_rounded),
+                                    onPressed: () => setState(() => _barcodes.removeAt(i)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _sku,
@@ -261,32 +374,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                     _categoryBrandUnitPickers(),
                     const SizedBox(height: 12),
                     TextFormField(
-                      controller: _desc,
-                      decoration:
-                          const InputDecoration(labelText: 'Description'),
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _weight,
-                            decoration:
-                                const InputDecoration(labelText: 'Weight'),
-                            keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _dimensions,
-                            decoration:
-                                const InputDecoration(labelText: 'Dimensions'),
-                          ),
-                        ),
-                      ],
+                      controller: _initialStock,
+                      decoration: const InputDecoration(labelText: 'Initial Stock (optional)'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     ),
                     const Divider(height: 24),
                     if (_attrDefs.isNotEmpty) ...[
@@ -468,4 +558,305 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       ],
     );
   }
+}
+
+Future<List<ProductBarcodeDto>?> _showBarcodeManagerDialog(
+  BuildContext context, {
+  required List<ProductBarcodeDto> initial,
+  required String primaryCode,
+}) async {
+  List<ProductBarcodeDto> list = initial.isNotEmpty
+      ? initial
+          .map((e) => ProductBarcodeDto(
+                barcodeId: e.barcodeId,
+                barcode: e.barcode,
+                packSize: e.packSize,
+                costPrice: e.costPrice,
+                sellingPrice: e.sellingPrice,
+                isPrimary: e.isPrimary,
+              ))
+          .toList()
+      : [
+          ProductBarcodeDto(
+            barcode: primaryCode,
+            packSize: 1,
+            isPrimary: true,
+          ),
+        ];
+  return showDialog<List<ProductBarcodeDto>>(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: const Text('Manage Barcodes'),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640, maxHeight: 560),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+              for (int i = 0; i < list.length; i++)
+                _BarcodeRow(
+                  key: ValueKey('barcode_$i'),
+                  value: list[i],
+                  isPrimary: list[i].isPrimary,
+                  onChanged: (v) => setState(() => list[i] = v),
+                  onPrimary: () => setState(() {
+                    for (int j = 0; j < list.length; j++) {
+                      list[j] = ProductBarcodeDto(
+                        barcodeId: list[j].barcodeId,
+                        barcode: list[j].barcode,
+                        packSize: list[j].packSize,
+                        costPrice: list[j].costPrice,
+                        sellingPrice: list[j].sellingPrice,
+                        isPrimary: i == j,
+                      );
+                    }
+                  }),
+                  onDelete: () => setState(() {
+                    if (list.length > 1) list.removeAt(i);
+                  }),
+                ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () => setState(() {
+                    list.add(ProductBarcodeDto(
+                      barcode: '',
+                      packSize: 1,
+                      isPrimary: list.every((b) => !b.isPrimary),
+                    ));
+                  }),
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add Barcode'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Note: Pack sizes and prices are global. Location-specific linking is not supported in backend yet.',
+                style: TextStyle(fontSize: 12),
+              ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).maybePop(null),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (list.where((b) => b.isPrimary).length != 1) {
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(const SnackBar(content: Text('Select exactly one primary barcode')));
+                return;
+              }
+              for (final b in list) {
+                final s = b.barcode.trim();
+                if (s.isEmpty || !RegExp(r'^\d+$').hasMatch(s)) {
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(const SnackBar(content: Text('All barcodes must be digits only')));
+                  return;
+                }
+                if ((b.packSize ?? 1) < 1) {
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(const SnackBar(content: Text('Pack size must be at least 1')));
+                  return;
+                }
+              }
+              Navigator.of(context).pop(list);
+            },
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _BarcodeRow extends StatefulWidget {
+  const _BarcodeRow({super.key, required this.value, required this.onChanged, required this.onDelete, required this.onPrimary, required this.isPrimary});
+  final ProductBarcodeDto value;
+  final ValueChanged<ProductBarcodeDto> onChanged;
+  final VoidCallback onDelete;
+  final VoidCallback onPrimary;
+  final bool isPrimary;
+
+  @override
+  State<_BarcodeRow> createState() => _BarcodeRowState();
+}
+
+class _BarcodeRowState extends State<_BarcodeRow> {
+  late final TextEditingController _code = TextEditingController(text: widget.value.barcode);
+  late final TextEditingController _pack = TextEditingController(text: (widget.value.packSize ?? 1).toString());
+  late final TextEditingController _cost = TextEditingController(text: widget.value.costPrice?.toString() ?? '');
+  late final TextEditingController _sell = TextEditingController(text: widget.value.sellingPrice?.toString() ?? '');
+
+  @override
+  void dispose() {
+    _code.dispose();
+    _pack.dispose();
+    _cost.dispose();
+    _sell.dispose();
+    super.dispose();
+  }
+
+  void _emit({bool? primary}) {
+    widget.onChanged(ProductBarcodeDto(
+      barcodeId: widget.value.barcodeId,
+      barcode: _code.text.trim(),
+      packSize: int.tryParse(_pack.text.trim()) ?? 1,
+      costPrice: double.tryParse(_cost.text.trim()),
+      sellingPrice: double.tryParse(_sell.text.trim()),
+      isPrimary: primary ?? widget.isPrimary,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Card(
+        elevation: 0,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            children: [
+              TextField(
+                controller: _code,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Barcode / Code'),
+                onChanged: (_) => _emit(),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _pack,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Pack Size'),
+                      onChanged: (_) => _emit(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _cost,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(labelText: 'Cost'),
+                      onChanged: (_) => _emit(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _sell,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(labelText: 'Price'),
+                      onChanged: (_) => _emit(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: widget.isPrimary ? 'Primary' : 'Make primary',
+                    onPressed: () => widget.onPrimary(),
+                    icon: Icon(widget.isPrimary ? Icons.star : Icons.star_border),
+                    color: widget.isPrimary ? Theme.of(context).colorScheme.primary : null,
+                  ),
+                  IconButton(
+                    tooltip: 'Delete',
+                    onPressed: widget.onDelete,
+                    icon: const Icon(Icons.delete_outline_rounded),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context, {ProductBarcodeDto? initial}) async {
+  final code = TextEditingController(text: initial?.barcode ?? '');
+  final pack = TextEditingController(text: (initial?.packSize ?? 1).toString());
+  final sell = TextEditingController(text: initial?.sellingPrice?.toString() ?? '');
+  return showDialog<ProductBarcodeDto>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(initial == null ? 'Add Barcode' : 'Edit Barcode'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: code,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Barcode'),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: pack,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Conversion'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: sell,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Selling Price'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).maybePop(null),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final s = code.text.trim();
+            if (s.isEmpty || !RegExp(r'^\\d+$').hasMatch(s)) {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(const SnackBar(content: Text('Barcode must be digits only')));
+              return;
+            }
+            final p = int.tryParse(pack.text.trim()) ?? 1;
+            if (p < 1) {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(const SnackBar(content: Text('Conversion must be at least 1')));
+              return;
+            }
+            final sp = double.tryParse(sell.text.trim());
+            Navigator.of(context).pop(ProductBarcodeDto(
+              barcodeId: initial?.barcodeId,
+              barcode: s,
+              packSize: p,
+              sellingPrice: sp,
+              isPrimary: false,
+            ));
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    ),
+  );
 }

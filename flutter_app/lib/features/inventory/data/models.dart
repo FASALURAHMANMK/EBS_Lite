@@ -210,9 +210,27 @@ class ProductDto {
                     ProductBarcodeDto.fromJson(e as Map<String, dynamic>))
                 .toList() ??
             const [],
-        attributes: (json['attributes'] as Map<String, dynamic>?)?.map(
-          (k, v) => MapEntry(int.tryParse(k) ?? -1, v.toString()),
-        ),
+        attributes: () {
+          final raw = json['attributes'];
+          if (raw == null) return null;
+          if (raw is Map<String, dynamic>) {
+            return raw.map((k, v) => MapEntry(int.tryParse(k) ?? -1, v.toString()));
+          }
+          if (raw is List) {
+            final map = <int, String>{};
+            for (final e in raw) {
+              if (e is Map<String, dynamic>) {
+                final id = e['attribute_id'];
+                final val = e['value'];
+                if (id is int && val != null) {
+                  map[id] = val.toString();
+                }
+              }
+            }
+            return map.isEmpty ? null : map;
+          }
+          return null;
+        }(),
       );
 
   Map<String, dynamic> toUpdateJson() => {

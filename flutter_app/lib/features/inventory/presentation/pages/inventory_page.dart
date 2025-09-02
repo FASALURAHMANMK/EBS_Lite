@@ -4,6 +4,7 @@ import '../../../../shared/pages/feature_detail_page.dart';
 import 'inventory_management_page.dart';
 import 'category_management_page.dart';
 import 'brand_management_page.dart';
+import 'attribute_management_page.dart';
 
 class InventoryPage extends StatelessWidget {
   const InventoryPage({super.key});
@@ -55,6 +56,14 @@ class InventoryPage extends StatelessWidget {
         label: 'Brand Management',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const BrandManagementPage()),
+        ),
+      ),
+      FeatureItem(
+        icon: Icons.build_rounded,
+        label: 'Attribute Management',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+              builder: (_) => const AttributeManagementPage()),
         ),
       ),
     ];

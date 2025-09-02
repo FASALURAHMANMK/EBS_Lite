@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -121,6 +122,47 @@ class InventoryRepository {
         .toList();
   }
 
+  Future<ProductAttributeDefinitionDto> createAttributeDefinition({
+    required String name,
+    required String type,
+    required bool isRequired,
+    List<String>? options,
+  }) async {
+    final body = <String, dynamic>{
+      'name': name,
+      'type': type,
+      'is_required': isRequired,
+    };
+    if (options != null && options.isNotEmpty) {
+      // Backend expects JSON string for options (e.g., "[\"Red\",\"Blue\"]")
+      body['options'] = jsonEncode(options);
+    }
+    final res = await _dio.post('/product-attribute-definitions', data: body);
+    return ProductAttributeDefinitionDto.fromJson(
+        res.data['data'] as Map<String, dynamic>);
+  }
+
+  Future<void> updateAttributeDefinition(
+    int id, {
+    String? name,
+    String? type,
+    bool? isRequired,
+    List<String>? options,
+    bool? isActive,
+  }) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    if (type != null) body['type'] = type;
+    if (isRequired != null) body['is_required'] = isRequired;
+    if (options != null) body['options'] = jsonEncode(options);
+    if (isActive != null) body['is_active'] = isActive;
+    await _dio.put('/product-attribute-definitions/$id', data: body);
+  }
+
+  Future<void> deleteAttributeDefinition(int id) async {
+    await _dio.delete('/product-attribute-definitions/$id');
+  }
+
   Future<ProductDto> createProduct(CreateProductPayload payload) async {
     final res = await _dio.post('/products', data: payload.toJson());
     return ProductDto.fromJson(res.data['data'] as Map<String, dynamic>);
@@ -133,6 +175,25 @@ class InventoryRepository {
 
   Future<void> deleteProduct(int id) async {
     await _dio.delete('/products/$id');
+  }
+
+  Future<void> adjustStock({
+    required int productId,
+    required double adjustment,
+    required String reason,
+  }) async {
+    final loc = _locationId;
+    final qp = <String, dynamic>{};
+    if (loc != null) qp['location_id'] = loc;
+    await _dio.post(
+      '/inventory/stock-adjustment',
+      queryParameters: qp.isEmpty ? null : qp,
+      data: {
+        'product_id': productId,
+        'adjustment': adjustment,
+        'reason': reason,
+      },
+    );
   }
 }
 
