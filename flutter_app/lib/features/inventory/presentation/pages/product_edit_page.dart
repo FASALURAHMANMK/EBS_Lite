@@ -50,6 +50,22 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  @override
+  void dispose() {
+    _name.dispose();
+    _sku.dispose();
+    _price.dispose();
+    _cost.dispose();
+    _reorder.dispose();
+    _itemCode.dispose();
+    _categoryController.dispose();
+    _brandController.dispose();
+    for (final c in _attrText.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
   Future<void> _load() async {
     try {
       final repo = ref.read(inventoryRepositoryProvider);
@@ -910,25 +926,6 @@ Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context, {ProductBarc
         FilledButton(
           onPressed: () {
             final s = code.text.trim();
-            // Accept valid digits-only barcode using correct regex
-            if (s.isNotEmpty && RegExp(r'^\d+$').hasMatch(s)) {
-              final p = int.tryParse(pack.text.trim()) ?? 1;
-              if (p < 1) {
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(const SnackBar(content: Text('Conversion must be at least 1')));
-                return;
-              }
-              final sp = double.tryParse(sell.text.trim());
-              Navigator.of(context).pop(ProductBarcodeDto(
-                barcodeId: initial?.barcodeId,
-                barcode: s,
-                packSize: p,
-                sellingPrice: sp,
-                isPrimary: false,
-              ));
-              return;
-            }
             if (s.isEmpty || !RegExp(r'^\d+$').hasMatch(s)) {
               ScaffoldMessenger.of(context)
                 ..hideCurrentSnackBar()

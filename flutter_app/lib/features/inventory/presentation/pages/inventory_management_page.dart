@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../controllers/inventory_notifier.dart';
 import '../../data/models.dart';
+import '../../../dashboard/controllers/location_notifier.dart';
+import '../../../dashboard/data/models.dart';
 import 'product_form_page.dart';
 import 'product_edit_page.dart';
 
@@ -17,6 +19,7 @@ class InventoryManagementPage extends ConsumerStatefulWidget {
 class _InventoryManagementPageState
     extends ConsumerState<InventoryManagementPage> {
   String _sort = 'name_asc';
+  bool _promptedLocation = false;
 
   List<InventoryListItem> _applySort(List<InventoryListItem> list) {
     final items = [...list];
@@ -207,6 +210,24 @@ class _InventoryManagementPageState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(inventoryNotifierProvider);
+    // Ensure a location is selected before making inventory/POS calls
+    final locState = ref.watch(locationNotifierProvider);
+    ref.listen<LocationState>(locationNotifierProvider, (prev, next) async {
+      final prevId = prev?.selected?.locationId;
+      final nextId = next.selected?.locationId;
+      if (nextId != null && nextId != prevId) {
+        await ref.read(inventoryNotifierProvider.notifier).refreshList();
+      }
+    });
+
+    // Prompt for location selection if none selected
+    if (!_promptedLocation && locState.selected == null && locState.locations.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _showLocationPicker(locState.locations);
+        _promptedLocation = true;
+      });
+    }
     final notifier = ref.read(inventoryNotifierProvider.notifier);
     final theme = Theme.of(context);
 
@@ -214,11 +235,10 @@ class _InventoryManagementPageState
       if (state.onlyLowStock && !e.isLowStock) return false;
       final selectedIds = state.selectedCategoryIds;
       if (selectedIds.isNotEmpty) {
-        final selectedNames = state.categories
-            .where((c) => selectedIds.contains(c.categoryId))
-            .map((c) => c.name)
-            .toSet();
-        if (selectedNames.isNotEmpty && !selectedNames.contains(e.categoryName)) return false;
+        // Filter strictly by category IDs when available
+        if (e.categoryId == null || !selectedIds.contains(e.categoryId)) {
+          return false;
+        }
       }
       return true;
     }).toList();
@@ -357,6 +377,42 @@ class _InventoryManagementPageState
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showLocationPicker(List<Location> locations) async {
+    final notifier = ref.read(locationNotifierProvider.notifier);
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Select Location'),
+          content: SizedBox(
+            width: 360,
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: locations.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final loc = locations[index];
+                return ListTile(
+                  title: Text(loc.name),
+                  onTap: () async {
+                    await notifier.select(loc);
+                    if (context.mounted) Navigator.of(context).pop();
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
     );
   }
 

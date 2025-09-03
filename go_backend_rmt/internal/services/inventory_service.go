@@ -78,6 +78,7 @@ func (s *InventoryService) GetStock(companyID, locationID int, productID *int) (
             p.name AS product_name,
             p.sku,
             p.reorder_level,
+            p.category_id,
             c.name AS category_name,
             b.name AS brand_name,
             u.symbol AS unit_symbol
@@ -110,16 +111,16 @@ func (s *InventoryService) GetStock(companyID, locationID int, productID *int) (
 
     // Ensure empty slice ([]) instead of null when no rows
     stockItems := make([]models.StockWithProduct, 0)
-	for rows.Next() {
-		var item models.StockWithProduct
-		err := rows.Scan(
-			&item.StockID, &item.LocationID, &item.ProductID, &item.Quantity,
-			&item.ReservedQuantity, &item.LastUpdated, &item.ProductName, &item.ProductSKU,
-			&item.ReorderLevel, &item.CategoryName, &item.BrandName, &item.UnitSymbol,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan stock: %w", err)
-		}
+    for rows.Next() {
+        var item models.StockWithProduct
+        err := rows.Scan(
+            &item.StockID, &item.LocationID, &item.ProductID, &item.Quantity,
+            &item.ReservedQuantity, &item.LastUpdated, &item.ProductName, &item.ProductSKU,
+            &item.ReorderLevel, &item.CategoryID, &item.CategoryName, &item.BrandName, &item.UnitSymbol,
+        )
+        if err != nil {
+            return nil, fmt.Errorf("failed to scan stock: %w", err)
+        }
 
 		// Check if low stock
 		item.IsLowStock = item.Quantity <= float64(item.ReorderLevel)

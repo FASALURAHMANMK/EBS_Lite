@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:ebs_lite/features/dashboard/controllers/location_notifier.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/inventory_repository.dart';
@@ -52,12 +53,20 @@ class InventoryState {
 }
 
 class InventoryNotifier extends StateNotifier<InventoryState> {
-  InventoryNotifier(this._repo) : super(const InventoryState());
+  InventoryNotifier(this._repo, this._ref) : super(const InventoryState());
 
   final InventoryRepository _repo;
+  final Ref _ref;
   Timer? _debounce;
 
   Future<void> load() async {
+    // Ensure a location is selected before hitting location-bound endpoints
+    final loc = _ref.read(locationNotifierProvider).selected;
+    if (loc == null) {
+      // Defer loading until a location is selected
+      state = state.copyWith(isLoading: false, error: null);
+      return;
+    }
     state = state.copyWith(isLoading: true, error: null);
     try {
       final cats = await _repo.getCategories();
@@ -93,6 +102,9 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
   }
 
   Future<void> refreshList() async {
+    // Ensure location is selected
+    final loc = _ref.read(locationNotifierProvider).selected;
+    if (loc == null) return;
     // Use stock list for default listing (includes stock & low-stock flag).
     final items = await _repo.getStock();
     state = state.copyWith(items: items);
@@ -104,6 +116,9 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
       await refreshList();
       return;
     }
+    // Ensure location is selected
+    final loc = _ref.read(locationNotifierProvider).selected;
+    if (loc == null) return;
     state = state.copyWith(isLoading: true, error: null);
     try {
       final items = await _repo.searchProducts(q);
@@ -117,7 +132,7 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
 final inventoryNotifierProvider =
     StateNotifierProvider<InventoryNotifier, InventoryState>((ref) {
   final repo = ref.watch(inventoryRepositoryProvider);
-  final notifier = InventoryNotifier(repo);
+  final notifier = InventoryNotifier(repo, ref);
   notifier.load();
   return notifier;
 });

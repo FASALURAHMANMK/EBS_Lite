@@ -4,6 +4,7 @@ class InventoryListItem {
   final int productId;
   final String name;
   final String? sku;
+  final int? categoryId;
   final String? categoryName;
   final String? brandName;
   final String? unitSymbol;
@@ -16,6 +17,7 @@ class InventoryListItem {
     required this.productId,
     required this.name,
     this.sku,
+    this.categoryId,
     this.categoryName,
     this.brandName,
     this.unitSymbol,
@@ -30,6 +32,7 @@ class InventoryListItem {
         productId: json['product_id'] as int,
         name: json['product_name'] as String? ?? '',
         sku: json['product_sku'] as String?,
+        categoryId: json['category_id'] as int?,
         categoryName: json['category_name'] as String?,
         brandName: json['brand_name'] as String?,
         unitSymbol: json['unit_symbol'] as String?,
@@ -45,6 +48,7 @@ class InventoryListItem {
         name: json['name'] as String? ?? '',
         sku: json['sku']
             as String?, // POS response may not include; okay if null
+        categoryId: json['category_id'] as int?,
         categoryName: json['category_name'] as String?,
         brandName: null,
         unitSymbol: null,

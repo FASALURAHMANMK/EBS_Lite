@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'core/theme_notifier.dart';
 import 'core/app_theme.dart';
 import 'core/api_client.dart';
 import 'core/secure_storage.dart';
+import 'core/auth_events.dart';
 
 import 'features/auth/controllers/auth_notifier.dart';
 import 'features/auth/data/auth_repository.dart';
@@ -67,6 +69,7 @@ class MyApp extends ConsumerStatefulWidget {
 
 class _MyAppState extends ConsumerState<MyApp> {
   bool _validating = false;
+  StreamSubscription<void>? _logoutSub;
 
   @override
   void initState() {
@@ -77,6 +80,15 @@ class _MyAppState extends ConsumerState<MyApp> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _validate();
     });
+    // Centralized logout on token refresh failure
+    _logoutSub = AuthEvents.instance.onLogout.listen((_) async {
+      final prefs = ref.read(sharedPreferencesProvider);
+      final storage = ref.read(secureStorageProvider);
+      await _purgeAllAuthPrefs(prefs, storage);
+      if (mounted) {
+        ref.read(authNotifierProvider.notifier).state = const AuthState();
+      }
+    });
   }
 
   Future<void> _validate() async {
@@ -84,12 +96,12 @@ class _MyAppState extends ConsumerState<MyApp> {
     final prefs = ref.read(sharedPreferencesProvider);
     final secureStorage = ref.read(secureStorageProvider);
 
-    final hasTokens =
-        (await secureStorage.read(key: AuthRepository.accessTokenKey)) != null &&
-            (await secureStorage.read(key: AuthRepository.refreshTokenKey)) !=
-                null &&
-            (await secureStorage.read(key: AuthRepository.sessionIdKey)) !=
-                null;
+    final hasTokens = (await secureStorage.read(
+                key: AuthRepository.accessTokenKey)) !=
+            null &&
+        (await secureStorage.read(key: AuthRepository.refreshTokenKey)) !=
+            null &&
+        (await secureStorage.read(key: AuthRepository.sessionIdKey)) != null;
 
     if (!hasTokens) {
       // Ensure clean state when there are no tokens.
@@ -149,6 +161,12 @@ class _MyAppState extends ConsumerState<MyApp> {
   }
 
   @override
+  void dispose() {
+    _logoutSub?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final mode = ref.watch(themeNotifierProvider);
     final authState = ref.watch(authNotifierProvider);
@@ -162,7 +180,8 @@ class _MyAppState extends ConsumerState<MyApp> {
                 : const DashboardScreen()));
 
     return MaterialApp(
-      key: ValueKey('auth:${authState.user != null}:${authState.company != null}'),
+      key: ValueKey(
+          'auth:${authState.user != null}:${authState.company != null}'),
       debugShowCheckedModeBanner: false,
       title: 'EBS Lite',
       theme: lightTheme,

@@ -14,6 +14,18 @@ class InventoryRepository {
 
   int? get _locationId => _ref.read(locationNotifierProvider).selected?.locationId;
 
+  // Custom error for missing location context
+  static const String _locationRequiredMessage =
+      'Please select a location to view inventory.';
+
+  int _requireLocation() {
+    final id = _locationId;
+    if (id == null) {
+      throw StateError(_locationRequiredMessage);
+    }
+    return id;
+  }
+
   // Safely extract a List from API responses which may return
   // { data: [...] }, null, or a top-level list.
   List<dynamic> _extractList(Response res) {
@@ -28,10 +40,10 @@ class InventoryRepository {
   }
 
   Future<List<InventoryListItem>> getStock() async {
-    final loc = _locationId;
+    final loc = _requireLocation();
     final res = await _dio.get(
       '/inventory/stock',
-      queryParameters: loc != null ? {'location_id': loc} : null,
+      queryParameters: {'location_id': loc},
     );
     final data = _extractList(res);
     return data
@@ -40,9 +52,9 @@ class InventoryRepository {
   }
 
   Future<InventoryListItem?> getStockForProduct(int productId) async {
-    final loc = _locationId;
+    final loc = _requireLocation();
     final qp = <String, dynamic>{'product_id': productId};
-    if (loc != null) qp['location_id'] = loc;
+    qp['location_id'] = loc;
     final res = await _dio.get('/inventory/stock', queryParameters: qp);
     final data = _extractList(res);
     if (data.isEmpty) return null;
@@ -50,12 +62,12 @@ class InventoryRepository {
   }
 
   Future<List<InventoryListItem>> searchProducts(String term) async {
-    final loc = _locationId;
+    final loc = _requireLocation();
     final res = await _dio.get(
       '/pos/products',
       queryParameters: {
         'search': term,
-        if (loc != null) 'location_id': loc,
+        'location_id': loc,
       },
     );
     final data = _extractList(res);
@@ -192,9 +204,8 @@ class InventoryRepository {
     required double adjustment,
     required String reason,
   }) async {
-    final loc = _locationId;
-    final qp = <String, dynamic>{};
-    if (loc != null) qp['location_id'] = loc;
+    final loc = _requireLocation();
+    final qp = <String, dynamic>{'location_id': loc};
     await _dio.post(
       '/inventory/stock-adjustment',
       queryParameters: qp.isEmpty ? null : qp,
@@ -207,9 +218,8 @@ class InventoryRepository {
   }
 
   Future<List<StockAdjustmentDto>> getStockAdjustments() async {
-    final loc = _locationId;
-    final qp = <String, dynamic>{};
-    if (loc != null) qp['location_id'] = loc;
+    final loc = _requireLocation();
+    final qp = <String, dynamic>{'location_id': loc};
     final res = await _dio.get(
       '/inventory/stock-adjustments',
       queryParameters: qp.isEmpty ? null : qp,
@@ -224,9 +234,8 @@ class InventoryRepository {
     required String reason,
     required List<Map<String, dynamic>> items,
   }) async {
-    final loc = _locationId;
-    final qp = <String, dynamic>{};
-    if (loc != null) qp['location_id'] = loc;
+    final loc = _requireLocation();
+    final qp = <String, dynamic>{'location_id': loc};
     final res = await _dio.post(
       '/inventory/stock-adjustment-documents',
       queryParameters: qp.isEmpty ? null : qp,
@@ -240,9 +249,8 @@ class InventoryRepository {
   }
 
   Future<List<StockAdjustmentDocumentDto>> getStockAdjustmentDocuments() async {
-    final loc = _locationId;
-    final qp = <String, dynamic>{};
-    if (loc != null) qp['location_id'] = loc;
+    final loc = _requireLocation();
+    final qp = <String, dynamic>{'location_id': loc};
     final res = await _dio.get(
       '/inventory/stock-adjustment-documents',
       queryParameters: qp.isEmpty ? null : qp,
@@ -254,9 +262,8 @@ class InventoryRepository {
   }
 
   Future<StockAdjustmentDocumentDto> getStockAdjustmentDocument(int id) async {
-    final loc = _locationId;
-    final qp = <String, dynamic>{};
-    if (loc != null) qp['location_id'] = loc;
+    final loc = _requireLocation();
+    final qp = <String, dynamic>{'location_id': loc};
     final res = await _dio.get(
       '/inventory/stock-adjustment-documents/$id',
       queryParameters: qp.isEmpty ? null : qp,

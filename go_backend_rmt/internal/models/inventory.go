@@ -14,14 +14,15 @@ type Stock struct {
 }
 
 type StockWithProduct struct {
-	Stock
-	ProductName  string  `json:"product_name"`
-	ProductSKU   *string `json:"product_sku,omitempty"`
-	CategoryName *string `json:"category_name,omitempty"`
-	BrandName    *string `json:"brand_name,omitempty"`
-	UnitSymbol   *string `json:"unit_symbol,omitempty"`
-	ReorderLevel int     `json:"reorder_level"`
-	IsLowStock   bool    `json:"is_low_stock"`
+    Stock
+    ProductName  string  `json:"product_name"`
+    ProductSKU   *string `json:"product_sku,omitempty"`
+    CategoryID   *int    `json:"category_id,omitempty"`
+    CategoryName *string `json:"category_name,omitempty"`
+    BrandName    *string `json:"brand_name,omitempty"`
+    UnitSymbol   *string `json:"unit_symbol,omitempty"`
+    ReorderLevel int     `json:"reorder_level"`
+    IsLowStock   bool    `json:"is_low_stock"`
 }
 
 type StockAdjustment struct {

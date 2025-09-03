@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../features/auth/data/auth_repository.dart';
+import 'auth_events.dart';
 
 class ApiClient {
   ApiClient(
@@ -86,6 +87,8 @@ class ApiClient {
           key: AuthRepository.accessTokenKey, value: newAccess);
     } catch (e) {
       await _purgeTokens();
+      // Notify app to reset auth state and navigate out
+      AuthEvents.instance.broadcastLogout();
       rethrow;
     }
   }
