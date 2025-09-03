@@ -307,7 +307,7 @@ func (s *InventoryService) GetStockAdjustmentDocuments(companyID, locationID int
         return nil, err
     }
     rows, err := s.db.Query(`
-        SELECT document_id, document_number, location_id, reason, created_by, created_at
+        SELECT d.document_id, d.document_number, d.location_id, d.reason, d.created_by, d.created_at
         FROM stock_adjustment_documents d
         JOIN locations l ON d.location_id = l.location_id
         WHERE l.company_id = $1 AND d.location_id = $2
@@ -354,7 +354,7 @@ func (s *InventoryService) GetStockAdjustmentDocument(documentID, companyID, loc
     }
     var d models.StockAdjustmentDocument
     err := s.db.QueryRow(`
-        SELECT document_id, document_number, location_id, reason, created_by, created_at
+        SELECT d.document_id, d.document_number, d.location_id, d.reason, d.created_by, d.created_at
         FROM stock_adjustment_documents d
         JOIN locations l ON d.location_id = l.location_id
         WHERE d.document_id = $1 AND l.company_id = $2 AND d.location_id = $3
