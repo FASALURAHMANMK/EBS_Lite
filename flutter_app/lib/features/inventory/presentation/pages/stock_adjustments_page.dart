@@ -454,7 +454,12 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
 
   Future<InventoryListItem?> _openProductPicker(BuildContext context) async {
     final repo = ref.read(inventoryRepositoryProvider);
-    List<InventoryListItem> results = [];
+    // Prefetch initial list from current location stock so the dialog isn't empty
+    List<InventoryListItem> initial = [];
+    try {
+      initial = await repo.getStock();
+    } catch (_) {}
+    List<InventoryListItem> results = List.of(initial);
     int? selectedId = widget.line.product?.productId;
     String query = '';
     return showDialog<InventoryListItem?>(
@@ -475,7 +480,7 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
                   onChanged: (v) async {
                     query = v.trim();
                     if (query.isEmpty) {
-                      setInner(() => results = []);
+                      setInner(() => results = List.of(initial));
                       return;
                     }
                     final list = await repo.searchProducts(query);
@@ -485,7 +490,7 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
                 const SizedBox(height: 8),
                 Flexible(
                   child: results.isEmpty
-                      ? const Center(child: Text('Type to search'))
+                      ? const Center(child: Text('No products'))
                       : ListView.builder(
                           shrinkWrap: true,
                           itemCount: results.length,
