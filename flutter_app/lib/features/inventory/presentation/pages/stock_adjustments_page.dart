@@ -37,6 +37,12 @@ class _StockAdjustmentsPageState extends ConsumerState<StockAdjustmentsPage> {
       final list = await repo.getStockAdjustmentDocuments();
       if (!mounted) return;
       setState(() => _all = list);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _all = const []);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Failed to load documents: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
