@@ -150,6 +150,94 @@ class ProductBarcodeDto {
       };
 }
 
+class StockAdjustmentDto {
+  final int adjustmentId;
+  final int locationId;
+  final int productId;
+  final double adjustment;
+  final String? reason;
+  final int? createdBy;
+  final DateTime? createdAt;
+
+  StockAdjustmentDto({
+    required this.adjustmentId,
+    required this.locationId,
+    required this.productId,
+    required this.adjustment,
+    this.reason,
+    this.createdBy,
+    this.createdAt,
+  });
+
+  factory StockAdjustmentDto.fromJson(Map<String, dynamic> json) => StockAdjustmentDto(
+        adjustmentId: json['adjustment_id'] as int? ?? json['id'] as int? ?? 0,
+        locationId: json['location_id'] as int? ?? 0,
+        productId: json['product_id'] as int? ?? 0,
+        adjustment: (json['adjustment'] as num?)?.toDouble() ?? 0,
+        reason: json['reason'] as String?,
+        createdBy: json['created_by'] as int?,
+        createdAt: json['created_at'] != null
+            ? DateTime.tryParse(json['created_at'] as String)
+            : null,
+      );
+}
+
+class StockAdjustmentDocumentItemDto {
+  final int itemId;
+  final int documentId;
+  final int productId;
+  final double adjustment;
+
+  StockAdjustmentDocumentItemDto({
+    required this.itemId,
+    required this.documentId,
+    required this.productId,
+    required this.adjustment,
+  });
+
+  factory StockAdjustmentDocumentItemDto.fromJson(Map<String, dynamic> json) =>
+      StockAdjustmentDocumentItemDto(
+        itemId: json['item_id'] as int? ?? 0,
+        documentId: json['document_id'] as int? ?? 0,
+        productId: json['product_id'] as int? ?? 0,
+        adjustment: (json['adjustment'] as num?)?.toDouble() ?? 0,
+      );
+}
+
+class StockAdjustmentDocumentDto {
+  final int documentId;
+  final String documentNumber;
+  final int locationId;
+  final String? reason;
+  final int? createdBy;
+  final DateTime? createdAt;
+  final List<StockAdjustmentDocumentItemDto> items;
+
+  StockAdjustmentDocumentDto({
+    required this.documentId,
+    required this.documentNumber,
+    required this.locationId,
+    this.reason,
+    this.createdBy,
+    this.createdAt,
+    this.items = const [],
+  });
+
+  factory StockAdjustmentDocumentDto.fromJson(Map<String, dynamic> json) =>
+      StockAdjustmentDocumentDto(
+        documentId: json['document_id'] as int? ?? 0,
+        documentNumber: json['document_number'] as String? ?? '',
+        locationId: json['location_id'] as int? ?? 0,
+        reason: json['reason'] as String?,
+        createdBy: json['created_by'] as int?,
+        createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'] as String) : null,
+        items: (json['items'] as List?)
+                ?.map((e) => StockAdjustmentDocumentItemDto.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            const [],
+      );
+}
+
 class ProductDto {
   final int productId;
   final int companyId;

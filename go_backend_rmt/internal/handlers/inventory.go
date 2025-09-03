@@ -12,7 +12,7 @@ import (
 )
 
 type InventoryHandler struct {
-	inventoryService *services.InventoryService
+    inventoryService *services.InventoryService
 }
 
 func NewInventoryHandler() *InventoryHandler {
@@ -138,6 +138,104 @@ func (h *InventoryHandler) GetStockAdjustments(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, "Stock adjustments retrieved successfully", adjustments)
+}
+
+// POST /inventory/stock-adjustment-documents
+func (h *InventoryHandler) CreateStockAdjustmentDocument(c *gin.Context) {
+    companyID := c.GetInt("company_id")
+    locationID := c.GetInt("location_id")
+    userID := c.GetInt("user_id")
+
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
+    if locParam := c.Query("location_id"); locParam != "" {
+        if id, err := strconv.Atoi(locParam); err == nil {
+            locationID = id
+        }
+    }
+    if locationID == 0 {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+        return
+    }
+
+    var req models.CreateStockAdjustmentDocumentRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+        return
+    }
+    if err := utils.ValidateStruct(&req); err != nil {
+        ve := utils.GetValidationErrors(err)
+        utils.ValidationErrorResponse(c, ve)
+        return
+    }
+
+    doc, err := h.inventoryService.CreateStockAdjustmentDocument(companyID, locationID, userID, &req)
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create adjustment document", err)
+        return
+    }
+    utils.SuccessResponse(c, "Stock adjustment document created", doc)
+}
+
+// GET /inventory/stock-adjustment-documents
+func (h *InventoryHandler) GetStockAdjustmentDocuments(c *gin.Context) {
+    companyID := c.GetInt("company_id")
+    locationID := c.GetInt("location_id")
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
+    if locParam := c.Query("location_id"); locParam != "" {
+        if id, err := strconv.Atoi(locParam); err == nil {
+            locationID = id
+        }
+    }
+    if locationID == 0 {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+        return
+    }
+    docs, err := h.inventoryService.GetStockAdjustmentDocuments(companyID, locationID)
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get documents", err)
+        return
+    }
+    utils.SuccessResponse(c, "Stock adjustment documents retrieved", docs)
+}
+
+// GET /inventory/stock-adjustment-documents/:id
+func (h *InventoryHandler) GetStockAdjustmentDocument(c *gin.Context) {
+    companyID := c.GetInt("company_id")
+    locationID := c.GetInt("location_id")
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
+    if locParam := c.Query("location_id"); locParam != "" {
+        if id, err := strconv.Atoi(locParam); err == nil {
+            locationID = id
+        }
+    }
+    if locationID == 0 {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+        return
+    }
+    id, err := strconv.Atoi(c.Param("id"))
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid document ID", err)
+        return
+    }
+    doc, err := h.inventoryService.GetStockAdjustmentDocument(id, companyID, locationID)
+    if err != nil {
+        if err.Error() == "document not found" {
+            utils.NotFoundResponse(c, "Document not found")
+            return
+        }
+        utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get document", err)
+        return
+    }
+    utils.SuccessResponse(c, "Stock adjustment document retrieved", doc)
 }
 
 func (h *InventoryHandler) GetStockTransfers(c *gin.Context) {

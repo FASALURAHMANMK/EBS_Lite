@@ -79,13 +79,13 @@ class _InventoryManagementPageState
 
   Future<void> _openCategoryDialog({
     required List<CategoryDto> categories,
-    required int? selectedId,
-    required ValueChanged<int?> onApply,
+    required List<int> selectedIds,
+    required ValueChanged<List<int>> onApply,
   }) async {
-    final result = await showDialog<int?>(
+    final result = await showDialog<List<int>>(
       context: context,
       builder: (context) {
-        int? current = selectedId;
+        final Set<int> current = {...selectedIds};
         String query = '';
         List<CategoryDto> filtered = categories;
         return StatefulBuilder(
@@ -119,16 +119,16 @@ class _InventoryManagementPageState
                             itemCount: filtered.length,
                             itemBuilder: (context, i) {
                               final c = filtered[i];
-                              final checked = current == c.categoryId;
+                              final checked = current.contains(c.categoryId);
                               return CheckboxListTile(
                                 title: Text(c.name),
                                 value: checked,
                                 onChanged: (v) {
                                   setInner(() {
                                     if (v == true) {
-                                      current = c.categoryId;
-                                    } else if (checked) {
-                                      current = null;
+                                      current.add(c.categoryId);
+                                    } else {
+                                      current.remove(c.categoryId);
                                     }
                                   });
                                 },
@@ -141,15 +141,15 @@ class _InventoryManagementPageState
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(context).pop(null),
+                onPressed: () => Navigator.of(context).pop(<int>[]),
                 child: const Text('Clear'),
               ),
               TextButton(
-                onPressed: () => Navigator.of(context).maybePop(selectedId),
+                onPressed: () => Navigator.of(context).maybePop(selectedIds),
                 child: const Text('Cancel'),
               ),
               FilledButton(
-                onPressed: () => Navigator.of(context).pop(current),
+                onPressed: () => Navigator.of(context).pop(current.toList()),
                 child: const Text('Apply'),
               ),
             ],
@@ -157,7 +157,7 @@ class _InventoryManagementPageState
         );
       },
     );
-    if (result != selectedId) {
+    if (result != null) {
       onApply(result);
     }
   }
@@ -212,17 +212,13 @@ class _InventoryManagementPageState
 
     final filtered = state.items.where((e) {
       if (state.onlyLowStock && !e.isLowStock) return false;
-      final catId = state.selectedCategoryId;
-      if (catId != null) {
-        // We only have category name in stock response; category filter will be basic
-        // In a full app, map id->name. For now, match by id via categories list and compare names.
-        final selected = state.categories.firstWhere(
-          (c) => c.categoryId == catId,
-          orElse: () => CategoryDto(categoryId: -1, name: ''),
-        );
-        if (selected.name.isNotEmpty && e.categoryName != selected.name) {
-          return false;
-        }
+      final selectedIds = state.selectedCategoryIds;
+      if (selectedIds.isNotEmpty) {
+        final selectedNames = state.categories
+            .where((c) => selectedIds.contains(c.categoryId))
+            .map((c) => c.name)
+            .toSet();
+        if (selectedNames.isNotEmpty && !selectedNames.contains(e.categoryName)) return false;
       }
       return true;
     }).toList();
@@ -277,19 +273,21 @@ class _InventoryManagementPageState
                   flex: 8, // give more width to category field
                   child: _CategoryField(
                     label: 'Category',
-                    valueText: state.selectedCategoryId == null
-                        ? 'All categories'
-                        : state.categories
-                            .firstWhere(
-                              (c) => c.categoryId == state.selectedCategoryId,
-                              orElse: () =>
-                                  CategoryDto(categoryId: -1, name: ''),
-                            )
-                            .name,
+                    valueText: () {
+                      if (state.selectedCategoryIds.isEmpty) return 'All categories';
+                      if (state.selectedCategoryIds.length == 1) {
+                        final id = state.selectedCategoryIds.first;
+                        return state.categories.firstWhere(
+                          (c) => c.categoryId == id,
+                          orElse: () => CategoryDto(categoryId: -1, name: ''),
+                        ).name;
+                      }
+                      return '${state.selectedCategoryIds.length} selected';
+                    }(),
                     onTap: () => _openCategoryDialog(
                       categories: state.categories,
-                      selectedId: state.selectedCategoryId,
-                      onApply: (id) => notifier.setCategory(id),
+                      selectedIds: state.selectedCategoryIds,
+                      onApply: (ids) => notifier.setCategories(ids),
                     ),
                   ),
                 ),

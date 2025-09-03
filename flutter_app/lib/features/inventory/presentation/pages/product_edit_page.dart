@@ -371,59 +371,49 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                       contentPadding: EdgeInsets.zero,
                     ),
                     const SizedBox(height: 12),
-                    // Category / Brand pickers and Unit
+                    // Category / Brand pickers via dialogs
                     Row(
                       children: [
                         Expanded(
-                          child: Autocomplete<CategoryDto>(
-                            displayStringForOption: (c) => c.name,
-                            optionsBuilder: (text) {
-                              final q = text.text.toLowerCase();
-                              return _categories.where(
-                                  (c) => c.name.toLowerCase().contains(q));
-                            },
-                            onSelected: (c) {
-                              _categoryId = c.categoryId;
-                              _categoryController.text = c.name;
-                            },
-                            fieldViewBuilder:
-                                (context, controller, focus, onSubmit) {
-                              controller.text = _categoryController.text;
-                              return TextField(
-                                controller: controller,
-                                focusNode: focus,
-                                decoration: const InputDecoration(
-                                  labelText: 'Category',
-                                  prefixIcon: Icon(Icons.category_rounded),
-                                ),
-                              );
+                          child: _SelectField(
+                            label: 'Category',
+                            valueText: _categories
+                                .firstWhere(
+                                  (c) => c.categoryId == _categoryId,
+                                  orElse: () => CategoryDto(categoryId: -1, name: ''),
+                                )
+                                .name,
+                            icon: Icons.category_rounded,
+                            onTap: () async {
+                              final picked = await _openSingleCategoryDialog();
+                              if (picked != null) {
+                                setState(() {
+                                  _categoryId = picked.categoryId;
+                                  _categoryController.text = picked.name;
+                                });
+                              }
                             },
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Autocomplete<BrandDto>(
-                            displayStringForOption: (b) => b.name,
-                            optionsBuilder: (text) {
-                              final q = text.text.toLowerCase();
-                              return _brands.where(
-                                  (b) => b.name.toLowerCase().contains(q));
-                            },
-                            onSelected: (b) {
-                              _brandId = b.brandId;
-                              _brandController.text = b.name;
-                            },
-                            fieldViewBuilder:
-                                (context, controller, focus, onSubmit) {
-                              controller.text = _brandController.text;
-                              return TextField(
-                                controller: controller,
-                                focusNode: focus,
-                                decoration: const InputDecoration(
-                                  labelText: 'Brand',
-                                  prefixIcon: Icon(Icons.sell_rounded),
-                                ),
-                              );
+                          child: _SelectField(
+                            label: 'Brand',
+                            valueText: _brands
+                                .firstWhere(
+                                  (b) => b.brandId == _brandId,
+                                  orElse: () => BrandDto(brandId: -1, name: ''),
+                                )
+                                .name,
+                            icon: Icons.sell_rounded,
+                            onTap: () async {
+                              final picked = await _openSingleBrandDialog();
+                              if (picked != null) {
+                                setState(() {
+                                  _brandId = picked.brandId;
+                                  _brandController.text = picked.name;
+                                });
+                              }
                             },
                           ),
                         ),
@@ -438,20 +428,23 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                       const Divider(height: 24),
                     ],
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<int>(
-                      value: _unitId,
-                      items: _units
-                          .map((u) => DropdownMenuItem(
-                                value: u.unitId,
-                                child: Text(
-                                    '${u.name}${u.symbol != null ? ' (${u.symbol})' : ''}'),
-                              ))
-                          .toList(),
-                      onChanged: (v) => setState(() => _unitId = v),
-                      decoration: const InputDecoration(
-                        labelText: 'Unit',
-                        prefixIcon: Icon(Icons.straighten_rounded),
-                      ),
+                    _SelectField(
+                      label: 'Unit',
+                      valueText: () {
+                        final u = _units.firstWhere(
+                          (e) => e.unitId == _unitId,
+                          orElse: () => UnitDto(unitId: -1, name: ''),
+                        );
+                        if (u.unitId == -1) return '';
+                        return '${u.name}${u.symbol != null ? ' (${u.symbol})' : ''}';
+                      }(),
+                      icon: Icons.straighten_rounded,
+                      onTap: () async {
+                        final picked = await _openSingleUnitDialog();
+                        if (picked != null) {
+                          setState(() => _unitId = picked.unitId);
+                        }
+                      },
                     ),
                     // Removed description/weight/dimensions in favor of attributes
                     const SizedBox(height: 24),
@@ -508,11 +501,16 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         );
       case 'SELECT':
         final opts = d.options ?? const <String>[];
-        return DropdownButtonFormField<String>(
-          value: _attrSelect[d.attributeId],
-          items: opts.map((o) => DropdownMenuItem(value: o, child: Text(o))).toList(),
-          onChanged: (v) => setState(() => _attrSelect[d.attributeId] = v),
-          decoration: InputDecoration(labelText: d.name + (d.isRequired ? ' *' : '')),
+        return _SelectField(
+          label: d.name + (d.isRequired ? ' *' : ''),
+          valueText: _attrSelect[d.attributeId] ?? (opts.isNotEmpty ? opts.first : ''),
+          icon: Icons.list_rounded,
+          onTap: () async {
+            final picked = await _openAttributeOptionDialog(d);
+            if (picked != null) {
+              setState(() => _attrSelect[d.attributeId] = picked);
+            }
+          },
         );
       case 'DATE':
         final c = _attrText.putIfAbsent(d.attributeId, () => TextEditingController());
@@ -554,6 +552,313 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         );
     }
   }
+
+  Future<CategoryDto?> _openSingleCategoryDialog() async {
+    String query = '';
+    List<CategoryDto> filtered = _categories;
+    int? current = _categoryId;
+    return showDialog<CategoryDto?>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setInner) => AlertDialog(
+          title: const Text('Select Category'),
+          content: SizedBox(
+            width: 500,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  decoration: const InputDecoration(
+                    hintText: 'Search categories',
+                    prefixIcon: Icon(Icons.search_rounded),
+                  ),
+                  onChanged: (v) {
+                    query = v.toLowerCase();
+                    setInner(() {
+                      filtered = _categories
+                          .where((c) => c.name.toLowerCase().contains(query))
+                          .toList();
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                Flexible(
+                  child: filtered.isEmpty
+                      ? const Center(child: Text('No categories'))
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: filtered.length,
+                          itemBuilder: (context, i) {
+                            final c = filtered[i];
+                            return RadioListTile<int>(
+                              value: c.categoryId,
+                              groupValue: current,
+                              onChanged: (v) => setInner(() => current = v),
+                              title: Text(c.name),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(null),
+              child: const Text('Clear'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).maybePop(null),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final sel = _categories.firstWhere(
+                  (c) => c.categoryId == current,
+                  orElse: () => CategoryDto(categoryId: -1, name: ''),
+                );
+                Navigator.of(context).pop(sel.categoryId == -1 ? null : sel);
+              },
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<BrandDto?> _openSingleBrandDialog() async {
+    String query = '';
+    List<BrandDto> filtered = _brands;
+    int? current = _brandId;
+    return showDialog<BrandDto?>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setInner) => AlertDialog(
+          title: const Text('Select Brand'),
+          content: SizedBox(
+            width: 500,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  decoration: const InputDecoration(
+                    hintText: 'Search brands',
+                    prefixIcon: Icon(Icons.search_rounded),
+                  ),
+                  onChanged: (v) {
+                    query = v.toLowerCase();
+                    setInner(() {
+                      filtered = _brands
+                          .where((b) => b.name.toLowerCase().contains(query))
+                          .toList();
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                Flexible(
+                  child: filtered.isEmpty
+                      ? const Center(child: Text('No brands'))
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: filtered.length,
+                          itemBuilder: (context, i) {
+                            final b = filtered[i];
+                            return RadioListTile<int>(
+                              value: b.brandId,
+                              groupValue: current,
+                              onChanged: (v) => setInner(() => current = v),
+                              title: Text(b.name),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(null),
+              child: const Text('Clear'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).maybePop(null),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final sel = _brands.firstWhere(
+                  (b) => b.brandId == current,
+                  orElse: () => BrandDto(brandId: -1, name: ''),
+                );
+                Navigator.of(context).pop(sel.brandId == -1 ? null : sel);
+              },
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<UnitDto?> _openSingleUnitDialog() async {
+    String query = '';
+    List<UnitDto> filtered = _units;
+    int? current = _unitId;
+    return showDialog<UnitDto?>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setInner) => AlertDialog(
+          title: const Text('Select Unit'),
+          content: SizedBox(
+            width: 500,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  decoration: const InputDecoration(
+                    hintText: 'Search units',
+                    prefixIcon: Icon(Icons.search_rounded),
+                  ),
+                  onChanged: (v) {
+                    query = v.toLowerCase();
+                    setInner(() {
+                      filtered = _units
+                          .where((u) =>
+                              u.name.toLowerCase().contains(query) ||
+                              (u.symbol ?? '').toLowerCase().contains(query))
+                          .toList();
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                Flexible(
+                  child: filtered.isEmpty
+                      ? const Center(child: Text('No units'))
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: filtered.length,
+                          itemBuilder: (context, i) {
+                            final u = filtered[i];
+                            final label = '${u.name}${u.symbol != null ? ' (${u.symbol})' : ''}';
+                            return RadioListTile<int>(
+                              value: u.unitId,
+                              groupValue: current,
+                              onChanged: (v) => setInner(() => current = v),
+                              title: Text(label),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(null),
+              child: const Text('Clear'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).maybePop(null),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final sel = _units.firstWhere(
+                  (u) => u.unitId == current,
+                  orElse: () => UnitDto(unitId: -1, name: ''),
+                );
+                Navigator.of(context).pop(sel.unitId == -1 ? null : sel);
+              },
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _openAttributeOptionDialog(ProductAttributeDefinitionDto d) async {
+    final opts = d.options ?? const <String>[];
+    String? current = _attrSelect[d.attributeId] ?? (opts.isNotEmpty ? opts.first : null);
+    return showDialog<String?>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setInner) => AlertDialog(
+          title: Text('Select ${d.name}'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: opts.length,
+                    itemBuilder: (context, i) {
+                      final o = opts[i];
+                      return RadioListTile<String>(
+                        value: o,
+                        groupValue: current,
+                        onChanged: (v) => setInner(() => current = v),
+                        title: Text(o),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).maybePop(null),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(current),
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectField extends StatelessWidget {
+  const _SelectField({required this.label, required this.valueText, required this.icon, required this.onTap});
+  final String label;
+  final String valueText;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon),
+          border: const OutlineInputBorder(),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                valueText,
+                style: theme.textTheme.bodyMedium,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Icon(Icons.arrow_drop_down_rounded),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context, {ProductBarcodeDto? initial}) async {
@@ -565,7 +870,7 @@ Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context, {ProductBarc
     builder: (context) => AlertDialog(
       title: Text(initial == null ? 'Add Barcode' : 'Edit Barcode'),
       content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720),
+        constraints: const BoxConstraints(maxWidth: 900),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -605,7 +910,26 @@ Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context, {ProductBarc
         FilledButton(
           onPressed: () {
             final s = code.text.trim();
-            if (s.isEmpty || !RegExp(r'^\\d+$').hasMatch(s)) {
+            // Accept valid digits-only barcode using correct regex
+            if (s.isNotEmpty && RegExp(r'^\d+$').hasMatch(s)) {
+              final p = int.tryParse(pack.text.trim()) ?? 1;
+              if (p < 1) {
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(const SnackBar(content: Text('Conversion must be at least 1')));
+                return;
+              }
+              final sp = double.tryParse(sell.text.trim());
+              Navigator.of(context).pop(ProductBarcodeDto(
+                barcodeId: initial?.barcodeId,
+                barcode: s,
+                packSize: p,
+                sellingPrice: sp,
+                isPrimary: false,
+              ));
+              return;
+            }
+            if (s.isEmpty || !RegExp(r'^\d+$').hasMatch(s)) {
               ScaffoldMessenger.of(context)
                 ..hideCurrentSnackBar()
                 ..showSnackBar(const SnackBar(content: Text('Barcode must be digits only')));

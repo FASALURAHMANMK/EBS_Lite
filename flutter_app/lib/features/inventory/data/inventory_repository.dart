@@ -39,6 +39,16 @@ class InventoryRepository {
         .toList();
   }
 
+  Future<InventoryListItem?> getStockForProduct(int productId) async {
+    final loc = _locationId;
+    final qp = <String, dynamic>{'product_id': productId};
+    if (loc != null) qp['location_id'] = loc;
+    final res = await _dio.get('/inventory/stock', queryParameters: qp);
+    final data = _extractList(res);
+    if (data.isEmpty) return null;
+    return InventoryListItem.fromStockJson(data.first as Map<String, dynamic>);
+  }
+
   Future<List<InventoryListItem>> searchProducts(String term) async {
     final loc = _locationId;
     final res = await _dio.get(
@@ -194,6 +204,65 @@ class InventoryRepository {
         'reason': reason,
       },
     );
+  }
+
+  Future<List<StockAdjustmentDto>> getStockAdjustments() async {
+    final loc = _locationId;
+    final qp = <String, dynamic>{};
+    if (loc != null) qp['location_id'] = loc;
+    final res = await _dio.get(
+      '/inventory/stock-adjustments',
+      queryParameters: qp.isEmpty ? null : qp,
+    );
+    final data = _extractList(res);
+    return data
+        .map((e) => StockAdjustmentDto.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<StockAdjustmentDocumentDto> createStockAdjustmentDocument({
+    required String reason,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final loc = _locationId;
+    final qp = <String, dynamic>{};
+    if (loc != null) qp['location_id'] = loc;
+    final res = await _dio.post(
+      '/inventory/stock-adjustment-documents',
+      queryParameters: qp.isEmpty ? null : qp,
+      data: {
+        'reason': reason,
+        'items': items,
+      },
+    );
+    final body = res.data is Map<String, dynamic> ? res.data['data'] : res.data;
+    return StockAdjustmentDocumentDto.fromJson(body as Map<String, dynamic>);
+  }
+
+  Future<List<StockAdjustmentDocumentDto>> getStockAdjustmentDocuments() async {
+    final loc = _locationId;
+    final qp = <String, dynamic>{};
+    if (loc != null) qp['location_id'] = loc;
+    final res = await _dio.get(
+      '/inventory/stock-adjustment-documents',
+      queryParameters: qp.isEmpty ? null : qp,
+    );
+    final data = _extractList(res);
+    return data
+        .map((e) => StockAdjustmentDocumentDto.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<StockAdjustmentDocumentDto> getStockAdjustmentDocument(int id) async {
+    final loc = _locationId;
+    final qp = <String, dynamic>{};
+    if (loc != null) qp['location_id'] = loc;
+    final res = await _dio.get(
+      '/inventory/stock-adjustment-documents/$id',
+      queryParameters: qp.isEmpty ? null : qp,
+    );
+    final body = res.data is Map<String, dynamic> ? res.data['data'] : res.data;
+    return StockAdjustmentDocumentDto.fromJson(body as Map<String, dynamic>);
   }
 }
 

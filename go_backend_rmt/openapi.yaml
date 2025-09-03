@@ -4417,3 +4417,100 @@ components:
         is_deleted:
           type: boolean
           nullable: true
+  /inventory/stock-adjustment-documents:
+    post:
+      summary: Create a stock adjustment document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStockAdjustmentDocumentRequest'
+      responses:
+        '200':
+          description: Document created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+    get:
+      summary: List stock adjustment documents
+      responses:
+        '200':
+          description: Documents
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/StockAdjustmentDocument'
+  /inventory/stock-adjustment-documents/{id}:
+    get:
+      summary: Get a stock adjustment document
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Document detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+    CreateStockAdjustmentDocumentRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateStockAdjustmentDocumentItem'
+    CreateStockAdjustmentDocumentItem:
+      type: object
+      properties:
+        product_id:
+          type: integer
+        adjustment:
+          type: number
+          format: float
+    StockAdjustmentDocument:
+      type: object
+      properties:
+        document_id:
+          type: integer
+        document_number:
+          type: string
+        location_id:
+          type: integer
+        reason:
+          type: string
+        created_by:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockAdjustmentDocumentItem'
+    StockAdjustmentDocumentItem:
+      type: object
+      properties:
+        item_id:
+          type: integer
+        document_id:
+          type: integer
+        product_id:
+          type: integer
+        adjustment:
+          type: number
+          format: float

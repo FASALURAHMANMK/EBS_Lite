@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
 import '../../../../shared/pages/feature_detail_page.dart';
+import 'stock_adjustments_page.dart';
 import 'inventory_management_page.dart';
 import 'category_management_page.dart';
 import 'brand_management_page.dart';
@@ -40,8 +41,7 @@ class InventoryPage extends StatelessWidget {
         label: 'Stock Adjustments',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
-              builder: (_) =>
-                  const FeatureDetailPage(title: 'Stock Adjustments')),
+              builder: (_) => const StockAdjustmentsPage()),
         ),
       ),
       FeatureItem(

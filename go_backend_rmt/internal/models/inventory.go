@@ -35,9 +35,39 @@ type StockAdjustment struct {
 }
 
 type CreateStockAdjustmentRequest struct {
-	ProductID  int     `json:"product_id" validate:"required"`
-	Adjustment float64 `json:"adjustment" validate:"required"`
-	Reason     string  `json:"reason" validate:"required,min=2,max=255"`
+    ProductID  int     `json:"product_id" validate:"required"`
+    Adjustment float64 `json:"adjustment" validate:"required"`
+    Reason     string  `json:"reason" validate:"required,min=2,max=255"`
+}
+
+// Stock adjustment document (header)
+type StockAdjustmentDocument struct {
+    DocumentID     int       `json:"document_id" db:"document_id"`
+    DocumentNumber string    `json:"document_number" db:"document_number"`
+    LocationID     int       `json:"location_id" db:"location_id"`
+    Reason         string    `json:"reason" db:"reason"`
+    CreatedBy      int       `json:"created_by" db:"created_by"`
+    CreatedAt      time.Time `json:"created_at" db:"created_at"`
+    Items          []StockAdjustmentDocumentItem `json:"items,omitempty"`
+}
+
+// Stock adjustment document detail (line)
+type StockAdjustmentDocumentItem struct {
+    ItemID     int     `json:"item_id" db:"item_id"`
+    DocumentID int     `json:"document_id" db:"document_id"`
+    ProductID  int     `json:"product_id" db:"product_id"`
+    Adjustment float64 `json:"adjustment" db:"adjustment"`
+}
+
+// Create document request payload
+type CreateStockAdjustmentDocumentRequest struct {
+    Reason string                                      `json:"reason" validate:"required,min=2,max=255"`
+    Items  []CreateStockAdjustmentDocumentItemRequest `json:"items" validate:"required,min=1"`
+}
+
+type CreateStockAdjustmentDocumentItemRequest struct {
+    ProductID  int     `json:"product_id" validate:"required"`
+    Adjustment float64 `json:"adjustment" validate:"required"`
 }
 
 type StockTransfer struct {

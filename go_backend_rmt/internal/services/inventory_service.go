@@ -12,7 +12,7 @@ import (
 )
 
 type InventoryService struct {
-	db *sql.DB
+    db *sql.DB
 }
 
 func NewInventoryService() *InventoryService {
@@ -166,6 +166,171 @@ func (s *InventoryService) GetStockAdjustments(companyID, locationID int) ([]mod
 	}
 
 	return adjustments, nil
+}
+
+// CreateStockAdjustmentDocument creates a header + items and applies stock changes atomically
+func (s *InventoryService) CreateStockAdjustmentDocument(companyID, locationID, userID int, req *models.CreateStockAdjustmentDocumentRequest) (*models.StockAdjustmentDocument, error) {
+    if len(req.Items) == 0 {
+        return nil, fmt.Errorf("no items to adjust")
+    }
+
+    tx, err := s.db.Begin()
+    if err != nil {
+        return nil, fmt.Errorf("failed to start transaction: %w", err)
+    }
+    defer tx.Rollback()
+
+    // Generate document number using numbering sequence, fallback to timestamp if not configured
+    ns := NewNumberingSequenceService()
+    docNumber, err := ns.NextNumber(tx, "stock_adjustment", companyID, &locationID)
+    if err != nil {
+        // fallback simple number
+        docNumber = fmt.Sprintf("ADJ-%d", time.Now().Unix())
+    }
+
+    var docID int
+    var createdAt time.Time
+    err = tx.QueryRow(`
+        INSERT INTO stock_adjustment_documents (document_number, location_id, reason, created_by)
+        VALUES ($1,$2,$3,$4)
+        RETURNING document_id, created_at
+    `, docNumber, locationID, req.Reason, userID).Scan(&docID, &createdAt)
+    if err != nil {
+        return nil, fmt.Errorf("failed to create document: %w", err)
+    }
+
+    for _, it := range req.Items {
+        // Verify product belongs to company
+        var productCompanyID int
+        err := tx.QueryRow("SELECT company_id FROM products WHERE product_id = $1 AND is_deleted = FALSE", it.ProductID).Scan(&productCompanyID)
+        if err == sql.ErrNoRows || productCompanyID != companyID {
+            return nil, fmt.Errorf("product not found")
+        }
+        if err != nil {
+            return nil, fmt.Errorf("failed to verify product: %w", err)
+        }
+
+        // Insert item
+        if _, err := tx.Exec(`
+            INSERT INTO stock_adjustment_document_items (document_id, product_id, adjustment)
+            VALUES ($1,$2,$3)
+        `, docID, it.ProductID, it.Adjustment); err != nil {
+            return nil, fmt.Errorf("failed to add document item: %w", err)
+        }
+
+        // Apply stock change (upsert)
+        if _, err := tx.Exec(`
+            INSERT INTO stock (location_id, product_id, quantity, last_updated)
+            VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+            ON CONFLICT (location_id, product_id)
+            DO UPDATE SET 
+                quantity = stock.quantity + $3,
+                last_updated = CURRENT_TIMESTAMP
+        `, locationID, it.ProductID, it.Adjustment); err != nil {
+            return nil, fmt.Errorf("failed to adjust stock: %w", err)
+        }
+
+        // Record adjustment history (keeps legacy listing working)
+        if _, err := tx.Exec(`
+            INSERT INTO stock_adjustments (location_id, product_id, adjustment, reason, created_by)
+            VALUES ($1,$2,$3,$4,$5)
+        `, locationID, it.ProductID, it.Adjustment, fmt.Sprintf("%s | %s", docNumber, req.Reason), userID); err != nil {
+            return nil, fmt.Errorf("failed to record adjustment: %w", err)
+        }
+    }
+
+    if err := tx.Commit(); err != nil {
+        return nil, fmt.Errorf("failed to commit transaction: %w", err)
+    }
+
+    return &models.StockAdjustmentDocument{
+        DocumentID:     docID,
+        DocumentNumber: docNumber,
+        LocationID:     locationID,
+        Reason:         req.Reason,
+        CreatedBy:      userID,
+        CreatedAt:      createdAt,
+    }, nil
+}
+
+// GetStockAdjustmentDocuments returns document headers for a company/location
+func (s *InventoryService) GetStockAdjustmentDocuments(companyID, locationID int) ([]models.StockAdjustmentDocument, error) {
+    rows, err := s.db.Query(`
+        SELECT document_id, document_number, location_id, reason, created_by, created_at
+        FROM stock_adjustment_documents d
+        JOIN locations l ON d.location_id = l.location_id
+        WHERE l.company_id = $1 AND d.location_id = $2
+        ORDER BY d.created_at DESC
+    `, companyID, locationID)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get documents: %w", err)
+    }
+    defer rows.Close()
+    list := make([]models.StockAdjustmentDocument, 0)
+    for rows.Next() {
+        var d models.StockAdjustmentDocument
+        if err := rows.Scan(&d.DocumentID, &d.DocumentNumber, &d.LocationID, &d.Reason, &d.CreatedBy, &d.CreatedAt); err != nil {
+            return nil, fmt.Errorf("failed to scan document: %w", err)
+        }
+        // include items for each document for list summaries
+        itsRows, err := s.db.Query(`
+            SELECT item_id, document_id, product_id, adjustment
+            FROM stock_adjustment_document_items
+            WHERE document_id = $1
+            ORDER BY item_id
+        `, d.DocumentID)
+        if err == nil {
+            var items []models.StockAdjustmentDocumentItem
+            for itsRows.Next() {
+                var it models.StockAdjustmentDocumentItem
+                if err := itsRows.Scan(&it.ItemID, &it.DocumentID, &it.ProductID, &it.Adjustment); err == nil {
+                    items = append(items, it)
+                }
+            }
+            itsRows.Close()
+            d.Items = items
+        }
+        list = append(list, d)
+    }
+    return list, nil
+}
+
+// GetStockAdjustmentDocument returns header + items
+func (s *InventoryService) GetStockAdjustmentDocument(documentID, companyID, locationID int) (*models.StockAdjustmentDocument, error) {
+    var d models.StockAdjustmentDocument
+    err := s.db.QueryRow(`
+        SELECT document_id, document_number, location_id, reason, created_by, created_at
+        FROM stock_adjustment_documents d
+        JOIN locations l ON d.location_id = l.location_id
+        WHERE d.document_id = $1 AND l.company_id = $2 AND d.location_id = $3
+    `, documentID, companyID, locationID).Scan(&d.DocumentID, &d.DocumentNumber, &d.LocationID, &d.Reason, &d.CreatedBy, &d.CreatedAt)
+    if err == sql.ErrNoRows {
+        return nil, fmt.Errorf("document not found")
+    }
+    if err != nil {
+        return nil, fmt.Errorf("failed to get document: %w", err)
+    }
+
+    rows, err := s.db.Query(`
+        SELECT item_id, document_id, product_id, adjustment
+        FROM stock_adjustment_document_items
+        WHERE document_id = $1
+        ORDER BY item_id
+    `, documentID)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get document items: %w", err)
+    }
+    defer rows.Close()
+    var items []models.StockAdjustmentDocumentItem
+    for rows.Next() {
+        var it models.StockAdjustmentDocumentItem
+        if err := rows.Scan(&it.ItemID, &it.DocumentID, &it.ProductID, &it.Adjustment); err != nil {
+            return nil, fmt.Errorf("failed to scan item: %w", err)
+        }
+        items = append(items, it)
+    }
+    d.Items = items
+    return &d, nil
 }
 
 func (s *InventoryService) CreateStockTransfer(companyID, fromLocationID, userID int, req *models.CreateStockTransferRequest) (*models.StockTransfer, error) {

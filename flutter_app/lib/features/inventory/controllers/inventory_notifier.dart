@@ -10,7 +10,7 @@ enum InventoryViewMode { grid, list }
 class InventoryState {
   final List<InventoryListItem> items;
   final List<CategoryDto> categories;
-  final int? selectedCategoryId;
+  final List<int> selectedCategoryIds;
   final String query;
   final InventoryViewMode viewMode;
   final bool onlyLowStock;
@@ -20,7 +20,7 @@ class InventoryState {
   const InventoryState({
     this.items = const [],
     this.categories = const [],
-    this.selectedCategoryId,
+    this.selectedCategoryIds = const [],
     this.query = '',
     this.viewMode = InventoryViewMode.grid,
     this.onlyLowStock = false,
@@ -31,8 +31,7 @@ class InventoryState {
   InventoryState copyWith({
     List<InventoryListItem>? items,
     List<CategoryDto>? categories,
-    int? selectedCategoryId,
-    bool clearSelectedCategory = false,
+    List<int>? selectedCategoryIds,
     String? query,
     InventoryViewMode? viewMode,
     bool? onlyLowStock,
@@ -42,9 +41,7 @@ class InventoryState {
     return InventoryState(
       items: items ?? this.items,
       categories: categories ?? this.categories,
-      selectedCategoryId: clearSelectedCategory
-          ? null
-          : (selectedCategoryId ?? this.selectedCategoryId),
+      selectedCategoryIds: selectedCategoryIds ?? this.selectedCategoryIds,
       query: query ?? this.query,
       viewMode: viewMode ?? this.viewMode,
       onlyLowStock: onlyLowStock ?? this.onlyLowStock,
@@ -83,8 +80,8 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
     state = state.copyWith(onlyLowStock: value);
   }
 
-  void setCategory(int? id) {
-    state = state.copyWith(selectedCategoryId: id, clearSelectedCategory: id == null);
+  void setCategories(List<int> ids) {
+    state = state.copyWith(selectedCategoryIds: ids);
   }
 
   void setQuery(String q) {
@@ -124,4 +121,3 @@ final inventoryNotifierProvider =
   notifier.load();
   return notifier;
 });
-

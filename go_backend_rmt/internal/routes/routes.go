@@ -219,17 +219,21 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 
 			// ADD THESE NEW INVENTORY ROUTES:
 			// Inventory management routes (require company and location)
-			inventory := protected.Group("/inventory")
-			inventory.Use(middleware.RequireCompanyAccess())
-			{
-				inventory.GET("/stock", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStock)
-				inventory.POST("/stock-adjustment", middleware.RequirePermission("ADJUST_STOCK"), inventoryHandler.AdjustStock)
-				inventory.GET("/stock-adjustments", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockAdjustments)
-				inventory.GET("/summary", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetInventorySummary)
-				inventory.POST("/import", middleware.RequirePermission("ADJUST_STOCK"), inventoryHandler.ImportInventory)
-				inventory.GET("/export", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.ExportInventory)
-				inventory.POST("/barcode", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GenerateBarcode)
-				inventory.GET("/transfers", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockTransfers)
+            inventory := protected.Group("/inventory")
+            inventory.Use(middleware.RequireCompanyAccess())
+            {
+                inventory.GET("/stock", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStock)
+                inventory.POST("/stock-adjustment", middleware.RequirePermission("ADJUST_STOCK"), inventoryHandler.AdjustStock)
+                inventory.GET("/stock-adjustments", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockAdjustments)
+                // Stock adjustment documents
+                inventory.POST("/stock-adjustment-documents", middleware.RequirePermission("ADJUST_STOCK"), inventoryHandler.CreateStockAdjustmentDocument)
+                inventory.GET("/stock-adjustment-documents", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockAdjustmentDocuments)
+                inventory.GET("/stock-adjustment-documents/:id", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockAdjustmentDocument)
+                inventory.GET("/summary", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetInventorySummary)
+                inventory.POST("/import", middleware.RequirePermission("ADJUST_STOCK"), inventoryHandler.ImportInventory)
+                inventory.GET("/export", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.ExportInventory)
+                inventory.POST("/barcode", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GenerateBarcode)
+                inventory.GET("/transfers", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockTransfers)
 				inventory.GET("/transfers/:id", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockTransfer)
 				inventory.POST("/transfers", middleware.RequirePermission("CREATE_TRANSFERS"), inventoryHandler.CreateStockTransfer)
 				inventory.PUT("/transfers/:id/approve", middleware.RequirePermission("APPROVE_TRANSFERS"), inventoryHandler.ApproveStockTransfer)
