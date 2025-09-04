@@ -505,21 +505,22 @@ func (s *InventoryService) GetStockTransfers(companyID, locationID int) ([]model
 }
 
 // ApproveStockTransfer marks a pending transfer as in transit
-func (s *InventoryService) ApproveStockTransfer(transferID, companyID, userID int) error {
+func (s *InventoryService) ApproveStockTransfer(transferID, companyID, actingLocationID, userID int) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	var status string
-	err = tx.QueryRow(`
-                SELECT st.status
+    var status string
+    var fromLocationID int
+    err = tx.QueryRow(`
+                SELECT st.status, st.from_location_id
                 FROM stock_transfers st
                 JOIN locations fl ON st.from_location_id = fl.location_id
                 JOIN locations tl ON st.to_location_id = tl.location_id
                 WHERE st.transfer_id = $1 AND (fl.company_id = $2 OR tl.company_id = $2)
-        `, transferID, companyID).Scan(&status)
+        `, transferID, companyID).Scan(&status, &fromLocationID)
 
 	if err == sql.ErrNoRows {
 		return fmt.Errorf("transfer not found")
@@ -528,9 +529,14 @@ func (s *InventoryService) ApproveStockTransfer(transferID, companyID, userID in
 		return fmt.Errorf("failed to get transfer: %w", err)
 	}
 
-	if status != "PENDING" {
-		return fmt.Errorf("only pending transfers can be approved")
-	}
+    if status != "PENDING" {
+        return fmt.Errorf("only pending transfers can be approved")
+    }
+
+    // Ensure approval is performed from source location
+    if actingLocationID != fromLocationID {
+        return fmt.Errorf("approval must be done from source location")
+    }
 
 	_, err = tx.Exec(`
                 UPDATE stock_transfers
@@ -544,7 +550,7 @@ func (s *InventoryService) ApproveStockTransfer(transferID, companyID, userID in
 	return tx.Commit()
 }
 
-func (s *InventoryService) CompleteStockTransfer(transferID, companyID, userID int) error {
+func (s *InventoryService) CompleteStockTransfer(transferID, companyID, actingLocationID, userID int) error {
 	// Start transaction
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -553,8 +559,8 @@ func (s *InventoryService) CompleteStockTransfer(transferID, companyID, userID i
 	defer tx.Rollback()
 
 	// Get transfer details
-	var fromLocationID, toLocationID int
-	var status string
+    var fromLocationID, toLocationID int
+    var status string
 	err = tx.QueryRow(`
 		SELECT from_location_id, to_location_id, status 
 		FROM stock_transfers 
@@ -568,9 +574,14 @@ func (s *InventoryService) CompleteStockTransfer(transferID, companyID, userID i
 		return fmt.Errorf("failed to get transfer: %w", err)
 	}
 
-	if status != "IN_TRANSIT" {
-		return fmt.Errorf("transfer is not in transit")
-	}
+    if status != "IN_TRANSIT" {
+        return fmt.Errorf("transfer is not in transit")
+    }
+
+    // Ensure completion is performed at destination location
+    if actingLocationID != toLocationID {
+        return fmt.Errorf("completion must be done at destination location")
+    }
 
 	// Get transfer items and process each
 	rows, err := tx.Query(`

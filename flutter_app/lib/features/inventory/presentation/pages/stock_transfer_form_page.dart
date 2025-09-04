@@ -67,12 +67,18 @@ class _StockTransferFormPageState extends ConsumerState<StockTransferFormPage> {
       if (widget.mode == TransferMode.transfer) {
         toId = _toLocationId ?? -1;
         if (toId <= 0) throw Exception('Select destination location');
+        if (toId == selectedId) {
+          throw Exception('Source and destination cannot be the same location');
+        }
         // source = selected location by default, no override
       } else {
         // request: to = selected, from = chosen
         toId = selectedId;
         fromOverride = _fromLocationId;
         if (fromOverride == null || fromOverride <= 0) throw Exception('Select source location');
+        if (fromOverride == selectedId) {
+          throw Exception('Source and destination cannot be the same location');
+        }
       }
 
       // Validate quantities against available stock at source

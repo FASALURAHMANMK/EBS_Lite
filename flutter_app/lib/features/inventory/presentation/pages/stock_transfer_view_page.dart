@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../data/inventory_repository.dart';
+import '../../../../core/error_handler.dart';
 import '../../data/models.dart';
 
 class StockTransferViewPage extends ConsumerStatefulWidget {
@@ -104,15 +105,32 @@ class _Actions extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.read(inventoryRepositoryProvider);
     final locId = ref.watch(locationNotifierProvider).selected?.locationId;
-    final isIncoming = locId != null && t.toLocationId == locId;
-    final isOutgoing = locId != null && t.fromLocationId == locId;
-    final canApprove = t.status == 'PENDING' && isIncoming;
+    final isIncoming = locId != null && t.toLocationId == locId && t.fromLocationId != locId;
+    final isOutgoing = locId != null && t.fromLocationId == locId && t.toLocationId != locId;
+    // Correct role gating:
+    // - Approve (dispatch) must be done by source (outgoing) location when Pending
+    // - Receive (complete) must be done by destination (incoming) location when In Transit
+    // - Cancel is allowed by source (outgoing) location while Pending
+    final canApprove = t.status == 'PENDING' && isOutgoing;
     final canComplete = t.status == 'IN_TRANSIT' && isIncoming;
     final canCancel = t.status == 'PENDING' && isOutgoing;
 
     Future<void> _do(Future<void> Function() f, String ok) async {
-      try { await f(); await onChanged(); if (context.mounted) ScaffoldMessenger.of(context)..hideCurrentSnackBar()..showSnackBar(SnackBar(content: Text(ok))); }
-      catch (e) { if (context.mounted) ScaffoldMessenger.of(context)..hideCurrentSnackBar()..showSnackBar(SnackBar(content: Text('Failed: $e'))); }
+      try {
+        await f();
+        await onChanged();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(SnackBar(content: Text(ok)));
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(SnackBar(content: Text('Failed: ${ErrorHandler.message(e)}')));
+        }
+      }
     }
 
     return Wrap(
@@ -137,4 +155,3 @@ class _Actions extends ConsumerWidget {
     );
   }
 }
-

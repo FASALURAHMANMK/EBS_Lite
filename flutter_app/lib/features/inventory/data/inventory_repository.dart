@@ -360,11 +360,13 @@ class InventoryRepository {
   }
 
   Future<void> approveStockTransfer(int id) async {
-    await _dio.put('/inventory/transfers/$id/approve');
+    final qp = <String, dynamic>{'location_id': _requireLocation()};
+    await _dio.put('/inventory/transfers/$id/approve', queryParameters: qp);
   }
 
   Future<void> completeStockTransfer(int id) async {
-    await _dio.put('/inventory/transfers/$id/complete');
+    final qp = <String, dynamic>{'location_id': _requireLocation()};
+    await _dio.put('/inventory/transfers/$id/complete', queryParameters: qp);
   }
 
   Future<void> cancelStockTransfer(int id) async {

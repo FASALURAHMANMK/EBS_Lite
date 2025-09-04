@@ -485,30 +485,36 @@ func (h *InventoryHandler) CreateStockTransfer(c *gin.Context) {
 		return
 	}
 
-	// Use location from context as source location
-	if locationParam := c.Query("location_id"); locationParam != "" {
-		if id, err := strconv.Atoi(locationParam); err == nil {
-			locationID = id
-		}
-	}
+    // Use location from context as source location
+    if locationParam := c.Query("location_id"); locationParam != "" {
+        if id, err := strconv.Atoi(locationParam); err == nil {
+            locationID = id
+        }
+    }
 
-	if locationID == 0 {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Source location ID required", nil)
-		return
-	}
+    if locationID == 0 {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Source location ID required", nil)
+        return
+    }
 
-	var req models.CreateStockTransferRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
-		return
-	}
+    var req models.CreateStockTransferRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+        return
+    }
 
-	// Validate request
-	if err := utils.ValidateStruct(&req); err != nil {
-		validationErrors := utils.GetValidationErrors(err)
-		utils.ValidationErrorResponse(c, validationErrors)
-		return
-	}
+    // Validate request
+    if err := utils.ValidateStruct(&req); err != nil {
+        validationErrors := utils.GetValidationErrors(err)
+        utils.ValidationErrorResponse(c, validationErrors)
+        return
+    }
+
+    // Prevent same source and destination
+    if locationID == req.ToLocationID {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Source and destination cannot be the same location", nil)
+        return
+    }
 
 	transfer, err := h.inventoryService.CreateStockTransfer(companyID, locationID, userID, &req)
 	if err != nil {
@@ -525,66 +531,98 @@ func (h *InventoryHandler) CreateStockTransfer(c *gin.Context) {
 
 // PUT /inventory/transfers/:id/approve
 func (h *InventoryHandler) ApproveStockTransfer(c *gin.Context) {
-	companyID := c.GetInt("company_id")
-	userID := c.GetInt("user_id")
+    companyID := c.GetInt("company_id")
+    userID := c.GetInt("user_id")
+    actingLocationID := c.GetInt("location_id")
 
 	if companyID == 0 {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
 
-	transferID, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid transfer ID", err)
-		return
-	}
+    transferID, err := strconv.Atoi(c.Param("id"))
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid transfer ID", err)
+        return
+    }
 
-	err = h.inventoryService.ApproveStockTransfer(transferID, companyID, userID)
-	if err != nil {
-		if err.Error() == "transfer not found" {
-			utils.NotFoundResponse(c, "Transfer not found")
-			return
-		}
-		if err.Error() == "only pending transfers can be approved" {
-			utils.ErrorResponse(c, http.StatusBadRequest, "Only pending transfers can be approved", err)
-			return
-		}
-		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to approve transfer", err)
-		return
-	}
+    // Optional override via query param for acting location
+    if locParam := c.Query("location_id"); locParam != "" {
+        if id, convErr := strconv.Atoi(locParam); convErr == nil {
+            actingLocationID = id
+        }
+    }
+    if actingLocationID == 0 {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required to approve", nil)
+        return
+    }
+
+    err = h.inventoryService.ApproveStockTransfer(transferID, companyID, actingLocationID, userID)
+    if err != nil {
+        if err.Error() == "transfer not found" {
+            utils.NotFoundResponse(c, "Transfer not found")
+            return
+        }
+        if err.Error() == "only pending transfers can be approved" {
+            utils.ErrorResponse(c, http.StatusBadRequest, "Only pending transfers can be approved", err)
+            return
+        }
+        if err.Error() == "approval must be done from source location" {
+            utils.ErrorResponse(c, http.StatusBadRequest, "Approval must be done from source location", err)
+            return
+        }
+        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to approve transfer", err)
+        return
+    }
 
 	utils.SuccessResponse(c, "Stock transfer approved successfully", nil)
 }
 
 // PUT /inventory/transfers/:id/complete
 func (h *InventoryHandler) CompleteStockTransfer(c *gin.Context) {
-	companyID := c.GetInt("company_id")
-	userID := c.GetInt("user_id")
+    companyID := c.GetInt("company_id")
+    userID := c.GetInt("user_id")
+    actingLocationID := c.GetInt("location_id")
 
 	if companyID == 0 {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
 
-	transferID, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid transfer ID", err)
-		return
-	}
+    transferID, err := strconv.Atoi(c.Param("id"))
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid transfer ID", err)
+        return
+    }
 
-	err = h.inventoryService.CompleteStockTransfer(transferID, companyID, userID)
-	if err != nil {
-		if err.Error() == "transfer not found" {
-			utils.NotFoundResponse(c, "Transfer not found")
-			return
-		}
-		if err.Error() == "transfer is not in transit" {
-			utils.ErrorResponse(c, http.StatusBadRequest, "Transfer is not in transit", err)
-			return
-		}
-		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to complete transfer", err)
-		return
-	}
+    // Optional override via query param for acting location
+    if locParam := c.Query("location_id"); locParam != "" {
+        if id, convErr := strconv.Atoi(locParam); convErr == nil {
+            actingLocationID = id
+        }
+    }
+    if actingLocationID == 0 {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required to complete", nil)
+        return
+    }
+
+    err = h.inventoryService.CompleteStockTransfer(transferID, companyID, actingLocationID, userID)
+    if err != nil {
+        if err.Error() == "transfer not found" {
+            utils.NotFoundResponse(c, "Transfer not found")
+            return
+        }
+        if err.Error() == "transfer is not in transit" {
+            utils.ErrorResponse(c, http.StatusBadRequest, "Transfer is not in transit", err)
+            return
+        }
+        if err.Error() == "completion must be done at destination location" {
+            utils.ErrorResponse(c, http.StatusBadRequest, "Completion must be done at destination location", err)
+            return
+        }
+        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to complete transfer", err)
+        return
+    }
 
 	utils.SuccessResponse(c, "Stock transfer completed successfully", nil)
 }

@@ -165,8 +165,8 @@ class _TransferTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final meLoc = ref.watch(locationNotifierProvider).selected?.locationId;
-    final incoming = meLoc != null && item.toLocationId == meLoc;
-    final outgoing = meLoc != null && item.fromLocationId == meLoc;
+    final incoming = meLoc != null && item.toLocationId == meLoc && item.fromLocationId != meLoc;
+    final outgoing = meLoc != null && item.fromLocationId == meLoc && item.toLocationId != meLoc;
     return ListTile(
       tileColor: theme.colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -194,4 +194,3 @@ class _TransferTile extends ConsumerWidget {
     );
   }
 }
-
