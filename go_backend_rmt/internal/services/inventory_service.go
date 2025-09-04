@@ -583,46 +583,50 @@ func (s *InventoryService) CompleteStockTransfer(transferID, companyID, actingLo
         return fmt.Errorf("completion must be done at destination location")
     }
 
-	// Get transfer items and process each
-	rows, err := tx.Query(`
-		SELECT product_id, quantity FROM stock_transfer_details 
-		WHERE transfer_id = $1
-	`, transferID)
-	if err != nil {
-		return fmt.Errorf("failed to get transfer items: %w", err)
-	}
-	defer rows.Close()
+    // Get transfer items first (drain rows), then process updates to avoid
+    // issuing new queries while the result set is still open (lib/pq quirk).
+    rows, err := tx.Query(`
+        SELECT product_id, quantity FROM stock_transfer_details 
+        WHERE transfer_id = $1
+    `, transferID)
+    if err != nil {
+        return fmt.Errorf("failed to get transfer items: %w", err)
+    }
+    var items []struct{ productID int; quantity float64 }
+    for rows.Next() {
+        var productID int
+        var quantity float64
+        if err := rows.Scan(&productID, &quantity); err != nil {
+            rows.Close()
+            return fmt.Errorf("failed to scan transfer item: %w", err)
+        }
+        items = append(items, struct{ productID int; quantity float64 }{productID: productID, quantity: quantity})
+    }
+    if err := rows.Close(); err != nil {
+        return fmt.Errorf("failed to close items cursor: %w", err)
+    }
 
-	for rows.Next() {
-		var productID int
-		var quantity float64
-		err := rows.Scan(&productID, &quantity)
-		if err != nil {
-			return fmt.Errorf("failed to scan transfer item: %w", err)
-		}
+    for _, it := range items {
+        // Reduce stock from source location
+        if _, err := tx.Exec(`
+            UPDATE stock SET quantity = quantity - $1, last_updated = CURRENT_TIMESTAMP
+            WHERE location_id = $2 AND product_id = $3
+        `, it.quantity, fromLocationID, it.productID); err != nil {
+            return fmt.Errorf("failed to reduce source stock: %w", err)
+        }
 
-		// Reduce stock from source location
-		_, err = tx.Exec(`
-			UPDATE stock SET quantity = quantity - $1, last_updated = CURRENT_TIMESTAMP
-			WHERE location_id = $2 AND product_id = $3
-		`, quantity, fromLocationID, productID)
-		if err != nil {
-			return fmt.Errorf("failed to reduce source stock: %w", err)
-		}
-
-		// Add stock to destination location
-		_, err = tx.Exec(`
-			INSERT INTO stock (location_id, product_id, quantity, last_updated)
-			VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-			ON CONFLICT (location_id, product_id)
-			DO UPDATE SET 
-				quantity = stock.quantity + $3,
-				last_updated = CURRENT_TIMESTAMP
-		`, toLocationID, productID, quantity)
-		if err != nil {
-			return fmt.Errorf("failed to add destination stock: %w", err)
-		}
-	}
+        // Add stock to destination location
+        if _, err := tx.Exec(`
+            INSERT INTO stock (location_id, product_id, quantity, last_updated)
+            VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+            ON CONFLICT (location_id, product_id)
+            DO UPDATE SET 
+                quantity = stock.quantity + $3,
+                last_updated = CURRENT_TIMESTAMP
+        `, toLocationID, it.productID, it.quantity); err != nil {
+            return fmt.Errorf("failed to add destination stock: %w", err)
+        }
+    }
 
 	// Mark transfer as completed
 	_, err = tx.Exec(`
