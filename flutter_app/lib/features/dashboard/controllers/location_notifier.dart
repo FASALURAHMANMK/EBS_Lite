@@ -6,7 +6,6 @@ import '../data/location_repository.dart';
 import '../data/models.dart';
 import '../../../core/api_client.dart';
 import '../../auth/controllers/auth_notifier.dart';
-import '../../auth/data/auth_repository.dart';
 import '../../../core/error_handler.dart';
 
 class LocationState {

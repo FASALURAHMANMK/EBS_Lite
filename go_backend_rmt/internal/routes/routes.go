@@ -23,7 +23,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 	authHandler := handlers.NewAuthHandler()
 	userHandler := handlers.NewUserHandler()
 	deviceSessionHandler := handlers.NewDeviceSessionHandler()
-	companyHandler := handlers.NewCompanyHandler()
+	companyHandler := handlers.NewCompanyHandler(cfg)
 	locationHandler := handlers.NewLocationHandler()
 	roleHandler := handlers.NewRoleHandler()
 	productHandler := handlers.NewProductHandler()
@@ -131,13 +131,14 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			// 	companies.DELETE("/:id", companyHandler.DeleteCompany)
 			// }
 
-			companies := protected.Group("/companies")
-			{
-				companies.GET("", middleware.RequireRole("Admin"), companyHandler.GetCompanies)
-				companies.POST("", companyHandler.CreateCompany) // No admin requirement for CREATE only
-				companies.PUT("/:id", middleware.RequireRole("Admin"), companyHandler.UpdateCompany)
-				companies.DELETE("/:id", middleware.RequireRole("Admin"), companyHandler.DeleteCompany)
-			}
+            companies := protected.Group("/companies")
+            {
+                companies.GET("", middleware.RequirePermission("VIEW_COMPANIES"), companyHandler.GetCompanies)
+                companies.POST("", companyHandler.CreateCompany) // No admin requirement for CREATE only
+                companies.PUT("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), companyHandler.UpdateCompany)
+                companies.DELETE("/:id", middleware.RequireRole("Admin"), companyHandler.DeleteCompany)
+                companies.POST("/:id/logo", middleware.RequirePermission("MANAGE_SETTINGS"), companyHandler.UploadCompanyLogo)
+            }
 
 			// Location management routes
 			locations := protected.Group("/locations")
@@ -234,12 +235,13 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
                 inventory.GET("/export", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.ExportInventory)
                 inventory.POST("/barcode", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GenerateBarcode)
                 inventory.GET("/transfers", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockTransfers)
-				inventory.GET("/transfers/:id", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockTransfer)
-				inventory.POST("/transfers", middleware.RequirePermission("CREATE_TRANSFERS"), inventoryHandler.CreateStockTransfer)
-				inventory.PUT("/transfers/:id/approve", middleware.RequirePermission("APPROVE_TRANSFERS"), inventoryHandler.ApproveStockTransfer)
-				inventory.PUT("/transfers/:id/complete", middleware.RequirePermission("APPROVE_TRANSFERS"), inventoryHandler.CompleteStockTransfer)
-				inventory.DELETE("/transfers/:id", middleware.RequirePermission("CREATE_TRANSFERS"), inventoryHandler.CancelStockTransfer)
-			}
+                inventory.GET("/transfers/:id", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockTransfer)
+                inventory.POST("/transfers", middleware.RequirePermission("CREATE_TRANSFERS"), inventoryHandler.CreateStockTransfer)
+                inventory.PUT("/transfers/:id/approve", middleware.RequirePermission("APPROVE_TRANSFERS"), inventoryHandler.ApproveStockTransfer)
+                inventory.PUT("/transfers/:id/complete", middleware.RequirePermission("APPROVE_TRANSFERS"), inventoryHandler.CompleteStockTransfer)
+                inventory.DELETE("/transfers/:id", middleware.RequirePermission("CREATE_TRANSFERS"), inventoryHandler.CancelStockTransfer)
+                inventory.GET("/product-transactions", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetProductTransactions)
+            }
 
 			// Sales management routes (require company and location)
 			sales := protected.Group("/sales")
@@ -652,4 +654,6 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			"message": "Method not allowed",
 		})
 	})
+    // Serve uploaded files
+    router.Static("/uploads", cfg.UploadPath)
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../controllers/ui_prefs_notifier.dart';
+import 'company_settings_page.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -45,6 +46,20 @@ class SettingsPage extends ConsumerWidget {
             tileColor: theme.colorScheme.surface,
           ),
           const SizedBox(height: 12),
+          ListTile(
+            leading: const Icon(Icons.business_rounded),
+            title: const Text('Company Settings'),
+            subtitle: const Text('Manage Company Settings'),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+            tileColor: theme.colorScheme.surface,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const CompanySettingsPage()),
+              );
+            },
+          ),
+           const SizedBox(height: 12),
           ListTile(
             leading: const Icon(Icons.security_rounded),
             title: const Text('Security'),

@@ -197,5 +197,19 @@ type ProductSummary struct {
 
 // BarcodeRequest defines the payload for generating inventory labels
 type BarcodeRequest struct {
-	ProductIDs []int `json:"product_ids" validate:"required,min=1"`
+    ProductIDs []int `json:"product_ids" validate:"required,min=1"`
+}
+
+// ProductTransaction represents any stock-affecting transaction for a product
+type ProductTransaction struct {
+    Type         string    `json:"type"`
+    OccurredAt   time.Time `json:"occurred_at"`
+    Reference    string    `json:"reference"`
+    Quantity     float64   `json:"quantity"`
+    LocationID   int       `json:"location_id"`
+    LocationName string    `json:"location_name,omitempty"`
+    PartnerName  *string   `json:"partner_name,omitempty"`
+    Entity       string    `json:"entity"`
+    EntityID     int       `json:"entity_id"`
+    Notes        *string   `json:"notes,omitempty"`
 }

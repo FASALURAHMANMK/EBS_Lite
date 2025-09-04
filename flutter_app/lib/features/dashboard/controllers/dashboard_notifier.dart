@@ -4,7 +4,6 @@ import 'package:dio/dio.dart';
 import '../data/dashboard_repository.dart';
 import '../data/models.dart';
 import '../../auth/controllers/auth_notifier.dart';
-import '../../auth/data/auth_repository.dart';
 import '../../../core/error_handler.dart';
 import 'location_notifier.dart';
 

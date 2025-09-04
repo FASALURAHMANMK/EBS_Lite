@@ -2454,3 +2454,15 @@ ALTER TABLE workflow_approvals ADD COLUMN IF NOT EXISTS updated_by INT REFERENCE
 UPDATE workflow_approvals SET created_by = 1, updated_by = 1 WHERE created_by IS NULL;
 ALTER TABLE workflow_approvals ALTER COLUMN created_by SET NOT NULL;
 
+ALTER TABLE currencies
+ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+
+-- Seed currencies (idempotent)
+INSERT INTO currencies (code, name, symbol, exchange_rate, is_base_currency)
+VALUES
+('USD', 'US Dollar', '$', 1.00, TRUE),
+('EUR', 'Euro', '€', 0.92, FALSE),
+('GBP', 'British Pound', '£', 0.78, FALSE),
+('INR', 'Indian Rupee', '₹', 83.00, FALSE),
+('AED', 'UAE Dirham', 'د.إ', 3.67, FALSE)
+ON CONFLICT (code) DO NOTHING;

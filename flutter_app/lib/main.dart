@@ -18,7 +18,6 @@ import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/presentation/splash_screen.dart';
 import 'features/auth/presentation/create_company_screen.dart';
-import 'features/auth/data/models.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/dashboard/controllers/location_notifier.dart';
 

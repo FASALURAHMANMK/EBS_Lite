@@ -3,6 +3,8 @@ import 'package:ebs_lite/shared/widgets/feature_grid.dart';
 import '../../../../shared/pages/feature_detail_page.dart';
 import 'stock_adjustments_page.dart';
 import 'inventory_management_page.dart';
+import 'inventory_view_page.dart';
+import 'stock_transfers_page.dart';
 import 'category_management_page.dart';
 import 'brand_management_page.dart';
 import 'attribute_management_page.dart';
@@ -15,15 +17,14 @@ class InventoryPage extends StatelessWidget {
     final items = [
       FeatureItem(
         icon: Icons.inventory_2_rounded,
-        label: 'Product View',
+        label: 'Inventory',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-              builder: (_) => const FeatureDetailPage(title: 'Product View')),
+          MaterialPageRoute(builder: (_) => const InventoryViewPage()),
         ),
       ),
       FeatureItem(
         icon: Icons.inventory_rounded,
-        label: 'Product Management',
+        label: 'Products',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const InventoryManagementPage()),
         ),
@@ -33,7 +34,7 @@ class InventoryPage extends StatelessWidget {
         label: 'Stock Transfer',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
-              builder: (_) => const FeatureDetailPage(title: 'Stock Transfer')),
+              builder: (_) => const StockTransfersPage()),
         ),
       ),
       FeatureItem(
@@ -46,21 +47,21 @@ class InventoryPage extends StatelessWidget {
       ),
       FeatureItem(
         icon: Icons.category_rounded,
-        label: 'Category Management',
+        label: 'Categories',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const CategoryManagementPage()),
         ),
       ),
       FeatureItem(
         icon: Icons.branding_watermark_rounded,
-        label: 'Brand Management',
+        label: 'Brands',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const BrandManagementPage()),
         ),
       ),
       FeatureItem(
         icon: Icons.build_rounded,
-        label: 'Attribute Management',
+        label: 'Attributes',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
               builder: (_) => const AttributeManagementPage()),

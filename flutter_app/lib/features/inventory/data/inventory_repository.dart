@@ -61,6 +61,15 @@ class InventoryRepository {
     return InventoryListItem.fromStockJson(data.first as Map<String, dynamic>);
   }
 
+  Future<InventoryListItem?> getStockForProductAtLocation(
+      {required int productId, required int locationId}) async {
+    final qp = <String, dynamic>{'product_id': productId, 'location_id': locationId};
+    final res = await _dio.get('/inventory/stock', queryParameters: qp);
+    final data = _extractList(res);
+    if (data.isEmpty) return null;
+    return InventoryListItem.fromStockJson(data.first as Map<String, dynamic>);
+  }
+
   Future<List<InventoryListItem>> searchProducts(String term) async {
     final loc = _requireLocation();
     final res = await _dio.get(
@@ -199,6 +208,27 @@ class InventoryRepository {
     await _dio.delete('/products/$id');
   }
 
+  Future<List<ProductTransactionDto>> getProductTransactions(
+    int productId, {
+    int? limit,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final loc = _requireLocation();
+    final qp = <String, dynamic>{
+      'product_id': productId,
+      'location_id': loc,
+    };
+    if (limit != null) qp['limit'] = limit;
+    if (from != null) qp['from_date'] = from.toIso8601String();
+    if (to != null) qp['to_date'] = to.toIso8601String();
+    final res = await _dio.get('/inventory/product-transactions', queryParameters: qp);
+    final data = _extractList(res);
+    return data
+        .map((e) => ProductTransactionDto.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<void> adjustStock({
     required int productId,
     required double adjustment,
@@ -270,6 +300,62 @@ class InventoryRepository {
     );
     final body = res.data is Map<String, dynamic> ? res.data['data'] : res.data;
     return StockAdjustmentDocumentDto.fromJson(body as Map<String, dynamic>);
+  }
+
+  // ===== Stock Transfer APIs =====
+  Future<List<StockTransferListItemDto>> getStockTransfers({
+    int? locationId,
+    int? sourceLocationId,
+    int? destinationLocationId,
+    String? status,
+  }) async {
+    final qp = <String, dynamic>{};
+    if (locationId != null) qp['location_id'] = locationId;
+    if (sourceLocationId != null) qp['source_location_id'] = sourceLocationId;
+    if (destinationLocationId != null) qp['destination_location_id'] = destinationLocationId;
+    if (status != null && status.isNotEmpty) qp['status'] = status;
+    final res = await _dio.get('/inventory/transfers', queryParameters: qp.isEmpty ? null : qp);
+    final data = _extractList(res);
+    return data.map((e) => StockTransferListItemDto.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<StockTransferDetailDto> getStockTransfer(int id) async {
+    final res = await _dio.get('/inventory/transfers/$id');
+    final body = res.data is Map<String, dynamic> ? res.data['data'] : res.data;
+    return StockTransferDetailDto.fromJson(body as Map<String, dynamic>);
+  }
+
+  Future<int> createStockTransfer({
+    required int toLocationId,
+    required List<Map<String, dynamic>> items,
+    String? notes,
+    int? fromLocationIdOverride,
+  }) async {
+    final qp = <String, dynamic>{};
+    if (fromLocationIdOverride != null) qp['location_id'] = fromLocationIdOverride;
+    final res = await _dio.post(
+      '/inventory/transfers',
+      queryParameters: qp.isEmpty ? null : qp,
+      data: {
+        'to_location_id': toLocationId,
+        'notes': notes,
+        'items': items,
+      },
+    );
+    final body = res.data is Map<String, dynamic> ? res.data['data'] : res.data;
+    return (body as Map<String, dynamic>)['transfer_id'] as int? ?? 0;
+  }
+
+  Future<void> approveStockTransfer(int id) async {
+    await _dio.put('/inventory/transfers/$id/approve');
+  }
+
+  Future<void> completeStockTransfer(int id) async {
+    await _dio.put('/inventory/transfers/$id/complete');
+  }
+
+  Future<void> cancelStockTransfer(int id) async {
+    await _dio.delete('/inventory/transfers/$id');
   }
 }
 

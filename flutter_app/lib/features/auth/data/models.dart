@@ -25,12 +25,33 @@ class User {
 class Company {
   final int companyId;
   final String name;
+  final String? logo;
+  final String? address;
+  final String? phone;
+  final String? email;
+  final String? taxNumber;
+  final int? currencyId;
 
-  Company({required this.companyId, required this.name});
+  Company({
+    required this.companyId,
+    required this.name,
+    this.logo,
+    this.address,
+    this.phone,
+    this.email,
+    this.taxNumber,
+    this.currencyId,
+  });
 
   factory Company.fromJson(Map<String, dynamic> json) => Company(
         companyId: json['company_id'] as int,
         name: json['name'] as String? ?? '',
+        logo: json['logo'] as String?,
+        address: json['address'] as String?,
+        phone: json['phone'] as String?,
+        email: json['email'] as String?,
+        taxNumber: json['tax_number'] as String?,
+        currencyId: json['currency_id'] as int?,
       );
 }
 

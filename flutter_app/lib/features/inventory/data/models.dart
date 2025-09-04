@@ -242,6 +242,47 @@ class StockAdjustmentDocumentDto {
       );
 }
 
+class ProductTransactionDto {
+  final String type; // SALE, PURCHASE, SALE_RETURN, PURCHASE_RETURN, ADJUSTMENT, TRANSFER_IN, TRANSFER_OUT
+  final DateTime? occurredAt;
+  final String reference;
+  final double quantity;
+  final int locationId;
+  final String? locationName;
+  final String? partnerName;
+  final String entity; // sale, purchase, stock_adjustment, transfer, sale_return, purchase_return
+  final int entityId;
+  final String? notes;
+
+  ProductTransactionDto({
+    required this.type,
+    required this.occurredAt,
+    required this.reference,
+    required this.quantity,
+    required this.locationId,
+    this.locationName,
+    this.partnerName,
+    required this.entity,
+    required this.entityId,
+    this.notes,
+  });
+
+  factory ProductTransactionDto.fromJson(Map<String, dynamic> json) => ProductTransactionDto(
+        type: json['type'] as String? ?? '',
+        occurredAt: json['occurred_at'] != null
+            ? DateTime.tryParse(json['occurred_at'] as String)
+            : null,
+        reference: json['reference'] as String? ?? '',
+        quantity: (json['quantity'] as num?)?.toDouble() ?? 0,
+        locationId: json['location_id'] as int? ?? 0,
+        locationName: json['location_name'] as String?,
+        partnerName: json['partner_name'] as String?,
+        entity: json['entity'] as String? ?? '',
+        entityId: json['entity_id'] as int? ?? 0,
+        notes: json['notes'] as String?,
+      );
+}
+
 class ProductDto {
   final int productId;
   final int companyId;
@@ -397,6 +438,145 @@ class CreateProductPayload {
           'attributes': attributes!.map((k, v) => MapEntry(k.toString(), v)),
       };
 }
+
+// Stock Transfer models
+class StockTransferItemSummaryDto {
+  final int productId;
+  final String productName;
+  final double quantity;
+
+  StockTransferItemSummaryDto({required this.productId, required this.productName, required this.quantity});
+
+  factory StockTransferItemSummaryDto.fromJson(Map<String, dynamic> json) => StockTransferItemSummaryDto(
+        productId: json['product_id'] as int,
+        productName: json['product_name'] as String? ?? '',
+        quantity: (json['quantity'] as num?)?.toDouble() ?? 0,
+      );
+}
+
+class StockTransferListItemDto {
+  final int transferId;
+  final String transferNumber;
+  final int fromLocationId;
+  final int toLocationId;
+  final String fromLocationName;
+  final String toLocationName;
+  final DateTime transferDate;
+  final String status; // PENDING, IN_TRANSIT, COMPLETED, CANCELLED
+  final String? notes;
+  final int createdBy;
+  final int? approvedBy;
+  final DateTime? approvedAt;
+  final List<StockTransferItemSummaryDto>? items;
+
+  StockTransferListItemDto({
+    required this.transferId,
+    required this.transferNumber,
+    required this.fromLocationId,
+    required this.toLocationId,
+    required this.fromLocationName,
+    required this.toLocationName,
+    required this.transferDate,
+    required this.status,
+    this.notes,
+    required this.createdBy,
+    this.approvedBy,
+    this.approvedAt,
+    this.items,
+  });
+
+  factory StockTransferListItemDto.fromJson(Map<String, dynamic> json) => StockTransferListItemDto(
+        transferId: json['transfer_id'] as int,
+        transferNumber: json['transfer_number'] as String? ?? '',
+        fromLocationId: json['from_location_id'] as int,
+        toLocationId: json['to_location_id'] as int,
+        fromLocationName: json['from_location_name'] as String? ?? '',
+        toLocationName: json['to_location_name'] as String? ?? '',
+        transferDate: DateTime.tryParse(json['transfer_date'] as String? ?? '') ?? DateTime.now(),
+        status: json['status'] as String? ?? 'PENDING',
+        notes: json['notes'] as String?,
+        createdBy: json['created_by'] as int? ?? 0,
+        approvedBy: json['approved_by'] as int?,
+        approvedAt: json['approved_at'] != null ? DateTime.tryParse(json['approved_at'] as String) : null,
+        items: (json['items'] as List?)?.map((e) => StockTransferItemSummaryDto.fromJson(e as Map<String, dynamic>)).toList(),
+      );
+}
+
+class StockTransferDetailItemDto {
+  final int transferDetailId;
+  final int productId;
+  final double quantity;
+  final double receivedQuantity;
+  final String productName;
+  final String? productSku;
+  final String? unitSymbol;
+
+  StockTransferDetailItemDto({
+    required this.transferDetailId,
+    required this.productId,
+    required this.quantity,
+    required this.receivedQuantity,
+    required this.productName,
+    this.productSku,
+    this.unitSymbol,
+  });
+
+  factory StockTransferDetailItemDto.fromJson(Map<String, dynamic> json) => StockTransferDetailItemDto(
+        transferDetailId: json['transfer_detail_id'] as int? ?? 0,
+        productId: json['product_id'] as int? ?? 0,
+        quantity: (json['quantity'] as num?)?.toDouble() ?? 0,
+        receivedQuantity: (json['received_quantity'] as num?)?.toDouble() ?? 0,
+        productName: json['product_name'] as String? ?? '',
+        productSku: json['product_sku'] as String?,
+        unitSymbol: json['unit_symbol'] as String?,
+      );
+}
+
+class StockTransferDetailDto {
+  final int transferId;
+  final String transferNumber;
+  final int fromLocationId;
+  final int toLocationId;
+  final String fromLocationName;
+  final String toLocationName;
+  final DateTime transferDate;
+  final String status;
+  final String? notes;
+  final String createdByName;
+  final String? approvedByName;
+  final List<StockTransferDetailItemDto> items;
+
+  StockTransferDetailDto({
+    required this.transferId,
+    required this.transferNumber,
+    required this.fromLocationId,
+    required this.toLocationId,
+    required this.fromLocationName,
+    required this.toLocationName,
+    required this.transferDate,
+    required this.status,
+    this.notes,
+    required this.createdByName,
+    this.approvedByName,
+    required this.items,
+  });
+
+  factory StockTransferDetailDto.fromJson(Map<String, dynamic> json) => StockTransferDetailDto(
+        transferId: json['transfer_id'] as int,
+        transferNumber: json['transfer_number'] as String? ?? '',
+        fromLocationId: json['from_location_id'] as int,
+        toLocationId: json['to_location_id'] as int,
+        fromLocationName: json['from_location_name'] as String? ?? '',
+        toLocationName: json['to_location_name'] as String? ?? '',
+        transferDate: DateTime.tryParse(json['transfer_date'] as String? ?? '') ?? DateTime.now(),
+        status: json['status'] as String? ?? 'PENDING',
+        notes: json['notes'] as String?,
+        createdByName: json['created_by_name'] as String? ?? '',
+        approvedByName: json['approved_by_name'] as String?,
+        items: (json['items'] as List?)?.map((e) => StockTransferDetailItemDto.fromJson(e as Map<String, dynamic>)).toList() ?? const [],
+      );
+}
+
 
 class ProductAttributeDefinitionDto {
   final int attributeId;

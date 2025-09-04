@@ -14,12 +14,16 @@ import (
 // Settings are stored as key-value pairs per company
 
 type SettingsService struct {
-	db *sql.DB
+    db *sql.DB
 }
 
 // NewSettingsService creates a new SettingsService
 func NewSettingsService() *SettingsService {
-	return &SettingsService{db: database.GetDB()}
+    s := &SettingsService{db: database.GetDB()}
+    // Best-effort ensure permissions exist so the frontend can access
+    // settings endpoints out of the box.
+    _ = s.ensureSettingsPermissions()
+    return s
 }
 
 // GetSettings retrieves all settings for a company
@@ -185,7 +189,62 @@ func (s *SettingsService) GetDeviceControlSettings(companyID int) (*models.Devic
 }
 
 func (s *SettingsService) UpdateDeviceControlSettings(companyID int, cfg models.DeviceControlSettings) error {
-	return s.updateJSONSetting(companyID, "device_control", cfg)
+    return s.updateJSONSetting(companyID, "device_control", cfg)
+}
+
+// ensureSettingsPermissions inserts required settings permissions and assigns
+// them to common roles if missing. This is idempotent and safe to call at startup.
+func (s *SettingsService) ensureSettingsPermissions() error {
+    // Insert permissions if missing
+    if _, err := s.db.Exec(`
+        INSERT INTO permissions (name, description, module, action)
+        VALUES ('VIEW_SETTINGS','View settings','settings','view')
+        ON CONFLICT (name) DO NOTHING
+    `); err != nil {
+        return fmt.Errorf("failed to ensure VIEW_SETTINGS: %w", err)
+    }
+    if _, err := s.db.Exec(`
+        INSERT INTO permissions (name, description, module, action)
+        VALUES ('MANAGE_SETTINGS','Manage settings','settings','manage')
+        ON CONFLICT (name) DO NOTHING
+    `); err != nil {
+        return fmt.Errorf("failed to ensure MANAGE_SETTINGS: %w", err)
+    }
+
+    // Assign to Super Admin (1) and Admin (2) by default (idempotent)
+    if _, err := s.db.Exec(`
+        INSERT INTO role_permissions (role_id, permission_id)
+        SELECT 1, p.permission_id FROM permissions p WHERE p.name IN ('VIEW_SETTINGS','MANAGE_SETTINGS')
+        ON CONFLICT (role_id, permission_id) DO NOTHING
+    `); err != nil {
+        return fmt.Errorf("failed to grant settings perms to role 1: %w", err)
+    }
+    if _, err := s.db.Exec(`
+        INSERT INTO role_permissions (role_id, permission_id)
+        SELECT 2, p.permission_id FROM permissions p WHERE p.name IN ('VIEW_SETTINGS','MANAGE_SETTINGS')
+        ON CONFLICT (role_id, permission_id) DO NOTHING
+    `); err != nil {
+        return fmt.Errorf("failed to grant settings perms to role 2: %w", err)
+    }
+    if _, err := s.db.Exec(`
+        INSERT INTO role_permissions (role_id, permission_id)
+        SELECT 3, p.permission_id FROM permissions p WHERE p.name = 'MANAGE_SETTINGS'
+        ON CONFLICT (role_id, permission_id) DO NOTHING
+    `); err != nil {
+        return fmt.Errorf("failed to grant MANAGE_SETTINGS to role 3: %w", err)
+    }
+    // At least allow viewing settings for common roles (Manager=3, Sales=4, Store=5)
+    if _, err := s.db.Exec(`
+        INSERT INTO role_permissions (role_id, permission_id)
+        SELECT r.role_id, p.permission_id
+        FROM permissions p
+        JOIN (VALUES (3),(4),(5)) AS r(role_id) ON TRUE
+        WHERE p.name = 'VIEW_SETTINGS'
+        ON CONFLICT (role_id, permission_id) DO NOTHING
+    `); err != nil {
+        return fmt.Errorf("failed to grant VIEW_SETTINGS to roles 3-5: %w", err)
+    }
+    return nil
 }
 
 // Payment methods CRUD

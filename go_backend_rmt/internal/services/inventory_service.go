@@ -956,3 +956,244 @@ func (s *InventoryService) GenerateBarcode(companyID int, req *models.BarcodeReq
 	// Placeholder - return empty PDF/label content
 	return []byte{}, nil
 }
+
+// GetProductTransactions returns a combined chronological list of stock-affecting
+// transactions for a single product at an optional location.
+func (s *InventoryService) GetProductTransactions(companyID int, productID int, locationID *int, limit *int, fromDate, toDate string) ([]models.ProductTransaction, error) {
+    args := []interface{}{companyID, productID}
+    idx := 3
+
+    // Helper to add optional filters to each SELECT
+    buildWhere := func(base string, locCol string, dateCol string) (string, []interface{}, int) {
+        q := base
+        a := make([]interface{}, 0)
+        added := 0
+        if locationID != nil {
+            q += fmt.Sprintf(" AND %s = $%d", locCol, idx)
+            a = append(a, *locationID)
+            idx++
+            added++
+        }
+        if fromDate != "" {
+            q += fmt.Sprintf(" AND %s >= $%d", dateCol, idx)
+            a = append(a, fromDate)
+            idx++
+            added++
+        }
+        if toDate != "" {
+            q += fmt.Sprintf(" AND %s <= $%d", dateCol, idx)
+            a = append(a, toDate)
+            idx++
+            added++
+        }
+        return q, a, added
+    }
+
+    selects := make([]string, 0)
+    selectArgs := make([]interface{}, 0)
+
+    // Sales (outgoing)
+    {
+        base := `
+            SELECT
+                'SALE' AS type,
+                s.created_at AS occurred_at,
+                s.sale_number AS reference,
+                -sd.quantity AS quantity,
+                s.location_id AS location_id,
+                l.name AS location_name,
+                c.name AS partner_name,
+                'sale' AS entity,
+                s.sale_id AS entity_id,
+                s.notes AS notes
+            FROM sale_details sd
+            JOIN sales s ON sd.sale_id = s.sale_id
+            JOIN locations l ON s.location_id = l.location_id
+            LEFT JOIN customers c ON s.customer_id = c.customer_id
+            WHERE l.company_id = $1 AND sd.product_id = $2 AND s.is_deleted = FALSE`
+        with, a, _ := buildWhere(base, "s.location_id", "s.created_at")
+        selects = append(selects, with)
+        selectArgs = append(selectArgs, a...)
+    }
+
+    // Sale returns (incoming)
+    {
+        base := `
+            SELECT
+                'SALE_RETURN' AS type,
+                sr.created_at AS occurred_at,
+                sr.return_number AS reference,
+                srd.quantity AS quantity,
+                sr.location_id AS location_id,
+                l.name AS location_name,
+                c.name AS partner_name,
+                'sale_return' AS entity,
+                sr.return_id AS entity_id,
+                NULL AS notes
+            FROM sale_return_details srd
+            JOIN sale_returns sr ON srd.return_id = sr.return_id
+            JOIN locations l ON sr.location_id = l.location_id
+            LEFT JOIN customers c ON sr.customer_id = c.customer_id
+            WHERE l.company_id = $1 AND srd.product_id = $2 AND sr.is_deleted = FALSE`
+        with, a, _ := buildWhere(base, "sr.location_id", "sr.created_at")
+        selects = append(selects, with)
+        selectArgs = append(selectArgs, a...)
+    }
+
+    // Purchases (incoming)
+    {
+        base := `
+            SELECT
+                'PURCHASE' AS type,
+                p.created_at AS occurred_at,
+                p.purchase_number AS reference,
+                pd.quantity AS quantity,
+                p.location_id AS location_id,
+                l.name AS location_name,
+                s.name AS partner_name,
+                'purchase' AS entity,
+                p.purchase_id AS entity_id,
+                p.notes AS notes
+            FROM purchase_details pd
+            JOIN purchases p ON pd.purchase_id = p.purchase_id
+            JOIN locations l ON p.location_id = l.location_id
+            LEFT JOIN suppliers s ON p.supplier_id = s.supplier_id
+            WHERE l.company_id = $1 AND pd.product_id = $2 AND p.is_deleted = FALSE`
+        with, a, _ := buildWhere(base, "p.location_id", "p.created_at")
+        selects = append(selects, with)
+        selectArgs = append(selectArgs, a...)
+    }
+
+    // Purchase returns (outgoing)
+    {
+        base := `
+            SELECT
+                'PURCHASE_RETURN' AS type,
+                pr.created_at AS occurred_at,
+                pr.return_number AS reference,
+                -prd.quantity AS quantity,
+                pr.location_id AS location_id,
+                l.name AS location_name,
+                s.name AS partner_name,
+                'purchase_return' AS entity,
+                pr.return_id AS entity_id,
+                NULL AS notes
+            FROM purchase_return_details prd
+            JOIN purchase_returns pr ON prd.return_id = pr.return_id
+            JOIN locations l ON pr.location_id = l.location_id
+            LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
+            WHERE l.company_id = $1 AND prd.product_id = $2 AND pr.is_deleted = FALSE`
+        with, a, _ := buildWhere(base, "pr.location_id", "pr.created_at")
+        selects = append(selects, with)
+        selectArgs = append(selectArgs, a...)
+    }
+
+    // Stock adjustments (could be +/-)
+    {
+        base := `
+            SELECT
+                'ADJUSTMENT' AS type,
+                sa.created_at AS occurred_at,
+                CONCAT('ADJ-', sa.adjustment_id) AS reference,
+                sa.adjustment AS quantity,
+                sa.location_id AS location_id,
+                l.name AS location_name,
+                NULL AS partner_name,
+                'stock_adjustment' AS entity,
+                sa.adjustment_id AS entity_id,
+                sa.reason AS notes
+            FROM stock_adjustments sa
+            JOIN locations l ON sa.location_id = l.location_id
+            WHERE l.company_id = $1 AND sa.product_id = $2`
+        with, a, _ := buildWhere(base, "sa.location_id", "sa.created_at")
+        selects = append(selects, with)
+        selectArgs = append(selectArgs, a...)
+    }
+
+    // Transfers OUT (outgoing from source)
+    {
+        base := `
+            SELECT
+                'TRANSFER_OUT' AS type,
+                st.created_at AS occurred_at,
+                st.transfer_number AS reference,
+                -std.quantity AS quantity,
+                st.from_location_id AS location_id,
+                lf.name AS location_name,
+                NULL AS partner_name,
+                'transfer' AS entity,
+                st.transfer_id AS entity_id,
+                st.notes AS notes
+            FROM stock_transfer_details std
+            JOIN stock_transfers st ON std.transfer_id = st.transfer_id
+            JOIN locations lf ON st.from_location_id = lf.location_id
+            JOIN locations lt ON st.to_location_id = lt.location_id
+            WHERE (lf.company_id = $1 OR lt.company_id = $1) AND std.product_id = $2`
+        with, a, _ := buildWhere(base, "st.from_location_id", "st.created_at")
+        selects = append(selects, with)
+        selectArgs = append(selectArgs, a...)
+    }
+
+    // Transfers IN (incoming to destination)
+    {
+        base := `
+            SELECT
+                'TRANSFER_IN' AS type,
+                st.created_at AS occurred_at,
+                st.transfer_number AS reference,
+                std.quantity AS quantity,
+                st.to_location_id AS location_id,
+                lt.name AS location_name,
+                NULL AS partner_name,
+                'transfer' AS entity,
+                st.transfer_id AS entity_id,
+                st.notes AS notes
+            FROM stock_transfer_details std
+            JOIN stock_transfers st ON std.transfer_id = st.transfer_id
+            JOIN locations lf ON st.from_location_id = lf.location_id
+            JOIN locations lt ON st.to_location_id = lt.location_id
+            WHERE (lf.company_id = $1 OR lt.company_id = $1) AND std.product_id = $2`
+        with, a, _ := buildWhere(base, "st.to_location_id", "st.created_at")
+        selects = append(selects, with)
+        selectArgs = append(selectArgs, a...)
+    }
+
+    query := "(" + selects[0] + ")"
+    for i := 1; i < len(selects); i++ {
+        query += " UNION ALL (" + selects[i] + ")"
+    }
+    query += " ORDER BY occurred_at DESC"
+    if limit != nil && *limit > 0 {
+        query += fmt.Sprintf(" LIMIT $%d", idx)
+        selectArgs = append(selectArgs, *limit)
+        idx++
+    }
+
+    // Final args: base (company, product) + per-select additions + optional limit
+    finalArgs := append([]interface{}{}, args...)
+    finalArgs = append(finalArgs, selectArgs...)
+
+    rows, err := s.db.Query(query, finalArgs...)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get product transactions: %w", err)
+    }
+    defer rows.Close()
+
+    res := make([]models.ProductTransaction, 0)
+    for rows.Next() {
+        var t models.ProductTransaction
+        var occurredAt time.Time
+        var partner *string
+        var notes *string
+        var locationName string
+        if err := rows.Scan(&t.Type, &occurredAt, &t.Reference, &t.Quantity, &t.LocationID, &locationName, &partner, &t.Entity, &t.EntityID, &notes); err != nil {
+            return nil, fmt.Errorf("failed to scan product transaction: %w", err)
+        }
+        t.OccurredAt = occurredAt
+        t.LocationName = locationName
+        t.PartnerName = partner
+        t.Notes = notes
+        res = append(res, t)
+    }
+    return res, nil
+}

@@ -373,6 +373,48 @@ func (h *InventoryHandler) GenerateBarcode(c *gin.Context) {
 	c.Data(http.StatusOK, "application/pdf", data)
 }
 
+// GET /inventory/product-transactions
+func (h *InventoryHandler) GetProductTransactions(c *gin.Context) {
+    companyID := c.GetInt("company_id")
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
+
+    // Required: product_id
+    productID, err := strconv.Atoi(c.Query("product_id"))
+    if err != nil || productID == 0 {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid product_id", err)
+        return
+    }
+
+    // Optional: location_id
+    var locationID *int
+    if v := c.Query("location_id"); v != "" {
+        if id, err := strconv.Atoi(v); err == nil && id > 0 {
+            locationID = &id
+        }
+    }
+
+    // Optional: limit, from_date, to_date
+    var limit *int
+    if v := c.Query("limit"); v != "" {
+        if l, err := strconv.Atoi(v); err == nil {
+            limit = &l
+        }
+    }
+    from := c.Query("from_date")
+    to := c.Query("to_date")
+
+    items, err := h.inventoryService.GetProductTransactions(companyID, productID, locationID, limit, from, to)
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get product transactions", err)
+        return
+    }
+    utils.SuccessResponse(c, "Product transactions retrieved successfully", items)
+}
+
+
 func (h *InventoryHandler) GetStockTransfer(c *gin.Context) {
 	companyID := c.GetInt("company_id")
 	if companyID == 0 {
