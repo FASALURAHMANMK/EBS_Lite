@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models.dart';
 import '../../data/supplier_repository.dart';
 import 'supplier_detail_page.dart';
+import 'supplier_create_page.dart';
 
 class SuppliersPage extends ConsumerStatefulWidget {
   const SuppliersPage({super.key});
@@ -27,8 +28,11 @@ class _SuppliersPageState extends ConsumerState<SuppliersPage> {
   }
 
   Future<void> _refresh() async {
-    setState(() => _future = _load());
-    await _future;
+    final f = _load();
+    setState(() {
+      _future = f;
+    });
+    await f;
   }
 
   @override
@@ -37,6 +41,18 @@ class _SuppliersPageState extends ConsumerState<SuppliersPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Suppliers'),
+        actions: [
+          IconButton(
+            tooltip: 'New Supplier',
+            icon: const Icon(Icons.add_rounded),
+            onPressed: () async {
+              final created = await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SupplierCreatePage()),
+              );
+              if (created == true) await _refresh();
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -105,4 +121,3 @@ class _SupplierTile extends StatelessWidget {
     );
   }
 }
-

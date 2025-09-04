@@ -96,7 +96,9 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       _barcodes = List.of(p.barcodes);
       final pri = _barcodes.firstWhere(
         (b) => b.isPrimary,
-        orElse: () => _barcodes.isNotEmpty ? _barcodes.first : ProductBarcodeDto(barcode: '', packSize: 1, isPrimary: true),
+        orElse: () => _barcodes.isNotEmpty
+            ? _barcodes.first
+            : ProductBarcodeDto(barcode: '', packSize: 1, isPrimary: true),
       );
       _itemCode.text = pri.barcode;
       _categoryId = p.categoryId;
@@ -115,25 +117,41 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
             orElse: () => BrandDto(brandId: -1, name: ''),
           )
           .name;
+      // Load supplier name if a default supplier is already linked
+      if (_defaultSupplierId != null) {
+        try {
+          final sup = await ref
+              .read(supplierRepositoryProvider)
+              .getSupplier(_defaultSupplierId!);
+          _supplierController.text = sup.name;
+        } catch (_) {
+          _supplierController.text = '';
+        }
+      } else {
+        _supplierController.text = '';
+      }
       // Initialize attribute controls
       final existing = p.attributes ?? const <int, String>{};
       for (final d in _attrDefs) {
         final existingVal = existing[d.attributeId];
         switch (d.type) {
           case 'BOOLEAN':
-            _attrBool[d.attributeId] = (existingVal ?? '').toLowerCase() == 'true';
+            _attrBool[d.attributeId] =
+                (existingVal ?? '').toLowerCase() == 'true';
             break;
           case 'SELECT':
             if (d.options != null && d.options!.isNotEmpty) {
-              _attrSelect[d.attributeId] = existingVal != null && d.options!.contains(existingVal)
-                  ? existingVal
-                  : d.options!.first;
+              _attrSelect[d.attributeId] =
+                  existingVal != null && d.options!.contains(existingVal)
+                      ? existingVal
+                      : d.options!.first;
             } else {
               _attrSelect[d.attributeId] = existingVal;
             }
             break;
           default:
-            _attrText[d.attributeId] = TextEditingController(text: existingVal ?? '');
+            _attrText[d.attributeId] =
+                TextEditingController(text: existingVal ?? '');
         }
       }
     } catch (e) {
@@ -177,7 +195,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
             isPrimary: true,
           );
         } else {
-          _barcodes.add(ProductBarcodeDto(barcode: _itemCode.text.trim(), packSize: 1, isPrimary: true));
+          _barcodes.add(ProductBarcodeDto(
+              barcode: _itemCode.text.trim(), packSize: 1, isPrimary: true));
         }
       }
 
@@ -275,35 +294,38 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                           (v == null || v.trim().isEmpty) ? 'Required' : null,
                       textInputAction: TextInputAction.next,
                     ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _supplierController,
-                  readOnly: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Default Supplier',
-                    suffixIcon: Icon(Icons.search_rounded),
-                  ),
-                  onTap: () async {
-                    final picked = await _openSupplierPicker();
-                    if (picked != null) {
-                      setState(() {
-                        _defaultSupplierId = picked.supplierId;
-                        _supplierController.text = picked.name;
-                      });
-                    }
-                  },
-                ),
-                const SizedBox(height: 12),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _supplierController,
+                      readOnly: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Default Supplier',
+                      ),
+                      onTap: () async {
+                        final picked = await _openSupplierPicker();
+                        if (picked != null) {
+                          setState(() {
+                            _defaultSupplierId = picked.supplierId;
+                            _supplierController.text = picked.name;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
                           child: TextFormField(
                             controller: _itemCode,
-                            decoration: const InputDecoration(labelText: 'Item Code'),
+                            decoration:
+                                const InputDecoration(labelText: 'Item Code'),
                             keyboardType: TextInputType.number,
                             enabled: false,
-                            validator: (v) =>
-                                (v == null || v.trim().isEmpty) ? 'Required' : (!RegExp(r'^\d+$').hasMatch(v.trim()) ? 'Digits only' : null),
+                            validator: (v) => (v == null || v.trim().isEmpty)
+                                ? 'Required'
+                                : (!RegExp(r'^\d+$').hasMatch(v.trim())
+                                    ? 'Digits only'
+                                    : null),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -333,7 +355,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                             elevation: 0,
                             child: ListTile(
                               title: Text(b.barcode),
-                              subtitle: Text('Conversion: ${b.packSize ?? 1} • Selling: ${b.sellingPrice?.toStringAsFixed(2) ?? '-'}'),
+                              subtitle: Text(
+                                  'Conversion: ${b.packSize ?? 1} • Selling: ${b.sellingPrice?.toStringAsFixed(2) ?? '-'}'),
                               trailing: Wrap(
                                 spacing: 8,
                                 children: [
@@ -341,7 +364,9 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                                     tooltip: 'Edit',
                                     icon: const Icon(Icons.edit_outlined),
                                     onPressed: () async {
-                                      final edited = await _showBarcodeDialog(context, initial: b);
+                                      final edited = await _showBarcodeDialog(
+                                          context,
+                                          initial: b);
                                       if (edited != null) {
                                         setState(() => _barcodes[i] = edited);
                                       }
@@ -349,8 +374,10 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                                   ),
                                   IconButton(
                                     tooltip: 'Delete',
-                                    icon: const Icon(Icons.delete_outline_rounded),
-                                    onPressed: () => setState(() => _barcodes.removeAt(i)),
+                                    icon: const Icon(
+                                        Icons.delete_outline_rounded),
+                                    onPressed: () =>
+                                        setState(() => _barcodes.removeAt(i)),
                                   ),
                                 ],
                               ),
@@ -393,7 +420,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _reorder,
-                      decoration: const InputDecoration(labelText: 'Reorder Level'),
+                      decoration:
+                          const InputDecoration(labelText: 'Reorder Level'),
                       keyboardType: TextInputType.number,
                       textInputAction: TextInputAction.next,
                     ),
@@ -420,7 +448,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                             valueText: _categories
                                 .firstWhere(
                                   (c) => c.categoryId == _categoryId,
-                                  orElse: () => CategoryDto(categoryId: -1, name: ''),
+                                  orElse: () =>
+                                      CategoryDto(categoryId: -1, name: ''),
                                 )
                                 .name,
                             icon: Icons.category_rounded,
@@ -543,7 +572,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         final opts = d.options ?? const <String>[];
         return _SelectField(
           label: d.name + (d.isRequired ? ' *' : ''),
-          valueText: _attrSelect[d.attributeId] ?? (opts.isNotEmpty ? opts.first : ''),
+          valueText:
+              _attrSelect[d.attributeId] ?? (opts.isNotEmpty ? opts.first : ''),
           icon: Icons.list_rounded,
           onTap: () async {
             final picked = await _openAttributeOptionDialog(d);
@@ -553,11 +583,13 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
           },
         );
       case 'DATE':
-        final c = _attrText.putIfAbsent(d.attributeId, () => TextEditingController());
+        final c =
+            _attrText.putIfAbsent(d.attributeId, () => TextEditingController());
         return TextFormField(
           controller: c,
           readOnly: true,
-          decoration: InputDecoration(labelText: d.name + (d.isRequired ? ' *' : '')),
+          decoration:
+              InputDecoration(labelText: d.name + (d.isRequired ? ' *' : '')),
           onTap: () async {
             final now = DateTime.now();
             final picked = await showDatePicker(
@@ -567,24 +599,33 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
               lastDate: DateTime(now.year + 10),
             );
             if (picked != null) {
-              final s = '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+              final s =
+                  '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
               c.text = s;
             }
           },
           validator: (v) {
-            if (d.isRequired && (v == null || v.trim().isEmpty)) return 'Required';
+            if (d.isRequired && (v == null || v.trim().isEmpty))
+              return 'Required';
             return null;
           },
         );
       default:
-        final c = _attrText.putIfAbsent(d.attributeId, () => TextEditingController());
+        final c =
+            _attrText.putIfAbsent(d.attributeId, () => TextEditingController());
         return TextFormField(
           controller: c,
-          decoration: InputDecoration(labelText: d.name + (d.isRequired ? ' *' : '')),
-          keyboardType: d.type == 'NUMBER' ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+          decoration:
+              InputDecoration(labelText: d.name + (d.isRequired ? ' *' : '')),
+          keyboardType: d.type == 'NUMBER'
+              ? const TextInputType.numberWithOptions(decimal: true)
+              : TextInputType.text,
           validator: (v) {
-            if (d.isRequired && (v == null || v.trim().isEmpty)) return 'Required';
-            if ((v ?? '').isNotEmpty && d.type == 'NUMBER' && double.tryParse(v!.trim()) == null) {
+            if (d.isRequired && (v == null || v.trim().isEmpty))
+              return 'Required';
+            if ((v ?? '').isNotEmpty &&
+                d.type == 'NUMBER' &&
+                double.tryParse(v!.trim()) == null) {
               return 'Enter a valid number';
             }
             return null;
@@ -780,7 +821,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                           itemCount: filtered.length,
                           itemBuilder: (context, i) {
                             final u = filtered[i];
-                            final label = '${u.name}${u.symbol != null ? ' (${u.symbol})' : ''}';
+                            final label =
+                                '${u.name}${u.symbol != null ? ' (${u.symbol})' : ''}';
                             return RadioListTile<int>(
                               value: u.unitId,
                               groupValue: current,
@@ -818,9 +860,11 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     );
   }
 
-  Future<String?> _openAttributeOptionDialog(ProductAttributeDefinitionDto d) async {
+  Future<String?> _openAttributeOptionDialog(
+      ProductAttributeDefinitionDto d) async {
     final opts = d.options ?? const <String>[];
-    String? current = _attrSelect[d.attributeId] ?? (opts.isNotEmpty ? opts.first : null);
+    String? current =
+        _attrSelect[d.attributeId] ?? (opts.isNotEmpty ? opts.first : null);
     return showDialog<String?>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -878,12 +922,16 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
-                  decoration: const InputDecoration(hintText: 'Search', prefixIcon: Icon(Icons.search_rounded)),
+                  decoration: const InputDecoration(
+                      hintText: 'Search',
+                      prefixIcon: Icon(Icons.search_rounded)),
                   onChanged: (v) async {
                     query = v.trim();
                     final repo = ref.read(supplierRepositoryProvider);
                     final list = await repo.getSuppliers(search: query);
-                    setInner(() => results = list.map((e) => _SupplierPick(e.supplierId, e.name)).toList());
+                    setInner(() => results = list
+                        .map((e) => _SupplierPick(e.supplierId, e.name))
+                        .toList());
                   },
                 ),
                 const SizedBox(height: 8),
@@ -904,7 +952,9 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel')),
           ],
         ),
       ),
@@ -919,7 +969,11 @@ class _SupplierPick {
 }
 
 class _SelectField extends StatelessWidget {
-  const _SelectField({required this.label, required this.valueText, required this.icon, required this.onTap});
+  const _SelectField(
+      {required this.label,
+      required this.valueText,
+      required this.icon,
+      required this.onTap});
   final String label;
   final String valueText;
   final IconData icon;
@@ -954,10 +1008,12 @@ class _SelectField extends StatelessWidget {
   }
 }
 
-Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context, {ProductBarcodeDto? initial}) async {
+Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context,
+    {ProductBarcodeDto? initial}) async {
   final code = TextEditingController(text: initial?.barcode ?? '');
   final pack = TextEditingController(text: (initial?.packSize ?? 1).toString());
-  final sell = TextEditingController(text: initial?.sellingPrice?.toString() ?? '');
+  final sell =
+      TextEditingController(text: initial?.sellingPrice?.toString() ?? '');
   return showDialog<ProductBarcodeDto>(
     context: context,
     builder: (context) => AlertDialog(
@@ -986,8 +1042,10 @@ Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context, {ProductBarc
                 Expanded(
                   child: TextField(
                     controller: sell,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Selling Price'),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration:
+                        const InputDecoration(labelText: 'Selling Price'),
                   ),
                 ),
               ],
@@ -1006,14 +1064,16 @@ Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context, {ProductBarc
             if (s.isEmpty || !RegExp(r'^\d+$').hasMatch(s)) {
               ScaffoldMessenger.of(context)
                 ..hideCurrentSnackBar()
-                ..showSnackBar(const SnackBar(content: Text('Barcode must be digits only')));
+                ..showSnackBar(const SnackBar(
+                    content: Text('Barcode must be digits only')));
               return;
             }
             final p = int.tryParse(pack.text.trim()) ?? 1;
             if (p < 1) {
               ScaffoldMessenger.of(context)
                 ..hideCurrentSnackBar()
-                ..showSnackBar(const SnackBar(content: Text('Conversion must be at least 1')));
+                ..showSnackBar(const SnackBar(
+                    content: Text('Conversion must be at least 1')));
               return;
             }
             final sp = double.tryParse(sell.text.trim());
