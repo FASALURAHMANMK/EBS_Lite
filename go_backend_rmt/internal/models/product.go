@@ -19,8 +19,9 @@ type Product struct {
 	IsActive     bool                    `json:"is_active" db:"is_active"`
 	CreatedBy    int                     `json:"created_by" db:"created_by"`
 	UpdatedBy    *int                    `json:"updated_by,omitempty" db:"updated_by"`
-	Attributes   []ProductAttributeValue `json:"attributes,omitempty" db:"-"`
-	SyncModel
+    Attributes   []ProductAttributeValue `json:"attributes,omitempty" db:"-"`
+    DefaultSupplierID *int               `json:"default_supplier_id,omitempty" db:"default_supplier_id"`
+    SyncModel
 }
 
 type CreateProductRequest struct {
@@ -37,7 +38,8 @@ type CreateProductRequest struct {
 	Weight       *float64         `json:"weight,omitempty"`
 	Dimensions   *string          `json:"dimensions,omitempty"`
 	IsSerialized bool             `json:"is_serialized"`
-	Attributes   map[int]string   `json:"attributes,omitempty"`
+    Attributes   map[int]string   `json:"attributes,omitempty"`
+    DefaultSupplierID *int        `json:"default_supplier_id,omitempty"`
 }
 
 type UpdateProductRequest struct {
@@ -55,7 +57,8 @@ type UpdateProductRequest struct {
 	Dimensions   *string          `json:"dimensions,omitempty"`
 	IsSerialized *bool            `json:"is_serialized,omitempty"`
 	IsActive     *bool            `json:"is_active,omitempty"`
-	Attributes   map[int]string   `json:"attributes,omitempty"`
+    Attributes   map[int]string   `json:"attributes,omitempty"`
+    DefaultSupplierID *int        `json:"default_supplier_id,omitempty"`
 }
 
 type Category struct {

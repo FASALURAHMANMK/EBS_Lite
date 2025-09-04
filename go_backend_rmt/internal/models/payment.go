@@ -1,0 +1,21 @@
+package models
+
+import "time"
+
+// Payment represents a supplier payment entry.
+type Payment struct {
+    PaymentID      int        `json:"payment_id" db:"payment_id"`
+    PaymentNumber  string     `json:"payment_number" db:"payment_number"`
+    SupplierID     *int       `json:"supplier_id,omitempty" db:"supplier_id"`
+    PurchaseID     *int       `json:"purchase_id,omitempty" db:"purchase_id"`
+    LocationID     *int       `json:"location_id,omitempty" db:"location_id"`
+    Amount         float64    `json:"amount" db:"amount"`
+    PaymentMethodID *int      `json:"payment_method_id,omitempty" db:"payment_method_id"`
+    ReferenceNumber *string   `json:"reference_number,omitempty" db:"reference_number"`
+    Notes          *string    `json:"notes,omitempty" db:"notes"`
+    PaymentDate    time.Time  `json:"payment_date" db:"payment_date"`
+    CreatedBy      int        `json:"created_by" db:"created_by"`
+    UpdatedBy      *int       `json:"updated_by,omitempty" db:"updated_by"`
+    SyncModel
+}
+

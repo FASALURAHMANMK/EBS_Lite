@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
 import 'package:ebs_lite/shared/pages/feature_detail_page.dart';
+import '../../../suppliers/presentation/pages/suppliers_page.dart';
 
 class PurchasesPage extends StatelessWidget {
   const PurchasesPage({super.key});
@@ -40,7 +41,7 @@ class PurchasesPage extends StatelessWidget {
         icon: Icons.local_shipping_rounded,
         label: 'Supplier Management',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FeatureDetailPage(title: 'Supplier Management')),
+          MaterialPageRoute(builder: (_) => const SuppliersPage()),
         ),
       ),
     ];
@@ -48,4 +49,3 @@ class PurchasesPage extends StatelessWidget {
     return FeatureGrid(items: items);
   }
 }
-

@@ -36,7 +36,8 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 	purchaseHandler := handlers.NewPurchaseHandler()
 	purchaseOrderHandler := handlers.NewPurchaseOrderHandler()
 	goodsReceiptHandler := handlers.NewGoodsReceiptHandler()
-	supplierHandler := handlers.NewSupplierHandler()
+    supplierHandler := handlers.NewSupplierHandler()
+    paymentHandler := handlers.NewPaymentHandler()
 	customerHandler := handlers.NewCustomerHandler()
 	collectionHandler := handlers.NewCollectionHandler()
 	cashRegisterHandler := handlers.NewCashRegisterHandler()
@@ -501,18 +502,25 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			}
 
 			// Supplier management routes (require company)
-			suppliers := protected.Group("/suppliers")
-			suppliers.Use(middleware.RequireCompanyAccess())
-			{
-				suppliers.GET("", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.GetSuppliers)
-				suppliers.POST("/import", middleware.RequirePermission("CREATE_SUPPLIERS"), supplierHandler.ImportSuppliers)
-				suppliers.GET("/export", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.ExportSuppliers)
-				suppliers.GET("/:id/summary", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.GetSupplierSummary)
-				suppliers.GET("/:id", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.GetSupplier)
-				suppliers.POST("", middleware.RequirePermission("CREATE_SUPPLIERS"), supplierHandler.CreateSupplier)
-				suppliers.PUT("/:id", middleware.RequirePermission("UPDATE_SUPPLIERS"), supplierHandler.UpdateSupplier)
-				suppliers.DELETE("/:id", middleware.RequirePermission("DELETE_SUPPLIERS"), supplierHandler.DeleteSupplier)
-			}
+            suppliers := protected.Group("/suppliers")
+            suppliers.Use(middleware.RequireCompanyAccess())
+            {
+                suppliers.GET("", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.GetSuppliers)
+                suppliers.POST("/import", middleware.RequirePermission("CREATE_SUPPLIERS"), supplierHandler.ImportSuppliers)
+                suppliers.GET("/export", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.ExportSuppliers)
+                suppliers.GET("/:id/summary", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.GetSupplierSummary)
+                suppliers.GET("/:id", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.GetSupplier)
+                suppliers.POST("", middleware.RequirePermission("CREATE_SUPPLIERS"), supplierHandler.CreateSupplier)
+                suppliers.PUT("/:id", middleware.RequirePermission("UPDATE_SUPPLIERS"), supplierHandler.UpdateSupplier)
+                suppliers.DELETE("/:id", middleware.RequirePermission("DELETE_SUPPLIERS"), supplierHandler.DeleteSupplier)
+            }
+
+            // Payments (supplier) routes
+            payments := protected.Group("/payments")
+            payments.Use(middleware.RequireCompanyAccess())
+            {
+                payments.GET("", middleware.RequirePermission("VIEW_PURCHASES"), paymentHandler.GetPayments)
+            }
 
 			// Currency routes
 			currencies := protected.Group("/currencies")

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
+import '../../../suppliers/data/supplier_repository.dart';
 
 class ProductFormPage extends ConsumerStatefulWidget {
   const ProductFormPage({super.key, this.initialName});
@@ -40,8 +41,10 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   int? _categoryId;
   int? _brandId;
   int? _unitId;
+  int? _defaultSupplierId;
   final _categoryController = TextEditingController();
   final _brandController = TextEditingController();
+  final _supplierController = TextEditingController();
   // Barcodes handled via dialog
   List<ProductBarcodeDto> _barcodes = [];
 
@@ -59,6 +62,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     }
     _categoryController.dispose();
     _brandController.dispose();
+    _supplierController.dispose();
     super.dispose();
   }
 
@@ -166,6 +170,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         categoryId: _categoryId,
         brandId: _brandId,
         unitId: _unitId,
+        defaultSupplierId: _defaultSupplierId,
         description: null,
         weight: null,
         dimensions: null,
@@ -238,6 +243,24 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       decoration: const InputDecoration(labelText: 'Name'),
                       validator: _req,
                       textInputAction: TextInputAction.next,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _supplierController,
+                      readOnly: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Default Supplier',
+                        suffixIcon: Icon(Icons.search_rounded),
+                      ),
+                      onTap: () async {
+                        final picked = await _openSupplierPicker();
+                        if (picked != null) {
+                          setState(() {
+                            _defaultSupplierId = picked.supplierId;
+                            _supplierController.text = picked.name;
+                          });
+                        }
+                      },
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -827,6 +850,60 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       ],
     );
   }
+
+  Future<_SupplierPick?> _openSupplierPicker() async {
+    String query = '';
+    List<_SupplierPick> results = const [];
+    return showDialog<_SupplierPick>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setInner) => AlertDialog(
+          title: const Text('Select Supplier'),
+          content: SizedBox(
+            width: 480,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  decoration: const InputDecoration(hintText: 'Search', prefixIcon: Icon(Icons.search_rounded)),
+                  onChanged: (v) async {
+                    query = v.trim();
+                    final repo = ref.read(supplierRepositoryProvider);
+                    final list = await repo.getSuppliers(search: query);
+                    setInner(() => results = list.map((e) => _SupplierPick(e.supplierId, e.name)).toList());
+                  },
+                ),
+                const SizedBox(height: 8),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: results.length,
+                    itemBuilder: (context, i) {
+                      final s = results[i];
+                      return ListTile(
+                        title: Text(s.name),
+                        onTap: () => Navigator.of(context).pop(s),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+          ],
+        ),
+      ),
+    );
+  }
+
+}
+
+class _SupplierPick {
+  final int supplierId;
+  final String name;
+  const _SupplierPick(this.supplierId, this.name);
 }
 
 class _SelectField extends StatelessWidget {

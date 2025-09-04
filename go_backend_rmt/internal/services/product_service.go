@@ -112,22 +112,24 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 }
 
 func (s *ProductService) GetProductByID(productID, companyID int) (*models.Product, error) {
-	query := `
+    query := `
                 SELECT product_id, company_id, category_id, brand_id, unit_id, name, sku,
                            description, cost_price, selling_price, reorder_level, weight, dimensions,
-                           is_serialized, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted
+                           is_serialized, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted,
+                           default_supplier_id
                 FROM products
                 WHERE product_id = $1 AND company_id = $2 AND is_deleted = FALSE
         `
 
 	var product models.Product
-	err := s.db.QueryRow(query, productID, companyID).Scan(
-		&product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
-		&product.UnitID, &product.Name, &product.SKU, &product.Description,
-		&product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
-		&product.Dimensions, &product.IsSerialized, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
-		&product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
-	)
+    err := s.db.QueryRow(query, productID, companyID).Scan(
+        &product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
+        &product.UnitID, &product.Name, &product.SKU, &product.Description,
+        &product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
+        &product.Dimensions, &product.IsSerialized, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
+        &product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
+        &product.DefaultSupplierID,
+    )
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("product not found")
@@ -179,21 +181,21 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 	}
 	defer tx.Rollback()
 
-	query := `
+    query := `
                 INSERT INTO products (
                         company_id, category_id, brand_id, unit_id, name, sku, description,
                         cost_price, selling_price, reorder_level, weight, dimensions, is_serialized,
-                        created_by, updated_by
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                        created_by, updated_by, default_supplier_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
                 RETURNING product_id, created_at
         `
 
 	var product models.Product
-	err = tx.QueryRow(query,
-		companyID, req.CategoryID, req.BrandID, req.UnitID, req.Name, req.SKU,
-		req.Description, req.CostPrice, req.SellingPrice, req.ReorderLevel, req.Weight,
-		req.Dimensions, req.IsSerialized, userID, userID,
-	).Scan(&product.ProductID, &product.CreatedAt)
+    err = tx.QueryRow(query,
+        companyID, req.CategoryID, req.BrandID, req.UnitID, req.Name, req.SKU,
+        req.Description, req.CostPrice, req.SellingPrice, req.ReorderLevel, req.Weight,
+        req.Dimensions, req.IsSerialized, userID, userID, req.DefaultSupplierID,
+    ).Scan(&product.ProductID, &product.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create product: %w", err)
 	}
@@ -233,7 +235,8 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 	product.IsActive = true
 	product.CreatedBy = userID
 	product.UpdatedBy = &userID
-	product.Attributes, _ = s.getProductAttributes(product.ProductID)
+    product.Attributes, _ = s.getProductAttributes(product.ProductID)
+    product.DefaultSupplierID = req.DefaultSupplierID
 
 	return &product, nil
 }
@@ -349,12 +352,18 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 		args = append(args, *req.IsSerialized)
 		changes["is_serialized"] = *req.IsSerialized
 	}
-	if req.IsActive != nil {
-		argCount++
-		setParts = append(setParts, fmt.Sprintf("is_active = $%d", argCount))
-		args = append(args, *req.IsActive)
-		changes["is_active"] = *req.IsActive
-	}
+    if req.IsActive != nil {
+        argCount++
+        setParts = append(setParts, fmt.Sprintf("is_active = $%d", argCount))
+        args = append(args, *req.IsActive)
+        changes["is_active"] = *req.IsActive
+    }
+    if req.DefaultSupplierID != nil {
+        argCount++
+        setParts = append(setParts, fmt.Sprintf("default_supplier_id = $%d", argCount))
+        args = append(args, *req.DefaultSupplierID)
+        changes["default_supplier_id"] = *req.DefaultSupplierID
+    }
 	if req.Barcodes != nil {
 		changes["barcodes"] = req.Barcodes
 	}

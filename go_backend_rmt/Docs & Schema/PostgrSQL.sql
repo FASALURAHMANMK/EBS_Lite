@@ -2457,6 +2457,10 @@ ALTER TABLE workflow_approvals ALTER COLUMN created_by SET NOT NULL;
 ALTER TABLE currencies
 ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
 
+-- Optional: Default supplier link for products
+ALTER TABLE products
+ADD COLUMN IF NOT EXISTS default_supplier_id INTEGER REFERENCES suppliers(supplier_id);
+
 -- Seed currencies (idempotent)
 INSERT INTO currencies (code, name, symbol, exchange_rate, is_base_currency)
 VALUES

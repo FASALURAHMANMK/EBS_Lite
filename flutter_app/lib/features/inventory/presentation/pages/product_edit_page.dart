@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
+import '../../../suppliers/data/supplier_repository.dart';
 
 class ProductEditPage extends ConsumerStatefulWidget {
   const ProductEditPage({super.key, required this.productId});
@@ -40,8 +41,10 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   int? _categoryId;
   int? _brandId;
   int? _unitId;
+  int? _defaultSupplierId;
   final _categoryController = TextEditingController();
   final _brandController = TextEditingController();
+  final _supplierController = TextEditingController();
   // description/weight/dimensions removed; use attributes
 
   @override
@@ -60,6 +63,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     _itemCode.dispose();
     _categoryController.dispose();
     _brandController.dispose();
+    _supplierController.dispose();
     for (final c in _attrText.values) {
       c.dispose();
     }
@@ -98,6 +102,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       _categoryId = p.categoryId;
       _brandId = p.brandId;
       _unitId = p.unitId;
+      _defaultSupplierId = p.defaultSupplierId;
       _categoryController.text = _categories
           .firstWhere(
             (c) => c.categoryId == _categoryId,
@@ -182,6 +187,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         categoryId: _categoryId,
         brandId: _brandId,
         unitId: _unitId,
+        defaultSupplierId: _defaultSupplierId,
         name: _name.text.trim(),
         sku: _sku.text.trim().isEmpty ? null : _sku.text.trim(),
         description: null,
@@ -269,7 +275,25 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                           (v == null || v.trim().isEmpty) ? 'Required' : null,
                       textInputAction: TextInputAction.next,
                     ),
-                    const SizedBox(height: 12),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _supplierController,
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Default Supplier',
+                    suffixIcon: Icon(Icons.search_rounded),
+                  ),
+                  onTap: () async {
+                    final picked = await _openSupplierPicker();
+                    if (picked != null) {
+                      setState(() {
+                        _defaultSupplierId = picked.supplierId;
+                        _supplierController.text = picked.name;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
@@ -839,6 +863,60 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       ),
     );
   }
+
+  Future<_SupplierPick?> _openSupplierPicker() async {
+    String query = '';
+    List<_SupplierPick> results = const [];
+    return showDialog<_SupplierPick>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setInner) => AlertDialog(
+          title: const Text('Select Supplier'),
+          content: SizedBox(
+            width: 480,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  decoration: const InputDecoration(hintText: 'Search', prefixIcon: Icon(Icons.search_rounded)),
+                  onChanged: (v) async {
+                    query = v.trim();
+                    final repo = ref.read(supplierRepositoryProvider);
+                    final list = await repo.getSuppliers(search: query);
+                    setInner(() => results = list.map((e) => _SupplierPick(e.supplierId, e.name)).toList());
+                  },
+                ),
+                const SizedBox(height: 8),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: results.length,
+                    itemBuilder: (context, i) {
+                      final s = results[i];
+                      return ListTile(
+                        title: Text(s.name),
+                        onTap: () => Navigator.of(context).pop(s),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SupplierPick {
+  final int supplierId;
+  final String name;
+  const _SupplierPick(this.supplierId, this.name);
+}
 }
 
 class _SelectField extends StatelessWidget {
@@ -935,6 +1013,8 @@ Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context, {ProductBarc
             final p = int.tryParse(pack.text.trim()) ?? 1;
             if (p < 1) {
               ScaffoldMessenger.of(context)
+      _supplierController.text = '';
+      // Supplier name isn't in product, leave blank
                 ..hideCurrentSnackBar()
                 ..showSnackBar(const SnackBar(content: Text('Conversion must be at least 1')));
               return;

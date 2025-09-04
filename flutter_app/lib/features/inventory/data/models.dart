@@ -301,6 +301,7 @@ class ProductDto {
   final bool isActive;
   final List<ProductBarcodeDto> barcodes;
   final Map<int, String>? attributes;
+  final int? defaultSupplierId;
 
   ProductDto({
     required this.productId,
@@ -320,6 +321,7 @@ class ProductDto {
     required this.isActive,
     required this.barcodes,
     this.attributes,
+    this.defaultSupplierId,
   });
 
   factory ProductDto.fromJson(Map<String, dynamic> json) => ProductDto(
@@ -364,6 +366,7 @@ class ProductDto {
           }
           return null;
         }(),
+        defaultSupplierId: json['default_supplier_id'] as int?,
       );
 
   Map<String, dynamic> toUpdateJson() => {
@@ -384,6 +387,7 @@ class ProductDto {
           'barcodes': barcodes.map((b) => b.toJson()).toList(),
         if (attributes != null && attributes!.isNotEmpty)
           'attributes': attributes!.map((k, v) => MapEntry(k.toString(), v)),
+        if (defaultSupplierId != null) 'default_supplier_id': defaultSupplierId,
       };
 }
 
@@ -402,6 +406,7 @@ class CreateProductPayload {
   final bool isSerialized;
   final List<ProductBarcodeDto> barcodes;
   final Map<int, String>? attributes;
+  final int? defaultSupplierId;
 
   CreateProductPayload({
     this.categoryId,
@@ -418,6 +423,7 @@ class CreateProductPayload {
     this.isSerialized = false,
     required this.barcodes,
     this.attributes,
+    this.defaultSupplierId,
   });
 
   Map<String, dynamic> toJson() => {
@@ -436,6 +442,7 @@ class CreateProductPayload {
         'barcodes': barcodes.map((e) => e.toJson()).toList(),
         if (attributes != null && attributes!.isNotEmpty)
           'attributes': attributes!.map((k, v) => MapEntry(k.toString(), v)),
+        if (defaultSupplierId != null) 'default_supplier_id': defaultSupplierId,
       };
 }
 
