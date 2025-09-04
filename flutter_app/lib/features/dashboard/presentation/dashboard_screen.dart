@@ -19,7 +19,6 @@ import 'package:ebs_lite/features/customers/presentation/pages/customers_page.da
 import 'package:ebs_lite/features/accounts/presentation/pages/accounting_page.dart';
 import 'package:ebs_lite/features/hr/presentation/pages/hr_page.dart';
 import 'pages/settings_page.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:ebs_lite/features/notifications/presentation/pages/notifications_page.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -36,6 +35,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void initState() {
     super.initState();
   }
+
   // Primary tabs for bottom navigation
   static const _primaryTabs = <_NavItem>[
     _NavItem('Dashboard', Icons.dashboard_rounded),
@@ -95,7 +95,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     // Prompt for location selection if user has multiple locations and none selected
     final locState = ref.watch(locationNotifierProvider);
-    if (!_promptedLocation && locState.selected == null &&
+    if (!_promptedLocation &&
+        locState.selected == null &&
         locState.locations.length > 1) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
