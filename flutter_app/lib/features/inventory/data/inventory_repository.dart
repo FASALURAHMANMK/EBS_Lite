@@ -314,6 +314,16 @@ class InventoryRepository {
     if (sourceLocationId != null) qp['source_location_id'] = sourceLocationId;
     if (destinationLocationId != null) qp['destination_location_id'] = destinationLocationId;
     if (status != null && status.isNotEmpty) qp['status'] = status;
+    // Backend requires at least one location-related filter. If caller didn't
+    // provide any, default to the currently selected location for safety.
+    if (!qp.containsKey('location_id') &&
+        !qp.containsKey('source_location_id') &&
+        !qp.containsKey('destination_location_id')) {
+      final loc = _locationId;
+      if (loc != null) {
+        qp['location_id'] = loc;
+      }
+    }
     final res = await _dio.get('/inventory/transfers', queryParameters: qp.isEmpty ? null : qp);
     final data = _extractList(res);
     return data.map((e) => StockTransferListItemDto.fromJson(e as Map<String, dynamic>)).toList();
@@ -331,8 +341,11 @@ class InventoryRepository {
     String? notes,
     int? fromLocationIdOverride,
   }) async {
-    final qp = <String, dynamic>{};
-    if (fromLocationIdOverride != null) qp['location_id'] = fromLocationIdOverride;
+    // Backend requires a source location. Use explicit override when provided
+    // (request mode), otherwise fall back to the currently selected location.
+    final qp = <String, dynamic>{
+      'location_id': fromLocationIdOverride ?? _requireLocation(),
+    };
     final res = await _dio.post(
       '/inventory/transfers',
       queryParameters: qp.isEmpty ? null : qp,

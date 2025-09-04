@@ -5,6 +5,7 @@ import '../../../dashboard/controllers/location_notifier.dart';
 import '../../../dashboard/data/models.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
+import '../../../../core/error_handler.dart';
 
 enum TransferMode { transfer, request }
 
@@ -104,7 +105,7 @@ class _StockTransferFormPageState extends ConsumerState<StockTransferFormPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Failed to submit: $e')));
+        ..showSnackBar(SnackBar(content: Text('Failed to submit: ${ErrorHandler.message(e)}')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
