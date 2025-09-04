@@ -917,7 +917,6 @@ class _SupplierPick {
   final String name;
   const _SupplierPick(this.supplierId, this.name);
 }
-}
 
 class _SelectField extends StatelessWidget {
   const _SelectField({required this.label, required this.valueText, required this.icon, required this.onTap});
@@ -1013,8 +1012,6 @@ Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context, {ProductBarc
             final p = int.tryParse(pack.text.trim()) ?? 1;
             if (p < 1) {
               ScaffoldMessenger.of(context)
-      _supplierController.text = '';
-      // Supplier name isn't in product, leave blank
                 ..hideCurrentSnackBar()
                 ..showSnackBar(const SnackBar(content: Text('Conversion must be at least 1')));
               return;

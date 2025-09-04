@@ -25,7 +25,7 @@ func NewSupplierService() *SupplierService {
 }
 
 func (s *SupplierService) GetSuppliers(companyID int, filters map[string]string) ([]models.SupplierWithStats, error) {
-	query := `
+    query := `
                 SELECT s.supplier_id, s.company_id, s.name, s.contact_person, s.phone, s.email,
                           s.address, s.tax_number, s.payment_terms, s.credit_limit, s.is_active,
                           s.created_by, s.updated_by, s.sync_status, s.created_at, s.updated_at,
@@ -35,7 +35,7 @@ func (s *SupplierService) GetSuppliers(companyID int, filters map[string]string)
 			   stats.last_purchase_date
 		FROM suppliers s
 		LEFT JOIN (
-			SELECT supplier_id,
+			SELECT p.supplier_id,
 				   SUM(CASE WHEN p.status != 'CANCELLED' THEN p.total_amount ELSE 0 END) as total_purchases,
 				   SUM(COALESCE(pr.total_amount, 0)) as total_returns,
 				   SUM(CASE WHEN p.status != 'CANCELLED' THEN (p.total_amount - p.paid_amount) ELSE 0 END) as outstanding_amount,
@@ -43,7 +43,7 @@ func (s *SupplierService) GetSuppliers(companyID int, filters map[string]string)
 			FROM purchases p
 			LEFT JOIN purchase_returns pr ON p.purchase_id = pr.purchase_id
 			WHERE p.is_deleted = FALSE
-			GROUP BY supplier_id
+			GROUP BY p.supplier_id
 		) stats ON s.supplier_id = stats.supplier_id
 		WHERE s.company_id = $1
 	`
@@ -97,7 +97,7 @@ func (s *SupplierService) GetSuppliers(companyID int, filters map[string]string)
 }
 
 func (s *SupplierService) GetSupplierByID(supplierID, companyID int) (*models.SupplierWithStats, error) {
-	query := `
+    query := `
                 SELECT s.supplier_id, s.company_id, s.name, s.contact_person, s.phone, s.email,
                           s.address, s.tax_number, s.payment_terms, s.credit_limit, s.is_active,
                           s.created_by, s.updated_by, s.sync_status, s.created_at, s.updated_at,
@@ -107,7 +107,7 @@ func (s *SupplierService) GetSupplierByID(supplierID, companyID int) (*models.Su
 			   stats.last_purchase_date
 		FROM suppliers s
 		LEFT JOIN (
-			SELECT supplier_id,
+			SELECT p.supplier_id,
 				   SUM(CASE WHEN p.status != 'CANCELLED' THEN p.total_amount ELSE 0 END) as total_purchases,
 				   SUM(COALESCE(pr.total_amount, 0)) as total_returns,
 				   SUM(CASE WHEN p.status != 'CANCELLED' THEN (p.total_amount - p.paid_amount) ELSE 0 END) as outstanding_amount,
@@ -115,7 +115,7 @@ func (s *SupplierService) GetSupplierByID(supplierID, companyID int) (*models.Su
 			FROM purchases p
 			LEFT JOIN purchase_returns pr ON p.purchase_id = pr.purchase_id
 			WHERE p.is_deleted = FALSE
-			GROUP BY supplier_id
+			GROUP BY p.supplier_id
 		) stats ON s.supplier_id = stats.supplier_id
 		WHERE s.supplier_id = $1 AND s.company_id = $2
 	`
