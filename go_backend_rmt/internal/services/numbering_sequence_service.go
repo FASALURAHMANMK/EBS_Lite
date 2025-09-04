@@ -1,12 +1,12 @@
 package services
 
 import (
-	"database/sql"
-	"fmt"
-	"strings"
+    "database/sql"
+    "fmt"
+    "strings"
 
-	"erp-backend/internal/database"
-	"erp-backend/internal/models"
+    "erp-backend/internal/database"
+    "erp-backend/internal/models"
 )
 
 type NumberingSequenceService struct {
@@ -185,35 +185,87 @@ func (s *NumberingSequenceService) checkLocationBelongsToCompany(companyID, loca
 // persists the incremented value within the provided transaction. It locks the
 // sequence row using FOR UPDATE to ensure atomicity across concurrent calls.
 func (s *NumberingSequenceService) NextNumber(tx *sql.Tx, sequenceName string, companyID int, locationID *int) (string, error) {
-	// Build query to fetch sequence with row-level lock
-	query := `SELECT sequence_id, prefix, sequence_length, current_number
+    // Build query to fetch sequence with row-level lock
+    query := `SELECT sequence_id, prefix, sequence_length, current_number
                  FROM numbering_sequences
                  WHERE name = $1 AND company_id = $2`
-	args := []interface{}{sequenceName, companyID}
-	if locationID != nil {
-		query += " AND (location_id = $3 OR location_id IS NULL)"
-		args = append(args, *locationID)
-	}
-	query += " FOR UPDATE"
+    args := []interface{}{sequenceName, companyID}
+    if locationID != nil {
+        query += " AND (location_id = $3 OR location_id IS NULL)"
+        args = append(args, *locationID)
+    }
+    query += " FOR UPDATE"
 
-	var seqID, seqLen, current int
-	var prefix sql.NullString
-	if err := tx.QueryRow(query, args...).Scan(&seqID, &prefix, &seqLen, &current); err != nil {
-		if err == sql.ErrNoRows {
-			return "", fmt.Errorf("numbering sequence not found")
-		}
-		return "", fmt.Errorf("failed to get numbering sequence: %w", err)
-	}
+    var seqID, seqLen, current int
+    var prefix sql.NullString
+    if err := tx.QueryRow(query, args...).Scan(&seqID, &prefix, &seqLen, &current); err != nil {
+        if err == sql.ErrNoRows {
+            // Auto-provision a default sequence if none exists for this company/location
+            // to prevent hard failures on first use.
+            defPrefix := defaultPrefixFor(sequenceName)
+            var locArg interface{}
+            if locationID != nil {
+                locArg = *locationID
+            } else {
+                locArg = nil
+            }
+            // Create with sensible defaults: length=6, start from 0
+            if _, insErr := tx.Exec(
+                `INSERT INTO numbering_sequences (company_id, location_id, name, prefix, sequence_length, current_number)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                companyID, locArg, sequenceName, defPrefix, 6, 0,
+            ); insErr != nil {
+                return "", fmt.Errorf("failed to create default numbering sequence: %w", insErr)
+            }
+            // Re-run the locked select now that a sequence exists
+            if err := tx.QueryRow(query, args...).Scan(&seqID, &prefix, &seqLen, &current); err != nil {
+                return "", fmt.Errorf("failed to get numbering sequence after create: %w", err)
+            }
+        } else {
+            return "", fmt.Errorf("failed to get numbering sequence: %w", err)
+        }
+    }
 
 	current++
-	if _, err := tx.Exec(`UPDATE numbering_sequences SET current_number = $1, updated_at = CURRENT_TIMESTAMP WHERE sequence_id = $2`, current, seqID); err != nil {
-		return "", fmt.Errorf("failed to update numbering sequence: %w", err)
-	}
+    if _, err := tx.Exec(`UPDATE numbering_sequences SET current_number = $1, updated_at = CURRENT_TIMESTAMP WHERE sequence_id = $2`, current, seqID); err != nil {
+        return "", fmt.Errorf("failed to update numbering sequence: %w", err)
+    }
 
 	prefixStr := ""
 	if prefix.Valid {
 		prefixStr = prefix.String
 	}
 
-	return fmt.Sprintf("%s%0*d", prefixStr, seqLen, current), nil
+    return fmt.Sprintf("%s%0*d", prefixStr, seqLen, current), nil
+}
+
+// defaultPrefixFor returns a sane default prefix for a given sequence name.
+// This helps auto-provision sequences on first use.
+func defaultPrefixFor(name string) *string {
+    n := strings.ToLower(strings.TrimSpace(name))
+    var p string
+    switch n {
+    case "sale":
+        p = "INV-"
+    case "quote":
+        p = "QOT-"
+    case "purchase":
+        p = "PO-"
+    case "sale_return":
+        p = "SR-"
+    case "purchase_return":
+        p = "PR-"
+    case "stock_adjustment":
+        p = "ADJ-"
+    case "stock_transfer":
+        p = "ST-"
+    default:
+        // Use first 3 letters uppercased as a generic prefix
+        up := strings.ToUpper(n)
+        if len(up) > 3 {
+            up = up[:3]
+        }
+        p = up + "-"
+    }
+    return &p
 }

@@ -10,8 +10,8 @@ class ApiClient {
   ApiClient(
     this._prefs,
     this._secureStorage, {
-    //String baseUrl = 'http://192.168.100.128:8080/api/v1',
-    String baseUrl = 'http://10.0.2.2:8080/api/v1',
+    String baseUrl = 'http://192.168.100.128:8080/api/v1',
+    //String baseUrl = 'http://10.0.2.2:8080/api/v1',
   }) : dio = Dio(BaseOptions(baseUrl: baseUrl)) {
     dio.interceptors.add(
       InterceptorsWrapper(
@@ -31,8 +31,8 @@ class ApiClient {
           if (error.response?.statusCode == 401 && !isRefreshCall) {
             try {
               await _refreshTokenSingleFlight();
-              final newAccess = await _secureStorage
-                  .read(key: AuthRepository.accessTokenKey);
+              final newAccess =
+                  await _secureStorage.read(key: AuthRepository.accessTokenKey);
               if (newAccess != null && newAccess.isNotEmpty) {
                 final reqOptions = error.requestOptions;
                 reqOptions.headers['Authorization'] = 'Bearer $newAccess';
