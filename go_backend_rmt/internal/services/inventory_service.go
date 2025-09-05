@@ -1055,14 +1055,14 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
         selectArgs = append(selectArgs, a...)
     }
 
-    // Purchases (incoming)
+    // Purchases (incoming) - include only received quantities (exclude POs)
     {
         base := `
             SELECT
                 'PURCHASE' AS type,
-                p.created_at AS occurred_at,
+                p.updated_at AS occurred_at,
                 p.purchase_number AS reference,
-                pd.quantity AS quantity,
+                pd.received_quantity AS quantity,
                 p.location_id AS location_id,
                 l.name AS location_name,
                 s.name AS partner_name,
@@ -1073,7 +1073,8 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
             JOIN purchases p ON pd.purchase_id = p.purchase_id
             JOIN locations l ON p.location_id = l.location_id
             LEFT JOIN suppliers s ON p.supplier_id = s.supplier_id
-            WHERE l.company_id = $1 AND pd.product_id = $2 AND p.is_deleted = FALSE`
+            WHERE l.company_id = $1 AND pd.product_id = $2 AND p.is_deleted = FALSE
+              AND pd.received_quantity > 0 AND p.status IN ('PARTIALLY_RECEIVED','RECEIVED')`
         with, a, _ := buildWhere(base, "p.location_id", "p.created_at")
         selects = append(selects, with)
         selectArgs = append(selectArgs, a...)

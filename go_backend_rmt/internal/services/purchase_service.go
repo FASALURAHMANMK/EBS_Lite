@@ -440,9 +440,15 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 		return fmt.Errorf("failed to verify purchase: %w", err)
 	}
 
-	if currentStatus != "PENDING" {
-		return fmt.Errorf("purchase with status %s cannot be received", currentStatus)
-	}
+    // Allow receiving when purchase is new/approved/partially received
+    switch currentStatus {
+    case "PENDING", "APPROVED", "PARTIALLY_RECEIVED":
+        // ok
+    case "RECEIVED", "CANCELLED":
+        return fmt.Errorf("purchase with status %s cannot be received", currentStatus)
+    default:
+        return fmt.Errorf("purchase with status %s cannot be received", currentStatus)
+    }
 
     // Create Goods Receipt header (auto-numbered) if table exists
     ns := NewNumberingSequenceService()

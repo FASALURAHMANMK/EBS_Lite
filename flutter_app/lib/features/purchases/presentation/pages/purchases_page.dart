@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
 import 'package:ebs_lite/shared/pages/feature_detail_page.dart';
+import 'package:ebs_lite/features/purchases/presentation/pages/purchase_orders_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/goods_receipts_page.dart';
 import '../../../suppliers/presentation/pages/suppliers_page.dart';
 
@@ -14,7 +15,7 @@ class PurchasesPage extends StatelessWidget {
         icon: Icons.description_rounded,
         label: 'Purchase Order',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FeatureDetailPage(title: 'Purchase Order')),
+          MaterialPageRoute(builder: (_) => const PurchaseOrdersPage()),
         ),
       ),
       FeatureItem(
