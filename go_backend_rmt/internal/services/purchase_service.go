@@ -141,15 +141,14 @@ func (s *PurchaseService) GetPurchaseByID(purchaseID, companyID int) (*models.Pu
 	purchase.Location = &models.Location{Name: locationName.String}
 
 	// Get purchase details
-	detailsQuery := `
+    detailsQuery := `
                 SELECT pd.purchase_detail_id, pd.purchase_id, pd.product_id, pd.quantity,
                            pd.unit_price, pd.discount_percentage, pd.discount_amount, pd.tax_id,
                            pd.tax_amount, pd.line_total, pd.received_quantity, pd.serial_numbers,
                            pd.expiry_date, pd.batch_number,
-                           p.name as product_name, p.sku, pb.barcode
+                           p.name as product_name, p.sku
                 FROM purchase_details pd
                 JOIN products p ON pd.product_id = p.product_id
-                LEFT JOIN product_barcodes pb ON p.product_id = pb.product_id AND pb.is_primary = TRUE
                 WHERE pd.purchase_id = $1
                 ORDER BY pd.purchase_detail_id
         `
@@ -161,32 +160,26 @@ func (s *PurchaseService) GetPurchaseByID(purchaseID, companyID int) (*models.Pu
 	defer rows.Close()
 
 	for rows.Next() {
-		var detail models.PurchaseDetail
-		var productName, sku, barcode sql.NullString
+    var detail models.PurchaseDetail
+        var productName, sku sql.NullString
 
-    err := rows.Scan(
+        err := rows.Scan(
             &detail.PurchaseDetailID, &detail.PurchaseID, &detail.ProductID, &detail.Quantity,
             &detail.UnitPrice, &detail.DiscountPercentage, &detail.DiscountAmount, &detail.TaxID,
             &detail.TaxAmount, &detail.LineTotal, &detail.ReceivedQuantity, pq.Array(&detail.SerialNumbers),
             &detail.ExpiryDate, &detail.BatchNumber,
-            &productName, &sku, &barcode,
+            &productName, &sku,
         )
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan purchase detail: %w", err)
 		}
 
 		// Set product info
-		detail.Product = &models.Product{
-			ProductID: detail.ProductID,
-			Name:      productName.String,
-			SKU:       nullStringToStringPtr(sku),
-			Barcodes: func() []models.ProductBarcode {
-				if barcode.Valid {
-					return []models.ProductBarcode{{Barcode: barcode.String, IsPrimary: true}}
-				}
-				return nil
-			}(),
-		}
+        detail.Product = &models.Product{
+            ProductID: detail.ProductID,
+            Name:      productName.String,
+            SKU:       nullStringToStringPtr(sku),
+        }
 
 		purchase.Items = append(purchase.Items, detail)
 	}
