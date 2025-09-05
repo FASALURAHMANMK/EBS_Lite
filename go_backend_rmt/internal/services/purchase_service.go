@@ -164,13 +164,13 @@ func (s *PurchaseService) GetPurchaseByID(purchaseID, companyID int) (*models.Pu
 		var detail models.PurchaseDetail
 		var productName, sku, barcode sql.NullString
 
-		err := rows.Scan(
-			&detail.PurchaseDetailID, &detail.PurchaseID, &detail.ProductID, &detail.Quantity,
-			&detail.UnitPrice, &detail.DiscountPercentage, &detail.DiscountAmount, &detail.TaxID,
-			&detail.TaxAmount, &detail.LineTotal, &detail.ReceivedQuantity, &detail.SerialNumbers,
-			&detail.ExpiryDate, &detail.BatchNumber,
-			&productName, &sku, &barcode,
-		)
+    err := rows.Scan(
+            &detail.PurchaseDetailID, &detail.PurchaseID, &detail.ProductID, &detail.Quantity,
+            &detail.UnitPrice, &detail.DiscountPercentage, &detail.DiscountAmount, &detail.TaxID,
+            &detail.TaxAmount, &detail.LineTotal, &detail.ReceivedQuantity, pq.Array(&detail.SerialNumbers),
+            &detail.ExpiryDate, &detail.BatchNumber,
+            &productName, &sku, &barcode,
+        )
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan purchase detail: %w", err)
 		}
@@ -451,19 +451,25 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 		return fmt.Errorf("purchase with status %s cannot be received", currentStatus)
 	}
 
-    // Create Goods Receipt header (auto-numbered)
+    // Create Goods Receipt header (auto-numbered) if table exists
     ns := NewNumberingSequenceService()
     receiptNumber, err := ns.NextNumber(tx, "grn", companyID, &locationID)
     if err != nil {
         return fmt.Errorf("failed to generate goods receipt number: %w", err)
     }
     var goodsReceiptID int
+    grSupported := true
     if err := tx.QueryRow(`
         INSERT INTO goods_receipts (receipt_number, purchase_id, location_id, supplier_id, received_date, received_by)
         VALUES ($1, $2, $3, $4, CURRENT_DATE, $5)
         RETURNING goods_receipt_id
     `, receiptNumber, purchaseID, locationID, supplierID, userID).Scan(&goodsReceiptID); err != nil {
-        return fmt.Errorf("failed to insert goods receipt: %w", err)
+        if pqErr, ok := err.(*pq.Error); ok && (string(pqErr.Code) == "42P01" || string(pqErr.Code) == "42703") {
+            // Table or column missing; gracefully disable GRN persistence
+            grSupported = false
+        } else {
+            return fmt.Errorf("failed to insert goods receipt: %w", err)
+        }
     }
 
     // Update purchase details with received quantities
@@ -535,13 +541,19 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 			return fmt.Errorf("serial numbers provided for a non-serialized product")
 		}
 
-        // Insert goods receipt item row
-        lineTotal := item.ReceivedQuantity * costPrice
-        if _, err := tx.Exec(`
-            INSERT INTO goods_receipt_items (goods_receipt_id, product_id, received_quantity, unit_price, line_total)
-            VALUES ($1, $2, $3, $4, $5)
-        `, goodsReceiptID, productID, item.ReceivedQuantity, costPrice, lineTotal); err != nil {
-            return fmt.Errorf("failed to insert goods receipt item: %w", err)
+        // Insert goods receipt item row (if supported)
+        if grSupported {
+            lineTotal := item.ReceivedQuantity * costPrice
+            if _, err := tx.Exec(`
+                INSERT INTO goods_receipt_items (goods_receipt_id, product_id, received_quantity, unit_price, line_total)
+                VALUES ($1, $2, $3, $4, $5)
+            `, goodsReceiptID, productID, item.ReceivedQuantity, costPrice, lineTotal); err != nil {
+                if pqErr, ok := err.(*pq.Error); ok && (string(pqErr.Code) == "42P01" || string(pqErr.Code) == "42703") {
+                    grSupported = false
+                } else {
+                    return fmt.Errorf("failed to insert goods receipt item: %w", err)
+                }
+            }
         }
 
         // Update or insert stock
@@ -559,20 +571,58 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 
         // Create stock lot entry for FIFO tracking
         if item.ReceivedQuantity > 0 {
-            _, err = tx.Exec(`
-                INSERT INTO stock_lots (product_id, location_id, supplier_id, purchase_id, goods_receipt_id,
-                                       quantity, remaining_quantity, cost_price, received_date,
-                                       expiry_date, batch_number, serial_numbers)
-                SELECT pd.product_id, $1, p.supplier_id, p.purchase_id, $2,
-                       $3, $3, pd.unit_price, CURRENT_DATE,
-                       $4, $5, $6
-                FROM purchase_details pd
-                JOIN purchases p ON pd.purchase_id = p.purchase_id
-                WHERE pd.purchase_detail_id = $7
-            `, locationID, goodsReceiptID, item.ReceivedQuantity, item.ExpiryDate, item.BatchNumber,
-                pq.Array(item.SerialNumbers), item.PurchaseDetailID)
-            if err != nil {
-                return fmt.Errorf("failed to create stock lot: %w", err)
+            // Try inserting with goods_receipt_id if supported; otherwise fallback to legacy columns
+            if grSupported {
+                _, err = tx.Exec(`
+                    INSERT INTO stock_lots (product_id, location_id, supplier_id, purchase_id, goods_receipt_id,
+                                           quantity, remaining_quantity, cost_price, received_date,
+                                           expiry_date, batch_number, serial_numbers)
+                    SELECT pd.product_id, $1, p.supplier_id, p.purchase_id, $2,
+                           $3, $3, pd.unit_price, CURRENT_DATE,
+                           $4, $5, $6
+                    FROM purchase_details pd
+                    JOIN purchases p ON pd.purchase_id = p.purchase_id
+                    WHERE pd.purchase_detail_id = $7
+                `, locationID, goodsReceiptID, item.ReceivedQuantity, item.ExpiryDate, item.BatchNumber,
+                    pq.Array(item.SerialNumbers), item.PurchaseDetailID)
+                if err != nil {
+                    if pqErr, ok := err.(*pq.Error); ok && string(pqErr.Code) == "42703" {
+                        // Column goods_receipt_id missing; fallback to legacy insert
+                        _, err = tx.Exec(`
+                            INSERT INTO stock_lots (product_id, location_id, supplier_id, purchase_id,
+                                                   quantity, remaining_quantity, cost_price, received_date,
+                                                   expiry_date, batch_number, serial_numbers)
+                            SELECT pd.product_id, $1, p.supplier_id, p.purchase_id,
+                                   $2, $2, pd.unit_price, CURRENT_DATE,
+                                   $3, $4, $5
+                            FROM purchase_details pd
+                            JOIN purchases p ON pd.purchase_id = p.purchase_id
+                            WHERE pd.purchase_detail_id = $6
+                        `, locationID, item.ReceivedQuantity, item.ExpiryDate, item.BatchNumber,
+                            pq.Array(item.SerialNumbers), item.PurchaseDetailID)
+                        if err != nil {
+                            return fmt.Errorf("failed to create stock lot: %w", err)
+                        }
+                    } else if err != nil {
+                        return fmt.Errorf("failed to create stock lot: %w", err)
+                    }
+                }
+            } else {
+                _, err = tx.Exec(`
+                    INSERT INTO stock_lots (product_id, location_id, supplier_id, purchase_id,
+                                           quantity, remaining_quantity, cost_price, received_date,
+                                           expiry_date, batch_number, serial_numbers)
+                    SELECT pd.product_id, $1, p.supplier_id, p.purchase_id,
+                           $2, $2, pd.unit_price, CURRENT_DATE,
+                           $3, $4, $5
+                    FROM purchase_details pd
+                    JOIN purchases p ON pd.purchase_id = p.purchase_id
+                    WHERE pd.purchase_detail_id = $6
+                `, locationID, item.ReceivedQuantity, item.ExpiryDate, item.BatchNumber,
+                    pq.Array(item.SerialNumbers), item.PurchaseDetailID)
+                if err != nil {
+                    return fmt.Errorf("failed to create stock lot: %w", err)
+                }
             }
         }
 
