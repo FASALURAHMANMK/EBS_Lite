@@ -14,7 +14,7 @@ import (
 
 // GetUploadPath returns the configured upload root directory
 func GetUploadPath() string {
-    cfg := config.GetConfig()
+    cfg := config.Load()
     return cfg.UploadPath
 }
 

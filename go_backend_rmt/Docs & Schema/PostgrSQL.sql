@@ -2462,6 +2462,9 @@ ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
 ALTER TABLE products
 ADD COLUMN IF NOT EXISTS default_supplier_id INTEGER REFERENCES suppliers(supplier_id);
 
+ALTER TABLE purchases
+ADD COLUMN IF NOT EXISTS invoice_file VARCHAR(255);
+
 -- Seed currencies (idempotent)
 INSERT INTO currencies (code, name, symbol, exchange_rate, is_base_currency)
 VALUES
