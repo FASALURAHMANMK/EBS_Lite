@@ -1,3 +1,4 @@
+import 'package:ebs_lite/features/inventory/data/models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -18,14 +19,16 @@ class _PoFormPageState extends ConsumerState<PoFormPage> {
   String? _supplierName;
   final _refNo = TextEditingController();
   final _notes = TextEditingController();
-  final List<_PoLine> _lines = [ _PoLine() ];
+  final List<_PoLine> _lines = [_PoLine()];
   bool _saving = false;
 
   @override
   void dispose() {
     _refNo.dispose();
     _notes.dispose();
-    for (final l in _lines) { l.dispose(); }
+    for (final l in _lines) {
+      l.dispose();
+    }
     super.dispose();
   }
 
@@ -41,7 +44,10 @@ class _PoFormPageState extends ConsumerState<PoFormPage> {
             _SupplierPicker(
               supplierId: _supplierId,
               supplierName: _supplierName,
-              onPicked: (id, name) => setState(() { _supplierId = id; _supplierName = name; }),
+              onPicked: (id, name) => setState(() {
+                _supplierId = id;
+                _supplierName = name;
+              }),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -77,7 +83,12 @@ class _PoFormPageState extends ConsumerState<PoFormPage> {
               height: 48,
               child: FilledButton(
                 onPressed: _saving ? null : _save,
-                child: _saving ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2.4)) : const Text('Create PO'),
+                child: _saving
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2.4))
+                    : const Text('Create PO'),
               ),
             ),
           ],
@@ -97,20 +108,30 @@ class _PoFormPageState extends ConsumerState<PoFormPage> {
             _LineProductPicker(line: _lines[i]),
             const SizedBox(height: 8),
             Row(children: [
-              Expanded(child: TextField(
+              Expanded(
+                  child: TextField(
                 controller: _lines[i].qty,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Quantity', prefixIcon: Icon(Icons.format_list_numbered_rounded)),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                    labelText: 'Quantity',
+                    prefixIcon: Icon(Icons.format_list_numbered_rounded)),
               )),
               const SizedBox(width: 8),
-              Expanded(child: TextField(
+              Expanded(
+                  child: TextField(
                 controller: _lines[i].price,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Unit Price', prefixIcon: Icon(Icons.currency_rupee_rounded)),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                    labelText: 'Unit Price',
+                    prefixIcon: Icon(Icons.currency_rupee_rounded)),
               )),
               IconButton(
                 tooltip: 'Remove',
-                onPressed: _lines.length == 1 ? null : () => setState(() => _lines.removeAt(i)),
+                onPressed: _lines.length == 1
+                    ? null
+                    : () => setState(() => _lines.removeAt(i)),
                 icon: const Icon(Icons.delete_outline_rounded),
               ),
             ]),
@@ -124,12 +145,20 @@ class _PoFormPageState extends ConsumerState<PoFormPage> {
   Future<void> _save() async {
     final supplierId = _supplierId;
     if (supplierId == null) {
-      ScaffoldMessenger.of(context)..hideCurrentSnackBar()..showSnackBar(const SnackBar(content: Text('Please select supplier')));
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Please select supplier')));
       return;
     }
-    final lines = _lines.where((l) => l.product != null && (double.tryParse(l.qty.text.trim()) ?? 0) > 0).toList();
+    final lines = _lines
+        .where((l) =>
+            l.product != null && (double.tryParse(l.qty.text.trim()) ?? 0) > 0)
+        .toList();
     if (lines.isEmpty) {
-      ScaffoldMessenger.of(context)..hideCurrentSnackBar()..showSnackBar(const SnackBar(content: Text('Add at least one item with quantity')));
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(
+            content: Text('Add at least one item with quantity')));
       return;
     }
     setState(() => _saving = true);
@@ -153,7 +182,9 @@ class _PoFormPageState extends ConsumerState<PoFormPage> {
       Navigator.of(context).pop(id);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)..hideCurrentSnackBar()..showSnackBar(SnackBar(content: Text('Failed: $e')));
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Failed: $e')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -164,7 +195,10 @@ class _PoLine {
   InventoryListItem? product;
   final qty = TextEditingController();
   final price = TextEditingController();
-  void dispose() { qty.dispose(); price.dispose(); }
+  void dispose() {
+    qty.dispose();
+    price.dispose();
+  }
 }
 
 class _LineProductPicker extends ConsumerStatefulWidget {
@@ -192,7 +226,12 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
           border: OutlineInputBorder(),
         ),
         child: Row(children: [
-          Expanded(child: Text(p == null ? 'Tap to select a product' : '${p.name}${(p.sku ?? '').isNotEmpty ? ' • SKU: ${p.sku}' : ''}', overflow: TextOverflow.ellipsis)),
+          Expanded(
+              child: Text(
+                  p == null
+                      ? 'Tap to select a product'
+                      : '${p.name}${(p.sku ?? '').isNotEmpty ? ' • SKU: ${p.sku}' : ''}',
+                  overflow: TextOverflow.ellipsis)),
           const Icon(Icons.arrow_drop_down_rounded),
         ]),
       ),
@@ -202,7 +241,9 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
   Future<InventoryListItem?> _openProductPicker(BuildContext context) async {
     final repo = ref.read(inventoryRepositoryProvider);
     List<InventoryListItem> initial = [];
-    try { initial = await repo.getStock(); } catch (_) {}
+    try {
+      initial = await repo.getStock();
+    } catch (_) {}
     List<InventoryListItem> results = List.of(initial);
     int? selectedId = widget.line.product?.productId;
     return showDialog<InventoryListItem?>(
@@ -216,10 +257,15 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
-                  decoration: const InputDecoration(hintText: 'Search by name or SKU', prefixIcon: Icon(Icons.search_rounded)),
+                  decoration: const InputDecoration(
+                      hintText: 'Search by name or SKU',
+                      prefixIcon: Icon(Icons.search_rounded)),
                   onChanged: (v) async {
                     final q = v.trim();
-                    if (q.isEmpty) { setInner(() => results = List.of(initial)); return; }
+                    if (q.isEmpty) {
+                      setInner(() => results = List.of(initial));
+                      return;
+                    }
                     final list = await repo.searchProducts(q);
                     setInner(() => results = list);
                   },
@@ -250,14 +296,28 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, null), child: const Text('Cancel')),
-            FilledButton(onPressed: () {
-              final it = results.firstWhere(
-                (e) => e.productId == selectedId,
-                orElse: () => InventoryListItem(productId: -1, name: '', sku: null, categoryName: null, brandName: null, unitSymbol: null, reorderLevel: 0, stock: 0, isLowStock: false, price: null),
-              );
-              Navigator.pop(context, it.productId == -1 ? null : it);
-            }, child: const Text('Select')),
+            TextButton(
+                onPressed: () => Navigator.pop(context, null),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () {
+                  final it = results.firstWhere(
+                    (e) => e.productId == selectedId,
+                    orElse: () => InventoryListItem(
+                        productId: -1,
+                        name: '',
+                        sku: null,
+                        categoryName: null,
+                        brandName: null,
+                        unitSymbol: null,
+                        reorderLevel: 0,
+                        stock: 0,
+                        isLowStock: false,
+                        price: null),
+                  );
+                  Navigator.pop(context, it.productId == -1 ? null : it);
+                },
+                child: const Text('Select')),
           ],
         ),
       ),
@@ -266,14 +326,18 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
 }
 
 class _SupplierPicker extends ConsumerWidget {
-  const _SupplierPicker({this.supplierId, this.supplierName, required this.onPicked});
+  const _SupplierPicker(
+      {this.supplierId, this.supplierName, required this.onPicked});
   final int? supplierId;
   final String? supplierName;
   final void Function(int id, String name) onPicked;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final display = supplierName ?? (supplierId == null ? 'Tap to select supplier' : 'Supplier #$supplierId');
+    final display = supplierName ??
+        (supplierId == null
+            ? 'Tap to select supplier'
+            : 'Supplier #$supplierId');
     return InkWell(
       onTap: () async {
         final picked = await _openSupplierPicker(context, ref);
@@ -281,19 +345,28 @@ class _SupplierPicker extends ConsumerWidget {
       },
       borderRadius: BorderRadius.circular(8),
       child: InputDecorator(
-        decoration: const InputDecoration(labelText: 'Supplier', prefixIcon: Icon(Icons.local_shipping_outlined), border: OutlineInputBorder()),
-        child: Row(children: [ Expanded(child: Text(display, overflow: TextOverflow.ellipsis)), const Icon(Icons.arrow_drop_down_rounded) ]),
+        decoration: const InputDecoration(
+            labelText: 'Supplier',
+            prefixIcon: Icon(Icons.local_shipping_outlined),
+            border: OutlineInputBorder()),
+        child: Row(children: [
+          Expanded(child: Text(display, overflow: TextOverflow.ellipsis)),
+          const Icon(Icons.arrow_drop_down_rounded)
+        ]),
       ),
     );
   }
 
-  Future<(int,String)?> _openSupplierPicker(BuildContext context, WidgetRef ref) async {
+  Future<(int, String)?> _openSupplierPicker(
+      BuildContext context, WidgetRef ref) async {
     final repo = ref.read(supplierRepositoryProvider);
     List<SupplierDto> results = [];
-    try { results = await repo.getSuppliers(); } catch (_) {}
+    try {
+      results = await repo.getSuppliers();
+    } catch (_) {}
     String q = '';
     int? selected;
-    return showDialog<(int,String)?>(
+    return showDialog<(int, String)?>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setInner) => AlertDialog(
@@ -304,8 +377,15 @@ class _SupplierPicker extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
-                  decoration: const InputDecoration(hintText: 'Search suppliers', prefixIcon: Icon(Icons.search_rounded)),
-                  onChanged: (v) async { q = v.trim(); final list = await repo.getSuppliers(search: q.isEmpty ? null : q); setInner(() => results = list); },
+                  decoration: const InputDecoration(
+                      hintText: 'Search suppliers',
+                      prefixIcon: Icon(Icons.search_rounded)),
+                  onChanged: (v) async {
+                    q = v.trim();
+                    final list =
+                        await repo.getSuppliers(search: q.isEmpty ? null : q);
+                    setInner(() => results = list);
+                  },
                 ),
                 const SizedBox(height: 8),
                 Flexible(
@@ -321,7 +401,9 @@ class _SupplierPicker extends ConsumerWidget {
                               groupValue: selected,
                               onChanged: (v) => setInner(() => selected = v),
                               title: Text(s.name),
-                              subtitle: Text([(s.phone ?? ''), (s.email ?? '')].where((e) => e.isNotEmpty).join(' • ')),
+                              subtitle: Text([(s.phone ?? ''), (s.email ?? '')]
+                                  .where((e) => e.isNotEmpty)
+                                  .join(' • ')),
                             );
                           },
                         ),
@@ -330,12 +412,38 @@ class _SupplierPicker extends ConsumerWidget {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            FilledButton(onPressed: () { final s = results.firstWhere((e) => e.supplierId == selected, orElse: () => results.isEmpty ? SupplierDto(supplierId: -1, name: '', contactPerson: null, phone: null, email: null, address: null, paymentTerms: 0, creditLimit: 0, isActive: true, totalPurchases: 0, totalReturns: 0, outstandingAmount: 0, lastPurchaseDate: null) : results.first); if (s.supplierId <= 0) { Navigator.pop(context, null); return; } Navigator.pop(context, (s.supplierId, s.name)); }, child: const Text('Select')),
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () {
+                  final s = results.firstWhere((e) => e.supplierId == selected,
+                      orElse: () => results.isEmpty
+                          ? SupplierDto(
+                              supplierId: -1,
+                              name: '',
+                              contactPerson: null,
+                              phone: null,
+                              email: null,
+                              address: null,
+                              paymentTerms: 0,
+                              creditLimit: 0,
+                              isActive: true,
+                              totalPurchases: 0,
+                              totalReturns: 0,
+                              outstandingAmount: 0,
+                              lastPurchaseDate: null)
+                          : results.first);
+                  if (s.supplierId <= 0) {
+                    Navigator.pop(context, null);
+                    return;
+                  }
+                  Navigator.pop(context, (s.supplierId, s.name));
+                },
+                child: const Text('Select')),
           ],
         ),
       ),
     );
   }
 }
-
