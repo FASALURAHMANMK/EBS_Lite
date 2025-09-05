@@ -363,6 +363,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
             goodsReceipts.Use(middleware.RequireCompanyAccess())
             {
                 goodsReceipts.GET("", middleware.RequirePermission("VIEW_PURCHASES"), goodsReceiptHandler.GetGoodsReceipts)
+                goodsReceipts.GET("/:id", middleware.RequirePermission("VIEW_PURCHASES"), goodsReceiptHandler.GetGoodsReceipt)
                 goodsReceipts.POST("", middleware.RequirePermission("RECEIVE_PURCHASES"), goodsReceiptHandler.RecordGoodsReceipt)
             }
 

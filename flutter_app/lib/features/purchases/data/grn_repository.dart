@@ -34,6 +34,14 @@ class GrnRepository {
     return data.map((e) => GoodsReceiptDto.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  Future<GoodsReceiptDetailDto> getGoodsReceipt(int id) async {
+    final res = await _dio.get('/goods-receipts/$id');
+    final body = res.data is Map && (res.data['data'] != null)
+        ? res.data['data'] as Map<String, dynamic>
+        : res.data as Map<String, dynamic>;
+    return GoodsReceiptDetailDto.fromJson(body);
+  }
+
   // Creates a purchase without PO and immediately records a GRN against it.
   // Returns the created purchaseId.
   Future<int> createGrnWithoutPo({
@@ -106,4 +114,3 @@ final grnRepositoryProvider = Provider<GrnRepository>((ref) {
   final dio = ref.watch(dioProvider);
   return GrnRepository(dio, ref);
 });
-

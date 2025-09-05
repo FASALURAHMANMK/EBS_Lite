@@ -66,3 +66,27 @@ func (h *GoodsReceiptHandler) GetGoodsReceipts(c *gin.Context) {
     }
     utils.SuccessResponse(c, "Goods receipts retrieved successfully", list)
 }
+
+// GET /goods-receipts/:id
+func (h *GoodsReceiptHandler) GetGoodsReceipt(c *gin.Context) {
+    companyID := c.GetInt("company_id")
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
+    id, err := strconv.Atoi(c.Param("id"))
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid GRN ID", err)
+        return
+    }
+    gr, err := h.purchaseService.GetGoodsReceiptByID(companyID, id)
+    if err != nil {
+        if err.Error() == "goods receipt not found" {
+            utils.NotFoundResponse(c, "Goods receipt not found")
+            return
+        }
+        utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get goods receipt", err)
+        return
+    }
+    utils.SuccessResponse(c, "Goods receipt retrieved successfully", gr)
+}

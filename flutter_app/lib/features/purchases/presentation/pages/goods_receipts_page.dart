@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/grn_repository.dart';
 import '../../data/models.dart';
 import 'grn_form_page.dart';
+import 'grn_detail_page.dart';
 
 class GoodsReceiptsPage extends ConsumerStatefulWidget {
   const GoodsReceiptsPage({super.key});
@@ -101,6 +102,11 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
                                   if ((gr.supplierName ?? '').isNotEmpty) gr.supplierName!,
                                   _fmt(gr.receivedDate),
                                 ].join(' • ')),
+                                onTap: () async {
+                                  await Navigator.of(context).push(
+                                    MaterialPageRoute(builder: (_) => GoodsReceiptDetailPage(goodsReceiptId: gr.goodsReceiptId)),
+                                  );
+                                },
                               ),
                             );
                           },

@@ -700,6 +700,60 @@ func (s *PurchaseService) GetPendingPurchases(companyID, locationID int) ([]mode
 	return purchases, nil
 }
 
+// GetGoodsReceiptByID returns a goods receipt header with items
+func (s *PurchaseService) GetGoodsReceiptByID(companyID, id int) (*models.GoodsReceipt, error) {
+    // Header
+    var gr models.GoodsReceipt
+    var supplierName, locationName string
+    err := s.db.QueryRow(`
+        SELECT gr.goods_receipt_id, gr.receipt_number, gr.purchase_id, gr.location_id, gr.supplier_id,
+               gr.received_date, gr.received_by,
+               s.name as supplier_name, l.name as location_name
+        FROM goods_receipts gr
+        JOIN suppliers s ON gr.supplier_id = s.supplier_id
+        JOIN locations l ON gr.location_id = l.location_id
+        WHERE gr.goods_receipt_id = $1 AND s.company_id = $2 AND gr.is_deleted = FALSE
+    `, id, companyID).Scan(
+        &gr.GoodsReceiptID, &gr.ReceiptNumber, &gr.PurchaseID, &gr.LocationID, &gr.SupplierID,
+        &gr.ReceivedDate, &gr.ReceivedBy, &supplierName, &locationName,
+    )
+    if err != nil {
+        if err == sql.ErrNoRows {
+            return nil, fmt.Errorf("goods receipt not found")
+        }
+        return nil, fmt.Errorf("failed to get goods receipt: %w", err)
+    }
+    gr.Supplier = &models.Supplier{Name: supplierName}
+    gr.Location = &models.Location{Name: locationName}
+
+    // Items
+    rows, err := s.db.Query(`
+        SELECT gri.goods_receipt_item_id, gri.goods_receipt_id, gri.product_id,
+               gri.received_quantity, gri.unit_price, gri.line_total,
+               p.name, p.sku
+        FROM goods_receipt_items gri
+        JOIN products p ON gri.product_id = p.product_id
+        WHERE gri.goods_receipt_id = $1
+        ORDER BY gri.goods_receipt_item_id
+    `, id)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get goods receipt items: %w", err)
+    }
+    defer rows.Close()
+
+    for rows.Next() {
+        var it models.GoodsReceiptItem
+        var name, sku sql.NullString
+        if err := rows.Scan(&it.GoodsReceiptItemID, &it.GoodsReceiptID, &it.ProductID,
+            &it.ReceivedQuantity, &it.UnitPrice, &it.LineTotal, &name, &sku); err != nil {
+            return nil, fmt.Errorf("failed to scan goods receipt item: %w", err)
+        }
+        it.Product = &models.Product{ProductID: it.ProductID, Name: name.String, SKU: nullStringToStringPtr(sku)}
+        gr.Items = append(gr.Items, it)
+    }
+    return &gr, nil
+}
+
 // GetGoodsReceipts returns goods receipts for a location with optional filters
 func (s *PurchaseService) GetGoodsReceipts(companyID, locationID int, filters map[string]string) ([]models.GoodsReceipt, error) {
     query := `
