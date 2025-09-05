@@ -26,7 +26,7 @@ func (s *PurchaseService) GetPurchases(companyID, locationID int, filters map[st
     query := `
         SELECT p.purchase_id, p.purchase_number, p.location_id, p.supplier_id, p.purchase_date,
                p.subtotal, p.tax_amount, p.discount_amount, p.total_amount, p.paid_amount,
-               p.payment_terms, p.due_date, p.status, p.reference_number, p.invoice_file, p.notes,
+               p.payment_terms, p.due_date, p.status, p.reference_number, p.notes,
                p.created_by, p.updated_by, p.sync_status, p.created_at, p.updated_at,
                s.name as supplier_name, l.name as location_name
         FROM purchases p
@@ -79,7 +79,7 @@ func (s *PurchaseService) GetPurchases(companyID, locationID int, filters map[st
         err := rows.Scan(
             &p.PurchaseID, &p.PurchaseNumber, &p.LocationID, &p.SupplierID, &p.PurchaseDate,
             &p.Subtotal, &p.TaxAmount, &p.DiscountAmount, &p.TotalAmount, &p.PaidAmount,
-            &p.PaymentTerms, &p.DueDate, &p.Status, &p.ReferenceNumber, &p.InvoiceFile, &p.Notes,
+            &p.PaymentTerms, &p.DueDate, &p.Status, &p.ReferenceNumber, &p.Notes,
             &p.CreatedBy, &p.UpdatedBy, &p.SyncStatus, &p.CreatedAt, &p.UpdatedAt,
             &supplierName, &locationName,
         )
@@ -102,7 +102,7 @@ func (s *PurchaseService) GetPurchaseByID(purchaseID, companyID int) (*models.Pu
     query := `
         SELECT p.purchase_id, p.purchase_number, p.location_id, p.supplier_id, p.purchase_date,
                p.subtotal, p.tax_amount, p.discount_amount, p.total_amount, p.paid_amount,
-               p.payment_terms, p.due_date, p.status, p.reference_number, p.invoice_file, p.notes,
+               p.payment_terms, p.due_date, p.status, p.reference_number, p.notes,
                p.created_by, p.updated_by, p.sync_status, p.created_at, p.updated_at,
                s.name as supplier_name, s.contact_person, s.phone, s.email,
                l.name as location_name
@@ -118,7 +118,7 @@ func (s *PurchaseService) GetPurchaseByID(purchaseID, companyID int) (*models.Pu
     err := s.db.QueryRow(query, purchaseID, companyID).Scan(
         &purchase.PurchaseID, &purchase.PurchaseNumber, &purchase.LocationID, &purchase.SupplierID, &purchase.PurchaseDate,
         &purchase.Subtotal, &purchase.TaxAmount, &purchase.DiscountAmount, &purchase.TotalAmount, &purchase.PaidAmount,
-        &purchase.PaymentTerms, &purchase.DueDate, &purchase.Status, &purchase.ReferenceNumber, &purchase.InvoiceFile, &purchase.Notes,
+        &purchase.PaymentTerms, &purchase.DueDate, &purchase.Status, &purchase.ReferenceNumber, &purchase.Notes,
         &purchase.CreatedBy, &purchase.UpdatedBy, &purchase.SyncStatus, &purchase.CreatedAt, &purchase.UpdatedAt,
         &supplierName, &contactPerson, &phone, &email, &locationName,
     )
@@ -902,6 +902,12 @@ func (s *PurchaseService) SetPurchaseInvoiceFile(purchaseID, companyID int, path
     }
     if exists == 0 {
         return fmt.Errorf("purchase not found")
+    }
+    // Check if column exists; if not, skip update for backward compatibility
+    var colCount int
+    if err := s.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'purchases' AND column_name = 'invoice_file'`).Scan(&colCount); err == nil && colCount == 0 {
+        // Silently ignore missing column
+        return nil
     }
     if _, err := s.db.Exec(`UPDATE purchases SET invoice_file = $1, updated_at = CURRENT_TIMESTAMP WHERE purchase_id = $2`, path, purchaseID); err != nil {
         return fmt.Errorf("failed to set invoice file: %w", err)
