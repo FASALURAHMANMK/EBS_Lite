@@ -453,12 +453,15 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 
     // Create Goods Receipt header (auto-numbered) if table exists
     ns := NewNumberingSequenceService()
-    receiptNumber, err := ns.NextNumber(tx, "grn", companyID, &locationID)
-    if err != nil {
-        return fmt.Errorf("failed to generate goods receipt number: %w", err)
-    }
     var goodsReceiptID int
     grSupported := true
+    receiptNumber := ""
+    if rn, err := ns.NextNumber(tx, "grn", companyID, &locationID); err == nil {
+        receiptNumber = rn
+    } else {
+        // If numbering sequences not available, skip GRN persistence but continue receiving
+        grSupported = false
+    }
     if err := tx.QueryRow(`
         INSERT INTO goods_receipts (receipt_number, purchase_id, location_id, supplier_id, received_date, received_by)
         VALUES ($1, $2, $3, $4, CURRENT_DATE, $5)
