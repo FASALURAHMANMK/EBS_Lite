@@ -143,7 +143,7 @@ func (s *PurchaseService) GetPurchaseByID(purchaseID, companyID int) (*models.Pu
 	// Get purchase details
     detailsQuery := `
                 SELECT pd.purchase_detail_id, pd.purchase_id, pd.product_id, pd.quantity,
-                           pd.unit_price, pd.discount_percentage, pd.discount_amount, pd.tax_id,
+                           pd.unit_price, COALESCE(pd.discount_percentage, 0), COALESCE(pd.discount_amount, 0), pd.tax_id,
                            pd.tax_amount, pd.line_total, pd.received_quantity, pd.serial_numbers,
                            pd.expiry_date, pd.batch_number,
                            p.name as product_name, p.sku
