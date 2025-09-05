@@ -598,6 +598,7 @@ CREATE TABLE purchases (
     due_date DATE,
     status VARCHAR(50) DEFAULT 'COMPLETED',
     reference_number VARCHAR(100),
+    invoice_file VARCHAR(255),
     notes TEXT,
     created_by INTEGER NOT NULL REFERENCES users(user_id),
     updated_by INTEGER REFERENCES users(user_id),

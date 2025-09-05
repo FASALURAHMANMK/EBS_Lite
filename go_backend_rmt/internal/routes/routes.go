@@ -345,7 +345,8 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				purchases.POST("", middleware.RequirePermission("CREATE_PURCHASES"), purchaseHandler.CreatePurchase)
 				purchases.POST("/quick", middleware.RequirePermission("CREATE_PURCHASES"), purchaseHandler.CreateQuickPurchase)
 				purchases.PUT("/:id", middleware.RequirePermission("UPDATE_PURCHASES"), purchaseHandler.UpdatePurchase)
-				purchases.PUT("/:id/receive", middleware.RequirePermission("RECEIVE_PURCHASES"), purchaseHandler.ReceivePurchase)
+                purchases.PUT("/:id/receive", middleware.RequirePermission("RECEIVE_PURCHASES"), purchaseHandler.ReceivePurchase)
+                purchases.POST("/:id/invoice", middleware.RequirePermission("UPDATE_PURCHASES"), purchaseHandler.UploadPurchaseInvoice)
 				purchases.DELETE("/:id", middleware.RequirePermission("DELETE_PURCHASES"), purchaseHandler.DeletePurchase)
 			}
 
@@ -358,11 +359,12 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				purchaseOrders.PUT("/:id/approve", middleware.RequirePermission("UPDATE_PURCHASES"), purchaseOrderHandler.ApprovePurchaseOrder)
 			}
 
-			goodsReceipts := protected.Group("/goods-receipts")
-			goodsReceipts.Use(middleware.RequireCompanyAccess())
-			{
-				goodsReceipts.POST("", middleware.RequirePermission("RECEIVE_PURCHASES"), goodsReceiptHandler.RecordGoodsReceipt)
-			}
+            goodsReceipts := protected.Group("/goods-receipts")
+            goodsReceipts.Use(middleware.RequireCompanyAccess())
+            {
+                goodsReceipts.GET("", middleware.RequirePermission("VIEW_PURCHASES"), goodsReceiptHandler.GetGoodsReceipts)
+                goodsReceipts.POST("", middleware.RequirePermission("RECEIVE_PURCHASES"), goodsReceiptHandler.RecordGoodsReceipt)
+            }
 
 			// Purchase Returns management routes (require company and location)
 			purchaseReturns := protected.Group("/purchase-returns")

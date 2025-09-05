@@ -5,30 +5,31 @@ import (
 )
 
 type Purchase struct {
-	PurchaseID      int              `json:"purchase_id" db:"purchase_id"`
-	PurchaseNumber  string           `json:"purchase_number" db:"purchase_number"`
-	LocationID      int              `json:"location_id" db:"location_id"`
-	SupplierID      int              `json:"supplier_id" db:"supplier_id"`
-	PurchaseOrderID *int             `json:"purchase_order_id,omitempty" db:"purchase_order_id"`
-	WorkflowStateID *int             `json:"workflow_state_id,omitempty" db:"workflow_state_id"`
-	PurchaseDate    time.Time        `json:"purchase_date" db:"purchase_date"`
-	Subtotal        float64          `json:"subtotal" db:"subtotal"`
-	TaxAmount       float64          `json:"tax_amount" db:"tax_amount"`
-	DiscountAmount  float64          `json:"discount_amount" db:"discount_amount"`
-	TotalAmount     float64          `json:"total_amount" db:"total_amount"`
-	PaidAmount      float64          `json:"paid_amount" db:"paid_amount"`
-	PaymentTerms    int              `json:"payment_terms" db:"payment_terms"`
-	DueDate         *time.Time       `json:"due_date,omitempty" db:"due_date"`
-	Status          string           `json:"status" db:"status"`
-	ReferenceNumber *string          `json:"reference_number,omitempty" db:"reference_number"`
-	Notes           *string          `json:"notes,omitempty" db:"notes"`
-	CreatedBy       int              `json:"created_by" db:"created_by"`
-	UpdatedBy       *int             `json:"updated_by,omitempty" db:"updated_by"`
-	Items           []PurchaseDetail `json:"items,omitempty"`
-	GoodsReceipts   []GoodsReceipt   `json:"goods_receipts,omitempty"`
-	Supplier        *Supplier        `json:"supplier,omitempty"`
-	Location        *Location        `json:"location,omitempty"`
-	SyncModel
+    PurchaseID      int              `json:"purchase_id" db:"purchase_id"`
+    PurchaseNumber  string           `json:"purchase_number" db:"purchase_number"`
+    LocationID      int              `json:"location_id" db:"location_id"`
+    SupplierID      int              `json:"supplier_id" db:"supplier_id"`
+    PurchaseOrderID *int             `json:"purchase_order_id,omitempty" db:"purchase_order_id"`
+    WorkflowStateID *int             `json:"workflow_state_id,omitempty" db:"workflow_state_id"`
+    PurchaseDate    time.Time        `json:"purchase_date" db:"purchase_date"`
+    Subtotal        float64          `json:"subtotal" db:"subtotal"`
+    TaxAmount       float64          `json:"tax_amount" db:"tax_amount"`
+    DiscountAmount  float64          `json:"discount_amount" db:"discount_amount"`
+    TotalAmount     float64          `json:"total_amount" db:"total_amount"`
+    PaidAmount      float64          `json:"paid_amount" db:"paid_amount"`
+    PaymentTerms    int              `json:"payment_terms" db:"payment_terms"`
+    DueDate         *time.Time       `json:"due_date,omitempty" db:"due_date"`
+    Status          string           `json:"status" db:"status"`
+    ReferenceNumber *string          `json:"reference_number,omitempty" db:"reference_number"`
+    InvoiceFile     *string          `json:"invoice_file,omitempty" db:"invoice_file"`
+    Notes           *string          `json:"notes,omitempty" db:"notes"`
+    CreatedBy       int              `json:"created_by" db:"created_by"`
+    UpdatedBy       *int             `json:"updated_by,omitempty" db:"updated_by"`
+    Items           []PurchaseDetail `json:"items,omitempty"`
+    GoodsReceipts   []GoodsReceipt   `json:"goods_receipts,omitempty"`
+    Supplier        *Supplier        `json:"supplier,omitempty"`
+    Location        *Location        `json:"location,omitempty"`
+    SyncModel
 }
 
 type PurchaseDetail struct {

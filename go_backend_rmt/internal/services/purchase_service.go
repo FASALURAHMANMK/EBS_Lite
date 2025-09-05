@@ -23,17 +23,17 @@ func NewPurchaseService() *PurchaseService {
 }
 
 func (s *PurchaseService) GetPurchases(companyID, locationID int, filters map[string]string) ([]models.Purchase, error) {
-	query := `
-		SELECT p.purchase_id, p.purchase_number, p.location_id, p.supplier_id, p.purchase_date,
-			   p.subtotal, p.tax_amount, p.discount_amount, p.total_amount, p.paid_amount,
-			   p.payment_terms, p.due_date, p.status, p.reference_number, p.notes,
-			   p.created_by, p.updated_by, p.sync_status, p.created_at, p.updated_at,
-			   s.name as supplier_name, l.name as location_name
-		FROM purchases p
-		JOIN suppliers s ON p.supplier_id = s.supplier_id
-		JOIN locations l ON p.location_id = l.location_id
-		WHERE s.company_id = $1 AND p.location_id = $2 AND p.is_deleted = FALSE
-	`
+    query := `
+        SELECT p.purchase_id, p.purchase_number, p.location_id, p.supplier_id, p.purchase_date,
+               p.subtotal, p.tax_amount, p.discount_amount, p.total_amount, p.paid_amount,
+               p.payment_terms, p.due_date, p.status, p.reference_number, p.invoice_file, p.notes,
+               p.created_by, p.updated_by, p.sync_status, p.created_at, p.updated_at,
+               s.name as supplier_name, l.name as location_name
+        FROM purchases p
+        JOIN suppliers s ON p.supplier_id = s.supplier_id
+        JOIN locations l ON p.location_id = l.location_id
+        WHERE s.company_id = $1 AND p.location_id = $2 AND p.is_deleted = FALSE
+    `
 
 	args := []interface{}{companyID, locationID}
 	argCount := 2
@@ -76,13 +76,13 @@ func (s *PurchaseService) GetPurchases(companyID, locationID int, filters map[st
 		var p models.Purchase
 		var supplierName, locationName string
 
-		err := rows.Scan(
-			&p.PurchaseID, &p.PurchaseNumber, &p.LocationID, &p.SupplierID, &p.PurchaseDate,
-			&p.Subtotal, &p.TaxAmount, &p.DiscountAmount, &p.TotalAmount, &p.PaidAmount,
-			&p.PaymentTerms, &p.DueDate, &p.Status, &p.ReferenceNumber, &p.Notes,
-			&p.CreatedBy, &p.UpdatedBy, &p.SyncStatus, &p.CreatedAt, &p.UpdatedAt,
-			&supplierName, &locationName,
-		)
+        err := rows.Scan(
+            &p.PurchaseID, &p.PurchaseNumber, &p.LocationID, &p.SupplierID, &p.PurchaseDate,
+            &p.Subtotal, &p.TaxAmount, &p.DiscountAmount, &p.TotalAmount, &p.PaidAmount,
+            &p.PaymentTerms, &p.DueDate, &p.Status, &p.ReferenceNumber, &p.InvoiceFile, &p.Notes,
+            &p.CreatedBy, &p.UpdatedBy, &p.SyncStatus, &p.CreatedAt, &p.UpdatedAt,
+            &supplierName, &locationName,
+        )
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan purchase: %w", err)
 		}
@@ -99,29 +99,29 @@ func (s *PurchaseService) GetPurchases(companyID, locationID int, filters map[st
 
 func (s *PurchaseService) GetPurchaseByID(purchaseID, companyID int) (*models.PurchaseWithDetails, error) {
 	// Get purchase header
-	query := `
-		SELECT p.purchase_id, p.purchase_number, p.location_id, p.supplier_id, p.purchase_date,
-			   p.subtotal, p.tax_amount, p.discount_amount, p.total_amount, p.paid_amount,
-			   p.payment_terms, p.due_date, p.status, p.reference_number, p.notes,
-			   p.created_by, p.updated_by, p.sync_status, p.created_at, p.updated_at,
-			   s.name as supplier_name, s.contact_person, s.phone, s.email,
-			   l.name as location_name
-		FROM purchases p
-		JOIN suppliers s ON p.supplier_id = s.supplier_id
-		JOIN locations l ON p.location_id = l.location_id
-		WHERE p.purchase_id = $1 AND s.company_id = $2 AND p.is_deleted = FALSE
-	`
+    query := `
+        SELECT p.purchase_id, p.purchase_number, p.location_id, p.supplier_id, p.purchase_date,
+               p.subtotal, p.tax_amount, p.discount_amount, p.total_amount, p.paid_amount,
+               p.payment_terms, p.due_date, p.status, p.reference_number, p.invoice_file, p.notes,
+               p.created_by, p.updated_by, p.sync_status, p.created_at, p.updated_at,
+               s.name as supplier_name, s.contact_person, s.phone, s.email,
+               l.name as location_name
+        FROM purchases p
+        JOIN suppliers s ON p.supplier_id = s.supplier_id
+        JOIN locations l ON p.location_id = l.location_id
+        WHERE p.purchase_id = $1 AND s.company_id = $2 AND p.is_deleted = FALSE
+    `
 
 	var purchase models.PurchaseWithDetails
 	var supplierName, contactPerson, phone, email, locationName sql.NullString
 
-	err := s.db.QueryRow(query, purchaseID, companyID).Scan(
-		&purchase.PurchaseID, &purchase.PurchaseNumber, &purchase.LocationID, &purchase.SupplierID, &purchase.PurchaseDate,
-		&purchase.Subtotal, &purchase.TaxAmount, &purchase.DiscountAmount, &purchase.TotalAmount, &purchase.PaidAmount,
-		&purchase.PaymentTerms, &purchase.DueDate, &purchase.Status, &purchase.ReferenceNumber, &purchase.Notes,
-		&purchase.CreatedBy, &purchase.UpdatedBy, &purchase.SyncStatus, &purchase.CreatedAt, &purchase.UpdatedAt,
-		&supplierName, &contactPerson, &phone, &email, &locationName,
-	)
+    err := s.db.QueryRow(query, purchaseID, companyID).Scan(
+        &purchase.PurchaseID, &purchase.PurchaseNumber, &purchase.LocationID, &purchase.SupplierID, &purchase.PurchaseDate,
+        &purchase.Subtotal, &purchase.TaxAmount, &purchase.DiscountAmount, &purchase.TotalAmount, &purchase.PaidAmount,
+        &purchase.PaymentTerms, &purchase.DueDate, &purchase.Status, &purchase.ReferenceNumber, &purchase.InvoiceFile, &purchase.Notes,
+        &purchase.CreatedBy, &purchase.UpdatedBy, &purchase.SyncStatus, &purchase.CreatedAt, &purchase.UpdatedAt,
+        &supplierName, &contactPerson, &phone, &email, &locationName,
+    )
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("purchase not found")
@@ -431,14 +431,15 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 	}
 	defer tx.Rollback()
 
-	// Verify purchase exists and can be received
-	var currentStatus string
-	var locationID int
-	err = tx.QueryRow(`
-		SELECT p.status, p.location_id FROM purchases p
-		JOIN suppliers s ON p.supplier_id = s.supplier_id
-		WHERE p.purchase_id = $1 AND s.company_id = $2 AND p.is_deleted = FALSE
-	`, purchaseID, companyID).Scan(&currentStatus, &locationID)
+    // Verify purchase exists and can be received
+    var currentStatus string
+    var locationID int
+    var supplierID int
+    err = tx.QueryRow(`
+        SELECT p.status, p.location_id, p.supplier_id FROM purchases p
+        JOIN suppliers s ON p.supplier_id = s.supplier_id
+        WHERE p.purchase_id = $1 AND s.company_id = $2 AND p.is_deleted = FALSE
+    `, purchaseID, companyID).Scan(&currentStatus, &locationID, &supplierID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return fmt.Errorf("purchase not found")
@@ -450,8 +451,23 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 		return fmt.Errorf("purchase with status %s cannot be received", currentStatus)
 	}
 
-	// Update purchase details with received quantities
-	for _, item := range req.Items {
+    // Create Goods Receipt header (auto-numbered)
+    ns := NewNumberingSequenceService()
+    receiptNumber, err := ns.NextNumber(tx, "grn", companyID, &locationID)
+    if err != nil {
+        return fmt.Errorf("failed to generate goods receipt number: %w", err)
+    }
+    var goodsReceiptID int
+    if err := tx.QueryRow(`
+        INSERT INTO goods_receipts (receipt_number, purchase_id, location_id, supplier_id, received_date, received_by)
+        VALUES ($1, $2, $3, $4, CURRENT_DATE, $5)
+        RETURNING goods_receipt_id
+    `, receiptNumber, purchaseID, locationID, supplierID, userID).Scan(&goodsReceiptID); err != nil {
+        return fmt.Errorf("failed to insert goods receipt: %w", err)
+    }
+
+    // Update purchase details with received quantities
+    for _, item := range req.Items {
 		// Verify purchase detail exists
 		var currentQuantity float64
 		err = tx.QueryRow(`
@@ -519,37 +535,46 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 			return fmt.Errorf("serial numbers provided for a non-serialized product")
 		}
 
-		// Update or insert stock
-		_, err = tx.Exec(`
-			INSERT INTO stock (location_id, product_id, quantity, last_updated)
-			VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-			ON CONFLICT (location_id, product_id)
-			DO UPDATE SET 
-				quantity = stock.quantity + $3,
-				last_updated = CURRENT_TIMESTAMP
-		`, locationID, productID, item.ReceivedQuantity)
-		if err != nil {
-			return fmt.Errorf("failed to update stock: %w", err)
-		}
+        // Insert goods receipt item row
+        lineTotal := item.ReceivedQuantity * costPrice
+        if _, err := tx.Exec(`
+            INSERT INTO goods_receipt_items (goods_receipt_id, product_id, received_quantity, unit_price, line_total)
+            VALUES ($1, $2, $3, $4, $5)
+        `, goodsReceiptID, productID, item.ReceivedQuantity, costPrice, lineTotal); err != nil {
+            return fmt.Errorf("failed to insert goods receipt item: %w", err)
+        }
 
-		// Create stock lot entry for FIFO tracking
-		if item.ReceivedQuantity > 0 {
+        // Update or insert stock
         _, err = tx.Exec(`
-                INSERT INTO stock_lots (product_id, location_id, supplier_id, purchase_id,
+            INSERT INTO stock (location_id, product_id, quantity, last_updated)
+            VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+            ON CONFLICT (location_id, product_id)
+            DO UPDATE SET 
+                quantity = stock.quantity + $3,
+                last_updated = CURRENT_TIMESTAMP
+        `, locationID, productID, item.ReceivedQuantity)
+        if err != nil {
+            return fmt.Errorf("failed to update stock: %w", err)
+        }
+
+        // Create stock lot entry for FIFO tracking
+        if item.ReceivedQuantity > 0 {
+            _, err = tx.Exec(`
+                INSERT INTO stock_lots (product_id, location_id, supplier_id, purchase_id, goods_receipt_id,
                                        quantity, remaining_quantity, cost_price, received_date,
                                        expiry_date, batch_number, serial_numbers)
-                SELECT pd.product_id, $1, p.supplier_id, p.purchase_id,
-                       $2, $2, pd.unit_price, CURRENT_DATE,
-                       $3, $4, $5
+                SELECT pd.product_id, $1, p.supplier_id, p.purchase_id, $2,
+                       $3, $3, pd.unit_price, CURRENT_DATE,
+                       $4, $5, $6
                 FROM purchase_details pd
                 JOIN purchases p ON pd.purchase_id = p.purchase_id
-                WHERE pd.purchase_detail_id = $6
-            `, locationID, item.ReceivedQuantity, item.ExpiryDate, item.BatchNumber,
+                WHERE pd.purchase_detail_id = $7
+            `, locationID, goodsReceiptID, item.ReceivedQuantity, item.ExpiryDate, item.BatchNumber,
                 pq.Array(item.SerialNumbers), item.PurchaseDetailID)
-        if err != nil {
-            return fmt.Errorf("failed to create stock lot: %w", err)
+            if err != nil {
+                return fmt.Errorf("failed to create stock lot: %w", err)
+            }
         }
-		}
 
 		// Update product cost price if this is a newer purchase
 		_, err = tx.Exec(`
@@ -627,6 +652,49 @@ func (s *PurchaseService) GetPendingPurchases(companyID, locationID int) ([]mode
 	}
 
 	return purchases, nil
+}
+
+// GetGoodsReceipts returns goods receipts for a location with optional filters
+func (s *PurchaseService) GetGoodsReceipts(companyID, locationID int, filters map[string]string) ([]models.GoodsReceipt, error) {
+    query := `
+        SELECT gr.goods_receipt_id, gr.receipt_number, gr.purchase_id, gr.location_id, gr.supplier_id,
+               gr.received_date, gr.received_by,
+               s.name as supplier_name, l.name as location_name
+        FROM goods_receipts gr
+        JOIN suppliers s ON gr.supplier_id = s.supplier_id
+        JOIN locations l ON gr.location_id = l.location_id
+        WHERE s.company_id = $1 AND gr.location_id = $2 AND gr.is_deleted = FALSE
+    `
+
+    args := []interface{}{companyID, locationID}
+    arg := 2
+    if search, ok := filters["search"]; ok && strings.TrimSpace(search) != "" {
+        arg += 1
+        query += fmt.Sprintf(" AND (gr.receipt_number ILIKE $%d OR s.name ILIKE $%d)", arg, arg)
+        args = append(args, "%"+strings.TrimSpace(search)+"%")
+    }
+
+    query += " ORDER BY gr.received_date DESC, gr.goods_receipt_id DESC"
+
+    rows, err := s.db.Query(query, args...)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get goods receipts: %w", err)
+    }
+    defer rows.Close()
+
+    var list []models.GoodsReceipt
+    for rows.Next() {
+        var gr models.GoodsReceipt
+        var supplierName, locationName string
+        if err := rows.Scan(&gr.GoodsReceiptID, &gr.ReceiptNumber, &gr.PurchaseID, &gr.LocationID, &gr.SupplierID,
+            &gr.ReceivedDate, &gr.ReceivedBy, &supplierName, &locationName); err != nil {
+            return nil, fmt.Errorf("failed to scan goods receipt: %w", err)
+        }
+        gr.Supplier = &models.Supplier{Name: supplierName}
+        gr.Location = &models.Location{Name: locationName}
+        list = append(list, gr)
+    }
+    return list, nil
 }
 
 func (s *PurchaseService) UpdatePurchase(purchaseID, companyID, userID int, req *models.UpdatePurchaseRequest) error {
@@ -819,6 +887,26 @@ func (s *PurchaseService) UpdatePurchase(purchaseID, companyID, userID int, req 
 	}
 
 	return tx.Commit()
+}
+
+// SetPurchaseInvoiceFile updates purchases.invoice_file for a purchase within the company
+func (s *PurchaseService) SetPurchaseInvoiceFile(purchaseID, companyID int, path string) error {
+    // Verify belongs to company
+    var exists int
+    if err := s.db.QueryRow(`
+        SELECT COUNT(*) FROM purchases p
+        JOIN suppliers s ON p.supplier_id = s.supplier_id
+        WHERE p.purchase_id = $1 AND s.company_id = $2 AND p.is_deleted = FALSE
+    `, purchaseID, companyID).Scan(&exists); err != nil {
+        return fmt.Errorf("failed to verify purchase: %w", err)
+    }
+    if exists == 0 {
+        return fmt.Errorf("purchase not found")
+    }
+    if _, err := s.db.Exec(`UPDATE purchases SET invoice_file = $1, updated_at = CURRENT_TIMESTAMP WHERE purchase_id = $2`, path, purchaseID); err != nil {
+        return fmt.Errorf("failed to set invoice file: %w", err)
+    }
+    return nil
 }
 
 func (s *PurchaseService) DeletePurchase(purchaseID, companyID int) error {

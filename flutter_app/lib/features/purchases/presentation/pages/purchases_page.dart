@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
 import 'package:ebs_lite/shared/pages/feature_detail_page.dart';
+import 'package:ebs_lite/features/purchases/presentation/pages/goods_receipts_page.dart';
 import '../../../suppliers/presentation/pages/suppliers_page.dart';
 
 class PurchasesPage extends StatelessWidget {
@@ -20,7 +21,7 @@ class PurchasesPage extends StatelessWidget {
         icon: Icons.receipt_rounded,
         label: 'Goods Receipt Note',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FeatureDetailPage(title: 'Goods Receipt Note')),
+          MaterialPageRoute(builder: (_) => const GoodsReceiptsPage()),
         ),
       ),
       FeatureItem(

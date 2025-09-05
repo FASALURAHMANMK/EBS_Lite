@@ -1,14 +1,14 @@
 package handlers
 
 import (
-	"net/http"
-	"strconv"
+    "net/http"
+    "strconv"
 
-	"erp-backend/internal/models"
-	"erp-backend/internal/services"
-	"erp-backend/internal/utils"
+    "erp-backend/internal/models"
+    "erp-backend/internal/services"
+    "erp-backend/internal/utils"
 
-	"github.com/gin-gonic/gin"
+    "github.com/gin-gonic/gin"
 )
 
 type PurchaseHandler struct {
@@ -540,6 +540,56 @@ func (h *PurchaseHandler) ReceivePurchase(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, "Purchase received successfully", nil)
+}
+
+// POST /purchases/:id/invoice
+// Accepts multipart file 'file', stores it under uploads, and saves path on purchase
+func (h *PurchaseHandler) UploadPurchaseInvoice(c *gin.Context) {
+    companyID := c.GetInt("company_id")
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
+
+    purchaseID, err := strconv.Atoi(c.Param("id"))
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid purchase ID", err)
+        return
+    }
+
+    file, err := c.FormFile("file")
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Missing file", err)
+        return
+    }
+
+    // Ensure purchase belongs to company
+    svc := services.NewPurchaseService()
+    // quick check via GetPurchaseByID
+    if _, err := svc.GetPurchaseByID(purchaseID, companyID); err != nil {
+        if err.Error() == "purchase not found" {
+            utils.NotFoundResponse(c, "Purchase not found")
+            return
+        }
+        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to verify purchase", err)
+        return
+    }
+
+    // Save file under /uploads/invoices
+    up := services.GetUploadPath()
+    path, err := services.SaveUploadedFile(up, "invoices", file)
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to save file", err)
+        return
+    }
+
+    // Update DB with served path
+    if err := svc.SetPurchaseInvoiceFile(purchaseID, companyID, path); err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to set invoice file", err)
+        return
+    }
+
+    utils.SuccessResponse(c, "Invoice uploaded", gin.H{"path": path})
 }
 
 // GET /purchases/pending
