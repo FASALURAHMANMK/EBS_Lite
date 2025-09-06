@@ -273,15 +273,29 @@ func (s *SettingsService) GetPaymentMethods(companyID int) ([]models.PaymentMeth
 }
 
 func (s *SettingsService) CreatePaymentMethod(companyID int, req *models.PaymentMethodRequest) (*models.PaymentMethod, error) {
-	row := s.db.QueryRow(`INSERT INTO payment_methods (company_id, name, type, external_integration, is_active) VALUES ($1,$2,$3,$4,$5) RETURNING method_id, name, type, external_integration, is_active`, companyID, req.Name, req.Type, req.ExternalIntegration, req.IsActive)
-	var pm models.PaymentMethod
-	var ext models.JSONB
-	if err := row.Scan(&pm.MethodID, &pm.Name, &pm.Type, &ext, &pm.IsActive); err != nil {
-		return nil, fmt.Errorf("failed to create payment method: %w", err)
-	}
-	pm.CompanyID = &companyID
-	pm.ExternalIntegration = &ext
-	return &pm, nil
+    row := s.db.QueryRow(`INSERT INTO payment_methods (company_id, name, type, external_integration, is_active) VALUES ($1,$2,$3,$4,$5) RETURNING method_id, name, type, external_integration, is_active`, companyID, req.Name, req.Type, req.ExternalIntegration, req.IsActive)
+    var pm models.PaymentMethod
+    var ext models.JSONB
+    if err := row.Scan(&pm.MethodID, &pm.Name, &pm.Type, &ext, &pm.IsActive); err != nil {
+        return nil, fmt.Errorf("failed to create payment method: %w", err)
+    }
+    pm.CompanyID = &companyID
+    pm.ExternalIntegration = &ext
+
+    // Ensure base currency is added by default with rate 1.0
+    var baseCurrencyID sql.NullInt64
+    if err := s.db.QueryRow(`SELECT currency_id FROM companies WHERE company_id=$1`, companyID).Scan(&baseCurrencyID); err != nil {
+        // If company has no currency set, try global base currency
+        var fallback sql.NullInt64
+        _ = s.db.QueryRow(`SELECT currency_id FROM currencies WHERE is_base_currency=TRUE LIMIT 1`).Scan(&fallback)
+        if fallback.Valid {
+            baseCurrencyID = fallback
+        }
+    }
+    if baseCurrencyID.Valid {
+        _, _ = s.db.Exec(`INSERT INTO payment_method_currencies (method_id, currency_id, exchange_rate) VALUES ($1,$2,1.0) ON CONFLICT(method_id, currency_id) DO NOTHING`, pm.MethodID, int(baseCurrencyID.Int64))
+    }
+    return &pm, nil
 }
 
 func (s *SettingsService) UpdatePaymentMethod(companyID, id int, req *models.PaymentMethodRequest) error {
@@ -341,6 +355,83 @@ func (s *SettingsService) DeletePaymentMethod(companyID, id int) error {
 
     if err := tx.Commit(); err != nil {
         return fmt.Errorf("failed to commit delete: %w", err)
+    }
+    return nil
+}
+
+// GetPaymentMethodCurrencies returns all currency mappings for this company's payment methods
+func (s *SettingsService) GetPaymentMethodCurrencies(companyID int) ([]models.PaymentMethodCurrencyMapping, error) {
+    rows, err := s.db.Query(`
+        SELECT pm.method_id, pmc.currency_id, pmc.exchange_rate
+        FROM payment_method_currencies pmc
+        JOIN payment_methods pm ON pmc.method_id = pm.method_id
+        WHERE pm.company_id = $1
+        ORDER BY pmc.method_id, pmc.currency_id
+    `, companyID)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get payment method currencies: %w", err)
+    }
+    defer rows.Close()
+
+    var res []models.PaymentMethodCurrencyMapping
+    for rows.Next() {
+        var r models.PaymentMethodCurrencyMapping
+        if err := rows.Scan(&r.MethodID, &r.CurrencyID, &r.ExchangeRate); err != nil {
+            return nil, fmt.Errorf("failed to scan mapping: %w", err)
+        }
+        res = append(res, r)
+    }
+    return res, nil
+}
+
+// SetPaymentMethodCurrencies replaces currencies for a specific method; ensures base currency exists with rate 1.0
+func (s *SettingsService) SetPaymentMethodCurrencies(companyID, methodID int, items []models.PaymentMethodCurrencyItem) error {
+    tx, err := s.db.Begin()
+    if err != nil {
+        return fmt.Errorf("failed to begin: %w", err)
+    }
+    defer tx.Rollback()
+
+    // Verify method belongs to company
+    var count int
+    if err := tx.QueryRow(`SELECT COUNT(1) FROM payment_methods WHERE method_id=$1 AND company_id=$2`, methodID, companyID).Scan(&count); err != nil {
+        return fmt.Errorf("failed to verify method: %w", err)
+    }
+    if count == 0 {
+        return fmt.Errorf("payment method not found")
+    }
+
+    if _, err := tx.Exec(`DELETE FROM payment_method_currencies WHERE method_id=$1`, methodID); err != nil {
+        return fmt.Errorf("failed to clear existing currencies: %w", err)
+    }
+
+    // Insert provided items
+    for _, it := range items {
+        if it.CurrencyID <= 0 || it.ExchangeRate <= 0 {
+            continue
+        }
+        if _, err := tx.Exec(`INSERT INTO payment_method_currencies (method_id, currency_id, exchange_rate) VALUES ($1,$2,$3) ON CONFLICT(method_id, currency_id) DO UPDATE SET exchange_rate=EXCLUDED.exchange_rate, updated_at=CURRENT_TIMESTAMP`, methodID, it.CurrencyID, it.ExchangeRate); err != nil {
+            return fmt.Errorf("failed to upsert currency mapping: %w", err)
+        }
+    }
+
+    // Ensure base currency is present with 1.0
+    var baseCurrencyID sql.NullInt64
+    if err := tx.QueryRow(`SELECT currency_id FROM companies WHERE company_id=$1`, companyID).Scan(&baseCurrencyID); err != nil {
+        var fallback sql.NullInt64
+        _ = tx.QueryRow(`SELECT currency_id FROM currencies WHERE is_base_currency=TRUE LIMIT 1`).Scan(&fallback)
+        if fallback.Valid {
+            baseCurrencyID = fallback
+        }
+    }
+    if baseCurrencyID.Valid {
+        if _, err := tx.Exec(`INSERT INTO payment_method_currencies (method_id, currency_id, exchange_rate) VALUES ($1,$2,1.0) ON CONFLICT(method_id, currency_id) DO UPDATE SET exchange_rate=1.0, updated_at=CURRENT_TIMESTAMP`, methodID, int(baseCurrencyID.Int64)); err != nil {
+            return fmt.Errorf("failed to ensure base currency: %w", err)
+        }
+    }
+
+    if err := tx.Commit(); err != nil {
+        return fmt.Errorf("failed to commit currencies update: %w", err)
     }
     return nil
 }

@@ -64,10 +64,28 @@ type PrinterProfile struct {
 
 // PaymentMethodRequest is used to create or update payment methods
 type PaymentMethodRequest struct {
-	Name                string `json:"name" validate:"required"`
-	Type                string `json:"type" validate:"required"`
-	ExternalIntegration *JSONB `json:"external_integration,omitempty"`
-	IsActive            bool   `json:"is_active"`
+    Name                string `json:"name" validate:"required"`
+    Type                string `json:"type" validate:"required"`
+    ExternalIntegration *JSONB `json:"external_integration,omitempty"`
+    IsActive            bool   `json:"is_active"`
+}
+
+// PaymentMethodCurrencyItem represents one currency configuration for a payment method
+type PaymentMethodCurrencyItem struct {
+    CurrencyID   int     `json:"currency_id" validate:"required"`
+    ExchangeRate float64 `json:"exchange_rate" validate:"required,gt=0"`
+}
+
+// SetPaymentMethodCurrenciesRequest updates currencies for a payment method
+type SetPaymentMethodCurrenciesRequest struct {
+    Currencies []PaymentMethodCurrencyItem `json:"currencies" validate:"required,dive"`
+}
+
+// PaymentMethodCurrencyMapping is a row of mapping for responses
+type PaymentMethodCurrencyMapping struct {
+    MethodID     int     `json:"method_id" db:"method_id"`
+    CurrencyID   int     `json:"currency_id" db:"currency_id"`
+    ExchangeRate float64 `json:"exchange_rate" db:"exchange_rate"`
 }
 
 // SessionLimitRequest is used to create or update maximum session limits

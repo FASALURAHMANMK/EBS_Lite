@@ -155,8 +155,9 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
     try {
       final repo = ref.read(paymentMethodsRepositoryProvider);
       if (initial == null) {
-        final created = await repo.createMethod(name: name.text.trim(), type: type, isActive: isActive);
-        setState(() => _methods = [..._methods, created]);
+        await repo.createMethod(name: name.text.trim(), type: type, isActive: isActive);
+        // Reload to refresh currencies mapping (base currency added by default)
+        await _load();
       } else {
         await repo.updateMethod(id: initial.methodId, name: name.text.trim(), type: type, isActive: isActive);
         _load();
@@ -240,15 +241,17 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
     );
     if (res != true) return;
     try {
-      final mapping = Map<int, List<Map<String, dynamic>>>.from(_methodCurrencies);
-      mapping[m.methodId] = selected.entries
+      final list = selected.entries
           .map((e) => {
                 'currency_id': e.key,
                 'rate': e.value,
               })
           .toList();
-      await ref.read(paymentMethodsRepositoryProvider).setMethodCurrencies(mapping);
-      setState(() => _methodCurrencies = mapping);
+      await ref.read(paymentMethodsRepositoryProvider).setMethodCurrenciesForMethod(m.methodId, list);
+      setState(() {
+        _methodCurrencies = Map<int, List<Map<String, dynamic>>>.from(_methodCurrencies);
+        _methodCurrencies[m.methodId] = list;
+      });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -257,4 +260,3 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
     }
   }
 }
-

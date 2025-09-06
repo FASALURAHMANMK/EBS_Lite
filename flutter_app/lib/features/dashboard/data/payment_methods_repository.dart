@@ -76,34 +76,34 @@ class PaymentMethodsRepository {
     await _dio.delete('/settings/payment-methods/$id');
   }
 
-  // Settings mapping for per-method currencies: { method_id: [{currency_id, rate?}] }
+  // Per-method currencies mapping: grouped by methodId -> [{currency_id, rate}]
   Future<Map<int, List<Map<String, dynamic>>>> getMethodCurrencies() async {
-    final res = await _dio.get('/settings');
+    final res = await _dio.get('/settings/payment-methods/currencies');
     final body = res.data;
-    final data = body is Map<String, dynamic> ? body['data'] : body;
-    if (data is Map<String, dynamic>) {
-      final raw = data['payment_method_currencies'];
-      if (raw is Map<String, dynamic>) {
-        final map = <int, List<Map<String, dynamic>>>{};
-        raw.forEach((k, v) {
-          final id = int.tryParse(k) ?? -1;
-          if (id > 0 && v is List) {
-            map[id] = v.cast<Map<String, dynamic>>();
-          }
-        });
-        return map;
-      }
+    final list = body is Map<String, dynamic> ? (body['data'] as List<dynamic>? ?? const []) : (body as List<dynamic>? ?? const []);
+    final grouped = <int, List<Map<String, dynamic>>>{};
+    for (final row in list) {
+      final m = row as Map<String, dynamic>;
+      final mid = m['method_id'] as int?;
+      final cid = m['currency_id'] as int?;
+      final rate = (m['exchange_rate'] as num?)?.toDouble();
+      if (mid == null || cid == null) continue;
+      grouped.putIfAbsent(mid, () => []);
+      grouped[mid]!.add({'currency_id': cid, 'rate': rate ?? 1.0});
     }
-    return {};
+    return grouped;
   }
 
-  Future<void> setMethodCurrencies(Map<int, List<Map<String, dynamic>>> mapping) async {
-    final payload = <String, dynamic>{};
-    mapping.forEach((k, v) => payload[k.toString()] = v);
-    await _dio.put('/settings', data: {
-      'settings': {
-        'payment_method_currencies': payload,
-      }
+  // Update currencies for a single method
+  Future<void> setMethodCurrenciesForMethod(int methodId, List<Map<String, dynamic>> currencies) async {
+    final items = currencies
+        .map((e) => {
+              'currency_id': e['currency_id'],
+              'exchange_rate': e['rate'],
+            })
+        .toList();
+    await _dio.put('/settings/payment-methods/$methodId/currencies', data: {
+      'currencies': items,
     });
   }
 }
@@ -112,4 +112,3 @@ final paymentMethodsRepositoryProvider = Provider<PaymentMethodsRepository>((ref
   final dio = ref.watch(dioProvider);
   return PaymentMethodsRepository(dio);
 });
-

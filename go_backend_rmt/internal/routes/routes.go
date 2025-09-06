@@ -576,6 +576,9 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				settings.POST("/payment-methods", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.CreatePaymentMethod)
 				settings.PUT("/payment-methods/:id", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.UpdatePaymentMethod)
 				settings.DELETE("/payment-methods/:id", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.DeletePaymentMethod)
+				// currencies mapping for payment methods
+				settings.GET("/payment-methods/currencies", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetPaymentMethodCurrencies)
+				settings.PUT("/payment-methods/:id/currencies", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.SetPaymentMethodCurrencies)
 
 				settings.GET("/printer", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetPrinters)
 				settings.POST("/printer", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.CreatePrinter)

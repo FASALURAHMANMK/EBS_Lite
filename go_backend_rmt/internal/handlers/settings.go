@@ -328,6 +328,48 @@ func (h *SettingsHandler) DeletePaymentMethod(c *gin.Context) {
 	utils.SuccessResponse(c, "Payment method deleted successfully", nil)
 }
 
+// Payment method currencies
+func (h *SettingsHandler) GetPaymentMethodCurrencies(c *gin.Context) {
+    companyID := c.GetInt("company_id")
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
+    mappings, err := h.service.GetPaymentMethodCurrencies(companyID)
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get payment method currencies", err)
+        return
+    }
+    utils.SuccessResponse(c, "Payment method currencies retrieved successfully", mappings)
+}
+
+func (h *SettingsHandler) SetPaymentMethodCurrencies(c *gin.Context) {
+    companyID := c.GetInt("company_id")
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
+    id, err := strconv.Atoi(c.Param("id"))
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid payment method ID", err)
+        return
+    }
+    var req models.SetPaymentMethodCurrenciesRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+        return
+    }
+    if err := utils.ValidateStruct(&req); err != nil {
+        utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+        return
+    }
+    if err := h.service.SetPaymentMethodCurrencies(companyID, id, req.Currencies); err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update currencies", err)
+        return
+    }
+    utils.SuccessResponse(c, "Payment method currencies updated successfully", nil)
+}
+
 // Printer profiles CRUD
 func (h *SettingsHandler) GetPrinters(c *gin.Context) {
 	companyID := c.GetInt("company_id")

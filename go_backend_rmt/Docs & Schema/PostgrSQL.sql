@@ -295,6 +295,19 @@ CREATE TABLE payment_methods (
     is_active BOOLEAN DEFAULT TRUE
 );
 
+-- Mapping of allowed currencies per payment method with override rates
+CREATE TABLE IF NOT EXISTS payment_method_currencies (
+    id SERIAL PRIMARY KEY,
+    method_id INTEGER NOT NULL REFERENCES payment_methods(method_id) ON DELETE CASCADE,
+    currency_id INTEGER NOT NULL REFERENCES currencies(currency_id),
+    exchange_rate NUMERIC(18,6) NOT NULL DEFAULT 1.0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(method_id, currency_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pmc_method ON payment_method_currencies(method_id);
+CREATE INDEX IF NOT EXISTS idx_pmc_currency ON payment_method_currencies(currency_id);
+
 -- Employees Table
 CREATE TABLE employees (
     employee_id SERIAL PRIMARY KEY,
@@ -2496,3 +2509,15 @@ ALTER TABLE payment_methods ADD CONSTRAINT payment_methods_type_check CHECK (typ
 ALTER TABLE products ADD COLUMN IF NOT EXISTS tax_id INTEGER;
 ALTER TABLE products ALTER COLUMN tax_id SET NOT NULL;
 ALTER TABLE products ADD CONSTRAINT fk_products_tax FOREIGN KEY (tax_id) REFERENCES taxes(tax_id);
+-- payment
+CREATE TABLE IF NOT EXISTS payment_method_currencies (
+    id SERIAL PRIMARY KEY,
+    method_id INTEGER NOT NULL REFERENCES payment_methods(method_id) ON DELETE CASCADE,
+    currency_id INTEGER NOT NULL REFERENCES currencies(currency_id),
+    exchange_rate NUMERIC(18,6) NOT NULL DEFAULT 1.0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(method_id, currency_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pmc_method ON payment_method_currencies(method_id);
+CREATE INDEX IF NOT EXISTS idx_pmc_currency ON payment_method_currencies(currency_id);
