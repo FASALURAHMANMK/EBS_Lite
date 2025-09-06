@@ -29,15 +29,24 @@ class PosRepository {
     if (loc == null) return null;
     final res = await _dio.get('/numbering-sequences',
         queryParameters: {'location_id': loc.locationId});
-    final list = _asList(res);
-    final seq = list.cast<Map<String, dynamic>?>().firstWhere(
-          (e) => (e?['name'] as String?)?.toLowerCase() == 'sale',
-          orElse: () => null,
-        );
-    if (seq == null) return null;
-    final prefix = seq['prefix'] as String? ?? '';
-    final len = (seq['sequence_length'] as num?)?.toInt() ?? 6;
-    final curr = (seq['current_number'] as num?)?.toInt() ?? 0;
+    final list = _asList(res).cast<Map<String, dynamic>>();
+    Map<String, dynamic>? chosen;
+    // Prefer location-specific sequence over global fallback
+    for (final m in list) {
+      if ((m['name'] as String?)?.toLowerCase() == 'sale' && (m['location_id'] as int?) == loc.locationId) {
+        chosen = m;
+        break;
+      }
+    }
+    // Fallback to global company-level sequence (location_id == null)
+    chosen ??= list.firstWhere(
+      (m) => (m['name'] as String?)?.toLowerCase() == 'sale' && m['location_id'] == null,
+      orElse: () => <String, dynamic>{},
+    );
+    if (chosen.isEmpty) return null;
+    final prefix = chosen['prefix'] as String? ?? '';
+    final len = (chosen['sequence_length'] as num?)?.toInt() ?? 6;
+    final curr = (chosen['current_number'] as num?)?.toInt() ?? 0;
     final next = curr + 1;
     final padded = next.toString().padLeft(len, '0');
     return '$prefix$padded';

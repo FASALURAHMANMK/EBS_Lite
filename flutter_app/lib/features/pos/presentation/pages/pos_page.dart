@@ -303,6 +303,8 @@ class _BottomBar extends ConsumerWidget {
                         ? null
                         : () async {
                             await notifier.holdCurrent();
+                            // Extra nudge to refresh preview immediately in UI
+                            await notifier.refreshPreview();
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Sale held')),
@@ -331,6 +333,8 @@ class _BottomBar extends ConsumerWidget {
                             builder: (_) => const PaymentDialog(),
                           );
                           if (result != null && context.mounted) {
+                            // Force preview refresh on successful finalize
+                            await ref.read(posNotifierProvider.notifier).refreshPreview();
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Sale completed: ${result.saleNumber}')),
                             );
