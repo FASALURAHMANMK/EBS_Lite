@@ -1,12 +1,14 @@
 package services
 
 import (
-	"database/sql"
-	"encoding/json"
-	"fmt"
+    "database/sql"
+    "encoding/json"
+    "fmt"
 
-	"erp-backend/internal/database"
-	"erp-backend/internal/models"
+    "github.com/lib/pq"
+
+    "erp-backend/internal/database"
+    "erp-backend/internal/models"
 )
 
 // SettingsService provides methods to manage system settings
@@ -291,11 +293,56 @@ func (s *SettingsService) UpdatePaymentMethod(companyID, id int, req *models.Pay
 }
 
 func (s *SettingsService) DeletePaymentMethod(companyID, id int) error {
-	_, err := s.db.Exec(`DELETE FROM payment_methods WHERE method_id=$1 AND company_id=$2`, id, companyID)
-	if err != nil {
-		return fmt.Errorf("failed to delete payment method: %w", err)
-	}
-	return nil
+    tx, err := s.db.Begin()
+    if err != nil {
+        return fmt.Errorf("failed to begin transaction: %w", err)
+    }
+    defer tx.Rollback()
+
+    // Attempt hard delete; if FK violation, return a friendly error
+    if _, err := tx.Exec(`DELETE FROM payment_methods WHERE method_id=$1 AND company_id=$2`, id, companyID); err != nil {
+        if pqErr, ok := err.(*pq.Error); ok && string(pqErr.Code) == "23503" {
+            return fmt.Errorf("payment method is in use and cannot be deleted; please deactivate instead")
+        }
+        return fmt.Errorf("failed to delete payment method: %w", err)
+    }
+
+    // Cleanup settings mapping: remove this method from payment_method_currencies if present
+    var value models.JSONB
+    err = tx.QueryRow(`SELECT value FROM settings WHERE company_id=$1 AND key='payment_method_currencies'`, companyID).Scan(&value)
+    if err != nil && err != sql.ErrNoRows {
+        return fmt.Errorf("failed to read payment_method_currencies: %w", err)
+    }
+    if err == nil && value != nil {
+        m := map[string]interface{}(value)
+        key := fmt.Sprintf("%d", id)
+        if _, exists := m[key]; exists {
+            delete(m, key)
+            // Upsert updated mapping
+            // Marshal back into JSONB
+            b, merr := json.Marshal(m)
+            if merr != nil {
+                return fmt.Errorf("failed to marshal payment_method_currencies: %w", merr)
+            }
+            var newVal models.JSONB
+            if uerr := json.Unmarshal(b, &newVal); uerr != nil {
+                return fmt.Errorf("failed to unmarshal payment_method_currencies: %w", uerr)
+            }
+            if _, uerr := tx.Exec(`
+                INSERT INTO settings (company_id, key, value)
+                VALUES ($1, 'payment_method_currencies', $2)
+                ON CONFLICT (company_id, key)
+                DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
+            `, companyID, newVal); uerr != nil {
+                return fmt.Errorf("failed to update payment_method_currencies: %w", uerr)
+            }
+        }
+    }
+
+    if err := tx.Commit(); err != nil {
+        return fmt.Errorf("failed to commit delete: %w", err)
+    }
+    return nil
 }
 
 // Printer profiles CRUD

@@ -31,9 +31,10 @@ class PurchasesRepository {
     return data.cast<Map<String, dynamic>>();
   }
 
-  Future<List<Map<String, dynamic>>> getOrders({String? status}) async {
+  Future<List<Map<String, dynamic>>> getOrders({String? status, int? supplierId}) async {
     final qp = <String, dynamic>{};
     if (status != null) qp['status'] = status;
+    if (supplierId != null) qp['supplier_id'] = supplierId;
     final loc = _locationId;
     if (loc != null) qp['location_id'] = loc;
     final res = await _dio.get('/purchases', queryParameters: qp.isEmpty ? null : qp);

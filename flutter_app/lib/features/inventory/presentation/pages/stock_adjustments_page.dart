@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
+import 'stock_adjustment_document_detail_page.dart';
 import '../../../dashboard/controllers/location_notifier.dart';
 
 class StockAdjustmentsPage extends ConsumerStatefulWidget {
-  const StockAdjustmentsPage({super.key});
+  const StockAdjustmentsPage({super.key, this.initialQuery});
+  final String? initialQuery;
 
   @override
   ConsumerState<StockAdjustmentsPage> createState() => _StockAdjustmentsPageState();
@@ -21,6 +23,9 @@ class _StockAdjustmentsPageState extends ConsumerState<StockAdjustmentsPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
+      _search.text = widget.initialQuery!;
+    }
     _load();
   }
 
@@ -78,7 +83,7 @@ class _StockAdjustmentsPageState extends ConsumerState<StockAdjustmentsPage> {
                 if (id != null) {
                   // ignore: use_build_context_synchronously
                   await Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => _AdjustmentDocumentDetailPage(documentId: id)),
+                    MaterialPageRoute(builder: (_) => StockAdjustmentDocumentDetailPage(documentId: id)),
                   );
                 }
               }
@@ -129,7 +134,7 @@ class _StockAdjustmentsPageState extends ConsumerState<StockAdjustmentsPage> {
                               elevation: 0,
                               child: ListTile(
                                 onTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute(builder: (_) => _AdjustmentDocumentDetailPage(documentId: g.documentId)),
+                                  MaterialPageRoute(builder: (_) => StockAdjustmentDocumentDetailPage(documentId: g.documentId)),
                                 ),
                                 title: Text(g.documentNumber),
                                 subtitle: Text([
@@ -331,79 +336,6 @@ class _AdjustmentDocumentFormPageState extends ConsumerState<_AdjustmentDocument
   }
 }
 
-class _AdjustmentDocumentDetailPage extends ConsumerStatefulWidget {
-  const _AdjustmentDocumentDetailPage({required this.documentId});
-  final int documentId;
-
-  @override
-  ConsumerState<_AdjustmentDocumentDetailPage> createState() => _AdjustmentDocumentDetailPageState();
-}
-
-class _AdjustmentDocumentDetailPageState extends ConsumerState<_AdjustmentDocumentDetailPage> {
-  StockAdjustmentDocumentDto? _doc;
-  Map<int, ProductDto> _products = const {};
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() => _loading = true);
-    try {
-      final repo = ref.read(inventoryRepositoryProvider);
-      final doc = await repo.getStockAdjustmentDocument(widget.documentId);
-      final ids = doc.items.map((e) => e.productId).toSet().toList();
-      final map = <int, ProductDto>{};
-      for (final id in ids) {
-        try {
-          final p = await repo.getProduct(id);
-          map[id] = p;
-        } catch (_) {}
-      }
-      if (!mounted) return;
-      setState(() { _products = map; _doc = doc; });
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final d = _doc;
-    return Scaffold(
-      appBar: AppBar(title: Text(d?.documentNumber ?? 'Document')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Text(d?.reason ?? '-', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(d?.createdAt != null ? _fmt(d!.createdAt!) : '', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-            const SizedBox(height: 12),
-            if (_loading) const LinearProgressIndicator(minHeight: 2),
-            if (d != null) ...d.items.map((a) {
-              final name = _products[a.productId]?.name ?? 'Product #${a.productId}';
-              final qty = a.adjustment;
-              final color = qty >= 0 ? Colors.green : theme.colorScheme.error;
-              return Card(
-                elevation: 0,
-                child: ListTile(
-                  title: Text(name),
-                  trailing: Text((qty >= 0 ? '+ ' : '') + qty.toStringAsFixed(2), style: TextStyle(color: color, fontWeight: FontWeight.w700)),
-                ),
-              );
-            }).toList(),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _AdjLine {
   InventoryListItem? product;
   final qty = TextEditingController();
@@ -556,3 +488,4 @@ String _fmt(DateTime dt) {
   final mm = dt.minute.toString().padLeft(2, '0');
   return '$y-$m-$d $hh:$mm';
 }
+

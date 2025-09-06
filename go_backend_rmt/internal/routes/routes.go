@@ -368,15 +368,16 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
             }
 
 			// Purchase Returns management routes (require company and location)
-			purchaseReturns := protected.Group("/purchase-returns")
-			purchaseReturns.Use(middleware.RequireCompanyAccess())
-			{
-				purchaseReturns.GET("", middleware.RequirePermission("VIEW_PURCHASE_RETURNS"), purchaseHandler.GetPurchaseReturns)
-				purchaseReturns.GET("/:id", middleware.RequirePermission("VIEW_PURCHASE_RETURNS"), purchaseHandler.GetPurchaseReturn)
-				purchaseReturns.POST("", middleware.RequirePermission("CREATE_PURCHASE_RETURNS"), purchaseHandler.CreatePurchaseReturn)
-				purchaseReturns.PUT("/:id", middleware.RequirePermission("UPDATE_PURCHASE_RETURNS"), purchaseHandler.UpdatePurchaseReturn)
-				purchaseReturns.DELETE("/:id", middleware.RequirePermission("DELETE_PURCHASE_RETURNS"), purchaseHandler.DeletePurchaseReturn)
-			}
+            purchaseReturns := protected.Group("/purchase-returns")
+            purchaseReturns.Use(middleware.RequireCompanyAccess())
+            {
+                purchaseReturns.GET("", middleware.RequirePermission("VIEW_PURCHASE_RETURNS"), purchaseHandler.GetPurchaseReturns)
+                purchaseReturns.GET("/:id", middleware.RequirePermission("VIEW_PURCHASE_RETURNS"), purchaseHandler.GetPurchaseReturn)
+                purchaseReturns.POST("", middleware.RequirePermission("CREATE_PURCHASE_RETURNS"), purchaseHandler.CreatePurchaseReturn)
+                purchaseReturns.PUT("/:id", middleware.RequirePermission("UPDATE_PURCHASE_RETURNS"), purchaseHandler.UpdatePurchaseReturn)
+                purchaseReturns.DELETE("/:id", middleware.RequirePermission("DELETE_PURCHASE_RETURNS"), purchaseHandler.DeletePurchaseReturn)
+                purchaseReturns.POST("/:id/receipt", middleware.RequirePermission("UPDATE_PURCHASE_RETURNS"), purchaseHandler.UploadPurchaseReturnReceipt)
+            }
 
 			// Customer management routes (require company)
 			customers := protected.Group("/customers")
@@ -537,14 +538,15 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			}
 
 			// Tax routes
-			taxes := protected.Group("/taxes")
-			taxes.Use(middleware.RequireCompanyAccess())
-			{
-				taxes.GET("", middleware.RequirePermission("MANAGE_SETTINGS"), taxHandler.GetTaxes)
-				taxes.POST("", middleware.RequirePermission("MANAGE_SETTINGS"), taxHandler.CreateTax)
-				taxes.PUT("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), taxHandler.UpdateTax)
-				taxes.DELETE("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), taxHandler.DeleteTax)
-			}
+            taxes := protected.Group("/taxes")
+            taxes.Use(middleware.RequireCompanyAccess())
+            {
+                // Allow viewing taxes with VIEW_SETTINGS, but restrict modifications
+                taxes.GET("", middleware.RequirePermission("VIEW_SETTINGS"), taxHandler.GetTaxes)
+                taxes.POST("", middleware.RequirePermission("MANAGE_SETTINGS"), taxHandler.CreateTax)
+                taxes.PUT("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), taxHandler.UpdateTax)
+                taxes.DELETE("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), taxHandler.DeleteTax)
+            }
 
 			// Settings routes
 			settings := protected.Group("/settings")

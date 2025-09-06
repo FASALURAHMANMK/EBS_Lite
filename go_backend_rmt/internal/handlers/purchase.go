@@ -622,3 +622,50 @@ func (h *PurchaseHandler) GetPendingPurchases(c *gin.Context) {
 
 	utils.SuccessResponse(c, "Pending purchases retrieved successfully", purchases)
 }
+
+// POST /purchase-returns/:id/receipt
+// Accepts multipart file 'file' and optional form field 'number' to save a supplier return receipt
+func (h *PurchaseHandler) UploadPurchaseReturnReceipt(c *gin.Context) {
+    companyID := c.GetInt("company_id")
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
+
+    returnID, err := strconv.Atoi(c.Param("id"))
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid return ID", err)
+        return
+    }
+
+    file, err := c.FormFile("file")
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Missing file", err)
+        return
+    }
+
+    number := c.PostForm("number")
+
+    svc := services.NewPurchaseReturnService()
+    if err := svc.VerifyReturnInCompany(returnID, companyID); err != nil {
+        if err.Error() == "return not found" {
+            utils.NotFoundResponse(c, "Purchase return not found")
+            return
+        }
+        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to verify return", err)
+        return
+    }
+
+    up := services.GetUploadPath()
+    path, err := services.SaveUploadedFile(up, "returns", file)
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to save file", err)
+        return
+    }
+
+    if err := svc.SetPurchaseReturnReceiptFile(returnID, companyID, path, utils.EmptyToNil(number)); err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to set receipt", err)
+        return
+    }
+    utils.SuccessResponse(c, "Receipt uploaded", gin.H{"path": path})
+}

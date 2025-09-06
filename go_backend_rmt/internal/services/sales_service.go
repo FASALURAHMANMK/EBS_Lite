@@ -1,15 +1,16 @@
 package services
 
 import (
-	"database/sql"
-	"fmt"
-	"strings"
-	"time"
+    "database/sql"
+    "fmt"
+    "strconv"
+    "strings"
+    "time"
 
-	"github.com/lib/pq"
+    "github.com/lib/pq"
 
-	"erp-backend/internal/database"
-	"erp-backend/internal/models"
+    "erp-backend/internal/database"
+    "erp-backend/internal/models"
 )
 
 type SalesService struct {
@@ -35,13 +36,32 @@ func (s *SalesService) CalculateTotals(req *models.CreateSaleRequest) (float64, 
 		lineTotal -= discountAmount
 		subtotal += lineTotal
 
-		if item.TaxID != nil {
-			taxAmount, err := s.calculateTax(lineTotal, *item.TaxID)
-			if err != nil {
-				return 0, 0, 0, fmt.Errorf("failed to calculate tax: %w", err)
-			}
-			totalTax += taxAmount
-		}
+        // Resolve tax: prefer explicit tax_id, otherwise fallback to product's 'Default Tax'/'Tax' attribute
+        var effectiveTaxID *int
+        if item.TaxID != nil {
+            effectiveTaxID = item.TaxID
+        } else if item.ProductID != nil {
+            var raw sql.NullString
+            err := s.db.QueryRow(`
+                SELECT pav.value
+                FROM product_attribute_values pav
+                JOIN product_attributes pa ON pa.attribute_id = pav.attribute_id
+                WHERE pav.product_id = $1 AND pa.is_deleted = FALSE AND LOWER(pa.name) IN ('default tax','tax')
+                LIMIT 1
+            `, *item.ProductID).Scan(&raw)
+            if err == nil && raw.Valid {
+                if tid, perr := strconv.Atoi(strings.TrimSpace(raw.String)); perr == nil && tid > 0 {
+                    effectiveTaxID = &tid
+                }
+            }
+        }
+        if effectiveTaxID != nil {
+            taxAmount, err := s.calculateTax(lineTotal, *effectiveTaxID)
+            if err != nil {
+                return 0, 0, 0, fmt.Errorf("failed to calculate tax: %w", err)
+            }
+            totalTax += taxAmount
+        }
 	}
 
 	totalAmount := subtotal + totalTax - req.DiscountAmount
@@ -317,7 +337,7 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 
 		// Calculate subtotal for promotion eligibility
 		subtotal := float64(0)
-		for _, item := range req.Items {
+    for _, item := range req.Items {
 			lineTotal := item.Quantity * item.UnitPrice
 			discountAmount := lineTotal * (item.DiscountPercent / 100)
 			lineTotal -= discountAmount
@@ -430,13 +450,32 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 		discountAmount := lineTotal * (item.DiscountPercent / 100)
 		lineTotal -= discountAmount
 
-		var taxAmount float64
-		if item.TaxID != nil {
-			taxAmount, err = s.calculateTax(lineTotal, *item.TaxID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to calculate tax: %w", err)
-			}
-		}
+        var taxAmount float64
+        // Resolve tax: prefer explicit tax_id, otherwise fallback to product's 'Default Tax'/'Tax' attribute
+        var effectiveTaxID *int
+        if item.TaxID != nil {
+            effectiveTaxID = item.TaxID
+        } else if item.ProductID != nil {
+            var raw sql.NullString
+            q := `
+                SELECT pav.value
+                FROM product_attribute_values pav
+                JOIN product_attributes pa ON pa.attribute_id = pav.attribute_id
+                WHERE pav.product_id = $1 AND pa.is_deleted = FALSE AND LOWER(pa.name) IN ('default tax','tax')
+                LIMIT 1
+            `
+            if err := s.db.QueryRow(q, *item.ProductID).Scan(&raw); err == nil && raw.Valid {
+                if tid, perr := strconv.Atoi(strings.TrimSpace(raw.String)); perr == nil && tid > 0 {
+                    effectiveTaxID = &tid
+                }
+            }
+        }
+        if effectiveTaxID != nil {
+            taxAmount, err = s.calculateTax(lineTotal, *effectiveTaxID)
+            if err != nil {
+                return nil, fmt.Errorf("failed to calculate tax: %w", err)
+            }
+        }
 
 		// Validate serial numbers for serialized products
 		if item.ProductID != nil {

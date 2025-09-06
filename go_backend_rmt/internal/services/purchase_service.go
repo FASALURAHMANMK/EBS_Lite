@@ -476,32 +476,38 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 
     // Update purchase details with received quantities
     for _, item := range req.Items {
-		// Verify purchase detail exists
-		var currentQuantity float64
-		err = tx.QueryRow(`
-			SELECT quantity FROM purchase_details 
-			WHERE purchase_detail_id = $1 AND purchase_id = $2
-		`, item.PurchaseDetailID, purchaseID).Scan(&currentQuantity)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				return fmt.Errorf("purchase detail with ID %d not found", item.PurchaseDetailID)
-			}
-			return fmt.Errorf("failed to verify purchase detail: %w", err)
-		}
+        // Verify purchase detail exists and get current state
+        var orderedQty float64
+        var receivedSoFar float64
+        err = tx.QueryRow(`
+            SELECT quantity, received_quantity FROM purchase_details 
+            WHERE purchase_detail_id = $1 AND purchase_id = $2
+        `, item.PurchaseDetailID, purchaseID).Scan(&orderedQty, &receivedSoFar)
+        if err != nil {
+            if err == sql.ErrNoRows {
+                return fmt.Errorf("purchase detail with ID %d not found", item.PurchaseDetailID)
+            }
+            return fmt.Errorf("failed to verify purchase detail: %w", err)
+        }
 
-		if item.ReceivedQuantity > currentQuantity {
-			return fmt.Errorf("received quantity cannot exceed ordered quantity for detail ID %d", item.PurchaseDetailID)
-		}
+        if item.ReceivedQuantity <= 0 {
+            return fmt.Errorf("received quantity must be greater than zero for detail ID %d", item.PurchaseDetailID)
+        }
 
-		// Update received quantity
-		_, err = tx.Exec(`
-			UPDATE purchase_details 
-			SET received_quantity = $1
-			WHERE purchase_detail_id = $2
-		`, item.ReceivedQuantity, item.PurchaseDetailID)
-		if err != nil {
-			return fmt.Errorf("failed to update received quantity: %w", err)
-		}
+        // Validate we don't exceed ordered quantity
+        if receivedSoFar+item.ReceivedQuantity > orderedQty+1e-9 { // small epsilon for float
+            return fmt.Errorf("received quantity exceeds remaining quantity for detail ID %d", item.PurchaseDetailID)
+        }
+
+        // Increment received quantity atomically
+        _, err = tx.Exec(`
+            UPDATE purchase_details 
+            SET received_quantity = received_quantity + $1
+            WHERE purchase_detail_id = $2
+        `, item.ReceivedQuantity, item.PurchaseDetailID)
+        if err != nil {
+            return fmt.Errorf("failed to update received quantity: %w", err)
+        }
 
 		// Get product ID for stock update
 		var productID int
@@ -522,12 +528,12 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 			}
 			return fmt.Errorf("failed to verify product: %w", err)
 		}
-		if isSerialized {
-			if item.ReceivedQuantity != float64(int(item.ReceivedQuantity)) {
-				return fmt.Errorf("received quantity must be a whole number for serialized products")
-			}
-			if len(item.SerialNumbers) != int(item.ReceivedQuantity) {
-				return fmt.Errorf("serial numbers count must equal received quantity for serialized products")
+        if isSerialized {
+            if item.ReceivedQuantity != float64(int(item.ReceivedQuantity)) {
+                return fmt.Errorf("received quantity must be a whole number for serialized products")
+            }
+            if len(item.SerialNumbers) != int(item.ReceivedQuantity) {
+                return fmt.Errorf("serial numbers count must equal received quantity for serialized products")
 			}
 			seen := make(map[string]struct{}, len(item.SerialNumbers))
 			for _, srl := range item.SerialNumbers {

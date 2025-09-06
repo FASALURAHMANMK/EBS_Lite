@@ -3,6 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
+import '../../../purchases/presentation/pages/grn_detail_page.dart';
+import '../../../purchases/presentation/pages/purchase_return_detail_page.dart';
+import 'stock_transfer_view_page.dart';
+import 'stock_adjustments_page.dart';
+import 'stock_adjustment_document_detail_page.dart';
 
 class ProductTransactionsPage extends ConsumerStatefulWidget {
   const ProductTransactionsPage({super.key, required this.productId, required this.productName});
@@ -27,6 +32,49 @@ class _ProductTransactionsPageState extends ConsumerState<ProductTransactionsPag
   void initState() {
     super.initState();
     _future = _load();
+  }
+
+  void _openTransaction(ProductTransactionDto t) async {
+    // Route based on backend-provided entity/type
+    switch (t.entity) {
+      case 'goods_receipt':
+        if (!mounted) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => GoodsReceiptDetailPage(goodsReceiptId: t.entityId)),
+        );
+        break;
+      case 'transfer':
+        if (!mounted) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => StockTransferViewPage(transferId: t.entityId)),
+        );
+        break;
+      case 'purchase_return':
+        if (!mounted) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => PurchaseReturnDetailPage(returnId: t.entityId)),
+        );
+        break;
+      case 'stock_adjustment_document':
+        if (!mounted) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => StockAdjustmentDocumentDetailPage(documentId: t.entityId)),
+        );
+        break;
+      case 'stock_adjustment':
+        if (!mounted) return;
+        // No direct detail view for single adjustments; open documents page for context.
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const StockAdjustmentsPage()),
+        );
+        break;
+      // Future: add sale/sale_return/purchase_return when detail pages exist
+      default:
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(content: Text('Detail view not available for this transaction')));
+    }
   }
 
   Future<_ProductBundle> _load() async {
@@ -92,7 +140,7 @@ class _ProductTransactionsPageState extends ConsumerState<ProductTransactionsPag
                   ))
                 else ...[
                   for (final t in items) ...[
-                    _TransactionTile(t: t),
+                    _TransactionTile(t: t, onTap: () => _openTransaction(t)),
                     const SizedBox(height: 8),
                   ]
                 ]
@@ -205,8 +253,9 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _TransactionTile extends StatelessWidget {
-  const _TransactionTile({required this.t});
+  const _TransactionTile({required this.t, this.onTap});
   final ProductTransactionDto t;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -216,6 +265,7 @@ class _TransactionTile extends StatelessWidget {
     return ListTile(
       tileColor: theme.colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      onTap: onTap,
       title: Row(
         children: [
           _TypeChip(type: t.type),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
 import '../../../suppliers/data/supplier_repository.dart';
+import '../../../dashboard/data/taxes_repository.dart';
 
 class ProductFormPage extends ConsumerStatefulWidget {
   const ProductFormPage({super.key, this.initialName});
@@ -42,6 +43,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   int? _brandId;
   int? _unitId;
   int? _defaultSupplierId;
+  int? _taxId;
+  String? _taxName;
   final _categoryController = TextEditingController();
   final _brandController = TextEditingController();
   final _supplierController = TextEditingController();
@@ -158,6 +161,15 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           );
         }
       }
+      // Build attributes and ensure Default Tax attribute exists if needed
+      final attrs = _buildAttributesMap();
+      if (_taxId != null) {
+        final taxAttrId = await _ensureDefaultTaxAttributeId();
+        if (taxAttrId != null && taxAttrId > 0) {
+          attrs[taxAttrId] = _taxId!.toString();
+        }
+      }
+
       final payload = CreateProductPayload(
         name: _name.text.trim(),
         sku: _sku.text.trim().isEmpty ? null : _sku.text.trim(),
@@ -166,7 +178,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         reorderLevel: int.tryParse(_reorder.text.trim()) ?? 0,
         isSerialized: _serialized,
         barcodes: barcodes,
-        attributes: _buildAttributesMap(),
+        attributes: attrs,
         categoryId: _categoryId,
         brandId: _brandId,
         unitId: _unitId,
@@ -220,6 +232,27 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           if (v.isNotEmpty || d.isRequired) {
             map[d.attributeId] = v;
           }
+      }
+    }
+    return map;
+  }
+
+  Map<int, String> _buildAttributesMapWithTax() {
+    final map = _buildAttributesMap();
+    final tid = _taxId;
+    if (tid != null) {
+      final def = _attrDefs.firstWhere(
+        (d) => d.name.toLowerCase() == 'default tax' || d.name.toLowerCase() == 'tax',
+        orElse: () => ProductAttributeDefinitionDto(
+          attributeId: -1,
+          name: '',
+          type: 'TEXT',
+          isRequired: false,
+          options: const [],
+        ),
+      );
+      if (def.attributeId > 0) {
+        map[def.attributeId] = tid.toString();
       }
     }
     return map;
@@ -395,6 +428,21 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                     ),
                     const SizedBox(height: 12),
                     _categoryBrandUnitPickers(),
+                    const SizedBox(height: 12),
+                    _SelectField(
+                      label: 'Tax Type',
+                      valueText: _taxName ?? 'None',
+                      icon: Icons.percent_rounded,
+                      onTap: () async {
+                        final picked = await _openTaxPicker();
+                        if (picked != null) {
+                          setState(() {
+                            _taxId = picked.taxId;
+                            _taxName = '${picked.name} (${picked.percentage.toStringAsFixed(2)}%)';
+                          });
+                        }
+                      },
+                    ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _initialStock,
@@ -851,6 +899,87 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     );
   }
 
+  Future<int?> _ensureDefaultTaxAttributeId() async {
+    // Try find existing
+    try {
+      final def = _attrDefs.firstWhere(
+        (d) => d.name.toLowerCase() == 'default tax' || d.name.toLowerCase() == 'tax',
+      );
+      return def.attributeId;
+    } catch (_) {}
+    // Create if not found
+    try {
+      final created = await ref.read(inventoryRepositoryProvider).createAttributeDefinition(
+            name: 'Default Tax',
+            type: 'TEXT',
+            isRequired: false,
+          );
+      setState(() => _attrDefs = [..._attrDefs, created]);
+      return created.attributeId;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<TaxDto?> _openTaxPicker() async {
+    final repo = ref.read(taxesRepositoryProvider);
+    List<TaxDto> taxes = [];
+    try {
+      taxes = await repo.getTaxes();
+    } catch (_) {}
+    int? current = _taxId;
+    return showDialog<TaxDto?>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setInner) => AlertDialog(
+          title: const Text('Select Tax Type'),
+          content: SizedBox(
+            width: 500,
+            child: taxes.isEmpty
+                ? const Center(child: Text('No tax types'))
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: taxes.length + 1,
+                    itemBuilder: (context, i) {
+                      if (i == 0) {
+                        return RadioListTile<int>(
+                          value: -1,
+                          groupValue: current ?? -1,
+                          onChanged: (v) => setInner(() => current = null),
+                          title: const Text('None'),
+                        );
+                      }
+                      final t = taxes[i - 1];
+                      return RadioListTile<int>(
+                        value: t.taxId,
+                        groupValue: current,
+                        onChanged: (v) => setInner(() => current = v),
+                        title: Text(t.name),
+                        subtitle: Text('${t.percentage.toStringAsFixed(2)} %'),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, null), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () {
+                if (current == null) {
+                  Navigator.pop(context, const TaxDto(taxId: -1, name: 'None', percentage: 0, isCompound: false, isActive: true));
+                  return;
+                }
+                final sel = taxes.firstWhere((e) => e.taxId == current,
+                    orElse: () => const TaxDto(taxId: -1, name: 'None', percentage: 0, isCompound: false, isActive: true));
+                Navigator.pop(context, sel.taxId == -1 ? null : sel);
+              },
+              child: const Text('Apply'),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<_SupplierPick?> _openSupplierPicker() async {
     String query = '';
     List<_SupplierPick> results = const [];
@@ -940,124 +1069,6 @@ class _SelectField extends StatelessWidget {
       ),
     );
   }
-}
-
-Future<List<ProductBarcodeDto>?> _showBarcodeManagerDialog(
-  BuildContext context, {
-  required List<ProductBarcodeDto> initial,
-  required String primaryCode,
-}) async {
-  List<ProductBarcodeDto> list = initial.isNotEmpty
-      ? initial
-          .map((e) => ProductBarcodeDto(
-                barcodeId: e.barcodeId,
-                barcode: e.barcode,
-                packSize: e.packSize,
-                costPrice: e.costPrice,
-                sellingPrice: e.sellingPrice,
-                isPrimary: e.isPrimary,
-              ))
-          .toList()
-      : [
-          ProductBarcodeDto(
-            barcode: primaryCode,
-            packSize: 1,
-            isPrimary: true,
-          ),
-        ];
-  return showDialog<List<ProductBarcodeDto>>(
-    context: context,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setState) => AlertDialog(
-        title: const Text('Manage Barcodes'),
-        content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640, maxHeight: 560),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-              for (int i = 0; i < list.length; i++)
-                _BarcodeRow(
-                  key: ValueKey('barcode_$i'),
-                  value: list[i],
-                  isPrimary: list[i].isPrimary,
-                  onChanged: (v) => setState(() => list[i] = v),
-                  onPrimary: () => setState(() {
-                    for (int j = 0; j < list.length; j++) {
-                      list[j] = ProductBarcodeDto(
-                        barcodeId: list[j].barcodeId,
-                        barcode: list[j].barcode,
-                        packSize: list[j].packSize,
-                        costPrice: list[j].costPrice,
-                        sellingPrice: list[j].sellingPrice,
-                        isPrimary: i == j,
-                      );
-                    }
-                  }),
-                  onDelete: () => setState(() {
-                    if (list.length > 1) list.removeAt(i);
-                  }),
-                ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  onPressed: () => setState(() {
-                    list.add(ProductBarcodeDto(
-                      barcode: '',
-                      packSize: 1,
-                      isPrimary: list.every((b) => !b.isPrimary),
-                    ));
-                  }),
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Add Barcode'),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Note: Pack sizes and prices are global. Location-specific linking is not supported in backend yet.',
-                style: TextStyle(fontSize: 12),
-              ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).maybePop(null),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (list.where((b) => b.isPrimary).length != 1) {
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(const SnackBar(content: Text('Select exactly one primary barcode')));
-                return;
-              }
-              for (final b in list) {
-                final s = b.barcode.trim();
-                if (s.isEmpty || !RegExp(r'^\d+$').hasMatch(s)) {
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(const SnackBar(content: Text('All barcodes must be digits only')));
-                  return;
-                }
-                if ((b.packSize ?? 1) < 1) {
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(const SnackBar(content: Text('Pack size must be at least 1')));
-                  return;
-                }
-              }
-              Navigator.of(context).pop(list);
-            },
-            child: const Text('Apply'),
-          ),
-        ],
-      ),
-    ),
-  );
 }
 
 class _BarcodeRow extends StatefulWidget {

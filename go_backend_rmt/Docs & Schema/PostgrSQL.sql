@@ -279,7 +279,9 @@ CREATE TABLE taxes (
     name VARCHAR(100) NOT NULL,
     percentage NUMERIC(5,2) NOT NULL,
     is_compound BOOLEAN DEFAULT FALSE,
-    is_active BOOLEAN DEFAULT TRUE
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Payment Methods Table
@@ -287,7 +289,7 @@ CREATE TABLE payment_methods (
     method_id SERIAL PRIMARY KEY,
     company_id INTEGER REFERENCES companies(company_id),
     name VARCHAR(100) NOT NULL,
-    type VARCHAR(50) NOT NULL CHECK (type IN ('CASH', 'CARD', 'BANK', 'DIGITAL', 'OTHER')),
+    type VARCHAR(50) NOT NULL CHECK (type IN ('CASH', 'CARD', 'ONLINE', 'UPI', 'CHEQUE', 'CREDIT', 'BANK', 'DIGITAL', 'OTHER')),
     external_integration JSONB,
     is_active BOOLEAN DEFAULT TRUE
 );
@@ -636,6 +638,8 @@ CREATE TABLE purchase_returns (
     return_date DATE NOT NULL DEFAULT CURRENT_DATE,
     total_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
     reason TEXT,
+    reference_number VARCHAR(100),
+    receipt_file VARCHAR(255),
     status VARCHAR(50) DEFAULT 'COMPLETED',
     created_by INTEGER NOT NULL REFERENCES users(user_id),
     approved_by INTEGER REFERENCES users(user_id),
@@ -740,6 +744,8 @@ CREATE TABLE stock_transfer_details (
     quantity NUMERIC(10,3) NOT NULL,
     received_quantity NUMERIC(10,3) DEFAULT 0
 );
+
+
 
 -- Collections Table
 CREATE TABLE collections (
@@ -1015,7 +1021,8 @@ CREATE TABLE settings (
     description TEXT,
     data_type VARCHAR(50) DEFAULT 'TEXT',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (company_id, key)
 );
 
 -- Example: limit active device sessions per user
@@ -2458,13 +2465,6 @@ ALTER TABLE workflow_approvals ALTER COLUMN created_by SET NOT NULL;
 ALTER TABLE currencies
 ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
 
--- Optional: Default supplier link for products
-ALTER TABLE products
-ADD COLUMN IF NOT EXISTS default_supplier_id INTEGER REFERENCES suppliers(supplier_id);
-
-ALTER TABLE purchases
-ADD COLUMN IF NOT EXISTS invoice_file VARCHAR(255);
-
 -- Seed currencies (idempotent)
 INSERT INTO currencies (code, name, symbol, exchange_rate, is_base_currency)
 VALUES
@@ -2474,3 +2474,20 @@ VALUES
 ('INR', 'Indian Rupee', '₹', 83.00, FALSE),
 ('AED', 'UAE Dirham', 'د.إ', 3.67, FALSE)
 ON CONFLICT (code) DO NOTHING;
+
+-- Optional: Default supplier link for products
+ALTER TABLE products
+ADD COLUMN IF NOT EXISTS default_supplier_id INTEGER REFERENCES suppliers(supplier_id);
+
+ALTER TABLE purchases
+ADD COLUMN IF NOT EXISTS invoice_file VARCHAR(255);
+
+-- Add receipt and reference columns to purchase_returns for strict storage
+ALTER TABLE purchase_returns ADD COLUMN IF NOT EXISTS receipt_file VARCHAR(255);
+ALTER TABLE purchase_returns ADD COLUMN IF NOT EXISTS reference_number VARCHAR(100);
+-- tax
+ALTER TABLE taxes ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE taxes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+--payment
+ALTER TABLE payment_methods DROP CONSTRAINT payment_methods_type_check;
+ALTER TABLE payment_methods ADD CONSTRAINT payment_methods_type_check CHECK (type IN ('CASH','CARD','ONLINE','UPI','CHEQUE','CREDIT','BANK','DIGITAL','OTHER'));

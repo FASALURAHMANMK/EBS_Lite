@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
 import 'package:ebs_lite/shared/pages/feature_detail_page.dart';
+import 'package:ebs_lite/features/purchases/presentation/pages/purchase_returns_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/purchase_orders_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/goods_receipts_page.dart';
 import '../../../suppliers/presentation/pages/suppliers_page.dart';
@@ -29,14 +30,7 @@ class PurchasesPage extends StatelessWidget {
         icon: Icons.assignment_return_rounded,
         label: 'Purchase Returns',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FeatureDetailPage(title: 'Purchase Returns')),
-        ),
-      ),
-      FeatureItem(
-        icon: Icons.history_rounded,
-        label: 'Purchase History',
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FeatureDetailPage(title: 'Purchase History')),
+          MaterialPageRoute(builder: (_) => const PurchaseReturnsPage()),
         ),
       ),
       FeatureItem(

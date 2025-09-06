@@ -19,6 +19,8 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
   final _search = TextEditingController();
   bool _loading = true;
   List<Map<String, dynamic>> _all = const [];
+  // Filter: 'pending' | 'all' | 'received'
+  String _filter = 'pending';
 
   @override
   void initState() {
@@ -36,7 +38,21 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
     setState(() => _loading = true);
     try {
       final repo = ref.read(purchasesRepositoryProvider);
-      final list = await repo.getPendingOrders();
+      List<Map<String, dynamic>> list;
+      switch (_filter) {
+        case 'received':
+          list = await repo.getOrders(status: 'RECEIVED');
+          break;
+        case 'unapproved':
+          list = await repo.getOrders(status: 'PENDING');
+          break;
+        case 'all':
+          list = await repo.getOrders();
+          break;
+        case 'pending':
+        default:
+          list = await repo.getPendingOrders();
+      }
       if (!mounted) return;
       setState(() => _all = list);
     } finally {
@@ -89,6 +105,18 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
                 onChanged: (_) => setState(() {}),
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: _FilterChips(
+                value: _filter,
+                onChanged: (v) {
+                  if (_filter != v) {
+                    setState(() => _filter = v);
+                    _load();
+                  }
+                },
+              ),
+            ),
             if (_loading) const LinearProgressIndicator(minHeight: 2),
             Expanded(
               child: _loading
@@ -109,6 +137,7 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
                                 subtitle: Text([
                                   if ((po['supplier']?['name'] ?? po['supplier_name'] ?? '') != '') (po['supplier']?['name'] ?? po['supplier_name']).toString(),
                                   if (po['purchase_date'] != null) po['purchase_date'].toString(),
+                                  if ((po['status'] ?? '') != '') 'Status: ${po['status']}',
                                 ].where((e) => e.isNotEmpty).join(' • ')),
                                 onTap: () async {
                                   final id = po['purchase_id'] as int?;
@@ -131,3 +160,30 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
   }
 }
 
+class _FilterChips extends StatelessWidget {
+  const _FilterChips({required this.value, required this.onChanged});
+  final String value;
+  final void Function(String) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = const <(String, String)>[
+      ('pending', 'Pending & Partial'),
+      ('unapproved', 'Unapproved'),
+      ('received', 'Received'),
+      ('all', 'All'),
+    ];
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      children: [
+        for (final it in items)
+          ChoiceChip(
+            label: Text(it.$2),
+            selected: value == it.$1,
+            onSelected: (sel) => sel ? onChanged(it.$1) : null,
+          ),
+      ],
+    );
+  }
+}

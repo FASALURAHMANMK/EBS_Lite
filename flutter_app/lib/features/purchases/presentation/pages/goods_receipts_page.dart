@@ -135,7 +135,7 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
     );
     if (!mounted || choice == null) return;
     if (choice == 'po') {
-      // Pick a pending PO and receive
+      // Pick an APPROVED or PARTIALLY_RECEIVED PO and receive
       final picked = await _pickPO();
       if (picked != null) {
         await Navigator.of(context).push(
@@ -143,10 +143,6 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
         );
         if (!mounted) return;
         _load();
-      } else {
-        await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const PurchaseOrdersPage()),
-        );
       }
       return;
     }
@@ -159,8 +155,24 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
   Future<int?> _pickPO() async {
     final repo = ref.read(purchasesRepositoryProvider);
     List<Map<String, dynamic>> list = [];
-    try { list = await repo.getPendingOrders(); } catch (_) {}
-    int? selected;
+    try {
+      final pending = await repo.getPendingOrders();
+      // Keep only PARTIALLY_RECEIVED from this set
+      list = pending.where((e) => (e['status'] ?? '') == 'PARTIALLY_RECEIVED').toList();
+    } catch (_) {}
+    try {
+      final approved = await repo.getOrders(status: 'APPROVED');
+      // Merge and deduplicate by purchase_id
+      final ids = list.map((e) => e['purchase_id'] as int).toSet();
+      for (final it in approved) {
+        final id = it['purchase_id'] as int?;
+        if (id != null && !ids.contains(id)) {
+          list.add(it);
+          ids.add(id);
+        }
+      }
+    } catch (_) {}
+    int? selected = list.isNotEmpty ? (list.first['purchase_id'] as int?) : null;
     return showDialog<int?>(
       context: context,
       builder: (context) => StatefulBuilder(

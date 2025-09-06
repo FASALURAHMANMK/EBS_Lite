@@ -1055,27 +1055,26 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
         selectArgs = append(selectArgs, a...)
     }
 
-    // Purchases (incoming) - include only received quantities (exclude POs)
+    // Purchases (incoming) via Goods Receipts - show GRN number and per-receipt quantities
     {
         base := `
             SELECT
                 'PURCHASE' AS type,
-                p.updated_at AS occurred_at,
-                p.purchase_number AS reference,
-                pd.received_quantity AS quantity,
-                p.location_id AS location_id,
+                gr.received_date AS occurred_at,
+                gr.receipt_number AS reference,
+                gri.received_quantity AS quantity,
+                gr.location_id AS location_id,
                 l.name AS location_name,
                 s.name AS partner_name,
-                'purchase' AS entity,
-                p.purchase_id AS entity_id,
-                p.notes AS notes
-            FROM purchase_details pd
-            JOIN purchases p ON pd.purchase_id = p.purchase_id
-            JOIN locations l ON p.location_id = l.location_id
-            LEFT JOIN suppliers s ON p.supplier_id = s.supplier_id
-            WHERE l.company_id = $1 AND pd.product_id = $2 AND p.is_deleted = FALSE
-              AND pd.received_quantity > 0 AND p.status IN ('PARTIALLY_RECEIVED','RECEIVED')`
-        with, a, _ := buildWhere(base, "p.location_id", "p.created_at")
+                'goods_receipt' AS entity,
+                gr.goods_receipt_id AS entity_id,
+                NULL AS notes
+            FROM goods_receipt_items gri
+            JOIN goods_receipts gr ON gri.goods_receipt_id = gr.goods_receipt_id
+            JOIN locations l ON gr.location_id = l.location_id
+            LEFT JOIN suppliers s ON gr.supplier_id = s.supplier_id
+            WHERE l.company_id = $1 AND gri.product_id = $2 AND gr.is_deleted = FALSE`
+        with, a, _ := buildWhere(base, "gr.location_id", "gr.received_date")
         selects = append(selects, with)
         selectArgs = append(selectArgs, a...)
     }
@@ -1104,22 +1103,25 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
         selectArgs = append(selectArgs, a...)
     }
 
-    // Stock adjustments (could be +/-)
+    // Stock adjustments (could be +/-). If originating document exists, show its number and link to document.
     {
         base := `
             SELECT
                 'ADJUSTMENT' AS type,
                 sa.created_at AS occurred_at,
-                CONCAT('ADJ-', sa.adjustment_id) AS reference,
+                COALESCE(d.document_number, CONCAT('ADJ-', sa.adjustment_id)) AS reference,
                 sa.adjustment AS quantity,
                 sa.location_id AS location_id,
                 l.name AS location_name,
                 NULL AS partner_name,
-                'stock_adjustment' AS entity,
-                sa.adjustment_id AS entity_id,
+                CASE WHEN d.document_id IS NULL THEN 'stock_adjustment' ELSE 'stock_adjustment_document' END AS entity,
+                COALESCE(d.document_id, sa.adjustment_id) AS entity_id,
                 sa.reason AS notes
             FROM stock_adjustments sa
             JOIN locations l ON sa.location_id = l.location_id
+            LEFT JOIN stock_adjustment_documents d
+              ON d.location_id = sa.location_id
+             AND sa.reason LIKE d.document_number || '%'
             WHERE l.company_id = $1 AND sa.product_id = $2`
         with, a, _ := buildWhere(base, "sa.location_id", "sa.created_at")
         selects = append(selects, with)

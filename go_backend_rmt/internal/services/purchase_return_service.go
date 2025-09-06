@@ -15,9 +15,44 @@ type PurchaseReturnService struct {
 }
 
 func NewPurchaseReturnService() *PurchaseReturnService {
-	return &PurchaseReturnService{
-		db: database.GetDB(),
-	}
+    return &PurchaseReturnService{
+        db: database.GetDB(),
+    }
+}
+
+// VerifyReturnInCompany is an exported wrapper to reuse in handlers without duplicating logic
+func (s *PurchaseReturnService) VerifyReturnInCompany(returnID, companyID int) error {
+    return s.verifyReturnInCompany(returnID, companyID)
+}
+
+// SetPurchaseReturnReceiptFile stores a file path for the return; if optional columns are missing, it degrades gracefully.
+func (s *PurchaseReturnService) SetPurchaseReturnReceiptFile(returnID, companyID int, path string, number *string) error {
+    if err := s.verifyReturnInCompany(returnID, companyID); err != nil {
+        return err
+    }
+    // Conditionally update receipt_file column
+    var colCount int
+    if err := s.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'purchase_returns' AND column_name = 'receipt_file'`).Scan(&colCount); err == nil && colCount > 0 {
+        if _, err := s.db.Exec(`UPDATE purchase_returns SET receipt_file = $1, updated_at = CURRENT_TIMESTAMP WHERE return_id = $2`, path, returnID); err != nil {
+            return fmt.Errorf("failed to set receipt file: %w", err)
+        }
+    }
+    // Try to store number if provided
+    if number != nil && *number != "" {
+        // Prefer dedicated column reference_number if exists; otherwise append to reason
+        colCount = 0
+        if err := s.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'purchase_returns' AND column_name = 'reference_number'`).Scan(&colCount); err == nil && colCount > 0 {
+            if _, err := s.db.Exec(`UPDATE purchase_returns SET reference_number = $1, updated_at = CURRENT_TIMESTAMP WHERE return_id = $2`, *number, returnID); err != nil {
+                return fmt.Errorf("failed to set reference number: %w", err)
+            }
+        } else {
+            // Fallback: append to reason
+            if _, err := s.db.Exec(`UPDATE purchase_returns SET reason = CONCAT(COALESCE(reason,''), CASE WHEN reason IS NULL OR reason = '' THEN '' ELSE ' | ' END, 'Receipt: ', $1), updated_at = CURRENT_TIMESTAMP WHERE return_id = $2`, *number, returnID); err != nil {
+                return fmt.Errorf("failed to append receipt number to reason: %w", err)
+            }
+        }
+    }
+    return nil
 }
 
 func (s *PurchaseReturnService) GetPurchaseReturns(companyID, locationID int, filters map[string]string) ([]models.PurchaseReturn, error) {

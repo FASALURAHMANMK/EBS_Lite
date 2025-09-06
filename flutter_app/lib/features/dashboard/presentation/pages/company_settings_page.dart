@@ -6,6 +6,10 @@ import '../../data/settings_repository.dart';
 import '../../data/settings_models.dart';
 import '../../data/currency_repository.dart';
 import '../../data/company_repository.dart';
+import '../../data/taxes_repository.dart';
+import '../../data/payment_methods_repository.dart';
+import 'taxes_management_page.dart';
+import 'payment_modes_page.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../auth/controllers/auth_notifier.dart';
 import '../../../../core/api_client.dart';
@@ -25,6 +29,7 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
   final _address = TextEditingController();
   final _phone = TextEditingController();
   final _email = TextEditingController();
+  final _taxNumber = TextEditingController();
   int? _currencyId;
   String? _logoPath; // served path like /uploads/...
   List<CurrencyDto> _currencies = const [];
@@ -43,6 +48,7 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
     _address.dispose();
     _phone.dispose();
     _email.dispose();
+    _taxNumber.dispose();
     super.dispose();
   }
 
@@ -71,6 +77,7 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
         _address.text = comp.address ?? '';
         _phone.text = comp.phone ?? '';
         _email.text = comp.email ?? '';
+        _taxNumber.text = comp.taxNumber ?? '';
         _currencyId = comp.currencyId;
         _logoPath = comp.logo;
       } else {
@@ -113,6 +120,7 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
             address: _address.text.trim().isEmpty ? null : _address.text.trim(),
             phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
             email: _email.text.trim().isEmpty ? null : _email.text.trim(),
+            taxNumber: _taxNumber.text.trim().isEmpty ? null : _taxNumber.text.trim(),
             currencyId: _currencyId,
             logo: _logoPath,
           );
@@ -208,9 +216,18 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                     keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _taxNumber,
+                    decoration: const InputDecoration(
+                      labelText: 'Company Tax ID',
+                      prefixIcon: Icon(Icons.confirmation_number_rounded),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   InputDecorator(
                     decoration: const InputDecoration(
-                      labelText: 'Currency',
+                      labelText: 'Base Currency',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.currency_exchange_rounded),
                     ),
@@ -229,6 +246,42 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  // Management sections
+                  ListTile(
+                    leading: const Icon(Icons.percent_rounded),
+                    title: const Text('Manage Taxes'),
+                    subtitle: const Text('Add or edit tax types (name, percentage)'),
+                    tileColor: theme.colorScheme.surface,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    onTap: () {
+                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TaxesManagementPage()));
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    leading: const Icon(Icons.account_balance_wallet_rounded),
+                    title: const Text('Payment Modes'),
+                    subtitle: const Text('Manage payment modes and allowed currencies'),
+                    tileColor: theme.colorScheme.surface,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    onTap: () {
+                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PaymentModesPage()));
+                    },
+                  ),
+                    const SizedBox(height: 24),
+                  ListTile(
+                    leading: const Icon(Icons.location_city_rounded),
+                    title: const Text('Manage Locations'),
+                    subtitle: const Text('Add, edit, or remove locations'),
+                    tileColor: theme.colorScheme.surface,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const LocationsManagementPage()),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 24),
                   Align(
                     alignment: Alignment.centerRight,
                     child: FilledButton.icon(
@@ -242,19 +295,6 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                           : const Icon(Icons.save_rounded),
                       label: const Text('Save Changes'),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  ListTile(
-                    leading: const Icon(Icons.location_city_rounded),
-                    title: const Text('Manage Locations'),
-                    subtitle: const Text('Add, edit, or remove locations'),
-                    tileColor: theme.colorScheme.surface,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const LocationsManagementPage()),
-                      );
-                    },
                   ),
                 ],
               ),

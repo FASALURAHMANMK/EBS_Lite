@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
 import '../../../suppliers/data/supplier_repository.dart';
+import '../../../dashboard/data/taxes_repository.dart';
 
 class ProductEditPage extends ConsumerStatefulWidget {
   const ProductEditPage({super.key, required this.productId});
@@ -42,6 +43,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   int? _brandId;
   int? _unitId;
   int? _defaultSupplierId;
+  int? _taxId;
+  String? _taxName;
   final _categoryController = TextEditingController();
   final _brandController = TextEditingController();
   final _supplierController = TextEditingController();
@@ -154,6 +157,16 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                 TextEditingController(text: existingVal ?? '');
         }
       }
+      // Try to infer tax from attributes if a 'Default Tax' attribute exists
+      try {
+        final def = _attrDefs.firstWhere((d) => d.name.toLowerCase() == 'default tax' || d.name.toLowerCase() == 'tax');
+        final raw = p.attributes?[def.attributeId];
+        final id = int.tryParse(raw ?? '');
+        if (id != null && id > 0) {
+          _taxId = id;
+          _taxName = 'ID: $id';
+        }
+      } catch (_) {}
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -200,6 +213,15 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         }
       }
 
+      // Ensure Default Tax attribute exists and apply selected tax
+      var attrs = _buildAttributesMapWithTax();
+      if (_taxId != null) {
+        final taxAttrId = await _ensureDefaultTaxAttributeId();
+        if (taxAttrId != null && taxAttrId > 0) {
+          attrs[taxAttrId] = _taxId!.toString();
+        }
+      }
+
       final updated = ProductDto(
         productId: p.productId,
         companyId: p.companyId,
@@ -218,7 +240,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         isSerialized: _serialized,
         isActive: _active,
         barcodes: _barcodes,
-        attributes: _buildAttributesMap(),
+        attributes: attrs,
       );
       await repo.updateProduct(updated);
       if (!mounted) return;
@@ -231,6 +253,42 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<int?> _ensureDefaultTaxAttributeId() async {
+    // Try find existing
+    try {
+      final def = _attrDefs.firstWhere(
+        (d) => d.name.toLowerCase() == 'default tax' || d.name.toLowerCase() == 'tax',
+      );
+      return def.attributeId;
+    } catch (_) {}
+    // Create if not found
+    try {
+      final created = await ref.read(inventoryRepositoryProvider).createAttributeDefinition(
+            name: 'Default Tax',
+            type: 'TEXT',
+            isRequired: false,
+          );
+      setState(() => _attrDefs = [..._attrDefs, created]);
+      return created.attributeId;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  
+
+  Map<int, String> _buildAttributesMapWithTax() {
+    final map = _buildAttributesMap();
+    final tid = _taxId;
+    if (tid != null) {
+      try {
+        final def = _attrDefs.firstWhere((d) => d.name.toLowerCase() == 'default tax' || d.name.toLowerCase() == 'tax');
+        map[def.attributeId] = tid.toString();
+      } catch (_) {}
+    }
+    return map;
   }
 
   Future<void> _delete() async {
@@ -488,6 +546,21 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 12),
+                    _SelectField(
+                      label: 'Tax Type',
+                      valueText: _taxName ?? 'None',
+                      icon: Icons.percent_rounded,
+                      onTap: () async {
+                        final picked = await _openTaxPicker();
+                        if (picked != null) {
+                          setState(() {
+                            _taxId = picked.taxId;
+                            _taxName = '${picked.name} (${picked.percentage.toStringAsFixed(2)}%)';
+                          });
+                        }
+                      },
+                    ),
                     const Divider(height: 24),
                     if (_attrDefs.isNotEmpty) ...[
                       Text('Attributes', style: theme.textTheme.titleMedium),
@@ -548,7 +621,11 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
           break;
         case 'SELECT':
           final v = _attrSelect[d.attributeId];
-          if (v != null && v.isNotEmpty) map[d.attributeId] = v;
+          if (v != null && v.isNotEmpty) {
+            map[d.attributeId] = v;
+          } else if (d.isRequired && (d.options?.isNotEmpty ?? false)) {
+            map[d.attributeId] = d.options!.first;
+          }
           break;
         default:
           final c = _attrText[d.attributeId];
@@ -960,6 +1037,65 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       ),
     );
   }
+  Future<TaxDto?> _openTaxPicker() async {
+    final repo = ref.read(taxesRepositoryProvider);
+    List<TaxDto> taxes = [];
+    try {
+      taxes = await repo.getTaxes();
+    } catch (_) {}
+    int? current = _taxId;
+    return showDialog<TaxDto?>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setInner) => AlertDialog(
+          title: const Text('Select Tax Type'),
+          content: SizedBox(
+            width: 500,
+            child: taxes.isEmpty
+                ? const Center(child: Text('No tax types'))
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: taxes.length + 1,
+                    itemBuilder: (context, i) {
+                      if (i == 0) {
+                        return RadioListTile<int>(
+                          value: -1,
+                          groupValue: current ?? -1,
+                          onChanged: (v) => setInner(() => current = null),
+                          title: const Text('None'),
+                        );
+                      }
+                      final t = taxes[i - 1];
+                      return RadioListTile<int>(
+                        value: t.taxId,
+                        groupValue: current,
+                        onChanged: (v) => setInner(() => current = v),
+                        title: Text(t.name),
+                        subtitle: Text('${t.percentage.toStringAsFixed(2)} %'),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, null), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () {
+                if (current == null) {
+                  Navigator.pop(context, const TaxDto(taxId: -1, name: 'None', percentage: 0, isCompound: false, isActive: true));
+                  return;
+                }
+                final sel = taxes.firstWhere((e) => e.taxId == current,
+                    orElse: () => const TaxDto(taxId: -1, name: 'None', percentage: 0, isCompound: false, isActive: true));
+                Navigator.pop(context, sel.taxId == -1 ? null : sel);
+              },
+              child: const Text('Apply'),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
 }
 
 class _SupplierPick {

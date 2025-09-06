@@ -36,6 +36,16 @@ class _PoDetailPageState extends ConsumerState<PoDetailPage> {
   @override
   Widget build(BuildContext context) {
     final po = _po;
+    final status = (po?['status'] ?? '').toString();
+    final items = (po?['items'] as List? ?? const []).cast<Map<String, dynamic>>();
+    final hasRemaining = items.any((it) {
+      final qty = (it['quantity'] as num?)?.toDouble() ?? 0;
+      final rec = (it['received_quantity'] as num?)?.toDouble() ?? 0;
+      return qty - rec > 0.000001;
+    });
+    final canApprove = !_loading && (status != 'APPROVED' && status != 'PARTIALLY_RECEIVED' && status != 'RECEIVED');
+    final canReceive = !_loading && hasRemaining && (status == 'APPROVED' || status == 'PARTIALLY_RECEIVED');
+
     return Scaffold(
       appBar: AppBar(title: Text(po?['purchase_number']?.toString() ?? 'Purchase Order')),
       body: SafeArea(
@@ -51,9 +61,17 @@ class _PoDetailPageState extends ConsumerState<PoDetailPage> {
                       _Items(po: po),
                       const SizedBox(height: 16),
                       Row(children: [
-                        Expanded(child: OutlinedButton.icon(onPressed: _loading ? null : _approve, icon: const Icon(Icons.verified_outlined), label: const Text('Approve'))),
+                        Expanded(child: OutlinedButton.icon(
+                          onPressed: canApprove ? _approve : null,
+                          icon: const Icon(Icons.verified_outlined),
+                          label: Text(status == 'APPROVED' || status == 'PARTIALLY_RECEIVED' || status == 'RECEIVED' ? 'Approved' : 'Approve'),
+                        )),
                         const SizedBox(width: 8),
-                        Expanded(child: FilledButton.icon(onPressed: _loading ? null : _receive, icon: const Icon(Icons.call_received_rounded), label: const Text('Receive'))),
+                        Expanded(child: FilledButton.icon(
+                          onPressed: canReceive ? _receive : null,
+                          icon: const Icon(Icons.call_received_rounded),
+                          label: Text(status == 'RECEIVED' ? 'Received' : 'Receive'),
+                        )),
                       ]),
                     ],
                   ),
@@ -76,6 +94,11 @@ class _PoDetailPageState extends ConsumerState<PoDetailPage> {
   Future<void> _receive() async {
     final po = _po;
     if (po == null) return;
+    final status = (po['status'] ?? '').toString();
+    if (status != 'APPROVED' && status != 'PARTIALLY_RECEIVED') {
+      ScaffoldMessenger.of(context)..hideCurrentSnackBar()..showSnackBar(const SnackBar(content: Text('Approve the PO before receiving')));
+      return;
+    }
     final items = (po['items'] as List? ?? const []).cast<Map<String, dynamic>>();
     final remaining = items.map((it) {
       final qty = (it['quantity'] as num?)?.toDouble() ?? 0;
