@@ -268,7 +268,7 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                       Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PaymentModesPage()));
                     },
                   ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 12),
                   ListTile(
                     leading: const Icon(Icons.location_city_rounded),
                     title: const Text('Manage Locations'),

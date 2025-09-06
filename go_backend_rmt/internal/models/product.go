@@ -1,12 +1,13 @@
 package models
 
 type Product struct {
-	ProductID    int                     `json:"product_id" db:"product_id"`
-	CompanyID    int                     `json:"company_id" db:"company_id"`
-	CategoryID   *int                    `json:"category_id,omitempty" db:"category_id"`
-	BrandID      *int                    `json:"brand_id,omitempty" db:"brand_id"`
-	UnitID       *int                    `json:"unit_id,omitempty" db:"unit_id"`
-	Name         string                  `json:"name" db:"name" validate:"required,min=2,max=255"`
+    ProductID    int                     `json:"product_id" db:"product_id"`
+    CompanyID    int                     `json:"company_id" db:"company_id"`
+    CategoryID   *int                    `json:"category_id,omitempty" db:"category_id"`
+    BrandID      *int                    `json:"brand_id,omitempty" db:"brand_id"`
+    UnitID       *int                    `json:"unit_id,omitempty" db:"unit_id"`
+    TaxID        int                     `json:"tax_id" db:"tax_id"`
+    Name         string                  `json:"name" db:"name" validate:"required,min=2,max=255"`
 	SKU          *string                 `json:"sku,omitempty" db:"sku"`
 	Barcodes     []ProductBarcode        `json:"barcodes,omitempty" db:"-"`
 	Description  *string                 `json:"description,omitempty" db:"description"`
@@ -25,10 +26,11 @@ type Product struct {
 }
 
 type CreateProductRequest struct {
-	CategoryID   *int             `json:"category_id,omitempty"`
-	BrandID      *int             `json:"brand_id,omitempty"`
-	UnitID       *int             `json:"unit_id,omitempty"`
-	Name         string           `json:"name" validate:"required,min=2,max=255"`
+    CategoryID   *int             `json:"category_id,omitempty"`
+    BrandID      *int             `json:"brand_id,omitempty"`
+    UnitID       *int             `json:"unit_id,omitempty"`
+    TaxID        int              `json:"tax_id" validate:"required"`
+    Name         string           `json:"name" validate:"required,min=2,max=255"`
 	SKU          *string          `json:"sku,omitempty"`
 	Barcodes     []ProductBarcode `json:"barcodes" validate:"required,min=1,dive"`
 	Description  *string          `json:"description,omitempty"`
@@ -43,10 +45,11 @@ type CreateProductRequest struct {
 }
 
 type UpdateProductRequest struct {
-	CategoryID   *int             `json:"category_id,omitempty"`
-	BrandID      *int             `json:"brand_id,omitempty"`
-	UnitID       *int             `json:"unit_id,omitempty"`
-	Name         *string          `json:"name,omitempty" validate:"omitempty,min=2,max=255"`
+    CategoryID   *int             `json:"category_id,omitempty"`
+    BrandID      *int             `json:"brand_id,omitempty"`
+    UnitID       *int             `json:"unit_id,omitempty"`
+    TaxID        *int             `json:"tax_id,omitempty"`
+    Name         *string          `json:"name,omitempty" validate:"omitempty,min=2,max=255"`
 	SKU          *string          `json:"sku,omitempty"`
 	Barcodes     []ProductBarcode `json:"barcodes,omitempty" validate:"omitempty,dive"`
 	Description  *string          `json:"description,omitempty"`

@@ -289,6 +289,7 @@ class ProductDto {
   final int? categoryId;
   final int? brandId;
   final int? unitId;
+  final int taxId;
   final String name;
   final String? sku;
   final String? description;
@@ -309,6 +310,7 @@ class ProductDto {
     this.categoryId,
     this.brandId,
     this.unitId,
+    required this.taxId,
     required this.name,
     this.sku,
     this.description,
@@ -330,6 +332,7 @@ class ProductDto {
         categoryId: json['category_id'] as int?,
         brandId: json['brand_id'] as int?,
         unitId: json['unit_id'] as int?,
+        taxId: json['tax_id'] as int? ?? 0,
         name: json['name'] as String? ?? '',
         sku: json['sku'] as String?,
         description: json['description'] as String?,
@@ -373,6 +376,7 @@ class ProductDto {
         if (categoryId != null) 'category_id': categoryId,
         if (brandId != null) 'brand_id': brandId,
         if (unitId != null) 'unit_id': unitId,
+        'tax_id': taxId,
         'name': name,
         if (sku != null) 'sku': sku,
         if (description != null) 'description': description,
@@ -395,6 +399,7 @@ class CreateProductPayload {
   final int? categoryId;
   final int? brandId;
   final int? unitId;
+  final int taxId;
   final String name;
   final String? sku;
   final String? description;
@@ -412,6 +417,7 @@ class CreateProductPayload {
     this.categoryId,
     this.brandId,
     this.unitId,
+    required this.taxId,
     required this.name,
     this.sku,
     this.description,
@@ -430,6 +436,7 @@ class CreateProductPayload {
         if (categoryId != null) 'category_id': categoryId,
         if (brandId != null) 'brand_id': brandId,
         if (unitId != null) 'unit_id': unitId,
+        'tax_id': taxId,
         'name': name,
         if (sku != null) 'sku': sku,
         if (description != null) 'description': description,

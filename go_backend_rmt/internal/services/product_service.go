@@ -84,13 +84,13 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 	var products []models.Product
 	for rows.Next() {
 		var product models.Product
-		err := rows.Scan(
-			&product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
-			&product.UnitID, &product.Name, &product.SKU, &product.Description,
-			&product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
-			&product.Dimensions, &product.IsSerialized, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
-			&product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
-		)
+        err := rows.Scan(
+            &product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
+            &product.UnitID, &product.Name, &product.SKU, &product.Description,
+            &product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
+            &product.Dimensions, &product.IsSerialized, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
+            &product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
+        )
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan product: %w", err)
 		}
@@ -116,7 +116,7 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
                 SELECT product_id, company_id, category_id, brand_id, unit_id, name, sku,
                            description, cost_price, selling_price, reorder_level, weight, dimensions,
                            is_serialized, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted,
-                           default_supplier_id
+                           default_supplier_id, tax_id
                 FROM products
                 WHERE product_id = $1 AND company_id = $2 AND is_deleted = FALSE
         `
@@ -128,7 +128,7 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
         &product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
         &product.Dimensions, &product.IsSerialized, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
         &product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
-        &product.DefaultSupplierID,
+        &product.DefaultSupplierID, &product.TaxID,
     )
 
 	if err == sql.ErrNoRows {
@@ -183,16 +183,16 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 
     query := `
                 INSERT INTO products (
-                        company_id, category_id, brand_id, unit_id, name, sku, description,
+                        company_id, category_id, brand_id, unit_id, tax_id, name, sku, description,
                         cost_price, selling_price, reorder_level, weight, dimensions, is_serialized,
                         created_by, updated_by, default_supplier_id
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
                 RETURNING product_id, created_at
         `
 
 	var product models.Product
     err = tx.QueryRow(query,
-        companyID, req.CategoryID, req.BrandID, req.UnitID, req.Name, req.SKU,
+        companyID, req.CategoryID, req.BrandID, req.UnitID, req.TaxID, req.Name, req.SKU,
         req.Description, req.CostPrice, req.SellingPrice, req.ReorderLevel, req.Weight,
         req.Dimensions, req.IsSerialized, userID, userID, req.DefaultSupplierID,
     ).Scan(&product.ProductID, &product.CreatedAt)
@@ -222,7 +222,8 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 	product.CategoryID = req.CategoryID
 	product.BrandID = req.BrandID
 	product.UnitID = req.UnitID
-	product.Name = req.Name
+    product.Name = req.Name
+    product.TaxID = req.TaxID
 	product.SKU = req.SKU
 	product.Barcodes = req.Barcodes
 	product.Description = req.Description
@@ -357,6 +358,12 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
         setParts = append(setParts, fmt.Sprintf("is_active = $%d", argCount))
         args = append(args, *req.IsActive)
         changes["is_active"] = *req.IsActive
+    }
+    if req.TaxID != nil {
+        argCount++
+        setParts = append(setParts, fmt.Sprintf("tax_id = $%d", argCount))
+        args = append(args, *req.TaxID)
+        changes["tax_id"] = *req.TaxID
     }
     if req.DefaultSupplierID != nil {
         argCount++

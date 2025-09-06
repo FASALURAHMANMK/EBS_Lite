@@ -161,13 +161,10 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           );
         }
       }
-      // Build attributes and ensure Default Tax attribute exists if needed
+      // Build attributes
       final attrs = _buildAttributesMap();
-      if (_taxId != null) {
-        final taxAttrId = await _ensureDefaultTaxAttributeId();
-        if (taxAttrId != null && taxAttrId > 0) {
-          attrs[taxAttrId] = _taxId!.toString();
-        }
+      if (_taxId == null) {
+        throw StateError('Please select Tax Type');
       }
 
       final payload = CreateProductPayload(
@@ -186,6 +183,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         description: null,
         weight: null,
         dimensions: null,
+        taxId: _taxId!,
       );
       final created = await repo.createProduct(payload);
       final initQty = double.tryParse(_initialStock.text.trim()) ?? 0;
@@ -438,7 +436,10 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                         if (picked != null) {
                           setState(() {
                             _taxId = picked.taxId;
-                            _taxName = '${picked.name} (${picked.percentage.toStringAsFixed(2)}%)';
+                            final pct = (picked.percentage % 1 == 0)
+                                ? picked.percentage.toStringAsFixed(0)
+                                : picked.percentage.toStringAsFixed(2);
+                            _taxName = '${picked.name} ($pct%)';
                           });
                         }
                       },
@@ -899,27 +900,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     );
   }
 
-  Future<int?> _ensureDefaultTaxAttributeId() async {
-    // Try find existing
-    try {
-      final def = _attrDefs.firstWhere(
-        (d) => d.name.toLowerCase() == 'default tax' || d.name.toLowerCase() == 'tax',
-      );
-      return def.attributeId;
-    } catch (_) {}
-    // Create if not found
-    try {
-      final created = await ref.read(inventoryRepositoryProvider).createAttributeDefinition(
-            name: 'Default Tax',
-            type: 'TEXT',
-            isRequired: false,
-          );
-      setState(() => _attrDefs = [..._attrDefs, created]);
-      return created.attributeId;
-    } catch (_) {
-      return null;
-    }
-  }
+  
 
   Future<TaxDto?> _openTaxPicker() async {
     final repo = ref.read(taxesRepositoryProvider);
@@ -927,7 +908,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     try {
       taxes = await repo.getTaxes();
     } catch (_) {}
-    int? current = _taxId;
+    int? current = _taxId ?? (taxes.isNotEmpty ? taxes.first.taxId : null);
     return showDialog<TaxDto?>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -939,23 +920,15 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 ? const Center(child: Text('No tax types'))
                 : ListView.builder(
                     shrinkWrap: true,
-                    itemCount: taxes.length + 1,
+                    itemCount: taxes.length,
                     itemBuilder: (context, i) {
-                      if (i == 0) {
-                        return RadioListTile<int>(
-                          value: -1,
-                          groupValue: current ?? -1,
-                          onChanged: (v) => setInner(() => current = null),
-                          title: const Text('None'),
-                        );
-                      }
-                      final t = taxes[i - 1];
+                      final t = taxes[i];
                       return RadioListTile<int>(
                         value: t.taxId,
                         groupValue: current,
                         onChanged: (v) => setInner(() => current = v),
                         title: Text(t.name),
-                        subtitle: Text('${t.percentage.toStringAsFixed(2)} %'),
+                        subtitle: Text('${(t.percentage % 1 == 0 ? t.percentage.toStringAsFixed(0) : t.percentage.toStringAsFixed(2))} %'),
                       );
                     },
                   ),
@@ -965,12 +938,11 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             FilledButton(
               onPressed: () {
                 if (current == null) {
-                  Navigator.pop(context, const TaxDto(taxId: -1, name: 'None', percentage: 0, isCompound: false, isActive: true));
+                  Navigator.pop(context, null);
                   return;
                 }
-                final sel = taxes.firstWhere((e) => e.taxId == current,
-                    orElse: () => const TaxDto(taxId: -1, name: 'None', percentage: 0, isCompound: false, isActive: true));
-                Navigator.pop(context, sel.taxId == -1 ? null : sel);
+                final sel = taxes.firstWhere((e) => e.taxId == current, orElse: () => taxes.first);
+                Navigator.pop(context, sel);
               },
               child: const Text('Apply'),
             )

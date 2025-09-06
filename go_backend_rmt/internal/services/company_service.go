@@ -111,7 +111,7 @@ func (s *CompanyService) CreateCompany(req *models.CreateCompanyRequest, userID 
 	}
 	defer tx.Rollback()
 
-	// Create company
+    // Create company
 	query := `
 		INSERT INTO companies (name, logo, address, phone, email, tax_number, currency_id)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -123,11 +123,20 @@ func (s *CompanyService) CreateCompany(req *models.CreateCompanyRequest, userID 
 		req.Name, req.Logo, req.Address, req.Phone, req.Email, req.TaxNumber, req.CurrencyID,
 	).Scan(&company.CompanyID, &company.CreatedAt)
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to create company: %w", err)
-	}
+    if err != nil {
+        return nil, fmt.Errorf("failed to create company: %w", err)
+    }
 
-	// Create default location
+    // Seed default tax: 'None' (0%) and 'GST 18%' example only if desired in future
+    if _, err = tx.Exec(`
+        INSERT INTO taxes (company_id, name, percentage, is_compound, is_active)
+        VALUES ($1, 'None', 0, FALSE, TRUE)
+        ON CONFLICT DO NOTHING
+    `, company.CompanyID); err != nil {
+        return nil, fmt.Errorf("failed to seed default tax: %w", err)
+    }
+
+    // Create default location
 	_, err = tx.Exec(`
 		INSERT INTO locations (company_id, name, address, is_active)
 		VALUES ($1, 'Main Office', $2, TRUE)

@@ -195,6 +195,7 @@ CREATE TABLE products (
     category_id INTEGER REFERENCES categories(category_id),
     brand_id INTEGER REFERENCES brands(brand_id),
     unit_id INTEGER REFERENCES units(unit_id),
+    tax_id INTEGER NOT NULL REFERENCES taxes(tax_id),
     name VARCHAR(255) NOT NULL,
     sku VARCHAR(100),
     description TEXT,
@@ -2491,3 +2492,7 @@ ALTER TABLE taxes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_
 --payment
 ALTER TABLE payment_methods DROP CONSTRAINT payment_methods_type_check;
 ALTER TABLE payment_methods ADD CONSTRAINT payment_methods_type_check CHECK (type IN ('CASH','CARD','ONLINE','UPI','CHEQUE','CREDIT','BANK','DIGITAL','OTHER'));
+-- tax
+ALTER TABLE products ADD COLUMN IF NOT EXISTS tax_id INTEGER;
+ALTER TABLE products ALTER COLUMN tax_id SET NOT NULL;
+ALTER TABLE products ADD CONSTRAINT fk_products_tax FOREIGN KEY (tax_id) REFERENCES taxes(tax_id);

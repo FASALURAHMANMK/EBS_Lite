@@ -3,7 +3,6 @@ package services
 import (
     "database/sql"
     "fmt"
-    "strconv"
     "strings"
     "time"
 
@@ -36,23 +35,15 @@ func (s *SalesService) CalculateTotals(req *models.CreateSaleRequest) (float64, 
 		lineTotal -= discountAmount
 		subtotal += lineTotal
 
-        // Resolve tax: prefer explicit tax_id, otherwise fallback to product's 'Default Tax'/'Tax' attribute
+        // Resolve tax: prefer explicit tax_id, otherwise fallback to product's tax_id field
         var effectiveTaxID *int
         if item.TaxID != nil {
             effectiveTaxID = item.TaxID
         } else if item.ProductID != nil {
-            var raw sql.NullString
-            err := s.db.QueryRow(`
-                SELECT pav.value
-                FROM product_attribute_values pav
-                JOIN product_attributes pa ON pa.attribute_id = pav.attribute_id
-                WHERE pav.product_id = $1 AND pa.is_deleted = FALSE AND LOWER(pa.name) IN ('default tax','tax')
-                LIMIT 1
-            `, *item.ProductID).Scan(&raw)
-            if err == nil && raw.Valid {
-                if tid, perr := strconv.Atoi(strings.TrimSpace(raw.String)); perr == nil && tid > 0 {
-                    effectiveTaxID = &tid
-                }
+            var prodTaxID int
+            err := s.db.QueryRow(`SELECT tax_id FROM products WHERE product_id=$1 AND is_deleted=FALSE`, *item.ProductID).Scan(&prodTaxID)
+            if err == nil && prodTaxID > 0 {
+                effectiveTaxID = &prodTaxID
             }
         }
         if effectiveTaxID != nil {
@@ -451,23 +442,15 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 		lineTotal -= discountAmount
 
         var taxAmount float64
-        // Resolve tax: prefer explicit tax_id, otherwise fallback to product's 'Default Tax'/'Tax' attribute
+        // Resolve tax: prefer explicit tax_id, otherwise fallback to product's tax_id field
         var effectiveTaxID *int
         if item.TaxID != nil {
             effectiveTaxID = item.TaxID
         } else if item.ProductID != nil {
-            var raw sql.NullString
-            q := `
-                SELECT pav.value
-                FROM product_attribute_values pav
-                JOIN product_attributes pa ON pa.attribute_id = pav.attribute_id
-                WHERE pav.product_id = $1 AND pa.is_deleted = FALSE AND LOWER(pa.name) IN ('default tax','tax')
-                LIMIT 1
-            `
-            if err := s.db.QueryRow(q, *item.ProductID).Scan(&raw); err == nil && raw.Valid {
-                if tid, perr := strconv.Atoi(strings.TrimSpace(raw.String)); perr == nil && tid > 0 {
-                    effectiveTaxID = &tid
-                }
+            var prodTaxID int
+            q := `SELECT tax_id FROM products WHERE product_id=$1 AND is_deleted=FALSE`
+            if err := s.db.QueryRow(q, *item.ProductID).Scan(&prodTaxID); err == nil && prodTaxID > 0 {
+                effectiveTaxID = &prodTaxID
             }
         }
         if effectiveTaxID != nil {

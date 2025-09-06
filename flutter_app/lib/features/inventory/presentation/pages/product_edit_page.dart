@@ -157,16 +157,23 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                 TextEditingController(text: existingVal ?? '');
         }
       }
-      // Try to infer tax from attributes if a 'Default Tax' attribute exists
-      try {
-        final def = _attrDefs.firstWhere((d) => d.name.toLowerCase() == 'default tax' || d.name.toLowerCase() == 'tax');
-        final raw = p.attributes?[def.attributeId];
-        final id = int.tryParse(raw ?? '');
-        if (id != null && id > 0) {
-          _taxId = id;
+      // Read tax from product.taxId and map to name+percentage
+      final id = p.taxId;
+      if (id > 0) {
+        _taxId = id;
+        try {
+          final taxes = await ref.read(taxesRepositoryProvider).getTaxes();
+          final t = taxes.firstWhere((e) => e.taxId == id, orElse: () => const TaxDto(taxId: -1, name: '', percentage: 0, isCompound: false, isActive: true));
+          if (t.taxId == id) {
+            final pct = _formatPercent(t.percentage);
+            _taxName = '${t.name} ($pct%)';
+          } else {
+            _taxName = 'ID: $id';
+          }
+        } catch (_) {
           _taxName = 'ID: $id';
         }
-      } catch (_) {}
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -213,13 +220,10 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         }
       }
 
-      // Ensure Default Tax attribute exists and apply selected tax
-      var attrs = _buildAttributesMapWithTax();
-      if (_taxId != null) {
-        final taxAttrId = await _ensureDefaultTaxAttributeId();
-        if (taxAttrId != null && taxAttrId > 0) {
-          attrs[taxAttrId] = _taxId!.toString();
-        }
+      // Build attributes
+      var attrs = _buildAttributesMap();
+      if (_taxId == null) {
+        throw StateError('Please select Tax Type');
       }
 
       final updated = ProductDto(
@@ -241,6 +245,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         isActive: _active,
         barcodes: _barcodes,
         attributes: attrs,
+        taxId: _taxId!,
       );
       await repo.updateProduct(updated);
       if (!mounted) return;
@@ -255,27 +260,9 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     }
   }
 
-  Future<int?> _ensureDefaultTaxAttributeId() async {
-    // Try find existing
-    try {
-      final def = _attrDefs.firstWhere(
-        (d) => d.name.toLowerCase() == 'default tax' || d.name.toLowerCase() == 'tax',
-      );
-      return def.attributeId;
-    } catch (_) {}
-    // Create if not found
-    try {
-      final created = await ref.read(inventoryRepositoryProvider).createAttributeDefinition(
-            name: 'Default Tax',
-            type: 'TEXT',
-            isRequired: false,
-          );
-      setState(() => _attrDefs = [..._attrDefs, created]);
-      return created.attributeId;
-    } catch (_) {
-      return null;
-    }
-  }
+  String _formatPercent(double p) => (p % 1 == 0) ? p.toStringAsFixed(0) : p.toStringAsFixed(2);
+
+  
 
   
 
@@ -556,7 +543,10 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                         if (picked != null) {
                           setState(() {
                             _taxId = picked.taxId;
-                            _taxName = '${picked.name} (${picked.percentage.toStringAsFixed(2)}%)';
+                            final pct = (picked.percentage % 1 == 0)
+                                ? picked.percentage.toStringAsFixed(0)
+                                : picked.percentage.toStringAsFixed(2);
+                            _taxName = '${picked.name} ($pct%)';
                           });
                         }
                       },
@@ -1044,6 +1034,9 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       taxes = await repo.getTaxes();
     } catch (_) {}
     int? current = _taxId;
+    if (current == null && taxes.isNotEmpty) {
+      current = taxes.first.taxId;
+    }
     return showDialog<TaxDto?>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -1055,23 +1048,15 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                 ? const Center(child: Text('No tax types'))
                 : ListView.builder(
                     shrinkWrap: true,
-                    itemCount: taxes.length + 1,
+                    itemCount: taxes.length,
                     itemBuilder: (context, i) {
-                      if (i == 0) {
-                        return RadioListTile<int>(
-                          value: -1,
-                          groupValue: current ?? -1,
-                          onChanged: (v) => setInner(() => current = null),
-                          title: const Text('None'),
-                        );
-                      }
-                      final t = taxes[i - 1];
+                      final t = taxes[i];
                       return RadioListTile<int>(
                         value: t.taxId,
                         groupValue: current,
                         onChanged: (v) => setInner(() => current = v),
                         title: Text(t.name),
-                        subtitle: Text('${t.percentage.toStringAsFixed(2)} %'),
+                        subtitle: Text('${(t.percentage % 1 == 0 ? t.percentage.toStringAsFixed(0) : t.percentage.toStringAsFixed(2))} %'),
                       );
                     },
                   ),
@@ -1081,12 +1066,11 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
             FilledButton(
               onPressed: () {
                 if (current == null) {
-                  Navigator.pop(context, const TaxDto(taxId: -1, name: 'None', percentage: 0, isCompound: false, isActive: true));
+                  Navigator.pop(context, null);
                   return;
                 }
-                final sel = taxes.firstWhere((e) => e.taxId == current,
-                    orElse: () => const TaxDto(taxId: -1, name: 'None', percentage: 0, isCompound: false, isActive: true));
-                Navigator.pop(context, sel.taxId == -1 ? null : sel);
+                final sel = taxes.firstWhere((e) => e.taxId == current, orElse: () => taxes.first);
+                Navigator.pop(context, sel);
               },
               child: const Text('Apply'),
             )
