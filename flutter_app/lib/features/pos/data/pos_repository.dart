@@ -188,7 +188,10 @@ class PosRepository {
   }
 
   Future<void> voidSale(int saleId) async {
-    await _dio.put('/sales/$saleId', data: {'status': 'VOID'});
+    final loc = _ref.read(locationNotifierProvider).selected;
+    await _dio.post('/pos/void/$saleId', queryParameters: {
+      if (loc != null) 'location_id': loc.locationId,
+    });
   }
 
   Future<SaleDto> getSaleById(int saleId) async {

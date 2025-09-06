@@ -552,6 +552,116 @@ func (s *POSService) recordSalePaymentsTx(tx *sql.Tx, saleID int, lines []models
     return nil
 }
 
+// VoidSale creates a new VOID invoice for a prior sale, consuming a new sale
+// number. If the original sale was COMPLETED, this contains negative item
+// lines to reverse stock and amounts. If original was DRAFT/HELD, a zero-total
+// void invoice is created to record the event and advance numbering.
+func (s *POSService) VoidSale(companyID, locationID, userID, originalSaleID int) (*models.Sale, error) {
+    // Load original sale header and items
+    var status string
+    var origLocationID int
+    var subtotal, tax, discount, total float64
+    err := s.db.QueryRow(`
+        SELECT s.status, s.location_id, s.subtotal, s.tax_amount, s.discount_amount, s.total_amount
+        FROM sales s
+        JOIN locations l ON s.location_id = l.location_id
+        WHERE s.sale_id=$1 AND l.company_id=$2 AND s.is_deleted=FALSE
+    `, originalSaleID, companyID).Scan(&status, &origLocationID, &subtotal, &tax, &discount, &total)
+    if err != nil {
+        if err == sql.ErrNoRows {
+            return nil, fmt.Errorf("sale not found")
+        }
+        return nil, fmt.Errorf("failed to get sale: %w", err)
+    }
+    if origLocationID != locationID {
+        return nil, fmt.Errorf("invalid location for sale")
+    }
+
+    tx, err := s.db.Begin()
+    if err != nil {
+        return nil, fmt.Errorf("failed to begin transaction: %w", err)
+    }
+    defer tx.Rollback()
+
+    // Generate new sale number
+    ns := NewNumberingSequenceService()
+    voidNumber, err := ns.NextNumber(tx, "sale", companyID, &locationID)
+    if err != nil {
+        return nil, fmt.Errorf("failed to generate sale number: %w", err)
+    }
+
+    // Insert void sale header with negative totals if original completed
+    var vSubtotal, vTax, vDiscount, vTotal float64
+    if status == "COMPLETED" {
+        vSubtotal = -subtotal
+        vTax = -tax
+        vDiscount = -discount
+        vTotal = -total
+    } else {
+        vSubtotal, vTax, vDiscount, vTotal = 0, 0, 0, 0
+    }
+
+    var voidSaleID int
+    if err := tx.QueryRow(`
+        INSERT INTO sales (sale_number, location_id, customer_id, sale_date, sale_time,
+                           subtotal, tax_amount, discount_amount, total_amount, paid_amount,
+                           payment_method_id, status, pos_status, is_quick_sale, notes, created_by, updated_by)
+        SELECT $1, s.location_id, s.customer_id, CURRENT_DATE, CURRENT_TIME,
+               $2, $3, $4, $5, 0, NULL, 'VOID','COMPLETED', FALSE, 'Void of sale ' || s.sale_number, $6, $6
+        FROM sales s WHERE s.sale_id=$7
+        RETURNING sale_id
+    `, voidNumber, vSubtotal, vTax, vDiscount, vTotal, userID, originalSaleID).Scan(&voidSaleID); err != nil {
+        return nil, fmt.Errorf("failed to create void sale: %w", err)
+    }
+
+    if status == "COMPLETED" {
+        // Copy items as negatives and adjust stock back
+        rows, err := tx.Query(`
+            SELECT product_id, product_name, quantity, unit_price, discount_percentage, discount_amount, tax_id, tax_amount, line_total, serial_numbers, notes
+            FROM sale_details WHERE sale_id=$1
+        `, originalSaleID)
+        if err != nil {
+            return nil, fmt.Errorf("failed to read original items: %w", err)
+        }
+        defer rows.Close()
+        for rows.Next() {
+            var productID *int
+            var productName *string
+            var quantity, unitPrice, discPct, discAmt, taxAmt, lineTotal float64
+            var taxID *int
+            var serials []string
+            var notes *string
+            if err := rows.Scan(&productID, &productName, &quantity, &unitPrice, &discPct, &discAmt, &taxID, &taxAmt, &lineTotal, pq.Array(&serials), &notes); err != nil {
+                return nil, fmt.Errorf("failed to scan original item: %w", err)
+            }
+            nQty := -quantity
+            nDiscAmt := -discAmt
+            nTaxAmt := -taxAmt
+            nLineTotal := -lineTotal
+            if _, err := tx.Exec(`
+                INSERT INTO sale_details (sale_id, product_id, product_name, quantity, unit_price,
+                                          discount_percentage, discount_amount, tax_id, tax_amount,
+                                          line_total, serial_numbers, notes)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+            `, voidSaleID, productID, productName, nQty, unitPrice, discPct, nDiscAmt, taxID, nTaxAmt, nLineTotal, pq.Array(serials), notes); err != nil {
+                return nil, fmt.Errorf("failed to insert void item: %w", err)
+            }
+            if productID != nil {
+                // For sale, stock change was -quantity; for void we add back +quantity
+                if err := s.salesService.updateStock(tx, locationID, *productID, quantity); err != nil { // add back
+                    return nil, fmt.Errorf("failed to revert stock: %w", err)
+                }
+            }
+        }
+    }
+
+    if err := tx.Commit(); err != nil {
+        return nil, fmt.Errorf("failed to commit void: %w", err)
+    }
+
+    return s.salesService.GetSaleByID(voidSaleID, companyID)
+}
+
 // CreateHeldSale creates a sale with status=DRAFT and pos_status=HOLD without updating stock.
 // It calculates totals similarly to a normal sale but does not decrement inventory
 // or require payment method. This allows resuming later.
