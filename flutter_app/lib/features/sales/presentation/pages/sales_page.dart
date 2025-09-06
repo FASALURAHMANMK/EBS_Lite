@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
 import 'package:ebs_lite/shared/pages/feature_detail_page.dart';
+import 'package:ebs_lite/features/pos/presentation/pages/pos_page.dart';
 
 class SalesPage extends StatelessWidget {
   const SalesPage({super.key});
@@ -10,9 +11,9 @@ class SalesPage extends StatelessWidget {
     final items = [
       FeatureItem(
         icon: Icons.point_of_sale_rounded,
-        label: 'New Sale',
+        label: 'New Sale (POS)',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FeatureDetailPage(title: 'New Sale')),
+          MaterialPageRoute(builder: (_) => const PosPage()),
         ),
       ),
       FeatureItem(
@@ -55,4 +56,3 @@ class SalesPage extends StatelessWidget {
     return FeatureGrid(items: items);
   }
 }
-

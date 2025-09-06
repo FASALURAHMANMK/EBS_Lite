@@ -146,7 +146,13 @@ func (s *POSService) GetHeldSales(companyID, locationID int) ([]models.Sale, err
 }
 
 func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string) ([]models.POSProductResponse, error) {
-	query := `
+    // Enrich POS search to match:
+    // - name (ILIKE)
+    // - sku (ILIKE)
+    // - barcode (exact OR LIKE)
+    // - category name (ILIKE)
+    // - attribute values (ILIKE)
+    query := `
                 SELECT p.product_id, p.name,
                            COALESCE(pb.selling_price, p.selling_price, 0) as price,
                            COALESCE(st.quantity, 0) as stock,
@@ -160,15 +166,25 @@ func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string
                 AND (
                         LOWER(p.name) LIKE LOWER($3) OR
                         LOWER(p.sku) LIKE LOWER($3) OR
-                        EXISTS (SELECT 1 FROM product_barcodes pb2 WHERE pb2.product_id = p.product_id AND pb2.barcode = $4)
+                        EXISTS (
+                            SELECT 1 FROM product_barcodes pb2 
+                            WHERE pb2.product_id = p.product_id 
+                              AND (pb2.barcode = $4 OR pb2.barcode ILIKE $3)
+                        ) OR
+                        (c.name IS NOT NULL AND LOWER(c.name) LIKE LOWER($3)) OR
+                        EXISTS (
+                            SELECT 1 FROM product_attribute_values pav 
+                            WHERE pav.product_id = p.product_id 
+                              AND LOWER(pav.value) LIKE LOWER($3)
+                        )
                 )
                 ORDER BY p.name
                 LIMIT 50
         `
 
-	searchPattern := "%" + searchTerm + "%"
+    searchPattern := "%" + searchTerm + "%"
 
-	rows, err := s.db.Query(query, companyID, locationID, searchPattern, searchTerm)
+    rows, err := s.db.Query(query, companyID, locationID, searchPattern, searchTerm)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search products: %w", err)
 	}

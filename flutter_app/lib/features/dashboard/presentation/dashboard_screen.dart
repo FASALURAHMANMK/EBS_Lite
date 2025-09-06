@@ -19,6 +19,7 @@ import 'package:ebs_lite/features/customers/presentation/pages/customers_page.da
 import 'package:ebs_lite/features/accounts/presentation/pages/accounting_page.dart';
 import 'package:ebs_lite/features/hr/presentation/pages/hr_page.dart';
 import 'pages/settings_page.dart';
+import 'package:ebs_lite/features/pos/presentation/pages/pos_page.dart';
 import 'package:ebs_lite/features/notifications/presentation/pages/notifications_page.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -215,7 +216,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               actions: [
                 QuickAction(
                     icon: Icons.point_of_sale_rounded,
-                    label: 'Sale (${quickCounts?.sales ?? 0})'),
+                    label: 'Sale (${quickCounts?.sales ?? 0})',
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const PosPage()),
+                      );
+                    }),
                 QuickAction(
                     icon: Icons.shopping_cart_rounded,
                     label: 'Purchase (${quickCounts?.purchases ?? 0})'),

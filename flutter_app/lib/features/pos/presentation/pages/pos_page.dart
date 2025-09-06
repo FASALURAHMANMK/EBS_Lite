@@ -1,0 +1,335 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../dashboard/controllers/location_notifier.dart';
+import '../../controllers/pos_notifier.dart';
+import '../../data/models.dart';
+import '../widgets/customer_selector_dialog.dart';
+import '../widgets/payment_dialog.dart';
+
+class PosPage extends ConsumerWidget {
+  const PosPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(posNotifierProvider);
+    final notifier = ref.read(posNotifierProvider.notifier);
+    final loc = ref.watch(locationNotifierProvider).selected;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Point of Sale'),
+        centerTitle: false,
+      ),
+      body: Column(
+        children: [
+          // Top Row: Receipt number + Customer selection button
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Receipt # ${state.committedReceipt ?? state.receiptPreview ?? '-'}',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      if (loc != null)
+                        Text('Location: ${loc.name}', style: Theme.of(context).textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+                FilledButton.icon(
+                  onPressed: () async {
+                    final picked = await showDialog<PosCustomerDto>(
+                      context: context,
+                      builder: (_) => const CustomerSelectorDialog(),
+                    );
+                    if (picked != null) notifier.setCustomer(picked);
+                  },
+                  icon: const Icon(Icons.person_search_rounded),
+                  label: const Text('Select Customer'),
+                )
+              ],
+            ),
+          ),
+          // Customer name row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12.0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Customer: ${state.customerLabel}'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Product search with live suggestions (show 2)
+          _SearchBar(),
+          const SizedBox(height: 8),
+          // Cart list (scrollable)
+          const Expanded(child: _CartList()),
+          const SizedBox(height: 80), // spacer for bottom panel
+        ],
+      ),
+      // Persistent amount + process button
+      bottomNavigationBar: _BottomBar(),
+    );
+  }
+}
+
+class _SearchBar extends ConsumerWidget {
+  final _controller = TextEditingController();
+  _SearchBar({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(posNotifierProvider);
+    final notifier = ref.read(posNotifierProvider.notifier);
+    _controller.value = TextEditingValue(
+      text: state.query,
+      selection: TextSelection.collapsed(offset: state.query.length),
+    );
+    final suggestions = state.suggestions.take(2).toList();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+      child: Column(
+        children: [
+          TextField(
+            controller: _controller,
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.search_rounded),
+              hintText: 'Search by code, barcode, name, attributes...'
+            ),
+            onChanged: notifier.setQuery,
+            onSubmitted: (value) {
+              // Add first suggestion on enter
+              if (suggestions.isNotEmpty) {
+                notifier.addProduct(suggestions.first);
+              }
+            },
+          ),
+          if (suggestions.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 6),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: suggestions
+                    .map((p) => ListTile(
+                          dense: true,
+                          title: Text(p.name),
+                          subtitle: Text('Price: ${p.price.toStringAsFixed(2)}  •  Stock: ${p.stock.toStringAsFixed(2)}'),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.add_circle_rounded),
+                            onPressed: () => notifier.addProduct(p),
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CartList extends ConsumerWidget {
+  const _CartList();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(posNotifierProvider);
+    final notifier = ref.read(posNotifierProvider.notifier);
+    if (state.cart.isEmpty) {
+      return Center(
+        child: Text(
+          'No items yet. Search and add products.',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      itemBuilder: (context, index) {
+        final item = state.cart[index];
+        return Card(
+          child: ListTile(
+            title: Text(item.product.name),
+            subtitle: Text('Unit: ${item.unitPrice.toStringAsFixed(2)}'),
+            leading: IconButton(
+              icon: const Icon(Icons.remove_circle_outline_rounded),
+              onPressed: () {
+                final newQty = (item.quantity - 1).clamp(0.0, 1e9);
+                if (newQty == 0) {
+                  notifier.removeItem(item);
+                } else {
+                  notifier.updateQty(item, newQty);
+                }
+              },
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('x ${item.quantity.toStringAsFixed(0)}  '),
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline_rounded),
+                  onPressed: () => notifier.updateQty(item, item.quantity + 1),
+                ),
+                const SizedBox(width: 8),
+                Text(item.lineTotal.toStringAsFixed(2), style: Theme.of(context).textTheme.titleMedium),
+              ],
+            ),
+          ),
+        );
+      },
+      separatorBuilder: (_, __) => const SizedBox(height: 6),
+      itemCount: state.cart.length,
+    );
+  }
+}
+
+class _BottomBar extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(posNotifierProvider);
+    final notifier = ref.read(posNotifierProvider.notifier);
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Subtotal'),
+                      Text(state.subtotal.toStringAsFixed(2)),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Discount'),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(state.discount.toStringAsFixed(2)),
+                          const SizedBox(width: 6),
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            tooltip: 'Set discount',
+                            onPressed: () async {
+                              final value = await showDialog<double>(
+                                context: context,
+                                builder: (_) => _DiscountDialog(initial: state.discount),
+                              );
+                              if (value != null) notifier.setDiscount(value);
+                            },
+                          )
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Total', style: Theme.of(context).textTheme.titleMedium),
+                      Text(state.total.toStringAsFixed(2), style: Theme.of(context).textTheme.titleMedium),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            FilledButton.icon(
+              onPressed: state.cart.isEmpty
+                  ? null
+                  : () async {
+                      final result = await showDialog<PosCheckoutResult>(
+                        context: context,
+                        builder: (_) => const PaymentDialog(),
+                      );
+                      if (result != null && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Sale completed: ${result.saleNumber}')),
+                        );
+                      }
+                    },
+              icon: const Icon(Icons.arrow_forward_rounded),
+              label: const Text('Proceed to Pay'),
+              style: FilledButton.styleFrom(minimumSize: const Size(180, 48)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DiscountDialog extends StatefulWidget {
+  const _DiscountDialog({required this.initial});
+  final double initial;
+  @override
+  State<_DiscountDialog> createState() => _DiscountDialogState();
+}
+
+class _DiscountDialogState extends State<_DiscountDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initial.toStringAsFixed(2));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Set Discount'),
+      content: TextField(
+        controller: _controller,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: const InputDecoration(
+          labelText: 'Discount Amount',
+          prefixIcon: Icon(Icons.local_offer_outlined),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        FilledButton(
+          onPressed: () {
+            final v = double.tryParse(_controller.text.trim()) ?? 0.0;
+            Navigator.of(context).pop(v.clamp(0.0, 1e12));
+          },
+          child: const Text('Apply'),
+        )
+      ],
+    );
+  }
+}
