@@ -1,12 +1,14 @@
 package services
 
 import (
-	"database/sql"
-	"fmt"
-	"log"
+    "database/sql"
+    "fmt"
+    "log"
 
-	"erp-backend/internal/database"
-	"erp-backend/internal/models"
+    "github.com/lib/pq"
+
+    "erp-backend/internal/database"
+    "erp-backend/internal/models"
 )
 
 type POSService struct {
@@ -373,4 +375,120 @@ func (s *POSService) checkStockAvailability(locationID, productID int, requiredQ
 	}
 
 	return availableStock >= requiredQuantity, nil
+}
+
+// CreateHeldSale creates a sale with status=DRAFT and pos_status=HOLD without updating stock.
+// It calculates totals similarly to a normal sale but does not decrement inventory
+// or require payment method. This allows resuming later.
+func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *models.POSCheckoutRequest) (*models.Sale, error) {
+    if len(req.Items) == 0 {
+        return nil, fmt.Errorf("at least one item is required")
+    }
+
+    // Start transaction
+    tx, err := s.db.Begin()
+    if err != nil {
+        return nil, fmt.Errorf("failed to start transaction: %w", err)
+    }
+    defer tx.Rollback()
+
+    // Generate sale number using numbering sequences
+    ns := NewNumberingSequenceService()
+    saleNumber, err := ns.NextNumber(tx, "sale", companyID, &locationID)
+    if err != nil {
+        return nil, fmt.Errorf("failed to generate sale number: %w", err)
+    }
+
+    // Calculate totals and per-line taxes
+    subtotal := float64(0)
+    totalTax := float64(0)
+
+    // We'll also compute discount per line for persistence
+    type lineComputed struct {
+        qty      float64
+        unit     float64
+        discPct  float64
+        discAmt  float64
+        taxID    *int
+        taxAmt   float64
+        total    float64
+        pid      *int
+        pname    *string
+        serials  []string
+        notes    *string
+    }
+    lines := make([]lineComputed, 0, len(req.Items))
+
+    for _, item := range req.Items {
+        lineTotal := item.Quantity * item.UnitPrice
+        discountAmount := lineTotal * (item.DiscountPercent / 100)
+        lineTotal -= discountAmount
+        var taxAmount float64
+        var effectiveTaxID *int
+        if item.TaxID != nil {
+            effectiveTaxID = item.TaxID
+        } else if item.ProductID != nil {
+            var prodTaxID int
+            if err := s.db.QueryRow(`SELECT tax_id FROM products WHERE product_id=$1 AND is_deleted=FALSE`, *item.ProductID).Scan(&prodTaxID); err == nil && prodTaxID > 0 {
+                effectiveTaxID = &prodTaxID
+            }
+        }
+        if effectiveTaxID != nil {
+            taxAmount, err = NewSalesService().calculateTax(lineTotal, *effectiveTaxID)
+            if err != nil {
+                return nil, fmt.Errorf("failed to calculate tax: %w", err)
+            }
+        }
+        subtotal += lineTotal
+        totalTax += taxAmount
+        lines = append(lines, lineComputed{
+            qty:     item.Quantity,
+            unit:    item.UnitPrice,
+            discPct: item.DiscountPercent,
+            discAmt: discountAmount,
+            taxID:   effectiveTaxID,
+            taxAmt:  taxAmount,
+            total:   lineTotal,
+            pid:     item.ProductID,
+            pname:   item.ProductName,
+            serials: item.SerialNumbers,
+            notes:   item.Notes,
+        })
+    }
+
+    totalAmount := subtotal + totalTax - req.DiscountAmount
+    if totalAmount < 0 {
+        totalAmount = 0
+    }
+
+    // Insert sale as DRAFT + HOLD with zero paid
+    var saleID int
+    err = tx.QueryRow(`
+        INSERT INTO sales (sale_number, location_id, customer_id, sale_date, sale_time,
+                           subtotal, tax_amount, discount_amount, total_amount, paid_amount,
+                           payment_method_id, status, pos_status, is_quick_sale, notes, created_by, updated_by)
+        VALUES ($1,$2,$3,CURRENT_DATE,CURRENT_TIME,$4,$5,$6,$7,$8,$9,'DRAFT','HOLD',FALSE,$10,$11,$11)
+        RETURNING sale_id
+    `, saleNumber, locationID, req.CustomerID, subtotal, totalTax, req.DiscountAmount, totalAmount, 0.0, nil, nil, userID).Scan(&saleID)
+    if err != nil {
+        return nil, fmt.Errorf("failed to create held sale: %w", err)
+    }
+
+    // Insert sale details (no stock updates)
+    for _, lc := range lines {
+        if _, err := tx.Exec(`
+            INSERT INTO sale_details (sale_id, product_id, product_name, quantity, unit_price,
+                                      discount_percentage, discount_amount, tax_id, tax_amount,
+                                      line_total, serial_numbers, notes)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        `, saleID, lc.pid, lc.pname, lc.qty, lc.unit, lc.discPct, lc.discAmt, lc.taxID, lc.taxAmt, lc.total, pq.Array(lc.serials), lc.notes); err != nil {
+            return nil, fmt.Errorf("failed to create held sale item: %w", err)
+        }
+    }
+
+    if err := tx.Commit(); err != nil {
+        return nil, fmt.Errorf("failed to commit held sale: %w", err)
+    }
+
+    return s.salesService.GetSaleByID(saleID, companyID)
 }

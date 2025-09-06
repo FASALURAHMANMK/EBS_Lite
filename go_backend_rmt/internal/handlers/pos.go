@@ -302,3 +302,79 @@ func (h *POSHandler) GetReceiptData(c *gin.Context) {
 
 	utils.SuccessResponse(c, "Receipt data retrieved successfully", receiptData)
 }
+
+// POST /pos/calculate
+// Calculates subtotal, tax and total for the provided POS items and discount
+// without creating a sale. Useful for client-side previews.
+func (h *POSHandler) CalculateTotals(c *gin.Context) {
+    companyID := c.GetInt("company_id")
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
+
+    var req models.POSCheckoutRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+        return
+    }
+
+    // Reuse sales service calculation logic
+    salesService := services.NewSalesService()
+    subtotal, tax, total, err := salesService.CalculateTotals(&models.CreateSaleRequest{
+        CustomerID:     req.CustomerID,
+        Items:          req.Items,
+        DiscountAmount: req.DiscountAmount,
+    })
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to calculate totals", err)
+        return
+    }
+
+    utils.SuccessResponse(c, "Totals calculated successfully", gin.H{
+        "subtotal":    subtotal,
+        "tax_amount":  tax,
+        "total_amount": total,
+    })
+}
+
+// POST /pos/hold
+// Creates a held sale (status=DRAFT, pos_status=HOLD) without affecting stock.
+func (h *POSHandler) HoldSale(c *gin.Context) {
+    companyID := c.GetInt("company_id")
+    locationID := c.GetInt("location_id")
+    userID := c.GetInt("user_id")
+
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
+    if loc := c.Query("location_id"); loc != "" {
+        if id, err := strconv.Atoi(loc); err == nil {
+            locationID = id
+        }
+    }
+    if locationID == 0 {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+        return
+    }
+
+    var req models.POSCheckoutRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+        return
+    }
+    if err := utils.ValidateStruct(&req); err != nil {
+        validationErrors := utils.GetValidationErrors(err)
+        utils.ValidationErrorResponse(c, validationErrors)
+        return
+    }
+
+    sale, err := h.posService.CreateHeldSale(companyID, locationID, userID, &req)
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to hold sale", err)
+        return
+    }
+
+    utils.CreatedResponse(c, "Sale held successfully", sale)
+}

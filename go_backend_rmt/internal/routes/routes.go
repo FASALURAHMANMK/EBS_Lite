@@ -273,18 +273,20 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			}
 
 			// POS specific routes (require company and location)
-			pos := protected.Group("/pos")
-			pos.Use(middleware.RequireCompanyAccess())
-			{
-				pos.GET("/products", middleware.RequirePermission("VIEW_PRODUCTS"), posHandler.GetPOSProducts)
-				pos.GET("/customers", middleware.RequirePermission("VIEW_CUSTOMERS"), posHandler.GetPOSCustomers)
-				pos.POST("/checkout", middleware.RequirePermission("CREATE_SALES"), posHandler.ProcessCheckout)
-				pos.POST("/print", middleware.RequirePermission("PRINT_INVOICES"), posHandler.PrintInvoice)
-				pos.GET("/held-sales", middleware.RequirePermission("VIEW_SALES"), posHandler.GetHeldSales)
-				pos.GET("/payment-methods", middleware.RequirePermission("VIEW_SALES"), posHandler.GetPaymentMethods)
-				pos.GET("/sales-summary", middleware.RequirePermission("VIEW_REPORTS"), posHandler.GetSalesSummary)
-				pos.GET("/receipt/:id", middleware.RequirePermission("VIEW_SALES"), posHandler.GetReceiptData)
-			}
+                pos := protected.Group("/pos")
+                pos.Use(middleware.RequireCompanyAccess())
+                {
+                    pos.GET("/products", middleware.RequirePermission("VIEW_PRODUCTS"), posHandler.GetPOSProducts)
+                    pos.GET("/customers", middleware.RequirePermission("VIEW_CUSTOMERS"), posHandler.GetPOSCustomers)
+                    pos.POST("/checkout", middleware.RequirePermission("CREATE_SALES"), posHandler.ProcessCheckout)
+                    pos.POST("/calculate", middleware.RequirePermission("CREATE_SALES"), posHandler.CalculateTotals)
+                    pos.POST("/hold", middleware.RequirePermission("CREATE_SALES"), posHandler.HoldSale)
+                    pos.POST("/print", middleware.RequirePermission("PRINT_INVOICES"), posHandler.PrintInvoice)
+                    pos.GET("/held-sales", middleware.RequirePermission("VIEW_SALES"), posHandler.GetHeldSales)
+                    pos.GET("/payment-methods", middleware.RequirePermission("VIEW_SALES"), posHandler.GetPaymentMethods)
+                    pos.GET("/sales-summary", middleware.RequirePermission("VIEW_REPORTS"), posHandler.GetSalesSummary)
+                    pos.GET("/receipt/:id", middleware.RequirePermission("VIEW_SALES"), posHandler.GetReceiptData)
+                }
 
 			loyalty := protected.Group("/loyalty-programs")
 			loyalty.Use(middleware.RequireCompanyAccess())

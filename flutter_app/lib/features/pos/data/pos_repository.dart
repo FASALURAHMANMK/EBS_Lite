@@ -121,10 +121,91 @@ class PosRepository {
     final sale = (data?['sale'] as Map<String, dynamic>?) ?? {};
     return PosCheckoutResult.fromSale(sale);
   }
+
+  Future<Map<String, double>> calculateTotals({
+    required List<PosCartItem> items,
+    required double discountAmount,
+  }) async {
+    final res = await _dio.post('/pos/calculate', data: {
+      'items': items
+          .map((i) => {
+                'product_id': i.product.productId,
+                'quantity': i.quantity,
+                'unit_price': i.unitPrice,
+              })
+          .toList(),
+      'discount_amount': discountAmount,
+    });
+    final map = (res.data is Map<String, dynamic>) ? (res.data['data'] as Map<String, dynamic>) : {};
+    return {
+      'subtotal': (map['subtotal'] as num?)?.toDouble() ?? 0.0,
+      'tax_amount': (map['tax_amount'] as num?)?.toDouble() ?? 0.0,
+      'total_amount': (map['total_amount'] as num?)?.toDouble() ?? 0.0,
+    };
+  }
+
+  Future<PosCheckoutResult> holdSale({
+    int? customerId,
+    required List<PosCartItem> items,
+    double discountAmount = 0.0,
+  }) async {
+    final loc = _ref.read(locationNotifierProvider).selected;
+    if (loc == null) {
+      throw Exception('Select a location first');
+    }
+    final payload = {
+      if (customerId != null) 'customer_id': customerId,
+      'items': items
+          .map((i) => {
+                'product_id': i.product.productId,
+                'quantity': i.quantity,
+                'unit_price': i.unitPrice,
+              })
+          .toList(),
+      'paid_amount': 0,
+      'discount_amount': discountAmount,
+    };
+    final res = await _dio.post('/pos/hold', queryParameters: {'location_id': loc.locationId}, data: payload);
+    final sale = (res.data is Map<String, dynamic>) ? ((res.data['data'] as Map<String, dynamic>?) ?? {}) : {};
+    return PosCheckoutResult.fromSale(sale);
+  }
+
+  Future<List<HeldSaleDto>> getHeldSales() async {
+    final loc = _ref.read(locationNotifierProvider).selected;
+    if (loc == null) return const [];
+    final res = await _dio.get('/pos/held-sales', queryParameters: {'location_id': loc.locationId});
+    final list = _asList(res);
+    return list.map((e) => HeldSaleDto.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<void> resumeSale(int saleId) async {
+    await _dio.post('/sales/$saleId/resume');
+  }
+
+  Future<void> voidSale(int saleId) async {
+    await _dio.put('/sales/$saleId', data: {'status': 'VOID'});
+  }
+
+  Future<SaleDto> getSaleById(int saleId) async {
+    final res = await _dio.get('/sales/$saleId');
+    final body = res.data is Map<String, dynamic> ? res.data['data'] : res.data;
+    return SaleDto.fromJson(body as Map<String, dynamic>);
+  }
+
+  Future<List<CurrencyDto>> getCurrencies() async {
+    final res = await _dio.get('/currencies');
+    final list = _asList(res);
+    return list.map((e) => CurrencyDto.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<CustomerDetailDto> getCustomerDetail(int customerId) async {
+    final res = await _dio.get('/customers/$customerId');
+    final body = res.data is Map<String, dynamic> ? res.data['data'] : res.data;
+    return CustomerDetailDto.fromJson(body as Map<String, dynamic>);
+  }
 }
 
 final posRepositoryProvider = Provider<PosRepository>((ref) {
   final dio = ref.watch(dioProvider);
   return PosRepository(dio, ref);
 });
-

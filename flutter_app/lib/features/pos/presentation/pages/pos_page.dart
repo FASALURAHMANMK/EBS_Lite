@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../controllers/pos_notifier.dart';
 import '../../data/models.dart';
+import '../../data/pos_repository.dart';
 import '../widgets/customer_selector_dialog.dart';
 import '../widgets/payment_dialog.dart';
 
@@ -18,8 +19,17 @@ class PosPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Point of Sale'),
+        title: const Text('New Sale'),
         centerTitle: false,
+        actions: [
+          IconButton(
+            tooltip: 'Held Sales',
+            icon: const Icon(Icons.inbox_rounded),
+            onPressed: () async {
+              await showDialog(context: context, builder: (_) => const _HeldSalesDialog());
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -37,7 +47,8 @@ class PosPage extends ConsumerWidget {
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       if (loc != null)
-                        Text('Location: ${loc.name}', style: Theme.of(context).textTheme.bodySmall),
+                        Text('Location: ${loc.name}',
+                            style: Theme.of(context).textTheme.bodySmall),
                     ],
                   ),
                 ),
@@ -98,9 +109,8 @@ class _SearchBar extends ConsumerWidget {
           TextField(
             controller: _controller,
             decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search_rounded),
-              hintText: 'Search by code, barcode, name, attributes...'
-            ),
+                prefixIcon: Icon(Icons.search_rounded),
+                hintText: 'Search by code, barcode, name, attributes...'),
             onChanged: notifier.setQuery,
             onSubmitted: (value) {
               // Add first suggestion on enter
@@ -121,7 +131,8 @@ class _SearchBar extends ConsumerWidget {
                     .map((p) => ListTile(
                           dense: true,
                           title: Text(p.name),
-                          subtitle: Text('Price: ${p.price.toStringAsFixed(2)}  •  Stock: ${p.stock.toStringAsFixed(2)}'),
+                          subtitle: Text(
+                              'Price: ${p.price.toStringAsFixed(2)}  •  Stock: ${p.stock.toStringAsFixed(2)}'),
                           trailing: IconButton(
                             icon: const Icon(Icons.add_circle_rounded),
                             onPressed: () => notifier.addProduct(p),
@@ -179,7 +190,8 @@ class _CartList extends ConsumerWidget {
                   onPressed: () => notifier.updateQty(item, item.quantity + 1),
                 ),
                 const SizedBox(width: 8),
-                Text(item.lineTotal.toStringAsFixed(2), style: Theme.of(context).textTheme.titleMedium),
+                Text(item.lineTotal.toStringAsFixed(2),
+                    style: Theme.of(context).textTheme.titleMedium),
               ],
             ),
           ),
@@ -228,6 +240,14 @@ class _BottomBar extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      const Text('Tax'),
+                      Text(state.tax.toStringAsFixed(2)),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
                       const Text('Discount'),
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -240,7 +260,8 @@ class _BottomBar extends ConsumerWidget {
                             onPressed: () async {
                               final value = await showDialog<double>(
                                 context: context,
-                                builder: (_) => _DiscountDialog(initial: state.discount),
+                                builder: (_) =>
+                                    _DiscountDialog(initial: state.discount),
                               );
                               if (value != null) notifier.setDiscount(value);
                             },
@@ -253,31 +274,64 @@ class _BottomBar extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Total', style: Theme.of(context).textTheme.titleMedium),
-                      Text(state.total.toStringAsFixed(2), style: Theme.of(context).textTheme.titleMedium),
+                      Text('Total',
+                          style: Theme.of(context).textTheme.titleMedium),
+                      Text(state.total.toStringAsFixed(2),
+                          style: Theme.of(context).textTheme.titleMedium),
                     ],
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 12),
-            FilledButton.icon(
-              onPressed: state.cart.isEmpty
-                  ? null
-                  : () async {
-                      final result = await showDialog<PosCheckoutResult>(
-                        context: context,
-                        builder: (_) => const PaymentDialog(),
-                      );
-                      if (result != null && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Sale completed: ${result.saleNumber}')),
-                        );
-                      }
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Row(children: [
+                  OutlinedButton.icon(
+                    onPressed: state.cart.isEmpty
+                        ? null
+                        : () async {
+                            await notifier.holdCurrent();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Sale held')),
+                              );
+                            }
+                          },
+                    icon: const Icon(Icons.pause_circle_outline_rounded),
+                    label: const Text('Hold'),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: state.cart.isEmpty ? null : () {
+                      notifier.voidCurrent();
                     },
-              icon: const Icon(Icons.arrow_forward_rounded),
-              label: const Text('Proceed to Pay'),
-              style: FilledButton.styleFrom(minimumSize: const Size(180, 48)),
+                    icon: const Icon(Icons.cancel_outlined),
+                    label: const Text('Void'),
+                  ),
+                ]),
+                const SizedBox(height: 8),
+                FilledButton.icon(
+                  onPressed: state.cart.isEmpty
+                      ? null
+                      : () async {
+                          final result = await showDialog<PosCheckoutResult>(
+                            context: context,
+                            builder: (_) => const PaymentDialog(),
+                          );
+                          if (result != null && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Sale completed: ${result.saleNumber}')),
+                            );
+                          }
+                        },
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                  label: const Text('Proceed to Pay'),
+                  style: FilledButton.styleFrom(minimumSize: const Size(180, 48)),
+                ),
+              ],
             ),
           ],
         ),
@@ -299,7 +353,8 @@ class _DiscountDialogState extends State<_DiscountDialog> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.initial.toStringAsFixed(2));
+    _controller =
+        TextEditingController(text: widget.initial.toStringAsFixed(2));
   }
 
   @override
@@ -321,7 +376,9 @@ class _DiscountDialogState extends State<_DiscountDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel')),
         FilledButton(
           onPressed: () {
             final v = double.tryParse(_controller.text.trim()) ?? 0.0;
@@ -329,6 +386,88 @@ class _DiscountDialogState extends State<_DiscountDialog> {
           },
           child: const Text('Apply'),
         )
+      ],
+    );
+  }
+}
+
+class _HeldSalesDialog extends ConsumerStatefulWidget {
+  const _HeldSalesDialog();
+  @override
+  ConsumerState<_HeldSalesDialog> createState() => _HeldSalesDialogState();
+}
+
+class _HeldSalesDialogState extends ConsumerState<_HeldSalesDialog> {
+  bool _loading = true;
+  List<HeldSaleDto> _items = const [];
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final list = await ref.read(posRepositoryProvider).getHeldSales();
+      setState(() {
+        _items = list;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Held Sales'),
+      content: SizedBox(
+        width: 520,
+        height: 420,
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? Center(child: Text(_error!))
+                : ListView.separated(
+                    itemCount: _items.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final s = _items[index];
+                      return ListTile(
+                        title: Text(s.saleNumber),
+                        subtitle: Text('${s.customerName ?? 'Walk in'} • ${s.totalAmount.toStringAsFixed(2)}'),
+                        trailing: Wrap(spacing: 8, children: [
+                          TextButton(
+                            onPressed: () async {
+                              await ref.read(posNotifierProvider.notifier).loadHeldSaleItems(s.saleId);
+                              if (mounted) Navigator.of(context).pop();
+                            },
+                            child: const Text('Resume'),
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              await ref.read(posRepositoryProvider).voidSale(s.saleId);
+                              await _load();
+                            },
+                            child: const Text('Void'),
+                          ),
+                        ]),
+                      );
+                    },
+                  ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
       ],
     );
   }
