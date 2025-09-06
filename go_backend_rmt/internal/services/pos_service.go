@@ -140,11 +140,12 @@ func (s *POSService) PrintInvoice(invoiceID, companyID int) error {
 }
 
 func (s *POSService) GetHeldSales(companyID, locationID int) ([]models.Sale, error) {
-	filters := map[string]string{
-		"pos_status": "HOLD",
-	}
+    filters := map[string]string{
+        "pos_status": "HOLD",
+        "status":     "DRAFT",
+    }
 
-	return s.salesService.GetSales(companyID, locationID, filters)
+    return s.salesService.GetSales(companyID, locationID, filters)
 }
 
 func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string) ([]models.POSProductResponse, error) {

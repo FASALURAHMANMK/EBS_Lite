@@ -95,11 +95,18 @@ func (s *SalesService) GetSales(companyID, locationID int, filters map[string]st
 		args = append(args, customerID)
 	}
 
-	if status := filters["status"]; status != "" {
-		argCount++
-		query += fmt.Sprintf(" AND s.status = $%d", argCount)
-		args = append(args, status)
-	}
+    if status := filters["status"]; status != "" {
+        argCount++
+        query += fmt.Sprintf(" AND s.status = $%d", argCount)
+        args = append(args, status)
+    }
+
+    // Filter by POS status if provided (e.g., HOLD, ACTIVE, COMPLETED)
+    if posStatus := filters["pos_status"]; posStatus != "" {
+        argCount++
+        query += fmt.Sprintf(" AND s.pos_status = $%d", argCount)
+        args = append(args, posStatus)
+    }
 
 	query += " ORDER BY s.created_at DESC"
 

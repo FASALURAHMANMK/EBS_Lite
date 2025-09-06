@@ -162,8 +162,10 @@ class PosNotifier extends StateNotifier<PosState> {
       paidAmount: paidAmount,
       discountAmount: state.discount,
     );
+    final nextPreview = await _repo.getNextReceiptPreview();
     state = state.copyWith(
-      committedReceipt: result.saleNumber,
+      committedReceipt: null,
+      receiptPreview: nextPreview,
       cart: const [],
       suggestions: const [],
       discount: 0.0,
