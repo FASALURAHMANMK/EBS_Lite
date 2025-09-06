@@ -92,35 +92,50 @@ func (s *POSService) GetPOSCustomers(companyID int) ([]models.POSCustomerRespons
 }
 
 func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *models.POSCheckoutRequest) (*models.Sale, error) {
-	// Validate stock availability for all items
-	for _, item := range req.Items {
-		if item.ProductID != nil {
-			available, err := s.checkStockAvailability(locationID, *item.ProductID, item.Quantity)
-			if err != nil {
-				return nil, fmt.Errorf("failed to check stock for product %d: %w", *item.ProductID, err)
-			}
-			if !available {
-				return nil, fmt.Errorf("insufficient stock for product %d", *item.ProductID)
-			}
-		}
-	}
+    // Validate stock availability for all items
+    for _, item := range req.Items {
+        if item.ProductID != nil {
+            available, err := s.checkStockAvailability(locationID, *item.ProductID, item.Quantity)
+            if err != nil {
+                return nil, fmt.Errorf("failed to check stock for product %d: %w", *item.ProductID, err)
+            }
+            if !available {
+                return nil, fmt.Errorf("insufficient stock for product %d", *item.ProductID)
+            }
+        }
+    }
 
-	// Convert POS request to sale request
-	saleReq := &models.CreateSaleRequest{
-		CustomerID:      req.CustomerID,
-		Items:           req.Items,
-		PaymentMethodID: req.PaymentMethodID,
-		DiscountAmount:  req.DiscountAmount,
-		PaidAmount:      req.PaidAmount,
-	}
+    if req.SaleID != nil {
+        // Finalize an existing held sale and keep its sale_number
+        sale, err := s.finalizeHeldSale(companyID, locationID, userID, *req.SaleID, req)
+        if err != nil {
+            return nil, fmt.Errorf("failed to finalize held sale: %w", err)
+        }
+        return sale, nil
+    }
 
-	// Create the sale
-	sale, err := s.salesService.CreateSale(companyID, locationID, userID, saleReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to process checkout: %w", err)
-	}
+    // Normal flow: create a fresh sale
+    saleReq := &models.CreateSaleRequest{
+        CustomerID:      req.CustomerID,
+        Items:           req.Items,
+        PaymentMethodID: req.PaymentMethodID,
+        DiscountAmount:  req.DiscountAmount,
+        PaidAmount:      req.PaidAmount,
+    }
 
-	return sale, nil
+    sale, err := s.salesService.CreateSale(companyID, locationID, userID, saleReq)
+    if err != nil {
+        return nil, fmt.Errorf("failed to process checkout: %w", err)
+    }
+
+    // Record payment breakdown if provided
+    if len(req.Payments) > 0 {
+        if err := s.recordSalePayments(nil, sale.SaleID, req.Payments); err != nil {
+            log.Printf("warning: failed to record sale payments for sale %d: %v", sale.SaleID, err)
+        }
+    }
+
+    return sale, nil
 }
 
 func (s *POSService) PrintInvoice(invoiceID, companyID int) error {
@@ -376,6 +391,165 @@ func (s *POSService) checkStockAvailability(locationID, productID int, requiredQ
 	}
 
 	return availableStock >= requiredQuantity, nil
+}
+
+// finalizeHeldSale replaces the details of an existing DRAFT sale, updates totals
+// and stock, and marks it as COMPLETED while preserving sale_number.
+func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int, req *models.POSCheckoutRequest) (*models.Sale, error) {
+    // Verify sale exists, belongs to company & location, and is DRAFT
+    var status, posStatus string
+    var existingLocationID int
+    err := s.db.QueryRow(`SELECT s.status, s.pos_status, s.location_id FROM sales s JOIN locations l ON s.location_id = l.location_id WHERE s.sale_id=$1 AND l.company_id=$2 AND s.is_deleted=FALSE`, saleID, companyID).Scan(&status, &posStatus, &existingLocationID)
+    if err != nil {
+        if err == sql.ErrNoRows {
+            return nil, fmt.Errorf("sale not found")
+        }
+        return nil, fmt.Errorf("failed to verify sale: %w", err)
+    }
+    if existingLocationID != locationID {
+        return nil, fmt.Errorf("invalid location for sale")
+    }
+    if status != "DRAFT" {
+        return nil, fmt.Errorf("sale already finalized")
+    }
+
+    tx, err := s.db.Begin()
+    if err != nil {
+        return nil, fmt.Errorf("failed to begin transaction: %w", err)
+    }
+    defer tx.Rollback()
+
+    // Recalculate totals (reusing SalesService for tax resolution)
+    saleReq := &models.CreateSaleRequest{
+        CustomerID:      req.CustomerID,
+        Items:           req.Items,
+        PaymentMethodID: req.PaymentMethodID,
+        DiscountAmount:  req.DiscountAmount,
+        PaidAmount:      req.PaidAmount,
+    }
+    subtotal, tax, total, err := s.salesService.CalculateTotals(saleReq)
+    if err != nil {
+        return nil, fmt.Errorf("failed to calculate totals: %w", err)
+    }
+    if req.PaidAmount < 0 || req.PaidAmount > total {
+        // Clamp or return error; follow same validation as CreateSale
+        return nil, fmt.Errorf("invalid paid amount")
+    }
+
+    // Replace sale details
+    if _, err := tx.Exec(`DELETE FROM sale_details WHERE sale_id=$1`, saleID); err != nil {
+        return nil, fmt.Errorf("failed to clear sale details: %w", err)
+    }
+
+    // Insert details and update stock
+    for _, item := range req.Items {
+        // Compute line
+        lineTotal := item.Quantity * item.UnitPrice
+        discountAmount := lineTotal * (item.DiscountPercent / 100)
+        lineTotal -= discountAmount
+        var taxAmount float64
+        var effectiveTaxID *int
+        if item.TaxID != nil {
+            effectiveTaxID = item.TaxID
+        } else if item.ProductID != nil {
+            var prodTaxID int
+            q := `SELECT tax_id FROM products WHERE product_id=$1 AND is_deleted=FALSE`
+            if err := s.db.QueryRow(q, *item.ProductID).Scan(&prodTaxID); err == nil && prodTaxID > 0 {
+                effectiveTaxID = &prodTaxID
+            }
+        }
+        if effectiveTaxID != nil {
+            taxAmount, err = s.salesService.calculateTax(lineTotal, *effectiveTaxID)
+            if err != nil {
+                return nil, fmt.Errorf("failed to calculate tax: %w", err)
+            }
+        }
+
+        if _, err := tx.Exec(`
+            INSERT INTO sale_details (sale_id, product_id, product_name, quantity, unit_price,
+                                      discount_percentage, discount_amount, tax_id, tax_amount,
+                                      line_total, serial_numbers, notes)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        `, saleID, item.ProductID, item.ProductName, item.Quantity, item.UnitPrice, item.DiscountPercent, discountAmount, effectiveTaxID, taxAmount, lineTotal, pq.Array(item.SerialNumbers), item.Notes); err != nil {
+            return nil, fmt.Errorf("failed to insert sale detail: %w", err)
+        }
+
+        if item.ProductID != nil {
+            if err := s.salesService.updateStock(tx, locationID, *item.ProductID, -item.Quantity); err != nil {
+                return nil, fmt.Errorf("failed to update stock: %w", err)
+            }
+        }
+    }
+
+    // Update sale header to completed
+    if _, err := tx.Exec(`
+        UPDATE sales SET customer_id=$1, subtotal=$2, tax_amount=$3, discount_amount=$4, total_amount=$5,
+                          paid_amount=$6, payment_method_id=$7, status='COMPLETED', pos_status='COMPLETED',
+                          is_quick_sale=FALSE, updated_by=$8, updated_at=CURRENT_TIMESTAMP
+        WHERE sale_id=$9
+    `, req.CustomerID, subtotal, tax, req.DiscountAmount, total, req.PaidAmount, req.PaymentMethodID, userID, saleID); err != nil {
+        return nil, fmt.Errorf("failed to update sale: %w", err)
+    }
+
+    // Record payments (if any)
+    if len(req.Payments) > 0 {
+        if err := s.recordSalePaymentsTx(tx, saleID, req.Payments); err != nil {
+            return nil, fmt.Errorf("failed to record payments: %w", err)
+        }
+    }
+
+    if err := tx.Commit(); err != nil {
+        return nil, fmt.Errorf("failed to commit finalize: %w", err)
+    }
+
+    return s.salesService.GetSaleByID(saleID, companyID)
+}
+
+func (s *POSService) recordSalePayments(tx *sql.Tx, saleID int, lines []models.POSPaymentLine) error {
+    // Use separate transaction if none provided
+    if tx == nil {
+        var err error
+        tx, err = s.db.Begin()
+        if err != nil {
+            return err
+        }
+        defer func() {
+            _ = tx.Commit()
+        }()
+    }
+    return s.recordSalePaymentsTx(tx, saleID, lines)
+}
+
+func (s *POSService) recordSalePaymentsTx(tx *sql.Tx, saleID int, lines []models.POSPaymentLine) error {
+    for _, p := range lines {
+        var rate float64
+        // Resolve exchange rate: method-specific overrides else currency rate else 1
+        if p.CurrencyID != nil {
+            err := tx.QueryRow(`
+                SELECT COALESCE(pmc.exchange_rate, c.exchange_rate, 1.0)
+                FROM currencies c
+                LEFT JOIN payment_method_currencies pmc ON pmc.currency_id = c.currency_id AND pmc.method_id = $1
+                WHERE c.currency_id = $2
+            `, p.MethodID, *p.CurrencyID).Scan(&rate)
+            if err != nil {
+                if err == sql.ErrNoRows {
+                    rate = 1.0
+                } else {
+                    return fmt.Errorf("failed to resolve exchange rate: %w", err)
+                }
+            }
+        } else {
+            rate = 1.0
+        }
+        base := p.Amount * rate
+        if _, err := tx.Exec(`
+            INSERT INTO sale_payments (sale_id, method_id, currency_id, amount, base_amount, exchange_rate)
+            VALUES ($1,$2,$3,$4,$5,$6)
+        `, saleID, p.MethodID, p.CurrencyID, p.Amount, base, rate); err != nil {
+            return fmt.Errorf("failed to insert sale payment: %w", err)
+        }
+    }
+    return nil
 }
 
 // CreateHeldSale creates a sale with status=DRAFT and pos_status=HOLD without updating stock.

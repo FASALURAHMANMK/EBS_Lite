@@ -201,3 +201,15 @@ class CustomerDetailDto {
       );
 }
 
+class PosPaymentLineDto {
+  final int methodId;
+  final int? currencyId;
+  final double amount;
+  PosPaymentLineDto({required this.methodId, this.currencyId, required this.amount});
+
+  Map<String, dynamic> toJson() => {
+        'method_id': methodId,
+        if (currencyId != null) 'currency_id': currencyId,
+        'amount': amount,
+      };
+}

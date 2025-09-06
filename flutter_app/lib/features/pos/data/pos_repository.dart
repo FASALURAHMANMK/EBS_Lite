@@ -92,12 +92,15 @@ class PosRepository {
     int? paymentMethodId,
     required double paidAmount,
     double discountAmount = 0.0,
+    int? saleId,
+    List<PosPaymentLineDto>? payments,
   }) async {
     final loc = _ref.read(locationNotifierProvider).selected;
     if (loc == null) {
       throw Exception('Select a location first');
     }
     final payload = {
+      if (saleId != null) 'sale_id': saleId,
       if (customerId != null) 'customer_id': customerId,
       'items': items
           .map((i) => {
@@ -109,6 +112,8 @@ class PosRepository {
       if (paymentMethodId != null) 'payment_method_id': paymentMethodId,
       'paid_amount': paidAmount,
       'discount_amount': discountAmount,
+      if (payments != null && payments.isNotEmpty)
+        'payments': payments.map((p) => p.toJson()).toList(),
     };
     final res = await _dio.post(
       '/pos/checkout',

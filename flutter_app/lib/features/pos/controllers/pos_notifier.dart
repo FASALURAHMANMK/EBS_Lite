@@ -19,6 +19,7 @@ class PosState {
   final bool isLoading;
   final String? error;
   final List<PaymentMethodDto> paymentMethods;
+  final int? activeSaleId; // when resuming a held sale
 
   const PosState({
     this.receiptPreview,
@@ -33,6 +34,7 @@ class PosState {
     this.isLoading = false,
     this.error,
     this.paymentMethods = const [],
+    this.activeSaleId,
   });
 
   double get subtotal => cart.fold(0.0, (s, i) => s + i.lineTotal);
@@ -51,6 +53,7 @@ class PosState {
     bool? isLoading,
     String? error,
     List<PaymentMethodDto>? paymentMethods,
+    int? activeSaleId,
   }) {
     return PosState(
       receiptPreview: receiptPreview ?? this.receiptPreview,
@@ -65,6 +68,7 @@ class PosState {
       isLoading: isLoading ?? this.isLoading,
       error: error,
       paymentMethods: paymentMethods ?? this.paymentMethods,
+      activeSaleId: activeSaleId ?? this.activeSaleId,
     );
   }
 }
@@ -154,6 +158,7 @@ class PosNotifier extends StateNotifier<PosState> {
   Future<PosCheckoutResult> processCheckout({
     required int? paymentMethodId,
     required double paidAmount,
+    List<PosPaymentLineDto>? payments,
   }) async {
     final result = await _repo.checkout(
       customerId: state.customer?.customerId,
@@ -161,6 +166,8 @@ class PosNotifier extends StateNotifier<PosState> {
       paymentMethodId: paymentMethodId,
       paidAmount: paidAmount,
       discountAmount: state.discount,
+      saleId: state.activeSaleId,
+      payments: payments,
     );
     final nextPreview = await _repo.getNextReceiptPreview();
     state = state.copyWith(
@@ -170,6 +177,7 @@ class PosNotifier extends StateNotifier<PosState> {
       suggestions: const [],
       discount: 0.0,
       tax: 0.0,
+      activeSaleId: null,
     );
     return result;
   }
@@ -180,10 +188,10 @@ class PosNotifier extends StateNotifier<PosState> {
       items: state.cart,
       discountAmount: state.discount,
     );
-    // Reset cart and refresh preview
+    // Reset cart and refresh preview. Do not show held sale number in header.
     final preview = await _repo.getNextReceiptPreview();
     state = state.copyWith(
-      committedReceipt: res.saleNumber,
+      committedReceipt: null,
       cart: const [],
       suggestions: const [],
       discount: 0.0,
@@ -217,6 +225,7 @@ class PosNotifier extends StateNotifier<PosState> {
       cart: items,
       customerLabel: sale.customerName ?? state.customerLabel,
       committedReceipt: sale.saleNumber,
+      activeSaleId: saleId,
     );
     // ignore: unawaited_futures
     _recalculateTotals();
@@ -233,6 +242,13 @@ class PosNotifier extends StateNotifier<PosState> {
     } catch (_) {
       // Soft-fail; leave previous tax value
     }
+  }
+
+  Future<void> refreshPreview() async {
+    try {
+      final preview = await _repo.getNextReceiptPreview();
+      state = state.copyWith(receiptPreview: preview, committedReceipt: null);
+    } catch (_) {}
   }
 }
 

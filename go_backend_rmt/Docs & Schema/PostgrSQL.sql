@@ -517,6 +517,20 @@ CREATE TABLE sale_details (
     notes TEXT
 );
 
+-- Sale Payments Table (supports multi-tender and currencies)
+CREATE TABLE IF NOT EXISTS sale_payments (
+    sale_payment_id SERIAL PRIMARY KEY,
+    sale_id INTEGER NOT NULL REFERENCES sales(sale_id) ON DELETE CASCADE,
+    method_id INTEGER NOT NULL REFERENCES payment_methods(method_id),
+    currency_id INTEGER REFERENCES currencies(currency_id),
+    amount NUMERIC(12,2) NOT NULL, -- amount in given currency (or base if NULL currency)
+    base_amount NUMERIC(12,2) NOT NULL, -- converted amount in base currency
+    exchange_rate NUMERIC(18,6) NOT NULL DEFAULT 1.0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_sale_payments_sale ON sale_payments(sale_id);
+CREATE INDEX IF NOT EXISTS idx_sale_payments_method ON sale_payments(method_id);
+
 -- Sale Returns Table
 CREATE TABLE sale_returns (
     return_id SERIAL PRIMARY KEY,

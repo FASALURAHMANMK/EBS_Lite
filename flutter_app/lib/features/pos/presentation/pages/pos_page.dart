@@ -108,9 +108,17 @@ class _SearchBar extends ConsumerWidget {
         children: [
           TextField(
             controller: _controller,
-            decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search_rounded),
-                hintText: 'Search by code, barcode, name, attributes...'),
+            decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search_rounded),
+                hintText: 'Search by code, barcode, name, attributes...',
+                suffixIcon: IconButton(
+                  tooltip: 'Clear',
+                  icon: const Icon(Icons.clear_rounded),
+                  onPressed: () {
+                    _controller.clear();
+                    ref.read(posNotifierProvider.notifier).setQuery('');
+                  },
+                )),
             onChanged: notifier.setQuery,
             onSubmitted: (value) {
               // Add first suggestion on enter
@@ -137,6 +145,7 @@ class _SearchBar extends ConsumerWidget {
                             icon: const Icon(Icons.add_circle_rounded),
                             onPressed: () => notifier.addProduct(p),
                           ),
+                          onTap: () => notifier.addProduct(p),
                         ))
                     .toList(),
               ),
@@ -457,6 +466,8 @@ class _HeldSalesDialogState extends ConsumerState<_HeldSalesDialog> {
                           TextButton(
                             onPressed: () async {
                               await ref.read(posRepositoryProvider).voidSale(s.saleId);
+                              // After voiding, refresh the receipt preview on POS
+                              await ref.read(posNotifierProvider.notifier).refreshPreview();
                               await _load();
                             },
                             child: const Text('Void'),

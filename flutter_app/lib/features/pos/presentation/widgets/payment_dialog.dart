@@ -117,7 +117,15 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                               child: DropdownButtonFormField<int>(
                                 value: line.currencyId ?? _baseCurrency?.currencyId,
                                 items: _currencyMenuForMethod(line.methodId),
-                                onChanged: (v) => setState(() => line.currencyId = v),
+                                onChanged: (v) => setState(() {
+                                  final oldRate = _rateFor(line.methodId, line.currencyId);
+                                  final oldAmt = double.tryParse(line.controller.text.trim()) ?? 0.0;
+                                  final baseValue = oldAmt * oldRate;
+                                  line.currencyId = v;
+                                  final newRate = _rateFor(line.methodId, line.currencyId);
+                                  final newAmt = newRate == 0 ? 0.0 : baseValue / newRate;
+                                  line.controller.text = newAmt.toStringAsFixed(2);
+                                }),
                                 decoration: const InputDecoration(labelText: 'Currency'),
                               ),
                             ),
@@ -209,10 +217,21 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                   if (primaryMethod == null) return;
                   setState(() => _submitting = true);
                   try {
-                    final paid = _sumPaidInBase();
+                    final total = ref.read(posNotifierProvider).total;
+                    final paidBase = _sumPaidInBase();
+                    final paid = paidBase > total ? total : paidBase;
+                    // Build payment lines to record (including credit lines)
+                    final payments = _lines
+                        .where((l) => l.methodId != null)
+                        .map((l) => PosPaymentLineDto(
+                              methodId: l.methodId!,
+                              currencyId: l.currencyId,
+                              amount: double.tryParse(l.controller.text.trim()) ?? 0.0,
+                            ))
+                        .toList();
                     final result = await ref
                         .read(posNotifierProvider.notifier)
-                        .processCheckout(paymentMethodId: primaryMethod, paidAmount: paid);
+                        .processCheckout(paymentMethodId: primaryMethod, paidAmount: paid, payments: payments);
                     if (!mounted) return;
                     Navigator.of(context).pop(result);
                   } catch (e) {
@@ -264,6 +283,12 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
     double sum = 0.0;
     for (final l in _lines) {
       final amt = double.tryParse(l.controller.text.trim()) ?? 0.0;
+      // Exclude CREDIT lines from immediate paid sum
+      final method = _methods.firstWhere(
+        (m) => m.methodId == l.methodId,
+        orElse: () => PaymentMethodDto(methodId: -1, name: '', type: 'OTHER', isActive: true),
+      );
+      if (method.type.toUpperCase() == 'CREDIT') continue;
       final rate = _rateFor(l.methodId, l.currencyId);
       sum += amt * rate;
     }

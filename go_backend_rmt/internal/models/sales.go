@@ -124,11 +124,13 @@ type QuickSaleRequest struct {
 }
 
 type POSCheckoutRequest struct {
-	CustomerID      *int                      `json:"customer_id,omitempty"`
-	Items           []CreateSaleDetailRequest `json:"items" validate:"required,min=1"`
-	PaymentMethodID *int                      `json:"payment_method_id,omitempty"`
-	DiscountAmount  float64                   `json:"discount_amount"`
-	PaidAmount      float64                   `json:"paid_amount" validate:"gte=0"`
+    SaleID         *int                      `json:"sale_id,omitempty"`
+    CustomerID      *int                      `json:"customer_id,omitempty"`
+    Items           []CreateSaleDetailRequest `json:"items" validate:"required,min=1"`
+    PaymentMethodID *int                      `json:"payment_method_id,omitempty"`
+    DiscountAmount  float64                   `json:"discount_amount"`
+    PaidAmount      float64                   `json:"paid_amount" validate:"gte=0"`
+    Payments        []POSPaymentLine          `json:"payments,omitempty"`
 }
 
 type POSPrintRequest struct {
@@ -142,6 +144,14 @@ type POSProductResponse struct {
 	Stock        float64 `json:"stock"`
 	Barcode      *string `json:"barcode,omitempty"`
 	CategoryName *string `json:"category_name,omitempty"`
+}
+
+// POSPaymentLine represents an individual payment used in POS checkout, which
+// may be in a non-base currency.
+type POSPaymentLine struct {
+    MethodID   int     `json:"method_id" validate:"required"`
+    CurrencyID *int    `json:"currency_id,omitempty"`
+    Amount     float64 `json:"amount" validate:"required,gt=0"`
 }
 
 type POSCustomerResponse struct {
