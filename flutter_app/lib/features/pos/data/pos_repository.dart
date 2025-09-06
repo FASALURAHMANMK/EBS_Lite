@@ -118,7 +118,7 @@ class PosRepository {
     final data = (res.data is Map<String, dynamic>)
         ? (res.data['data'] as Map<String, dynamic>?)
         : null;
-    final sale = (data?['sale'] as Map<String, dynamic>?) ?? {};
+    final sale = (data?['sale'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     return PosCheckoutResult.fromSale(sale);
   }
 
@@ -136,7 +136,7 @@ class PosRepository {
           .toList(),
       'discount_amount': discountAmount,
     });
-    final map = (res.data is Map<String, dynamic>) ? (res.data['data'] as Map<String, dynamic>) : {};
+    final map = (res.data is Map<String, dynamic>) ? (res.data['data'] as Map<String, dynamic>) : <String, dynamic>{};
     return {
       'subtotal': (map['subtotal'] as num?)?.toDouble() ?? 0.0,
       'tax_amount': (map['tax_amount'] as num?)?.toDouble() ?? 0.0,
@@ -166,7 +166,7 @@ class PosRepository {
       'discount_amount': discountAmount,
     };
     final res = await _dio.post('/pos/hold', queryParameters: {'location_id': loc.locationId}, data: payload);
-    final sale = (res.data is Map<String, dynamic>) ? ((res.data['data'] as Map<String, dynamic>?) ?? {}) : {};
+    final sale = (res.data is Map<String, dynamic>) ? ((res.data['data'] as Map<String, dynamic>?) ?? <String, dynamic>{}) : <String, dynamic>{};
     return PosCheckoutResult.fromSale(sale);
   }
 

@@ -3,24 +3,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/settings_repository.dart';
-import '../../data/settings_models.dart';
 import '../../data/currency_repository.dart';
 import '../../data/company_repository.dart';
-import '../../data/taxes_repository.dart';
-import '../../data/payment_methods_repository.dart';
 import 'taxes_management_page.dart';
 import 'payment_modes_page.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../auth/controllers/auth_notifier.dart';
 import '../../../../core/api_client.dart';
 import 'locations_management_page.dart';
-import '../../../auth/controllers/auth_notifier.dart';
 
 class CompanySettingsPage extends ConsumerStatefulWidget {
   const CompanySettingsPage({super.key});
 
   @override
-  ConsumerState<CompanySettingsPage> createState() => _CompanySettingsPageState();
+  ConsumerState<CompanySettingsPage> createState() =>
+      _CompanySettingsPageState();
 }
 
 class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
@@ -60,14 +57,16 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
 
       // Load currencies
       try {
-        _currencies = await ref.read(currencyRepositoryProvider).getCurrencies();
+        _currencies =
+            await ref.read(currencyRepositoryProvider).getCurrencies();
       } catch (_) {}
 
       // Prefer companies API for full details; fallback to settings
       Company? comp;
       try {
         final list = await ref.read(companyRepositoryProvider).getCompanies();
-        comp = list.firstWhere((c) => c.companyId == companyId, orElse: () => auth.company!);
+        comp = list.firstWhere((c) => c.companyId == companyId,
+            orElse: () => auth.company!);
       } catch (_) {
         comp = auth.company;
       }
@@ -81,7 +80,8 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
         _currencyId = comp.currencyId;
         _logoPath = comp.logo;
       } else {
-        final cfg = await ref.read(settingsRepositoryProvider).getCompanySettings();
+        final cfg =
+            await ref.read(settingsRepositoryProvider).getCompanySettings();
         _name.text = cfg.name ?? '';
         _address.text = cfg.address ?? '';
         _phone.text = cfg.phone ?? '';
@@ -99,7 +99,9 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
       }
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Unable to load company settings. You might not have permission.')));
+        ..showSnackBar(SnackBar(
+            content: Text(
+                'Unable to load company settings. You might not have permission.')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -120,17 +122,21 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
             address: _address.text.trim().isEmpty ? null : _address.text.trim(),
             phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
             email: _email.text.trim().isEmpty ? null : _email.text.trim(),
-            taxNumber: _taxNumber.text.trim().isEmpty ? null : _taxNumber.text.trim(),
+            taxNumber:
+                _taxNumber.text.trim().isEmpty ? null : _taxNumber.text.trim(),
             currencyId: _currencyId,
             logo: _logoPath,
           );
       // Refresh auth state to propagate changes (logo/name)
       final me = await ref.read(authRepositoryProvider).me();
-      ref.read(authNotifierProvider.notifier).setAuth(user: me.user.toUser(), company: me.company);
+      ref
+          .read(authNotifierProvider.notifier)
+          .setAuth(user: me.user.toUser(), company: me.company);
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Company settings updated')));
+        ..showSnackBar(
+            const SnackBar(content: Text('Company settings updated')));
       Navigator.of(context).maybePop();
     } catch (e) {
       if (!mounted) return;
@@ -160,7 +166,9 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                       CircleAvatar(
                         radius: 28,
                         backgroundImage: _logoProvider(context),
-                        child: _logoPath == null ? const Icon(Icons.business) : null,
+                        child: _logoPath == null
+                            ? const Icon(Icons.business)
+                            : null,
                       ),
                       const SizedBox(width: 12),
                       FilledButton.icon(
@@ -238,7 +246,8 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                         items: _currencies
                             .map((c) => DropdownMenuItem<int?>(
                                   value: c.currencyId,
-                                  child: Text('${c.code} — ${c.name}${c.symbol != null ? ' (${c.symbol})' : ''}'),
+                                  child: Text(
+                                      '${c.code} — ${c.name}${c.symbol != null ? ' (${c.symbol})' : ''}'),
                                 ))
                             .toList(),
                         onChanged: (v) => setState(() => _currencyId = v),
@@ -250,34 +259,42 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                   ListTile(
                     leading: const Icon(Icons.percent_rounded),
                     title: const Text('Manage Taxes'),
-                    subtitle: const Text('Add or edit tax types (name, percentage)'),
+                    subtitle:
+                        const Text('Add or edit tax types (name, percentage)'),
                     tileColor: theme.colorScheme.surface,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     onTap: () {
-                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TaxesManagementPage()));
+                      Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => const TaxesManagementPage()));
                     },
                   ),
                   const SizedBox(height: 12),
                   ListTile(
                     leading: const Icon(Icons.account_balance_wallet_rounded),
                     title: const Text('Payment Modes'),
-                    subtitle: const Text('Manage payment modes and allowed currencies'),
+                    subtitle: const Text(
+                        'Manage payment modes and allowed currencies'),
                     tileColor: theme.colorScheme.surface,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     onTap: () {
-                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PaymentModesPage()));
+                      Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => const PaymentModesPage()));
                     },
                   ),
-                    const SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   ListTile(
                     leading: const Icon(Icons.location_city_rounded),
                     title: const Text('Manage Locations'),
                     subtitle: const Text('Add, edit, or remove locations'),
                     tileColor: theme.colorScheme.surface,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     onTap: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const LocationsManagementPage()),
+                        MaterialPageRoute(
+                            builder: (_) => const LocationsManagementPage()),
                       );
                     },
                   ),
@@ -290,7 +307,8 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                           ? const SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
                             )
                           : const Icon(Icons.save_rounded),
                       label: const Text('Save Changes'),
@@ -319,18 +337,23 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
     final auth = ref.read(authNotifierProvider);
     final companyId = auth.company?.companyId;
     if (companyId == null) return;
-    final result = await FilePicker.platform.pickFiles(type: FileType.image, allowMultiple: false);
+    final result = await FilePicker.platform
+        .pickFiles(type: FileType.image, allowMultiple: false);
     if (result == null || result.files.isEmpty) return;
     final f = result.files.single;
     final path = f.path;
     if (path == null) return;
     try {
       setState(() => _saving = true);
-      final logo = await ref.read(companyRepositoryProvider).uploadLogo(companyId, path, f.name);
+      final logo = await ref
+          .read(companyRepositoryProvider)
+          .uploadLogo(companyId, path, f.name);
       setState(() => _logoPath = logo);
       // Also refresh auth so sidebar updates immediately
       final me = await ref.read(authRepositoryProvider).me();
-      ref.read(authNotifierProvider.notifier).setAuth(user: me.user.toUser(), company: me.company);
+      ref
+          .read(authNotifierProvider.notifier)
+          .setAuth(user: me.user.toUser(), company: me.company);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
