@@ -303,6 +303,49 @@ func (h *POSHandler) GetReceiptData(c *gin.Context) {
 	utils.SuccessResponse(c, "Receipt data retrieved successfully", receiptData)
 }
 
+// POST /pos/void/:id
+// Creates a VOID invoice document using the next sale number. If the original
+// sale is COMPLETED, this void invoice will contain negative item lines to
+// reverse stock and amounts. If the original is DRAFT/HELD, a zero-total VOID
+// document is created just to record the void event and advance numbering.
+func (h *POSHandler) VoidSale(c *gin.Context) {
+    companyID := c.GetInt("company_id")
+    locationID := c.GetInt("location_id")
+    userID := c.GetInt("user_id")
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
+
+    if loc := c.Query("location_id"); loc != "" {
+        if id, err := strconv.Atoi(loc); err == nil {
+            locationID = id
+        }
+    }
+    if locationID == 0 {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+        return
+    }
+
+    saleID, err := strconv.Atoi(c.Param("id"))
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid sale ID", err)
+        return
+    }
+
+    voidSale, err := h.posService.VoidSale(companyID, locationID, userID, saleID)
+    if err != nil {
+        if err.Error() == "sale not found" {
+            utils.NotFoundResponse(c, "Sale not found")
+            return
+        }
+        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to void sale", err)
+        return
+    }
+
+    utils.CreatedResponse(c, "Void invoice created", voidSale)
+}
+
 // POST /pos/calculate
 // Calculates subtotal, tax and total for the provided POS items and discount
 // without creating a sale. Useful for client-side previews.

@@ -281,6 +281,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
                     pos.POST("/checkout", middleware.RequirePermission("CREATE_SALES"), posHandler.ProcessCheckout)
                     pos.POST("/calculate", middleware.RequirePermission("CREATE_SALES"), posHandler.CalculateTotals)
                     pos.POST("/hold", middleware.RequirePermission("CREATE_SALES"), posHandler.HoldSale)
+                    pos.POST("/void/:id", middleware.RequirePermission("UPDATE_SALES"), posHandler.VoidSale)
                     pos.POST("/print", middleware.RequirePermission("PRINT_INVOICES"), posHandler.PrintInvoice)
                     pos.GET("/held-sales", middleware.RequirePermission("VIEW_SALES"), posHandler.GetHeldSales)
                     pos.GET("/payment-methods", middleware.RequirePermission("VIEW_SALES"), posHandler.GetPaymentMethods)
