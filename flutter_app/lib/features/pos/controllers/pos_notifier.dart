@@ -54,10 +54,11 @@ class PosState {
     String? error,
     List<PaymentMethodDto>? paymentMethods,
     int? activeSaleId,
+    bool clearCommittedReceipt = false,
   }) {
     return PosState(
       receiptPreview: receiptPreview ?? this.receiptPreview,
-      committedReceipt: committedReceipt ?? this.committedReceipt,
+      committedReceipt: clearCommittedReceipt ? null : (committedReceipt ?? this.committedReceipt),
       customer: customer ?? this.customer,
       customerLabel: customerLabel ?? this.customerLabel,
       query: query ?? this.query,
@@ -171,7 +172,7 @@ class PosNotifier extends StateNotifier<PosState> {
     );
     final nextPreview = await _repo.getNextReceiptPreview();
     state = state.copyWith(
-      committedReceipt: null,
+      clearCommittedReceipt: true,
       receiptPreview: nextPreview,
       cart: const [],
       suggestions: const [],
@@ -191,7 +192,7 @@ class PosNotifier extends StateNotifier<PosState> {
     // Reset cart and refresh preview. Do not show held sale number in header.
     final preview = await _repo.getNextReceiptPreview();
     state = state.copyWith(
-      committedReceipt: null,
+      clearCommittedReceipt: true,
       cart: const [],
       suggestions: const [],
       discount: 0.0,
@@ -247,7 +248,7 @@ class PosNotifier extends StateNotifier<PosState> {
   Future<void> refreshPreview() async {
     try {
       final preview = await _repo.getNextReceiptPreview();
-      state = state.copyWith(receiptPreview: preview, committedReceipt: null);
+      state = state.copyWith(receiptPreview: preview, clearCommittedReceipt: true);
     } catch (_) {}
   }
 }

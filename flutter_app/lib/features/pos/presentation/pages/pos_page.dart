@@ -42,10 +42,15 @@ class PosPage extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Receipt # ${state.committedReceipt ?? state.receiptPreview ?? '-'}',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
+                      Builder(builder: (context) {
+                        final display = state.activeSaleId != null
+                            ? (state.committedReceipt ?? '-')
+                            : (state.receiptPreview ?? '-');
+                        return Text(
+                          'Receipt # $display',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        );
+                      }),
                       if (loc != null)
                         Text('Location: ${loc.name}',
                             style: Theme.of(context).textTheme.bodySmall),
