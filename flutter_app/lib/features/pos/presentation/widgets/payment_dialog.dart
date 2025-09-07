@@ -23,10 +23,12 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
   List<CurrencyDto> _currencies = const [];
   CurrencyDto? _baseCurrency;
 
-  // Optional: customer credit
-  CustomerDetailDto? _customer;
-
-  // Multiple payment lines
+  // Single selection state
+  int? _selectedMethodId;
+  int? _selectedCurrencyId;
+  final TextEditingController _amountController =
+      TextEditingController(text: '0.00');
+  // Additional payment lines (multi-method)
   final List<_PaymentLine> _lines = [];
 
   @override
@@ -43,24 +45,32 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
   Future<void> _bootstrap() async {
     final repo = ref.read(posRepositoryProvider);
     final methodRepo = ref.read(paymentMethodsRepositoryProvider);
-    final total = ref.read(posNotifierProvider).total;
-    final custId = ref.read(posNotifierProvider).customer?.customerId;
     try {
       final results = await Future.wait([
         methodRepo.getMethods(),
         methodRepo.getMethodCurrencies(),
         repo.getCurrencies(),
-        if (custId != null) repo.getCustomerDetail(custId),
       ]);
       _methods = results[0] as List<PaymentMethodDto>;
       _methodCurrencies = results[1] as Map<int, List<Map<String, dynamic>>>;
       _currencies = results[2] as List<CurrencyDto>;
-      if (results.length > 3) _customer = results[3] as CustomerDetailDto;
-      _baseCurrency = _currencies.firstWhere((c) => c.isBase, orElse: () => _currencies.isNotEmpty ? _currencies.first : CurrencyDto(currencyId: 0, code: 'BASE', symbol: null, isBase: true, exchangeRate: 1.0));
-      // Seed with one line defaulting to first method + base currency
-      final defaultMethod = _methods.isNotEmpty ? _methods.first.methodId : null;
-      final defaultCurrency = _baseCurrency?.currencyId;
-      _lines.add(_PaymentLine(methodId: defaultMethod, currencyId: defaultCurrency, controller: TextEditingController(text: total.toStringAsFixed(2))));
+      _baseCurrency = _currencies.firstWhere(
+        (c) => c.isBase,
+        orElse: () => _currencies.isNotEmpty
+            ? _currencies.first
+            : CurrencyDto(
+                currencyId: 0,
+                code: 'BASE',
+                symbol: null,
+                isBase: true,
+                exchangeRate: 1.0,
+              ),
+      );
+      _selectedMethodId = _methods.isNotEmpty ? _methods.first.methodId : null;
+      _selectedCurrencyId = _baseCurrency?.currencyId;
+      final total = ref.read(posNotifierProvider).total;
+      _amountController.text = total.toStringAsFixed(2);
+      _ensureAllowedCurrency();
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -74,18 +84,117 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
     final balance = (total - paidBase);
     final isChange = balance < 0;
     final displayBalance = balance.abs();
-    final eligibleCredit = _isCreditEligible(balance);
+    // Credit handling omitted in simplified UI
 
     return AlertDialog(
       title: const Text('Payment'),
       content: SizedBox(
-        width: 520,
+        width: 720,
+        height: 520,
         child: _loading
-            ? const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ..._lines.map((line) => Padding(
+            ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            : SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Methods as horizontally scrollable radio row
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: _methods
+                              .map(
+                                (m) => Padding(
+                                  padding: const EdgeInsets.only(right: 16.0),
+                                  child: InkWell(
+                                    onTap: () => setState(() {
+                                      _selectedMethodId = m.methodId;
+                                      _ensureAllowedCurrency();
+                                    }),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Radio<int>(
+                                          value: m.methodId,
+                                          groupValue: _selectedMethodId,
+                                          onChanged: (v) => setState(() {
+                                            _selectedMethodId = v;
+                                            _ensureAllowedCurrency();
+                                          }),
+                                        ),
+                                        Text(m.name),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ),
+                    ),
+                    // Amount input with currency picker prefix and clear suffix
+                    TextField(
+                      controller: _amountController,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        labelText: 'Amount',
+                        prefixIcon: InkWell(
+                          onTap: () async {
+                            final picked = await _pickCurrencyFor(context, _selectedMethodId);
+                            if (picked != null) {
+                              setState(() => _selectedCurrencyId = picked);
+                            }
+                          },
+                          child: Container(
+                            alignment: Alignment.center,
+                            width: 80,
+                            child: Text(
+                              _codeFor(_selectedCurrencyId),
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ),
+                        ),
+                        suffixIcon: IconButton(
+                          tooltip: 'Clear',
+                          icon: const Icon(Icons.clear_rounded),
+                          onPressed: () {
+                            setState(() => _amountController.text = '0.00');
+                          },
+                        ),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 12),
+                    // Additional payments rows
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Additional Payments', style: Theme.of(context).textTheme.titleSmall),
+                        TextButton.icon(
+                          onPressed: () => setState(() {
+                            _lines.add(_PaymentLine(
+                              methodId: _methods.isNotEmpty ? _methods.first.methodId : null,
+                              currencyId: _baseCurrency?.currencyId,
+                              controller: TextEditingController(text: '0.00'),
+                            ));
+                          }),
+                          icon: const Icon(Icons.add_rounded),
+                          label: const Text('Add Payment'),
+                        ),
+                      ],
+                    ),
+                    ..._lines.asMap().entries.map((e) {
+                      final idx = e.key;
+                      final line = e.value;
+                      return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6.0),
                         child: Row(
                           children: [
@@ -94,114 +203,79 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                               child: DropdownButtonFormField<int>(
                                 value: line.methodId,
                                 items: _methods
-                                    .map((m) => DropdownMenuItem<int>(value: m.methodId, child: Text(m.name)))
+                                    .map((m) => DropdownMenuItem<int>(
+                                          value: m.methodId,
+                                          child: Text(m.name),
+                                        ))
                                     .toList(),
                                 onChanged: (v) => setState(() {
                                   line.methodId = v;
-                                  // Reset currency to base if not allowed
-                                  final allowed = _allowedCurrenciesForMethod(v);
-                                  if (allowed.isNotEmpty) {
-                                    if (!allowed.contains(line.currencyId)) {
-                                      line.currencyId = allowed.first;
-                                    }
-                                  } else {
-                                    line.currencyId = _baseCurrency?.currencyId;
-                                  }
+                                  _ensureAllowedCurrencyForLine(line);
                                 }),
                                 decoration: const InputDecoration(labelText: 'Method'),
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Expanded(
-                              flex: 2,
-                              child: DropdownButtonFormField<int>(
-                                value: line.currencyId ?? _baseCurrency?.currencyId,
-                                items: _currencyMenuForMethod(line.methodId),
-                                onChanged: (v) => setState(() {
-                                  final oldRate = _rateFor(line.methodId, line.currencyId);
-                                  final oldAmt = double.tryParse(line.controller.text.trim()) ?? 0.0;
-                                  final baseValue = oldAmt * oldRate;
-                                  line.currencyId = v;
-                                  final newRate = _rateFor(line.methodId, line.currencyId);
-                                  final newAmt = newRate == 0 ? 0.0 : baseValue / newRate;
-                                  line.controller.text = newAmt.toStringAsFixed(2);
-                                }),
-                                decoration: const InputDecoration(labelText: 'Currency'),
+                            SizedBox(
+                              width: 90,
+                              child: TextButton(
+                                onPressed: () async {
+                                  final picked = await _pickCurrencyFor(context, line.methodId);
+                                  if (picked != null) setState(() => line.currencyId = picked);
+                                },
+                                child: Text(_codeFor(line.currencyId), style: Theme.of(context).textTheme.titleMedium),
                               ),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               flex: 2,
-                              child: TextFormField(
+                              child: TextField(
                                 controller: line.controller,
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                decoration: const InputDecoration(labelText: 'Amount'),
+                                decoration: InputDecoration(
+                                  labelText: 'Amount',
+                                  suffixIcon: IconButton(
+                                    tooltip: 'Clear',
+                                    icon: const Icon(Icons.clear_rounded),
+                                    onPressed: () => setState(() => line.controller.text = '0.00'),
+                                  ),
+                                ),
                                 onChanged: (_) => setState(() {}),
                               ),
                             ),
                             IconButton(
-                              onPressed: _lines.length == 1
-                                  ? null
-                                  : () => setState(() {
-                                        _lines.remove(line);
-                                      }),
-                              icon: const Icon(Icons.remove_circle_outline),
                               tooltip: 'Remove',
+                              onPressed: () => setState(() => _lines.removeAt(idx)),
+                              icon: const Icon(Icons.remove_circle_outline_rounded),
                             )
                           ],
                         ),
-                      )),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Wrap(spacing: 8, children: [
-                      TextButton.icon(
-                        onPressed: () => setState(() {
-                          _lines.add(_PaymentLine(
-                            methodId: _methods.isNotEmpty ? _methods.first.methodId : null,
-                            currencyId: _baseCurrency?.currencyId,
-                            controller: TextEditingController(text: '0.00'),
-                          ));
-                        }),
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Add Payment'),
-                      ),
-                      if (eligibleCredit)
-                        TextButton.icon(
-                          onPressed: () => setState(() {
-                            // Add or adjust a CREDIT line for the remaining balance
-                            final creditMethod = _methods.firstWhere(
-                              (m) => m.type.toUpperCase() == 'CREDIT',
-                              orElse: () => _methods.first,
-                            );
-                            final remaining = (state.total - _sumPaidInBase()).clamp(0.0, 1e12);
-                            _lines.add(_PaymentLine(
-                              methodId: creditMethod.methodId,
-                              currencyId: _baseCurrency?.currencyId,
-                              controller: TextEditingController(text: remaining.toStringAsFixed(2)),
-                            ));
-                          }),
-                          icon: const Icon(Icons.credit_score_rounded),
-                          label: const Text('Use Credit'),
+                      );
+                    }),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isChange ? 'Change' : 'Balance',
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
-                    ]),
-                  ),
-                  const Divider(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(isChange ? 'Change' : 'Balance', style: Theme.of(context).textTheme.titleMedium),
-                      Text(displayBalance.toStringAsFixed(2), style: Theme.of(context).textTheme.titleMedium),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Total'),
-                      Text(total.toStringAsFixed(2)),
-                    ],
-                  ),
-                ],
+                        Text(
+                          displayBalance.toStringAsFixed(2),
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Total'),
+                        Text(total.toStringAsFixed(2)),
+                      ],
+                    ),
+                  ],
+                ),
               ),
       ),
       actions: [
@@ -213,22 +287,26 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
           onPressed: _submitting
               ? null
               : () async {
-                  final primaryMethod = _primaryMethodId();
+                  final primaryMethod = _selectedMethodId;
                   if (primaryMethod == null) return;
                   setState(() => _submitting = true);
                   try {
                     final total = ref.read(posNotifierProvider).total;
                     final paidBase = _sumPaidInBase();
                     final paid = paidBase > total ? total : paidBase;
-                    // Build payment lines to record (including credit lines)
-                    final payments = _lines
-                        .where((l) => l.methodId != null)
-                        .map((l) => PosPaymentLineDto(
-                              methodId: l.methodId!,
-                              currencyId: l.currencyId,
-                              amount: double.tryParse(l.controller.text.trim()) ?? 0.0,
-                            ))
-                        .toList();
+                    // Build payments: primary + additional lines
+                    final payments = <PosPaymentLineDto>[
+                      PosPaymentLineDto(
+                        methodId: primaryMethod,
+                        currencyId: _selectedCurrencyId,
+                        amount: double.tryParse(_amountController.text.trim()) ?? 0.0,
+                      ),
+                      ..._lines.where((l) => l.methodId != null).map((l) => PosPaymentLineDto(
+                            methodId: l.methodId!,
+                            currencyId: l.currencyId,
+                            amount: double.tryParse(l.controller.text.trim()) ?? 0.0,
+                          )),
+                    ];
                     final result = await ref
                         .read(posNotifierProvider.notifier)
                         .processCheckout(paymentMethodId: primaryMethod, paidAmount: paid, payments: payments);
@@ -259,10 +337,18 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
     return list.map((e) => e['currency_id'] as int).toList();
   }
 
-  List<DropdownMenuItem<int>> _currencyMenuForMethod(int? methodId) {
-    final allowed = _allowedCurrenciesForMethod(methodId);
-    final subset = _currencies.where((c) => allowed.contains(c.currencyId)).toList();
-    return subset.map((c) => DropdownMenuItem<int>(value: c.currencyId, child: Text(c.code))).toList();
+  String _codeFor(int? currencyId) {
+    final cur = _currencies.firstWhere(
+      (c) => c.currencyId == currencyId,
+      orElse: () => _baseCurrency ??
+          CurrencyDto(
+              currencyId: 0,
+              code: 'BASE',
+              symbol: null,
+              isBase: true,
+              exchangeRate: 1.0),
+    );
+    return cur.code;
   }
 
   double _rateFor(int? methodId, int? currencyId) {
@@ -270,9 +356,10 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
     final list = _methodCurrencies[methodId ?? -1] ?? const [];
     final found = list.firstWhere(
       (e) => e['currency_id'] == currencyId,
-      orElse: () => {'exchange_rate': null},
+      orElse: () => const {'exchange_rate': null, 'rate': null},
     );
-    final rate = (found['exchange_rate'] as num?)?.toDouble();
+    final rate = (found['exchange_rate'] as num?)?.toDouble() ??
+        (found['rate'] as num?)?.toDouble();
     if (rate != null) return rate;
     // Fallback to global currency rate
     final cur = _currencies.firstWhere((c) => c.currencyId == currencyId, orElse: () => _baseCurrency ?? CurrencyDto(currencyId: currencyId, code: 'CUR', symbol: null, isBase: false, exchangeRate: 1.0));
@@ -281,36 +368,72 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
 
   double _sumPaidInBase() {
     double sum = 0.0;
+    // primary line
+    final pAmt = double.tryParse(_amountController.text.trim()) ?? 0.0;
+    sum += pAmt * _rateFor(_selectedMethodId, _selectedCurrencyId);
+    // additional lines
     for (final l in _lines) {
+      if (l.methodId == null) continue;
       final amt = double.tryParse(l.controller.text.trim()) ?? 0.0;
-      // Exclude CREDIT lines from immediate paid sum
-      final method = _methods.firstWhere(
-        (m) => m.methodId == l.methodId,
-        orElse: () => PaymentMethodDto(methodId: -1, name: '', type: 'OTHER', isActive: true),
-      );
-      if (method.type.toUpperCase() == 'CREDIT') continue;
-      final rate = _rateFor(l.methodId, l.currencyId);
-      sum += amt * rate;
+      sum += amt * _rateFor(l.methodId, l.currencyId);
     }
     return sum;
   }
 
-  bool _isCreditEligible(double remainingBalance) {
-    if (_customer == null) return false;
-    if (remainingBalance <= 0) return false;
-    final available = (_customer!.creditLimit - _customer!.creditBalance);
-    return available >= remainingBalance - 0.01; // small epsilon
+  void _ensureAllowedCurrency() {
+    final allowed = _allowedCurrenciesForMethod(_selectedMethodId);
+    if (allowed.isEmpty) {
+      _selectedCurrencyId = _baseCurrency?.currencyId;
+    } else if (!allowed.contains(_selectedCurrencyId)) {
+      _selectedCurrencyId = allowed.first;
+    }
   }
 
-  int? _primaryMethodId() {
-    if (_lines.isEmpty) return null;
-    // Prefer the method from the largest non-credit line; else any line
-    _lines.sort((a, b) {
-      final av = (double.tryParse(a.controller.text.trim()) ?? 0.0) * _rateFor(a.methodId, a.currencyId);
-      final bv = (double.tryParse(b.controller.text.trim()) ?? 0.0) * _rateFor(b.methodId, b.currencyId);
-      return bv.compareTo(av);
-    });
-    return _lines.first.methodId;
+  void _ensureAllowedCurrencyForLine(_PaymentLine line) {
+    final allowed = _allowedCurrenciesForMethod(line.methodId);
+    if (allowed.isEmpty) {
+      line.currencyId = _baseCurrency?.currencyId;
+    } else if (!allowed.contains(line.currencyId)) {
+      line.currencyId = allowed.first;
+    }
+  }
+
+  Future<int?> _pickCurrencyFor(BuildContext context, int? methodId) async {
+    final allowed = _allowedCurrenciesForMethod(methodId);
+    final subset = _currencies
+        .where((c) => allowed.isEmpty || allowed.contains(c.currencyId))
+        .toList();
+    return showDialog<int>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Select Currency'),
+          content: SizedBox(
+            width: 360,
+            height: 320,
+            child: ListView.builder(
+              itemCount: subset.length,
+              itemBuilder: (_, i) {
+                final c = subset[i];
+                return ListTile(
+                  title: Text(c.code),
+                  subtitle: c.isBase
+                      ? const Text('Base currency')
+                      : Text('Rate: ${c.exchangeRate}'),
+                  onTap: () => Navigator.of(ctx).pop(c.currencyId),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
 
