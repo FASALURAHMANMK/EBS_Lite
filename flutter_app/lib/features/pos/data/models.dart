@@ -50,20 +50,27 @@ class PosCartItem {
   final PosProductDto product;
   final double quantity;
   final double unitPrice;
+  final double discountPercent; // 0-100, per-line
 
   PosCartItem({
     required this.product,
     required this.quantity,
     required this.unitPrice,
+    this.discountPercent = 0.0,
   });
 
-  PosCartItem copyWith({double? quantity, double? unitPrice}) => PosCartItem(
+  PosCartItem copyWith({double? quantity, double? unitPrice, double? discountPercent}) => PosCartItem(
         product: product,
         quantity: quantity ?? this.quantity,
         unitPrice: unitPrice ?? this.unitPrice,
+        discountPercent: discountPercent ?? this.discountPercent,
       );
 
-  double get lineTotal => (quantity * unitPrice);
+  double get lineTotal {
+    final gross = quantity * unitPrice;
+    final disc = gross * (discountPercent.clamp(0.0, 100.0) / 100.0);
+    return (gross - disc).clamp(0.0, double.infinity);
+  }
 }
 
 class PosCheckoutResult {
@@ -136,14 +143,16 @@ class SaleItemDto {
   final String? productName;
   final double quantity;
   final double unitPrice;
+  final double discountPercent;
 
-  SaleItemDto({this.productId, this.productName, required this.quantity, required this.unitPrice});
+  SaleItemDto({this.productId, this.productName, required this.quantity, required this.unitPrice, this.discountPercent = 0.0});
 
   factory SaleItemDto.fromJson(Map<String, dynamic> json) => SaleItemDto(
         productId: json['product_id'] as int?,
         productName: json['product_name'] as String?,
         quantity: (json['quantity'] as num?)?.toDouble() ?? 0.0,
         unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0.0,
+        discountPercent: (json['discount_percentage'] as num?)?.toDouble() ?? 0.0,
       );
 }
 

@@ -55,6 +55,7 @@ class PosState {
     List<PaymentMethodDto>? paymentMethods,
     int? activeSaleId,
     bool clearCommittedReceipt = false,
+    bool clearActiveSaleId = false,
   }) {
     return PosState(
       receiptPreview: receiptPreview ?? this.receiptPreview,
@@ -69,7 +70,7 @@ class PosState {
       isLoading: isLoading ?? this.isLoading,
       error: error,
       paymentMethods: paymentMethods ?? this.paymentMethods,
-      activeSaleId: activeSaleId ?? this.activeSaleId,
+      activeSaleId: clearActiveSaleId ? null : (activeSaleId ?? this.activeSaleId),
     );
   }
 }
@@ -103,7 +104,15 @@ class PosNotifier extends StateNotifier<PosState> {
   }
 
   void setDiscount(double value) {
-    state = state.copyWith(discount: value);
+    // Applying a total discount clears any line-item discounts
+    if (value > 0) {
+      final cleared = state.cart
+          .map((i) => i.discountPercent > 0 ? i.copyWith(discountPercent: 0) : i)
+          .toList();
+      state = state.copyWith(cart: cleared, discount: value);
+    } else {
+      state = state.copyWith(discount: value);
+    }
     // ignore: unawaited_futures
     _recalculateTotals();
   }
@@ -156,6 +165,17 @@ class PosNotifier extends StateNotifier<PosState> {
     _recalculateTotals();
   }
 
+  void setItemDiscount(PosCartItem item, double percent) {
+    final normalized = percent.clamp(0.0, 100.0);
+    // Applying item-level discount disables total discount
+    final items = state.cart
+        .map((i) => i == item ? i.copyWith(discountPercent: normalized) : i)
+        .toList();
+    state = state.copyWith(cart: items, discount: 0.0);
+    // ignore: unawaited_futures
+    _recalculateTotals();
+  }
+
   Future<PosCheckoutResult> processCheckout({
     required int? paymentMethodId,
     required double paidAmount,
@@ -173,12 +193,12 @@ class PosNotifier extends StateNotifier<PosState> {
     final nextPreview = await _repo.getNextReceiptPreview();
     state = state.copyWith(
       clearCommittedReceipt: true,
+      clearActiveSaleId: true,
       receiptPreview: nextPreview,
       cart: const [],
       suggestions: const [],
       discount: 0.0,
       tax: 0.0,
-      activeSaleId: null,
     );
     return result;
   }
@@ -193,6 +213,7 @@ class PosNotifier extends StateNotifier<PosState> {
     final preview = await _repo.getNextReceiptPreview();
     state = state.copyWith(
       clearCommittedReceipt: true,
+      clearActiveSaleId: true,
       cart: const [],
       suggestions: const [],
       discount: 0.0,
@@ -202,7 +223,14 @@ class PosNotifier extends StateNotifier<PosState> {
   }
 
   void voidCurrent() {
-    state = state.copyWith(cart: const [], suggestions: const [], discount: 0.0, tax: 0.0);
+    state = state.copyWith(
+      cart: const [],
+      suggestions: const [],
+      discount: 0.0,
+      tax: 0.0,
+      clearCommittedReceipt: true,
+      clearActiveSaleId: true,
+    );
   }
 
   Future<void> loadHeldSaleItems(int saleId) async {
@@ -220,6 +248,7 @@ class PosNotifier extends StateNotifier<PosState> {
               ),
               quantity: si.quantity,
               unitPrice: si.unitPrice,
+              discountPercent: si.discountPercent,
             ))
         .toList();
     state = state.copyWith(

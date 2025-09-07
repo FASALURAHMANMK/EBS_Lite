@@ -116,6 +116,7 @@ class PosRepository {
                 'product_id': i.product.productId,
                 'quantity': i.quantity,
                 'unit_price': i.unitPrice,
+                'discount_percentage': i.discountPercent,
               })
           .toList(),
       if (paymentMethodId != null) 'payment_method_id': paymentMethodId,
@@ -146,6 +147,7 @@ class PosRepository {
                 'product_id': i.product.productId,
                 'quantity': i.quantity,
                 'unit_price': i.unitPrice,
+                'discount_percentage': i.discountPercent,
               })
           .toList(),
       'discount_amount': discountAmount,
@@ -174,6 +176,7 @@ class PosRepository {
                 'product_id': i.product.productId,
                 'quantity': i.quantity,
                 'unit_price': i.unitPrice,
+                'discount_percentage': i.discountPercent,
               })
           .toList(),
       'paid_amount': 0,

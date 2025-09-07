@@ -46,7 +46,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
       final now = DateTime.now();
       final todayStr = _fmtDate(now);
 
-      // Run sequentially but guarded so one failure doesn't block others
+      // Summaries (today, all-time)
       try {
         final sToday = await repo.getSalesSummary(dateFrom: todayStr, dateTo: todayStr);
         if (mounted) setState(() => _summaryToday = sToday);
@@ -56,7 +56,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
         if (mounted) setState(() => _summaryAll = sAll);
       } catch (_) {}
 
-      // History window: last 30 days by default
+      // Default history window: last 30 days unless a range is selected
       String fromDate = _fmtDate(now.subtract(const Duration(days: 30)));
       String? toDate;
       final dr = _dateRange;
@@ -65,10 +65,11 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
         toDate = _fmtDate(dr.end);
       }
 
-      // If exactly one customer selected, pass it to backend. If multiple, filter client-side.
+      // Single or multi-customer filtering
       final selectedIds = _selectedCustomers.map((e) => e.customerId).toList(growable: false);
       final singleCustomerId = selectedIds.length == 1 ? selectedIds.first : null;
 
+      // Sales
       try {
         final sales = await repo.getSalesHistory(
           dateFrom: fromDate,
@@ -87,6 +88,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
         }
         if (mounted) setState(() => _sales = filtered);
       } catch (_) {}
+
+      // Returns
       try {
         final returns = await repo.getSaleReturns(
           dateFrom: fromDate,
@@ -109,201 +112,18 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   }
 
   Future<void> _pickDateRange() async {
-    // Custom compact dialog with two small calendars and quick presets
-    DateTime todayDate() {
-      final now = DateTime.now();
-      return DateTime(now.year, now.month, now.day);
-    }
-    DateTimeRange today() {
-      final t = todayDate();
-      return DateTimeRange(start: t, end: t);
-    }
-    DateTimeRange yesterday() {
-      final t = todayDate().subtract(const Duration(days: 1));
-      return DateTimeRange(start: t, end: t);
-    }
-    DateTimeRange lastNDays(int n) {
-      final end = todayDate();
-      final start = end.subtract(Duration(days: n - 1));
-      return DateTimeRange(start: start, end: end);
-    }
-    DateTimeRange thisMonth() {
-      final now = DateTime.now();
-      final start = DateTime(now.year, now.month, 1);
-      final end = DateTime(now.year, now.month + 1, 0);
-      return DateTimeRange(start: start, end: end);
-    }
-    DateTimeRange lastMonth() {
-      final now = DateTime.now();
-      final start = DateTime(now.year, now.month - 1, 1);
-      final end = DateTime(now.year, now.month, 0);
-      return DateTimeRange(start: start, end: end);
-    }
-
-    DateTimeRange initial = _dateRange ?? lastNDays(7);
-    DateTime start = initial.start;
-    DateTime end = initial.end;
     final now = DateTime.now();
     final firstDate = DateTime(now.year - 3, 1, 1);
     final lastDate = DateTime(now.year + 1, 12, 31);
-
-    DateTime clampToRange(DateTime d) {
-      if (d.isBefore(firstDate)) return firstDate;
-      if (d.isAfter(lastDate)) return lastDate;
-      return DateTime(d.year, d.month, d.day);
-    }
-
-    final picked = await showDialog<DateTimeRange?>(
+    final initial = _dateRange ?? DateTimeRange(start: now.subtract(const Duration(days: 7)), end: now);
+    final picked = await showDateRangePicker(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setStateDialog) {
-            Widget calendarBox({required String label, required DateTime value, required void Function(DateTime) onChanged}) {
-              return Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(label, style: Theme.of(context).textTheme.labelLarge),
-                    ),
-                    SizedBox(
-                      height: 240,
-                      child: CalendarDatePicker(
-                        firstDate: firstDate,
-                        lastDate: lastDate,
-                        initialDate: value,
-                        onDateChanged: (d) => onChanged(clampToRange(d)),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            void applyPreset(DateTimeRange r) {
-              start = r.start;
-              end = r.end;
-              setStateDialog(() {});
-            }
-
-            return AlertDialog(
-              scrollable: true,
-              title: const Text('Select Date Range'),
-              content: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 720),
-                child: Builder(
-                  builder: (context) {
-                      final screenWidth = MediaQuery.of(context).size.width;
-                      // Heuristic for narrow layout inside dialog
-                      final narrow = screenWidth < 560;
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Wrap(
-                              spacing: 8,
-                              runSpacing: 4,
-                              children: [
-                                FilterChip(label: const Text('Today'), selected: start == today().start && end == today().end, onSelected: (_) => applyPreset(today())),
-                                FilterChip(label: const Text('Yesterday'), selected: start == yesterday().start && end == yesterday().end, onSelected: (_) => applyPreset(yesterday())),
-                                FilterChip(label: const Text('Last 7 days'), selected: start == lastNDays(7).start && end == lastNDays(7).end, onSelected: (_) => applyPreset(lastNDays(7))),
-                                FilterChip(label: const Text('Last 30 days'), selected: start == lastNDays(30).start && end == lastNDays(30).end, onSelected: (_) => applyPreset(lastNDays(30))),
-                                FilterChip(label: const Text('This month'), selected: start == thisMonth().start && end == thisMonth().end, onSelected: (_) => applyPreset(thisMonth())),
-                                FilterChip(label: const Text('Last month'), selected: start == lastMonth().start && end == lastMonth().end, onSelected: (_) => applyPreset(lastMonth())),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          if (narrow) ...[
-                            calendarBox(
-                              label: 'Start',
-                              value: start,
-                              onChanged: (d) {
-                                start = d;
-                                if (start.isAfter(end)) {
-                                  end = start;
-                                }
-                                setStateDialog(() {});
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            calendarBox(
-                              label: 'End',
-                              value: end,
-                              onChanged: (d) {
-                                end = d;
-                                if (end.isBefore(start)) {
-                                  start = end;
-                                }
-                                setStateDialog(() {});
-                              },
-                            ),
-                          ] else ...[
-                            Row(
-                              children: [
-                                calendarBox(
-                                  label: 'Start',
-                                  value: start,
-                                  onChanged: (d) {
-                                    start = d;
-                                    if (start.isAfter(end)) {
-                                      end = start;
-                                    }
-                                    setStateDialog(() {});
-                                  },
-                                ),
-                                const SizedBox(width: 12),
-                                calendarBox(
-                                  label: 'End',
-                                  value: end,
-                                  onChanged: (d) {
-                                    end = d;
-                                    if (end.isBefore(start)) {
-                                      start = end;
-                                    }
-                                    setStateDialog(() {});
-                                  },
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      );
-                    },
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop(const DateTimeRange(start: DateTime(0), end: DateTime(0)));
-                  },
-                  child: const Text('Clear'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(null),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.of(context).pop(DateTimeRange(start: start, end: end)),
-                  child: const Text('Apply'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      firstDate: firstDate,
+      lastDate: lastDate,
+      initialDateRange: initial,
     );
-
     if (picked != null) {
-      if (picked.start.year == 0 && picked.end.year == 0) {
-        // Clear
-        setState(() => _dateRange = null);
-      } else {
-        setState(() => _dateRange = picked);
-      }
+      setState(() => _dateRange = picked);
       await _load();
     }
   }
@@ -403,7 +223,6 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                         const SizedBox(width: 8),
                         FilledButton(
                           onPressed: () {
-                            // Convert selected IDs to minimal objects (id, name lookup from results or previous selection)
                             final mapById = {
                               for (final r in results) r.customerId: r,
                               for (final r in _selectedCustomers) r.customerId: r,
@@ -438,13 +257,20 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
     final theme = Theme.of(context);
     final q = _search.text.trim().toLowerCase();
 
-    // Merge sales and returns into a single list with type
-    final merged = <Map<String, dynamic>>[
-      ..._sales.map((e) => {...e, '_type': 'sale'}),
-      ..._returns.map((e) => {...e, '_type': 'return'}),
-    ];
+    // Merge sales and returns
+    final merged = <Map<String, dynamic>>[];
+    merged.addAll(_sales.map((e) {
+      final m = Map<String, dynamic>.from(e);
+      m['_type'] = 'sale';
+      return m;
+    }));
+    merged.addAll(_returns.map((e) {
+      final m = Map<String, dynamic>.from(e);
+      m['_type'] = 'return';
+      return m;
+    }));
 
-    // Sort by created_at/sale_date/return_date desc
+    // Sort newest first
     DateTime? parseDate(Map<String, dynamic> e) {
       DateTime? tryParse(dynamic v) {
         if (v == null) return null;
@@ -453,7 +279,6 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
       }
       return tryParse(e['created_at']) ?? tryParse(e['sale_date']) ?? tryParse(e['return_date']);
     }
-
     merged.sort((a, b) {
       final da = parseDate(a) ?? DateTime.fromMillisecondsSinceEpoch(0);
       final db = parseDate(b) ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -524,6 +349,12 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                       color: _dateRange != null ? theme.colorScheme.primary : null,
                     ),
                     onPressed: _pickDateRange,
+                    onLongPress: () async {
+                      if (_dateRange != null) {
+                        setState(() => _dateRange = null);
+                        await _load();
+                      }
+                    },
                   ),
                   const SizedBox(width: 4),
                   IconButton(
@@ -553,6 +384,12 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                       ],
                     ),
                     onPressed: _pickCustomers,
+                    onLongPress: () async {
+                      if (_selectedCustomers.isNotEmpty) {
+                        setState(() => _selectedCustomers = const []);
+                        await _load();
+                      }
+                    },
                   ),
                 ],
               ),
@@ -656,3 +493,4 @@ class _SummaryCard extends StatelessWidget {
     );
   }
 }
+

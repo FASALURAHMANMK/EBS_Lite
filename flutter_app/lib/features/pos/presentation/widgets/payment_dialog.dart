@@ -23,12 +23,7 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
   List<CurrencyDto> _currencies = const [];
   CurrencyDto? _baseCurrency;
 
-  // Single selection state
-  int? _selectedMethodId;
-  int? _selectedCurrencyId;
-  final TextEditingController _amountController =
-      TextEditingController(text: '0.00');
-  // Additional payment lines (multi-method)
+  // Payment lines (each with method, currency, amount)
   final List<_PaymentLine> _lines = [];
 
   @override
@@ -66,11 +61,17 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                 exchangeRate: 1.0,
               ),
       );
-      _selectedMethodId = _methods.isNotEmpty ? _methods.first.methodId : null;
-      _selectedCurrencyId = _baseCurrency?.currencyId;
       final total = ref.read(posNotifierProvider).total;
-      _amountController.text = total.toStringAsFixed(2);
-      _ensureAllowedCurrency();
+      final defaultMethod = _methods.isNotEmpty ? _methods.first.methodId : null;
+      final defaultCurrency = _baseCurrency?.currencyId;
+      _lines.clear();
+      final first = _PaymentLine(
+        methodId: defaultMethod,
+        currencyId: defaultCurrency,
+        controller: TextEditingController(text: total.toStringAsFixed(2)),
+      );
+      _ensureAllowedCurrencyForLine(first);
+      _lines.add(first);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -89,8 +90,8 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
     return AlertDialog(
       title: const Text('Payment'),
       content: SizedBox(
-        width: 720,
-        height: 520,
+        width: 860,
+        height: 560,
         child: _loading
             ? const Center(
                 child: Padding(
@@ -103,151 +104,109 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Methods as horizontally scrollable radio row
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12.0),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: _methods
-                              .map(
-                                (m) => Padding(
-                                  padding: const EdgeInsets.only(right: 16.0),
-                                  child: InkWell(
-                                    onTap: () => setState(() {
-                                      _selectedMethodId = m.methodId;
-                                      _ensureAllowedCurrency();
-                                    }),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Radio<int>(
-                                          value: m.methodId,
-                                          groupValue: _selectedMethodId,
-                                          onChanged: (v) => setState(() {
-                                            _selectedMethodId = v;
-                                            _ensureAllowedCurrency();
-                                          }),
-                                        ),
-                                        Text(m.name),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ),
-                    ),
-                    // Amount input with currency picker prefix and clear suffix
-                    TextField(
-                      controller: _amountController,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      decoration: InputDecoration(
-                        labelText: 'Amount',
-                        prefixIcon: InkWell(
-                          onTap: () async {
-                            final picked = await _pickCurrencyFor(context, _selectedMethodId);
-                            if (picked != null) {
-                              setState(() => _selectedCurrencyId = picked);
-                            }
-                          },
-                          child: Container(
-                            alignment: Alignment.center,
-                            width: 80,
-                            child: Text(
-                              _codeFor(_selectedCurrencyId),
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                          ),
-                        ),
-                        suffixIcon: IconButton(
-                          tooltip: 'Clear',
-                          icon: const Icon(Icons.clear_rounded),
-                          onPressed: () {
-                            setState(() => _amountController.text = '0.00');
-                          },
-                        ),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 12),
-                    // Additional payments rows
+                    // Payments
+                    // Payments header + Add button
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Additional Payments', style: Theme.of(context).textTheme.titleSmall),
+                        Text('Payments', style: Theme.of(context).textTheme.titleSmall),
                         TextButton.icon(
                           onPressed: () => setState(() {
-                            _lines.add(_PaymentLine(
+                            final l = _PaymentLine(
                               methodId: _methods.isNotEmpty ? _methods.first.methodId : null,
                               currencyId: _baseCurrency?.currencyId,
                               controller: TextEditingController(text: '0.00'),
-                            ));
+                            );
+                            _ensureAllowedCurrencyForLine(l);
+                            _lines.add(l);
                           }),
                           icon: const Icon(Icons.add_rounded),
                           label: const Text('Add Payment'),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 8),
+                    // Render each payment block (method row + amount row + remove)
                     ..._lines.asMap().entries.map((e) {
                       final idx = e.key;
                       final line = e.value;
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6.0),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              flex: 3,
-                              child: DropdownButtonFormField<int>(
-                                value: line.methodId,
-                                items: _methods
-                                    .map((m) => DropdownMenuItem<int>(
-                                          value: m.methodId,
-                                          child: Text(m.name),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: _methods
+                                    .map((m) => Padding(
+                                          padding: const EdgeInsets.only(right: 16.0),
+                                          child: InkWell(
+                                            onTap: () => setState(() {
+                                              line.methodId = m.methodId;
+                                              _ensureAllowedCurrencyForLine(line);
+                                            }),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Radio<int>(
+                                                  value: m.methodId,
+                                                  groupValue: line.methodId,
+                                                  onChanged: (v) => setState(() {
+                                                    line.methodId = v;
+                                                    _ensureAllowedCurrencyForLine(line);
+                                                  }),
+                                                ),
+                                                Text(m.name),
+                                              ],
+                                            ),
+                                          ),
                                         ))
                                     .toList(),
-                                onChanged: (v) => setState(() {
-                                  line.methodId = v;
-                                  _ensureAllowedCurrencyForLine(line);
-                                }),
-                                decoration: const InputDecoration(labelText: 'Method'),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            SizedBox(
-                              width: 90,
-                              child: TextButton(
-                                onPressed: () async {
-                                  final picked = await _pickCurrencyFor(context, line.methodId);
-                                  if (picked != null) setState(() => line.currencyId = picked);
-                                },
-                                child: Text(_codeFor(line.currencyId), style: Theme.of(context).textTheme.titleMedium),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              flex: 2,
-                              child: TextField(
-                                controller: line.controller,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                decoration: InputDecoration(
-                                  labelText: 'Amount',
-                                  suffixIcon: IconButton(
-                                    tooltip: 'Clear',
-                                    icon: const Icon(Icons.clear_rounded),
-                                    onPressed: () => setState(() => line.controller.text = '0.00'),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: line.controller,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: InputDecoration(
+                                      labelText: 'Amount',
+                                      prefixIcon: InkWell(
+                                        onTap: () async {
+                                          final picked = await _pickCurrencyFor(context, line.methodId);
+                                          if (picked != null) setState(() => line.currencyId = picked);
+                                        },
+                                        child: Container(
+                                          alignment: Alignment.center,
+                                          width: 80,
+                                          child: Text(
+                                            _codeFor(line.currencyId),
+                                            style: Theme.of(context).textTheme.titleMedium,
+                                          ),
+                                        ),
+                                      ),
+                                      suffixIcon: IconButton(
+                                        tooltip: 'Clear',
+                                        icon: const Icon(Icons.clear_rounded),
+                                        onPressed: () => setState(() => line.controller.text = '0.00'),
+                                      ),
+                                    ),
+                                    onChanged: (_) => setState(() {}),
                                   ),
                                 ),
-                                onChanged: (_) => setState(() {}),
-                              ),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  tooltip: 'Remove',
+                                  onPressed: _lines.length == 1
+                                      ? null
+                                      : () => setState(() => _lines.removeAt(idx)),
+                                  icon: const Icon(Icons.remove_circle_outline_rounded),
+                                )
+                              ],
                             ),
-                            IconButton(
-                              tooltip: 'Remove',
-                              onPressed: () => setState(() => _lines.removeAt(idx)),
-                              icon: const Icon(Icons.remove_circle_outline_rounded),
-                            )
                           ],
                         ),
                       );
@@ -256,10 +215,15 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          isChange ? 'Change' : 'Balance',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
+                        Text('Total Paid', style: Theme.of(context).textTheme.titleMedium),
+                        Text(_sumPaidInBase().toStringAsFixed(2), style: Theme.of(context).textTheme.titleMedium),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(isChange ? 'Change' : 'Balance', style: Theme.of(context).textTheme.titleMedium),
                         Text(
                           displayBalance.toStringAsFixed(2),
                           style: Theme.of(context).textTheme.titleMedium,
@@ -287,26 +251,22 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
           onPressed: _submitting
               ? null
               : () async {
-                  final primaryMethod = _selectedMethodId;
+                  final primaryMethod = _primaryMethodIdFromLines();
                   if (primaryMethod == null) return;
                   setState(() => _submitting = true);
                   try {
                     final total = ref.read(posNotifierProvider).total;
                     final paidBase = _sumPaidInBase();
                     final paid = paidBase > total ? total : paidBase;
-                    // Build payments: primary + additional lines
-                    final payments = <PosPaymentLineDto>[
-                      PosPaymentLineDto(
-                        methodId: primaryMethod,
-                        currencyId: _selectedCurrencyId,
-                        amount: double.tryParse(_amountController.text.trim()) ?? 0.0,
-                      ),
-                      ..._lines.where((l) => l.methodId != null).map((l) => PosPaymentLineDto(
-                            methodId: l.methodId!,
-                            currencyId: l.currencyId,
-                            amount: double.tryParse(l.controller.text.trim()) ?? 0.0,
-                          )),
-                    ];
+                    // Build payments from all lines
+                    final payments = _lines
+                        .where((l) => l.methodId != null)
+                        .map((l) => PosPaymentLineDto(
+                              methodId: l.methodId!,
+                              currencyId: l.currencyId,
+                              amount: double.tryParse(l.controller.text.trim()) ?? 0.0,
+                            ))
+                        .toList();
                     final result = await ref
                         .read(posNotifierProvider.notifier)
                         .processCheckout(paymentMethodId: primaryMethod, paidAmount: paid, payments: payments);
@@ -368,10 +328,6 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
 
   double _sumPaidInBase() {
     double sum = 0.0;
-    // primary line
-    final pAmt = double.tryParse(_amountController.text.trim()) ?? 0.0;
-    sum += pAmt * _rateFor(_selectedMethodId, _selectedCurrencyId);
-    // additional lines
     for (final l in _lines) {
       if (l.methodId == null) continue;
       final amt = double.tryParse(l.controller.text.trim()) ?? 0.0;
@@ -380,13 +336,20 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
     return sum;
   }
 
-  void _ensureAllowedCurrency() {
-    final allowed = _allowedCurrenciesForMethod(_selectedMethodId);
-    if (allowed.isEmpty) {
-      _selectedCurrencyId = _baseCurrency?.currencyId;
-    } else if (!allowed.contains(_selectedCurrencyId)) {
-      _selectedCurrencyId = allowed.first;
+  int? _primaryMethodIdFromLines() {
+    if (_lines.isEmpty) return null;
+    double best = -1.0;
+    int? chosen;
+    for (final l in _lines) {
+      if (l.methodId == null) continue;
+      final amt = double.tryParse(l.controller.text.trim()) ?? 0.0;
+      final base = amt * _rateFor(l.methodId, l.currencyId);
+      if (base > best) {
+        best = base;
+        chosen = l.methodId;
+      }
     }
+    return chosen ?? _lines.first.methodId;
   }
 
   void _ensureAllowedCurrencyForLine(_PaymentLine line) {
