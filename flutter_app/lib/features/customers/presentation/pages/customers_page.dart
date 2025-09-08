@@ -10,13 +10,6 @@ class CustomersPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = [
       FeatureItem(
-        icon: Icons.people_outline_rounded,
-        label: 'Customer View',
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FeatureDetailPage(title: 'Customer View')),
-        ),
-      ),
-      FeatureItem(
         icon: Icons.manage_accounts_rounded,
         label: 'Customer Management',
         onTap: () => Navigator.of(context).push(
@@ -27,14 +20,18 @@ class CustomersPage extends StatelessWidget {
         icon: Icons.payments_rounded,
         label: 'Credit Collection Entry',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FeatureDetailPage(title: 'Credit Collection Entry')),
+          MaterialPageRoute(
+              builder: (_) =>
+                  const FeatureDetailPage(title: 'Credit Collection Entry')),
         ),
       ),
       FeatureItem(
         icon: Icons.loyalty_rounded,
         label: 'Loyalty Management',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FeatureDetailPage(title: 'Loyalty Management')),
+          MaterialPageRoute(
+              builder: (_) =>
+                  const FeatureDetailPage(title: 'Loyalty Management')),
         ),
       ),
     ];

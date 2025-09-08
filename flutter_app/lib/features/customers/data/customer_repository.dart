@@ -66,6 +66,57 @@ class CustomerRepository {
     return data.map((e) => CustomerCollectionDto.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  Future<List<Map<String, dynamic>>> getOutstandingInvoices({required int customerId}) async {
+    // Fetch sales for this customer and let the UI compute outstanding
+    final qp = <String, dynamic>{'customer_id': customerId, 'status': 'COMPLETED'};
+    final loc = _locationId;
+    if (loc != null) qp['location_id'] = loc;
+    final res = await _dio.get('/sales', queryParameters: qp);
+    final data = _extractList(res);
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> getPaymentMethods() async {
+    try {
+      final res = await _dio.get('/pos/payment-methods');
+      final data = _extractList(res);
+      if (data.isNotEmpty) return data.cast<Map<String, dynamic>>();
+    } catch (_) {
+      // fallback below
+    }
+    final res = await _dio.get('/settings/payment-methods');
+    final data = _extractList(res);
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  Future<int> createCollection({
+    required int customerId,
+    required double amount,
+    int? paymentMethodId,
+    DateTime? receivedDate,
+    String? reference,
+    String? notes,
+    List<Map<String, dynamic>>? invoices, // [{sale_id, amount}]
+  }) async {
+    final payload = <String, dynamic>{
+      'customer_id': customerId,
+      'amount': amount,
+      if (paymentMethodId != null) 'payment_method_id': paymentMethodId,
+      if (receivedDate != null) 'received_date': receivedDate.toIso8601String().split('T').first,
+      if (reference != null && reference.isNotEmpty) 'reference': reference,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+      if (invoices != null && invoices.isNotEmpty) 'invoices': invoices,
+    };
+    final qp = <String, dynamic>{};
+    final loc = _locationId;
+    if (loc != null) qp['location_id'] = loc;
+    final res = await _dio.post('/collections', data: payload, queryParameters: qp.isEmpty ? null : qp);
+    final body = res.data is Map && (res.data['data'] != null)
+        ? res.data['data'] as Map<String, dynamic>
+        : res.data as Map<String, dynamic>;
+    return (body['collection_id'] as int?) ?? 0;
+  }
+
   Future<CustomerDto> createCustomer({
     required String name,
     String? phone,
@@ -117,4 +168,3 @@ final customerRepositoryProvider = Provider<CustomerRepository>((ref) {
   final dio = ref.watch(dioProvider);
   return CustomerRepository(dio, ref);
 });
-

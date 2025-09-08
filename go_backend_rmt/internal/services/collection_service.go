@@ -135,16 +135,89 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 		return nil, fmt.Errorf("failed to insert collection: %w", err)
 	}
 
-	// Link invoices if provided
-	for _, inv := range req.Invoices {
-		if _, err := tx.Exec(`INSERT INTO collection_invoices (collection_id, sale_id, amount) VALUES ($1,$2,$3)`,
-			col.CollectionID, inv.SaleID, inv.Amount); err != nil {
-			return nil, fmt.Errorf("failed to insert collection invoice: %w", err)
-		}
-		var saleNumber string
-		_ = tx.QueryRow("SELECT sale_number FROM sales WHERE sale_id = $1", inv.SaleID).Scan(&saleNumber)
-		col.Invoices = append(col.Invoices, models.CollectionInvoice{SaleID: inv.SaleID, SaleNumber: saleNumber, Amount: inv.Amount})
-	}
+    // Helper to apply payment to a specific sale after verifying ownership and not exceeding outstanding
+    applyToSale := func(saleID int, amount float64) error {
+        var total, paid float64
+        var custID int
+        err := tx.QueryRow(`SELECT s.total_amount, s.paid_amount, COALESCE(s.customer_id,0)
+                             FROM sales s
+                             JOIN locations l ON s.location_id = l.location_id
+                             WHERE s.sale_id = $1 AND l.company_id = $2`, saleID, companyID).Scan(&total, &paid, &custID)
+        if err != nil {
+            if err == sql.ErrNoRows {
+                return fmt.Errorf("invoice does not belong to company")
+            }
+            return fmt.Errorf("failed to verify invoice: %w", err)
+        }
+        // If sale is linked to a customer, ensure it matches
+        if custID != 0 && custID != req.CustomerID {
+            return fmt.Errorf("invoice does not belong to customer")
+        }
+        outstanding := total - paid
+        if outstanding <= 0 {
+            return nil
+        }
+        alloc := amount
+        if alloc > outstanding {
+            alloc = outstanding
+        }
+        if alloc <= 0 {
+            return nil
+        }
+        if _, err := tx.Exec(`UPDATE sales SET paid_amount = LEAST(total_amount, paid_amount + $1), updated_at = CURRENT_TIMESTAMP WHERE sale_id = $2`, alloc, saleID); err != nil {
+            return fmt.Errorf("failed to update invoice paid amount: %w", err)
+        }
+        if _, err := tx.Exec(`INSERT INTO collection_invoices (collection_id, sale_id, amount) VALUES ($1,$2,$3)`, col.CollectionID, saleID, alloc); err != nil {
+            return fmt.Errorf("failed to insert collection invoice: %w", err)
+        }
+        var saleNumber string
+        _ = tx.QueryRow("SELECT sale_number FROM sales WHERE sale_id = $1", saleID).Scan(&saleNumber)
+        col.Invoices = append(col.Invoices, models.CollectionInvoice{SaleID: saleID, SaleNumber: saleNumber, Amount: alloc})
+        return nil
+    }
+
+    // Link invoices if provided, otherwise auto-allocate FIFO to outstanding invoices
+    if len(req.Invoices) > 0 {
+        for _, inv := range req.Invoices {
+            if err := applyToSale(inv.SaleID, inv.Amount); err != nil {
+                return nil, err
+            }
+        }
+    } else {
+        // Auto-allocation across outstanding invoices for this customer (oldest first)
+        remaining := req.Amount
+        rows, err := tx.Query(`
+            SELECT s.sale_id, (s.total_amount - s.paid_amount) AS outstanding
+            FROM sales s
+            JOIN locations l ON s.location_id = l.location_id
+            WHERE COALESCE(s.customer_id,0) = $1 AND l.company_id = $2 AND s.is_deleted = FALSE AND (s.total_amount - s.paid_amount) > 0
+            ORDER BY s.sale_date ASC, s.created_at ASC, s.sale_id ASC`, req.CustomerID, companyID)
+        if err != nil {
+            return nil, fmt.Errorf("failed to fetch outstanding invoices: %w", err)
+        }
+        defer rows.Close()
+        for rows.Next() {
+            var saleID int
+            var out float64
+            if err := rows.Scan(&saleID, &out); err != nil {
+                return nil, fmt.Errorf("failed to scan outstanding invoice: %w", err)
+            }
+            if remaining <= 0 {
+                break
+            }
+            alloc := remaining
+            if alloc > out {
+                alloc = out
+            }
+            if err := applyToSale(saleID, alloc); err != nil {
+                return nil, err
+            }
+            remaining -= alloc
+        }
+        if err := rows.Err(); err != nil {
+            return nil, fmt.Errorf("failed to iterate outstanding invoices: %w", err)
+        }
+    }
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
