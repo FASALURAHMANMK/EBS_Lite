@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
 import 'package:ebs_lite/shared/pages/feature_detail_page.dart';
+import 'customer_management_page.dart';
 
 class CustomersPage extends StatelessWidget {
   const CustomersPage({super.key});
@@ -19,7 +20,7 @@ class CustomersPage extends StatelessWidget {
         icon: Icons.manage_accounts_rounded,
         label: 'Customer Management',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FeatureDetailPage(title: 'Customer Management')),
+          MaterialPageRoute(builder: (_) => const CustomerManagementPage()),
         ),
       ),
       FeatureItem(
@@ -41,4 +42,3 @@ class CustomersPage extends StatelessWidget {
     return FeatureGrid(items: items);
   }
 }
-

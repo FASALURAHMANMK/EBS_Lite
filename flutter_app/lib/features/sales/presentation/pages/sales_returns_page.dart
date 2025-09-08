@@ -5,148 +5,17 @@ import '../../../inventory/data/inventory_repository.dart';
 import '../../../inventory/data/models.dart';
 import '../../../pos/data/models.dart';
 import '../../../pos/data/pos_repository.dart';
+import '../../../pos/presentation/widgets/customer_selector_dialog.dart';
 import '../../data/sales_repository.dart';
 import 'sale_return_detail_page.dart';
 
-class SalesReturnsPage extends ConsumerStatefulWidget {
-  const SalesReturnsPage({super.key});
-
+class SaleReturnFormPage extends ConsumerStatefulWidget {
+  const SaleReturnFormPage({super.key});
   @override
-  ConsumerState<SalesReturnsPage> createState() => _SalesReturnsPageState();
+  ConsumerState<SaleReturnFormPage> createState() => _SaleReturnFormPageState();
 }
 
-class _SalesReturnsPageState extends ConsumerState<SalesReturnsPage> {
-  final _search = TextEditingController();
-  bool _loading = true;
-  List<Map<String, dynamic>> _all = const [];
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
-
-  Future<void> _load() async {
-    setState(() => _loading = true);
-    try {
-      final repo = ref.read(salesRepositoryProvider);
-      final list = await repo.getSaleReturns();
-      if (!mounted) return;
-      setState(() => _all = list);
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final q = _search.text.trim().toLowerCase();
-    final filtered = q.isEmpty
-        ? _all
-        : _all
-            .where((e) => (e['return_number'] ?? '')
-                .toString()
-                .toLowerCase()
-                .contains(q))
-            .toList();
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sales Returns'),
-        actions: [
-          IconButton(
-            tooltip: 'New Return',
-            icon: const Icon(Icons.add_rounded),
-            onPressed: () async {
-              final id = await Navigator.of(context)
-                  .push<int>(MaterialPageRoute(builder: (_) => const _SaleReturnFormPage()));
-              if (id != null) {
-                await _load();
-                if (!mounted) return;
-                await Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => SaleReturnDetailPage(returnId: id)),
-                );
-              }
-            },
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: TextField(
-                controller: _search,
-                decoration: InputDecoration(
-                  hintText: 'Search by Return #',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.refresh_rounded),
-                    onPressed: _load,
-                  ),
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-            ),
-            if (_loading) const LinearProgressIndicator(minHeight: 2),
-            Expanded(
-              child: _loading
-                  ? const SizedBox.shrink()
-                  : (filtered.isEmpty
-                      ? const Center(child: Text('No sale returns'))
-                      : ListView.separated(
-                          padding: const EdgeInsets.all(12),
-                          itemCount: filtered.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 8),
-                          itemBuilder: (context, i) {
-                            final doc = filtered[i];
-                            return Card(
-                              elevation: 0,
-                              child: ListTile(
-                                leading: const Icon(Icons.assignment_return_rounded),
-                                title: Text(doc['return_number']?.toString() ?? ''),
-                                subtitle: Text([
-                                  if ((doc['customer']?['name'] ?? doc['customer_name'] ?? '').toString().isNotEmpty)
-                                    (doc['customer']?['name'] ?? doc['customer_name']).toString(),
-                                  if ((doc['sale']?['sale_number'] ?? '').toString().isNotEmpty)
-                                    'From: ${doc['sale']['sale_number']}',
-                                  if (doc['return_date'] != null) doc['return_date'].toString(),
-                                ].where((e) => e.isNotEmpty).join(' · ')),
-                                onTap: () async {
-                                  final id = doc['return_id'] as int?;
-                                  if (id != null) {
-                                    await Navigator.of(context).push(
-                                      MaterialPageRoute(builder: (_) => SaleReturnDetailPage(returnId: id)),
-                                    );
-                                    _load();
-                                  }
-                                },
-                              ),
-                            );
-                          },
-                        )),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SaleReturnFormPage extends ConsumerStatefulWidget {
-  const _SaleReturnFormPage();
-  @override
-  ConsumerState<_SaleReturnFormPage> createState() => _SaleReturnFormPageState();
-}
-
-class _SaleReturnFormPageState extends ConsumerState<_SaleReturnFormPage> {
+class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
   PosCustomerDto? _customer;
   SaleDto? _linkedSale;
   bool _linking = false;
@@ -260,7 +129,9 @@ class _SaleReturnFormPageState extends ConsumerState<_SaleReturnFormPage> {
         }
       }
       if (!mounted) return;
-      Navigator.of(context).pop(returnId);
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => SaleReturnDetailPage(returnId: returnId)),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -523,90 +394,3 @@ class _CustomerPicker extends StatelessWidget {
     );
   }
 }
-
-// Reuse the existing dialog from POS module for customer selection
-class CustomerSelectorDialog extends ConsumerStatefulWidget {
-  const CustomerSelectorDialog({super.key});
-  @override
-  ConsumerState<CustomerSelectorDialog> createState() => _CustomerSelectorDialogState();
-}
-
-class _CustomerSelectorDialogState extends ConsumerState<CustomerSelectorDialog> {
-  final _controller = TextEditingController();
-  List<PosCustomerDto> _results = const [];
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _search('');
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _search(String q) async {
-    setState(() => _loading = true);
-    try {
-      final list = await ref.read(posRepositoryProvider).searchCustomers(q);
-      if (!mounted) return;
-      setState(() => _results = list);
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Select Customer'),
-      content: SizedBox(
-        width: 520,
-        height: 420,
-        child: Column(
-          children: [
-            TextField(
-              controller: _controller,
-              decoration: InputDecoration(
-                hintText: 'Search customers',
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.search_rounded),
-                  onPressed: () => _search(_controller.text.trim()),
-                ),
-              ),
-              onSubmitted: (v) => _search(v.trim()),
-            ),
-            const SizedBox(height: 8),
-            if (_loading) const LinearProgressIndicator(minHeight: 2),
-            Expanded(
-              child: _results.isEmpty && !_loading
-                  ? const Center(child: Text('No customers'))
-                  : ListView.builder(
-                      itemCount: _results.length,
-                      itemBuilder: (context, i) {
-                        final c = _results[i];
-                        return ListTile(
-                          title: Text(c.name),
-                          subtitle: Text([
-                            if ((c.phone ?? '').isNotEmpty) c.phone!,
-                            if ((c.email ?? '').isNotEmpty) c.email!,
-                          ].where((e) => e.isNotEmpty).join(' · ')),
-                          onTap: () => Navigator.of(context).pop(c),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-      ],
-    );
-  }
-}
-

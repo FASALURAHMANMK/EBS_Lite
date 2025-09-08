@@ -383,16 +383,17 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
                 purchaseReturns.POST("/:id/receipt", middleware.RequirePermission("UPDATE_PURCHASE_RETURNS"), purchaseHandler.UploadPurchaseReturnReceipt)
             }
 
-			// Customer management routes (require company)
-			customers := protected.Group("/customers")
-			customers.Use(middleware.RequireCompanyAccess())
-			{
-				customers.GET("", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.GetCustomers)
-				customers.GET("/:id/summary", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.GetCustomerSummary)
-				customers.POST("", middleware.RequirePermission("CREATE_CUSTOMERS"), customerHandler.CreateCustomer)
-				customers.POST("/import", middleware.RequirePermission("CREATE_CUSTOMERS"), customerHandler.ImportCustomers)
-				customers.GET("/export", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.ExportCustomers)
-				customers.PUT("/:id", middleware.RequirePermission("UPDATE_CUSTOMERS"), customerHandler.UpdateCustomer)
+            // Customer management routes (require company)
+            customers := protected.Group("/customers")
+            customers.Use(middleware.RequireCompanyAccess())
+            {
+                customers.GET("", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.GetCustomers)
+                customers.GET("/:id", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.GetCustomer)
+                customers.GET("/:id/summary", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.GetCustomerSummary)
+                customers.POST("", middleware.RequirePermission("CREATE_CUSTOMERS"), customerHandler.CreateCustomer)
+                customers.POST("/import", middleware.RequirePermission("CREATE_CUSTOMERS"), customerHandler.ImportCustomers)
+                customers.GET("/export", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.ExportCustomers)
+                customers.PUT("/:id", middleware.RequirePermission("UPDATE_CUSTOMERS"), customerHandler.UpdateCustomer)
 				customers.DELETE("/:id", middleware.RequirePermission("DELETE_CUSTOMERS"), customerHandler.DeleteCustomer)
 
 				credit := customers.Group("/:id/credit")

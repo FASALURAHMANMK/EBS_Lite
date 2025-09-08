@@ -13,11 +13,38 @@ import (
 )
 
 type CustomerHandler struct {
-	customerService *services.CustomerService
+    customerService *services.CustomerService
 }
 
 func NewCustomerHandler() *CustomerHandler {
-	return &CustomerHandler{customerService: services.NewCustomerService()}
+    return &CustomerHandler{customerService: services.NewCustomerService()}
+}
+
+// GET /customers/:id
+func (h *CustomerHandler) GetCustomer(c *gin.Context) {
+    companyID := c.GetInt("company_id")
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
+
+    customerID, err := strconv.Atoi(c.Param("id"))
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid customer ID", err)
+        return
+    }
+
+    cust, err := h.customerService.GetCustomerByID(customerID, companyID)
+    if err != nil {
+        if err.Error() == "customer not found" {
+            utils.NotFoundResponse(c, "Customer not found")
+            return
+        }
+        utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get customer", err)
+        return
+    }
+
+    utils.SuccessResponse(c, "Customer retrieved successfully", cust)
 }
 
 // GET /customers

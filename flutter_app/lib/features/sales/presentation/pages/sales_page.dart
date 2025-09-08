@@ -39,7 +39,7 @@ class SalesPage extends StatelessWidget {
         label: 'Returns',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
-              builder: (_) => const SalesReturnsPage()),
+              builder: (_) => const SaleReturnFormPage()),
         ),
       ),
       FeatureItem(
