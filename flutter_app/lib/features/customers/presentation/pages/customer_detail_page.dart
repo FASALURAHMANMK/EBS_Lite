@@ -53,7 +53,11 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
         onRefresh: () async {
           _reload();
           await Future.wait([
-            _customerFuture, _summaryFuture, _salesFuture, _returnsFuture, _collectionsFuture
+            _customerFuture,
+            _summaryFuture,
+            _salesFuture,
+            _returnsFuture,
+            _collectionsFuture
           ]);
         },
         child: ListView(
@@ -62,19 +66,25 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
             FutureBuilder<CustomerDto>(
               future: _customerFuture,
               builder: (context, s) {
-                if (!s.hasData) return const LinearProgressIndicator(minHeight: 2);
+                if (!s.hasData)
+                  return const LinearProgressIndicator(minHeight: 2);
                 final cu = s.data!;
                 return Card(
                   elevation: 0,
                   color: theme.colorScheme.surfaceContainerHighest,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   child: ListTile(
-                    title: Text(cu.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    title: Text(cu.name,
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700)),
                     subtitle: Text([
                       if ((cu.phone ?? '').isNotEmpty) 'Phone: ${cu.phone}',
                       if ((cu.email ?? '').isNotEmpty) 'Email: ${cu.email}',
-                      if ((cu.address ?? '').isNotEmpty) 'Address: ${cu.address}',
-                      if ((cu.taxNumber ?? '').isNotEmpty) 'Tax#: ${cu.taxNumber}',
+                      if ((cu.address ?? '').isNotEmpty)
+                        'Address: ${cu.address}',
+                      if ((cu.taxNumber ?? '').isNotEmpty)
+                        'Tax#: ${cu.taxNumber}',
                       'Credit Limit: ${cu.creditLimit.toStringAsFixed(2)} | Terms: ${cu.paymentTerms} days',
                     ].join('\n')),
                     isThreeLine: true,
@@ -83,7 +93,9 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
                       icon: const Icon(Icons.edit_outlined),
                       onPressed: () async {
                         final updated = await Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => CustomerEditPage(customerId: cu.customerId)),
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  CustomerEditPage(customerId: cu.customerId)),
                         );
                         if (updated == true && mounted) _reload();
                       },
@@ -104,15 +116,18 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
                 return Card(
                   elevation: 0,
                   color: theme.colorScheme.surfaceContainerHighest,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   child: Padding(
                     padding: const EdgeInsets.all(12.0),
                     child: Wrap(
                       spacing: 16,
                       runSpacing: 8,
                       children: [
-                        _metric('Outstanding', outstanding < 0 ? 0 : outstanding),
-                        _metric('Available Credit', available < 0 ? 0 : available),
+                        _metric(
+                            'Outstanding', outstanding < 0 ? 0 : outstanding),
+                        _metric(
+                            'Available Credit', available < 0 ? 0 : available),
                       ],
                     ),
                   ),
@@ -128,7 +143,8 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
                 return Card(
                   elevation: 0,
                   color: theme.colorScheme.surfaceContainerHighest,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   child: Padding(
                     padding: const EdgeInsets.all(12.0),
                     child: Wrap(
@@ -153,11 +169,14 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
                 if (!s.hasData) return const SizedBox.shrink();
                 final items = s.data!;
                 return _simpleList(
-                  items.map((e) => _SimpleRow(
-                    title: (e['sale_number'] ?? e['number'] ?? '').toString(),
-                    subtitle: (e['status'] ?? '').toString(),
-                    trailing: (e['total_amount'] ?? 0).toString(),
-                  )).toList(),
+                  items
+                      .map((e) => _SimpleRow(
+                            title: (e['sale_number'] ?? e['number'] ?? '')
+                                .toString(),
+                            subtitle: (e['status'] ?? '').toString(),
+                            trailing: (e['total_amount'] ?? 0).toString(),
+                          ))
+                      .toList(),
                 );
               },
             ),
@@ -169,11 +188,14 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
                 if (!s.hasData) return const SizedBox.shrink();
                 final items = s.data!;
                 return _simpleList(
-                  items.map((e) => _SimpleRow(
-                    title: (e['return_number'] ?? e['number'] ?? '').toString(),
-                    subtitle: (e['status'] ?? '').toString(),
-                    trailing: (e['total_amount'] ?? 0).toString(),
-                  )).toList(),
+                  items
+                      .map((e) => _SimpleRow(
+                            title: (e['return_number'] ?? e['number'] ?? '')
+                                .toString(),
+                            subtitle: (e['status'] ?? '').toString(),
+                            trailing: (e['total_amount'] ?? 0).toString(),
+                          ))
+                      .toList(),
                 );
               },
             ),
@@ -185,18 +207,20 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
                 if (!s.hasData) return const SizedBox.shrink();
                 final items = s.data!;
                 return _simpleList(
-                  items.map((p) => _SimpleRow(
-                    title: p.collectionNumber,
-                    subtitle: p.collectionDate.toLocal().toString(),
-                    trailing: p.amount.toStringAsFixed(2),
-                  )).toList(),
+                  items
+                      .map((p) => _SimpleRow(
+                            title: p.collectionNumber,
+                            subtitle: p.collectionDate.toLocal().toString(),
+                            trailing: p.amount.toStringAsFixed(2),
+                          ))
+                      .toList(),
                 );
               },
             ),
           ],
         ),
       ),
-      );
+    );
   }
 
   Widget _sectionTitle(String text) => Padding(
@@ -209,7 +233,9 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label, style: const TextStyle(fontSize: 12)),
-          Text(value.toStringAsFixed(2), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          Text(value.toStringAsFixed(2),
+              style:
+                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
         ],
       );
 
@@ -248,9 +274,11 @@ extension _Collect on _CustomerDetailPageState {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _CollectSheet(customerId: widget.customerId, onDone: () {
-        _reload();
-      }),
+      builder: (_) => _CollectSheet(
+          customerId: widget.customerId,
+          onDone: () {
+            _reload();
+          }),
     );
   }
 }
@@ -272,6 +300,7 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
   bool _saving = false;
   List<Map<String, dynamic>> _methods = const [];
   int? _methodId;
+  String? _methodName;
   List<Map<String, dynamic>> _invoices = const [];
   final Map<int, TextEditingController> _alloc = {};
 
@@ -284,22 +313,43 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
   Future<void> _bootstrap() async {
     try {
       final repo = ref.read(customerRepositoryProvider);
-      final results = await Future.wait([
-        repo.getPaymentMethods(),
-        repo.getOutstandingInvoices(customerId: widget.customerId),
-      ]);
-      final methods = results[0] as List<Map<String, dynamic>>;
-      final invoices = (results[1] as List<Map<String, dynamic>>)
-          .where((e) => ((e['total_amount'] ?? 0) as num).toDouble() - ((e['paid_amount'] ?? 0) as num).toDouble() > 0.0)
-          .toList();
+      final methods = await repo.getPaymentMethods();
       setState(() {
         _methods = methods;
-        _methodId = methods.isNotEmpty ? (methods.first['method_id'] as int? ?? methods.first['id'] as int?) : null;
+        _methodId = methods.isNotEmpty
+            ? (methods.first['method_id'] as int? ??
+                methods.first['id'] as int?)
+            : null;
+        _methodName = methods.isNotEmpty
+            ? ((methods.first['name'] ?? methods.first['method'])?.toString())
+            : null;
+      });
+    } catch (e) {
+      _showError(context, e);
+    }
+  }
+
+  Future<void> _loadInvoices() async {
+    try {
+      final repo = ref.read(customerRepositoryProvider);
+      final list =
+          await repo.getOutstandingInvoices(customerId: widget.customerId);
+      final invoices = list
+          .where((e) =>
+              ((e['total_amount'] ?? 0) as num).toDouble() -
+                  ((e['paid_amount'] ?? 0) as num).toDouble() >
+              0.0)
+          .toList();
+      setState(() {
         _invoices = invoices;
         for (final inv in invoices) {
-          _alloc[inv['sale_id'] as int] = TextEditingController();
+          final id = inv['sale_id'] as int?;
+          if (id != null && !_alloc.containsKey(id)) {
+            _alloc[id] = TextEditingController();
+          }
         }
       });
+      if (_invoiceMode) _autoAllocate();
     } catch (e) {
       _showError(context, e);
     }
@@ -356,7 +406,8 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
         if (val <= 0) continue;
         final out = _invoiceOutstanding(inv);
         if (val > out) {
-          _showInfo(context, 'Allocation for ${inv['sale_number']} exceeds outstanding');
+          _showInfo(context,
+              'Allocation for ${inv['sale_number']} exceeds outstanding');
           return;
         }
         lines.add({'sale_id': id, 'amount': val});
@@ -367,7 +418,8 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
         return;
       }
       if ((sum - amt).abs() > 0.009) {
-        _showInfo(context, 'Allocated total (${sum.toStringAsFixed(2)}) must equal amount (${amt.toStringAsFixed(2)})');
+        _showInfo(context,
+            'Allocated total (${sum.toStringAsFixed(2)}) must equal amount (${amt.toStringAsFixed(2)})');
         return;
       }
       invoices = lines;
@@ -381,7 +433,8 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
         amount: amt,
         paymentMethodId: _methodId,
         receivedDate: _date.value,
-        reference: _reference.text.trim().isEmpty ? null : _reference.text.trim(),
+        reference:
+            _reference.text.trim().isEmpty ? null : _reference.text.trim(),
         notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
         invoices: invoices,
       );
@@ -404,7 +457,7 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
       child: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -413,14 +466,62 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
                 children: [
                   const Icon(Icons.payments_rounded),
                   const SizedBox(width: 8),
-                  const Text('Record Collection', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                  const Spacer(),
-                  Switch(
-                    value: _invoiceMode,
-                    onChanged: (v) => setState(() => _invoiceMode = v),
+                  const Text('Record Collection',
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  // Left: toggle + label
+                  Row(
+                    children: [
+                      Switch(
+                        value: _invoiceMode,
+                        onChanged: (v) async {
+                          setState(() => _invoiceMode = v);
+                          if (v && _invoices.isEmpty) {
+                            await _loadInvoices();
+                          } else if (v) {
+                            _autoAllocate();
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 4),
+                      const Text('Apply to invoices'),
+                    ],
                   ),
-                  const SizedBox(width: 4),
-                  const Text('Apply to invoices'),
+                  const Spacer(),
+                  // Right: date label + icon + value (tap anywhere to pick)
+                  ValueListenableBuilder<DateTime>(
+                    valueListenable: _date,
+                    builder: (context, d, _) => InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () async {
+                        final now = DateTime.now();
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: d,
+                          firstDate: DateTime(now.year - 5),
+                          lastDate: DateTime(now.year + 5),
+                        );
+                        if (picked != null) _date.value = picked;
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8.0, vertical: 6.0),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.calendar_today_rounded, size: 20),
+                            const SizedBox(width: 8),
+                            Text('${d.toLocal()}'.split(' ').first),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -433,50 +534,69 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
                 },
               ),
               const SizedBox(height: 12),
-              DropdownButtonFormField<int>(
-                value: _methodId,
-                items: _methods
-                    .map((m) => DropdownMenuItem<int>(
-                          value: (m['method_id'] as int?) ?? (m['id'] as int?),
-                          child: Text((m['name'] ?? '').toString()),
-                        ))
-                    .toList(),
-                onChanged: (v) => setState(() => _methodId = v),
-                decoration: const InputDecoration(labelText: 'Payment Method'),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Payment Method'),
+                subtitle: Text(_methodName ?? 'Select'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: _methods.isEmpty
+                    ? null
+                    : () async {
+                        final picked = await showDialog<Map<String, dynamic>>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Select Payment Method'),
+                            content: SizedBox(
+                              width: double.maxFinite,
+                              child: ListView.builder(
+                                shrinkWrap: true,
+                                itemCount: _methods.length,
+                                itemBuilder: (_, i) {
+                                  final m = _methods[i];
+                                  final id = (m['method_id'] as int?) ??
+                                      (m['id'] as int?);
+                                  final name = (m['name'] ?? m['method'] ?? '')
+                                      .toString();
+                                  return RadioListTile<int>(
+                                    value: id ?? -1,
+                                    groupValue: _methodId ?? -1,
+                                    onChanged: (v) => Navigator.of(ctx)
+                                        .pop({'id': id, 'name': name}),
+                                    title: Text(name),
+                                  );
+                                },
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(),
+                                  child: const Text('Cancel')),
+                            ],
+                          ),
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _methodId = picked['id'] as int?;
+                            _methodName = picked['name'] as String?;
+                          });
+                        }
+                      },
               ),
-              const SizedBox(height: 12),
-              ValueListenableBuilder<DateTime>(
-                valueListenable: _date,
-                builder: (context, d, _) => ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Date'),
-                  subtitle: Text('${d.toLocal()}'.split(' ').first),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.calendar_today_rounded),
-                    onPressed: () async {
-                      final now = DateTime.now();
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: d,
-                        firstDate: DateTime(now.year - 5),
-                        lastDate: DateTime(now.year + 5),
-                      );
-                      if (picked != null) _date.value = picked;
-                    },
-                  ),
-                ),
-              ),
-              TextField(controller: _reference, decoration: const InputDecoration(labelText: 'Reference')),
               const SizedBox(height: 8),
-              TextField(controller: _notes, decoration: const InputDecoration(labelText: 'Notes')),
+              TextField(
+                  controller: _notes,
+                  decoration: const InputDecoration(labelText: 'Notes')),
               const SizedBox(height: 8),
               if (_invoiceMode) ...[
                 Row(
                   children: [
-                    const Text('Outstanding Invoices', style: TextStyle(fontWeight: FontWeight.w700)),
+                    const Text('Outstanding Invoices',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
                     const Spacer(),
-                    TextButton.icon(onPressed: _autoAllocate, icon: const Icon(Icons.auto_awesome_rounded), label: const Text('Auto allocate')),
+                    TextButton.icon(
+                        onPressed: _autoAllocate,
+                        icon: const Icon(Icons.auto_awesome_rounded),
+                        label: const Text('Auto allocate')),
                   ],
                 ),
                 const SizedBox(height: 4),
