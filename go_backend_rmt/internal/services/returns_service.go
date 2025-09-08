@@ -10,13 +10,66 @@ import (
 )
 
 type ReturnsService struct {
-	db *sql.DB
+    db *sql.DB
 }
 
 func NewReturnsService() *ReturnsService {
-	return &ReturnsService{
-		db: database.GetDB(),
-	}
+    return &ReturnsService{
+        db: database.GetDB(),
+    }
+}
+
+// FindReturnableSaleForCustomer attempts to find a single completed sale for
+// the given customer within the company that can fully cover the requested
+// return quantities for all provided items. It returns the sale_id to attach
+// the return to. If none is found, an error is returned instructing the caller
+// to specify an invoice.
+func (s *ReturnsService) FindReturnableSaleForCustomer(companyID, customerID int, items []models.CreateSaleReturnItemRequest) (int, error) {
+    // Verify customer belongs to company
+    var cnt int
+    if err := s.db.QueryRow(`SELECT COUNT(*) FROM customers WHERE customer_id=$1 AND company_id=$2 AND is_deleted=FALSE`, customerID, companyID).Scan(&cnt); err != nil {
+        return 0, fmt.Errorf("failed to verify customer: %w", err)
+    }
+    if cnt == 0 {
+        return 0, fmt.Errorf("customer not found")
+    }
+
+    // Candidate sales: most recent first
+    rows, err := s.db.Query(`
+        SELECT s.sale_id
+        FROM sales s
+        JOIN locations l ON s.location_id=l.location_id
+        WHERE l.company_id=$1 AND s.customer_id=$2 AND s.status='COMPLETED' AND s.is_deleted=FALSE
+        ORDER BY s.sale_date DESC, s.created_at DESC, s.sale_id DESC
+    `, companyID, customerID)
+    if err != nil {
+        return 0, fmt.Errorf("failed to query candidate sales: %w", err)
+    }
+    defer rows.Close()
+
+    for rows.Next() {
+        var saleID int
+        if err := rows.Scan(&saleID); err != nil {
+            return 0, fmt.Errorf("failed to scan sale id: %w", err)
+        }
+        // Check if this sale can cover all items
+        ok := true
+        for _, it := range items {
+            valid, err := s.validateReturnItem(saleID, it.ProductID, it.Quantity)
+            if err != nil || !valid {
+                ok = false
+                break
+            }
+        }
+        if ok {
+            return saleID, nil
+        }
+    }
+    if err := rows.Err(); err != nil {
+        return 0, fmt.Errorf("failed to iterate candidate sales: %w", err)
+    }
+
+    return 0, fmt.Errorf("no single invoice can cover requested quantities; please specify an invoice")
 }
 
 func (s *ReturnsService) GetSaleReturns(companyID int, filters map[string]string) ([]models.SaleReturn, error) {

@@ -12,13 +12,60 @@ import (
 )
 
 type ReturnsHandler struct {
-	returnsService *services.ReturnsService
+    returnsService *services.ReturnsService
 }
 
 func NewReturnsHandler() *ReturnsHandler {
-	return &ReturnsHandler{
-		returnsService: services.NewReturnsService(),
-	}
+    return &ReturnsHandler{
+        returnsService: services.NewReturnsService(),
+    }
+}
+// POST /sale-returns/by-customer
+// Allows processing a return when a customer is selected but an invoice number
+// is not provided. The service will locate a single prior sale for the
+// customer that can fully cover the requested return quantities for all items.
+// If no such single sale exists, the call fails instructing the client to
+// specify an invoice.
+func (h *ReturnsHandler) CreateSaleReturnByCustomer(c *gin.Context) {
+    companyID := c.GetInt("company_id")
+    userID := c.GetInt("user_id")
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
+
+    var req struct {
+        CustomerID int                                   `json:"customer_id" validate:"required"`
+        Items      []models.CreateSaleReturnItemRequest `json:"items" validate:"required,min=1"`
+        Reason     *string                               `json:"reason,omitempty"`
+    }
+    if err := c.ShouldBindJSON(&req); err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+        return
+    }
+    if err := utils.ValidateStruct(&req); err != nil {
+        validationErrors := utils.GetValidationErrors(err)
+        utils.ValidationErrorResponse(c, validationErrors)
+        return
+    }
+
+    saleID, err := h.returnsService.FindReturnableSaleForCustomer(companyID, req.CustomerID, req.Items)
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Unable to locate a matching invoice for the return", err)
+        return
+    }
+
+    // Delegate to standard creation against the identified sale
+    saleReturn, err := h.returnsService.CreateSaleReturn(companyID, userID, &models.CreateSaleReturnRequest{
+        SaleID: saleID,
+        Items:  req.Items,
+        Reason: req.Reason,
+    })
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create sale return", err)
+        return
+    }
+    utils.CreatedResponse(c, "Sale return created successfully", saleReturn)
 }
 
 // GET /sale-returns

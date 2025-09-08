@@ -362,9 +362,12 @@ func (h *SalesHandler) GetSalesHistory(c *gin.Context) {
 	if productID := c.Query("product_id"); productID != "" {
 		filters["product_id"] = productID
 	}
-	if paymentMethodID := c.Query("payment_method_id"); paymentMethodID != "" {
-		filters["payment_method_id"] = paymentMethodID
-	}
+    if paymentMethodID := c.Query("payment_method_id"); paymentMethodID != "" {
+        filters["payment_method_id"] = paymentMethodID
+    }
+    if saleNumber := c.Query("sale_number"); saleNumber != "" {
+        filters["sale_number"] = saleNumber
+    }
 
 	sales, err := h.salesService.GetSalesHistory(companyID, filters)
 	if err != nil {

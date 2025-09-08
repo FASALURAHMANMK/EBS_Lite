@@ -324,18 +324,19 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			}
 
 			// Sale Returns routes (separate from sales module for better organization)
-			saleReturns := protected.Group("/sale-returns")
-			saleReturns.Use(middleware.RequireCompanyAccess())
-			{
-				saleReturns.GET("", middleware.RequirePermission("VIEW_RETURNS"), returnsHandler.GetSaleReturns)
-				saleReturns.GET("/:id", middleware.RequirePermission("VIEW_RETURNS"), returnsHandler.GetSaleReturn)
-				saleReturns.POST("", middleware.RequirePermission("CREATE_RETURNS"), returnsHandler.CreateSaleReturn)
-				saleReturns.PUT("/:id", middleware.RequirePermission("UPDATE_RETURNS"), returnsHandler.UpdateSaleReturn)
-				saleReturns.DELETE("/:id", middleware.RequirePermission("DELETE_RETURNS"), returnsHandler.DeleteSaleReturn)
-				saleReturns.GET("/summary", middleware.RequirePermission("VIEW_REPORTS"), returnsHandler.GetReturnsSummary)
-				saleReturns.GET("/search/:sale_id", middleware.RequirePermission("VIEW_RETURNS"), returnsHandler.SearchReturnableSale)
-				saleReturns.POST("/process/:sale_id", middleware.RequirePermission("CREATE_RETURNS"), returnsHandler.ProcessQuickReturn)
-			}
+            saleReturns := protected.Group("/sale-returns")
+            saleReturns.Use(middleware.RequireCompanyAccess())
+            {
+                saleReturns.GET("", middleware.RequirePermission("VIEW_RETURNS"), returnsHandler.GetSaleReturns)
+                saleReturns.GET("/:id", middleware.RequirePermission("VIEW_RETURNS"), returnsHandler.GetSaleReturn)
+                saleReturns.POST("", middleware.RequirePermission("CREATE_RETURNS"), returnsHandler.CreateSaleReturn)
+                saleReturns.POST("/by-customer", middleware.RequirePermission("CREATE_RETURNS"), returnsHandler.CreateSaleReturnByCustomer)
+                saleReturns.PUT("/:id", middleware.RequirePermission("UPDATE_RETURNS"), returnsHandler.UpdateSaleReturn)
+                saleReturns.DELETE("/:id", middleware.RequirePermission("DELETE_RETURNS"), returnsHandler.DeleteSaleReturn)
+                saleReturns.GET("/summary", middleware.RequirePermission("VIEW_REPORTS"), returnsHandler.GetReturnsSummary)
+                saleReturns.GET("/search/:sale_id", middleware.RequirePermission("VIEW_RETURNS"), returnsHandler.SearchReturnableSale)
+                saleReturns.POST("/process/:sale_id", middleware.RequirePermission("CREATE_RETURNS"), returnsHandler.ProcessQuickReturn)
+            }
 
 			// Purchase management routes (require company and location)
 			purchases := protected.Group("/purchases")

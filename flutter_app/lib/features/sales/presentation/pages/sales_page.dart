@@ -3,6 +3,7 @@ import 'package:ebs_lite/shared/widgets/feature_grid.dart';
 import 'package:ebs_lite/shared/pages/feature_detail_page.dart';
 import 'package:ebs_lite/features/pos/presentation/pages/pos_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/sales_history_page.dart';
+import 'package:ebs_lite/features/sales/presentation/pages/sales_returns_page.dart';
 
 class SalesPage extends StatelessWidget {
   const SalesPage({super.key});
@@ -38,7 +39,7 @@ class SalesPage extends StatelessWidget {
         label: 'Returns',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
-              builder: (_) => const FeatureDetailPage(title: 'Returns')),
+              builder: (_) => const SalesReturnsPage()),
         ),
       ),
       FeatureItem(

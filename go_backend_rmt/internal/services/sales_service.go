@@ -900,11 +900,16 @@ func (s *SalesService) GetSalesHistory(companyID int, filters map[string]string)
 		query += fmt.Sprintf(" AND s.payment_method_id = $%d", argCount)
 		args = append(args, paymentMethodID)
 	}
-	if productID := filters["product_id"]; productID != "" {
-		argCount++
-		query += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM sale_details sd WHERE sd.sale_id = s.sale_id AND sd.product_id = $%d)", argCount)
-		args = append(args, productID)
-	}
+    if productID := filters["product_id"]; productID != "" {
+        argCount++
+        query += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM sale_details sd WHERE sd.sale_id = s.sale_id AND sd.product_id = $%d)", argCount)
+        args = append(args, productID)
+    }
+    if saleNumber := filters["sale_number"]; saleNumber != "" {
+        argCount++
+        query += fmt.Sprintf(" AND s.sale_number ILIKE '%%' || $%d || '%%'", argCount)
+        args = append(args, saleNumber)
+    }
 
 	query += " ORDER BY s.created_at DESC"
 

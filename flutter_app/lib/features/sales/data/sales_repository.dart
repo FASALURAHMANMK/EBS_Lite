@@ -29,6 +29,7 @@ class SalesRepository {
     int? customerId,
     int? paymentMethodId,
     int? productId,
+    String? saleNumber,
   }) async {
     final qp = <String, dynamic>{};
     if (dateFrom != null && dateFrom.isNotEmpty) qp['date_from'] = dateFrom;
@@ -36,6 +37,7 @@ class SalesRepository {
     if (customerId != null) qp['customer_id'] = customerId;
     if (paymentMethodId != null) qp['payment_method_id'] = paymentMethodId;
     if (productId != null) qp['product_id'] = productId;
+    if (saleNumber != null && saleNumber.isNotEmpty) qp['sale_number'] = saleNumber;
     final res = await _dio.get('/sales/history', queryParameters: qp.isEmpty ? null : qp);
     final data = _extractList(res);
     return data.cast<Map<String, dynamic>>();
@@ -67,6 +69,48 @@ class SalesRepository {
     return body;
   }
 
+  Future<Map<String, dynamic>> getReturnableForSale(int saleId) async {
+    final res = await _dio.get('/sale-returns/search/$saleId');
+    final body = res.data is Map && (res.data['data'] != null)
+        ? res.data['data'] as Map<String, dynamic>
+        : res.data as Map<String, dynamic>;
+    return body;
+  }
+
+  Future<int> createSaleReturn({
+    required int saleId,
+    required List<Map<String, dynamic>> items, // {product_id, quantity, unit_price}
+    String? reason,
+  }) async {
+    final payload = <String, dynamic>{
+      'sale_id': saleId,
+      'items': items,
+      if (reason != null && reason.isNotEmpty) 'reason': reason,
+    };
+    final res = await _dio.post('/sale-returns', data: payload);
+    final body = res.data is Map && (res.data['data'] != null)
+        ? res.data['data'] as Map<String, dynamic>
+        : res.data as Map<String, dynamic>;
+    return (body['return_id'] as int?) ?? (body['returnId'] as int? ?? 0);
+  }
+
+  Future<int> createSaleReturnByCustomer({
+    required int customerId,
+    required List<Map<String, dynamic>> items,
+    String? reason,
+  }) async {
+    final payload = <String, dynamic>{
+      'customer_id': customerId,
+      'items': items,
+      if (reason != null && reason.isNotEmpty) 'reason': reason,
+    };
+    final res = await _dio.post('/sale-returns/by-customer', data: payload);
+    final body = res.data is Map && (res.data['data'] != null)
+        ? res.data['data'] as Map<String, dynamic>
+        : res.data as Map<String, dynamic>;
+    return (body['return_id'] as int?) ?? (body['returnId'] as int? ?? 0);
+  }
+
   Future<Map<String, dynamic>> getSalesSummary({String? dateFrom, String? dateTo}) async {
     final qp = <String, dynamic>{};
     final loc = _locationId;
@@ -85,4 +129,3 @@ final salesRepositoryProvider = Provider<SalesRepository>((ref) {
   final dio = ref.watch(dioProvider);
   return SalesRepository(dio, ref);
 });
-
