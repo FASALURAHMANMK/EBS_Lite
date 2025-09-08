@@ -67,23 +67,15 @@ class CustomerRepository {
   }
 
   Future<List<Map<String, dynamic>>> getOutstandingInvoices({required int customerId}) async {
-    // Fetch sales for this customer and let the UI compute outstanding
-    final qp = <String, dynamic>{'customer_id': customerId, 'status': 'COMPLETED'};
-    final loc = _locationId;
-    if (loc != null) qp['location_id'] = loc;
-    final res = await _dio.get('/sales', queryParameters: qp);
+    // Use history endpoint (no location requirement) and compute outstanding client-side
+    final qp = <String, dynamic>{'customer_id': customerId};
+    final res = await _dio.get('/sales/history', queryParameters: qp);
     final data = _extractList(res);
     return data.cast<Map<String, dynamic>>();
   }
 
   Future<List<Map<String, dynamic>>> getPaymentMethods() async {
-    try {
-      final res = await _dio.get('/pos/payment-methods');
-      final data = _extractList(res);
-      if (data.isNotEmpty) return data.cast<Map<String, dynamic>>();
-    } catch (_) {
-      // fallback below
-    }
+    // Use company-defined payment methods
     final res = await _dio.get('/settings/payment-methods');
     final data = _extractList(res);
     return data.cast<Map<String, dynamic>>();
@@ -107,10 +99,11 @@ class CustomerRepository {
       if (notes != null && notes.isNotEmpty) 'notes': notes,
       if (invoices != null && invoices.isNotEmpty) 'invoices': invoices,
     };
-    final qp = <String, dynamic>{};
     final loc = _locationId;
-    if (loc != null) qp['location_id'] = loc;
-    final res = await _dio.post('/collections', data: payload, queryParameters: qp.isEmpty ? null : qp);
+    if (loc == null) {
+      throw StateError('Location not selected');
+    }
+    final res = await _dio.post('/collections', data: payload, queryParameters: {'location_id': loc});
     final body = res.data is Map && (res.data['data'] != null)
         ? res.data['data'] as Map<String, dynamic>
         : res.data as Map<String, dynamic>;
