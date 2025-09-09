@@ -106,8 +106,8 @@ func (s *DashboardService) GetMetrics(companyID, locationID int) (*models.Dashbo
 
 // GetQuickActionCounts returns counts for quick actions on dashboard
 func (s *DashboardService) GetQuickActionCounts(companyID, locationID int) (*models.QuickActionCounts, error) {
-	counts := &models.QuickActionCounts{}
-	today := time.Now().Format("2006-01-02")
+    counts := &models.QuickActionCounts{}
+    today := time.Now().Format("2006-01-02")
 
 	// Sales today
 	if err := s.db.QueryRow(`
@@ -139,15 +139,25 @@ func (s *DashboardService) GetQuickActionCounts(companyID, locationID int) (*mod
 		return nil, fmt.Errorf("failed to get collections count: %w", err)
 	}
 
-	// Payments today
-	if err := s.db.QueryRow(`
+    // Payments today
+    if err := s.db.QueryRow(`
                SELECT COUNT(*)
                FROM vouchers v
                JOIN locations l ON v.location_id = l.location_id
                WHERE l.company_id = $1 AND v.location_id = $2 AND v.date = $3 AND v.type = 'PAYMENT' AND v.is_deleted = FALSE`,
-		companyID, locationID, today).Scan(&counts.PaymentsToday); err != nil {
-		return nil, fmt.Errorf("failed to get payments count: %w", err)
-	}
+        companyID, locationID, today).Scan(&counts.PaymentsToday); err != nil {
+        return nil, fmt.Errorf("failed to get payments count: %w", err)
+    }
+
+    // Expenses today
+    if err := s.db.QueryRow(`
+               SELECT COUNT(*)
+               FROM expenses e
+               JOIN locations l ON e.location_id = l.location_id
+               WHERE l.company_id = $1 AND e.location_id = $2 AND e.expense_date = $3 AND e.is_deleted = FALSE`,
+        companyID, locationID, today).Scan(&counts.ExpensesToday); err != nil {
+        return nil, fmt.Errorf("failed to get expenses count: %w", err)
+    }
 
 	// Receipts today
 	if err := s.db.QueryRow(`

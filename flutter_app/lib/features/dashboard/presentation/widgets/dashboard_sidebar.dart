@@ -1,4 +1,3 @@
-// lib/dashboard/presentation/dashboard_sidebar.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -105,15 +104,18 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
-                  _section(context, Icons.account_balance_wallet_rounded, 'Accounts', const [
-                    'Cash Register', 'Day Open/Close', 'Vouchers', 'Ledgers', 'Audit'
+                  _section(context, Icons.account_balance_wallet_rounded,
+                      'Accounts', const [
+                    'Cash Register',
+                    'Day Open/Close',
+                    'Vouchers',
+                    'Ledgers',
+                    'Audit'
                   ]),
-                  _section(context, Icons.group_rounded, 'HR', const [
-                    'Attendance Register', 'Payroll Management'
-                  ]),
-                  _section(context, Icons.bar_chart_rounded, 'Reports', const [
-                    'Sales', 'Purchase', 'Accounts', 'Inventory'
-                  ]),
+                  _section(context, Icons.group_rounded, 'HR',
+                      const ['Attendance Register', 'Payroll Management']),
+                  _section(context, Icons.bar_chart_rounded, 'Reports',
+                      const ['Sales', 'Purchase', 'Accounts', 'Inventory']),
                   const Divider(height: 24),
                   _item(context, Icons.settings_rounded, 'Settings'),
                   const Divider(height: 24),
@@ -158,9 +160,7 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                         ),
                       );
                       if (confirm == true) {
-                        await ref
-                            .read(authNotifierProvider.notifier)
-                            .logout();
+                        await ref.read(authNotifierProvider.notifier).logout();
                       }
                     },
                   ),
@@ -198,8 +198,8 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
     );
   }
 
-  Widget _section(
-      BuildContext context, IconData icon, String title, List<String> children) {
+  Widget _section(BuildContext context, IconData icon, String title,
+      List<String> children) {
     final theme = Theme.of(context);
     return Theme(
       data: theme.copyWith(dividerColor: Colors.transparent),
@@ -211,8 +211,8 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
         children: children
             .map(
               (label) => ListTile(
-                leading:
-                    const SizedBox(width: 24, child: Icon(Icons.circle, size: 6)),
+                leading: const SizedBox(
+                    width: 24, child: Icon(Icons.circle, size: 6)),
                 title: Text(label),
                 dense: true,
                 visualDensity: VisualDensity.compact,

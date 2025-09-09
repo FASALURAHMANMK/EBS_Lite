@@ -2,12 +2,14 @@ class DashboardMetrics {
   final double creditOutstanding;
   final double inventoryValue;
   final double todaySales;
+  final double todayPurchases;
   final double dailyCashSummary;
 
   DashboardMetrics({
     required this.creditOutstanding,
     required this.inventoryValue,
     required this.todaySales,
+    required this.todayPurchases,
     required this.dailyCashSummary,
   });
 
@@ -16,6 +18,8 @@ class DashboardMetrics {
         (json['credit_outstanding'] as num?)?.toDouble() ?? 0;
     final inventoryValue = (json['inventory_value'] as num?)?.toDouble() ?? 0;
     final todaySales = (json['today_sales'] as num?)?.toDouble() ?? 0;
+    final todayPurchases =
+        (json['today_purchases'] as num?)?.toDouble() ?? 0;
 
     // Backend exposes cash_in and cash_out. If daily_cash_summary is not
     // present, compute it as (cash_in - cash_out).
@@ -29,6 +33,7 @@ class DashboardMetrics {
       creditOutstanding: creditOutstanding,
       inventoryValue: inventoryValue,
       todaySales: todaySales,
+      todayPurchases: todayPurchases,
       dailyCashSummary: dailyCashSummary,
     );
   }
@@ -49,13 +54,14 @@ class QuickActionCounts {
 
   factory QuickActionCounts.fromJson(Map<String, dynamic> json) {
     // Map from backend fields: sales_today, purchases_today, collections_today,
-    // and use payments_today as a proxy for expenses (UI currently not using it).
+    // Prefer expenses_today; fallback to payments_today for legacy support.
     final sales = json['sales_today'] as int? ?? json['sales'] as int? ?? 0;
     final purchases =
         json['purchases_today'] as int? ?? json['purchases'] as int? ?? 0;
     final collections = json['collections_today'] as int? ??
         json['collections'] as int? ?? 0;
-    final expenses = json['payments_today'] as int? ?? json['expenses'] as int? ?? 0;
+    final expenses = json['expenses_today'] as int? ??
+        json['payments_today'] as int? ?? json['expenses'] as int? ?? 0;
 
     return QuickActionCounts(
       sales: sales,

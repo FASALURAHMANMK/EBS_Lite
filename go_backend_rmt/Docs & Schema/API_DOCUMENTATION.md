@@ -275,6 +275,7 @@ Standard `APIResponse` with fields:
     - sales_today (int)
     - purchases_today (int)
     - collections_today (int)
+    - expenses_today (int)
     - payments_today (int)
     - receipts_today (int)
     - journals_today (int)

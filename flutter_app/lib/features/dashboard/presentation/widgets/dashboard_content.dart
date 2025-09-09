@@ -1,4 +1,3 @@
-// lib/dashboard/presentation/dashboard_content.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -86,6 +85,13 @@ class DashboardContent extends ConsumerWidget {
                 color: Colors.orange,
               ),
               StatCard(
+                icon: Icons.shopping_bag_rounded,
+                title: "Today's Purchases",
+                value: _fmt(metrics?.todayPurchases),
+                subtitle: 'Supplier orders',
+                color: Colors.purple,
+              ),
+              StatCard(
                 icon: Icons.attach_money_rounded,
                 title: 'Daily Cash Summary',
                 value: _fmt(metrics?.dailyCashSummary),
@@ -112,79 +118,13 @@ class DashboardContent extends ConsumerWidget {
             height: 280,
             child: FeatureGrid(
               items: const [
-                FeatureItem(icon: Icons.point_of_sale_rounded, label: 'New Sale'),
-                FeatureItem(icon: Icons.description_rounded, label: 'Purchase Order'),
-                FeatureItem(icon: Icons.inventory_2_rounded, label: 'Inventory View'),
-                FeatureItem(icon: Icons.people_alt_rounded, label: 'Customer View'),
-                FeatureItem(icon: Icons.point_of_sale_rounded, label: 'Cash Register'),
-                FeatureItem(icon: Icons.bar_chart_rounded, label: 'Reports'),
+                FeatureItem(
+                    icon: Icons.point_of_sale_rounded, label: 'New Sale'),
+                FeatureItem(icon: Icons.inventory_2_rounded, label: 'Products'),
+                FeatureItem(icon: Icons.people_alt_rounded, label: 'Customers'),
+                FeatureItem(
+                    icon: Icons.point_of_sale_rounded, label: 'Cash Register'),
               ],
-            ),
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          sliver: SliverToBoxAdapter(
-            child: Card(
-              elevation: 0,
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Recent Activity',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 12),
-                    ...List.generate(3, (i) {
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withOpacity(.15),
-                          child: Icon(
-                            i == 0
-                                ? Icons.point_of_sale_rounded
-                                : i == 1
-                                    ? Icons.description_rounded
-                                    : Icons.inventory_2_rounded,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                        title: Text(
-                          i == 0
-                              ? 'New sale created'
-                              : i == 1
-                                  ? 'PO approved'
-                                  : 'Stock adjusted',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyLarge
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: Text(
-                          '2h ago · by Admin',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant),
-                        ),
-                      );
-                    })
-                  ],
-                ),
-              ),
             ),
           ),
         ),
