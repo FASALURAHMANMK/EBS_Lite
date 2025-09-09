@@ -89,15 +89,19 @@ class CustomerRepository {
     String? reference,
     String? notes,
     List<Map<String, dynamic>>? invoices, // [{sale_id, amount}]
+    bool skipAutoAllocation = false,
   }) async {
     final payload = <String, dynamic>{
       'customer_id': customerId,
       'amount': amount,
       if (paymentMethodId != null) 'payment_method_id': paymentMethodId,
       if (receivedDate != null) 'received_date': receivedDate.toIso8601String().split('T').first,
+      // Backend expects 'reference' (maps to reference_number column)
       if (reference != null && reference.isNotEmpty) 'reference': reference,
       if (notes != null && notes.isNotEmpty) 'notes': notes,
       if (invoices != null && invoices.isNotEmpty) 'invoices': invoices,
+      if (invoices == null || invoices.isEmpty)
+        'skip_allocation': skipAutoAllocation,
     };
     final loc = _locationId;
     if (loc == null) {

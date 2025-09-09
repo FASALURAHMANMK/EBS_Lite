@@ -5,6 +5,7 @@ import '../../data/models.dart';
 import '../../data/customer_repository.dart';
 import 'customer_edit_page.dart';
 import '../../../loyalty/data/loyalty_repository.dart';
+import '../../../../core/error_handler.dart';
 
 class CustomerDetailPage extends ConsumerStatefulWidget {
   const CustomerDetailPage({super.key, required this.customerId});
@@ -311,9 +312,10 @@ extension on num {
 }
 
 void _showError(BuildContext context, Object e) {
+  final msg = ErrorHandler.message(e);
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(e.toString())));
+    ..showSnackBar(SnackBar(content: Text(msg)));
 }
 
 void _showInfo(BuildContext context, String m) {
@@ -490,6 +492,7 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
             _reference.text.trim().isEmpty ? null : _reference.text.trim(),
         notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
         invoices: invoices,
+        skipAutoAllocation: !_invoiceMode,
       );
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -635,6 +638,11 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
                         }
                       },
               ),
+              const SizedBox(height: 8),
+              // Optional reference to help reconcile (e.g., cheque no., bank txn)
+              TextField(
+                  controller: _reference,
+                  decoration: const InputDecoration(labelText: 'Reference')),
               const SizedBox(height: 8),
               TextField(
                   controller: _notes,

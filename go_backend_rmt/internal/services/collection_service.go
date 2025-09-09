@@ -176,7 +176,7 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
         return nil
     }
 
-    // Link invoices if provided, otherwise auto-allocate FIFO to outstanding invoices
+    // Link invoices if provided
     if len(req.Invoices) > 0 {
         for _, inv := range req.Invoices {
             if err := applyToSale(inv.SaleID, inv.Amount); err != nil {
@@ -184,6 +184,11 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
             }
         }
     } else {
+        // Optionally skip auto-allocation when requested
+        if req.SkipAllocation != nil && *req.SkipAllocation {
+            // No invoice links created; collection recorded as on-account
+            // Caller may reconcile later.
+        } else {
         // Auto-allocation across outstanding invoices for this customer (oldest first)
         remaining := req.Amount
         rows, err := tx.Query(`
@@ -216,6 +221,7 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
         }
         if err := rows.Err(); err != nil {
             return nil, fmt.Errorf("failed to iterate outstanding invoices: %w", err)
+        }
         }
     }
 
