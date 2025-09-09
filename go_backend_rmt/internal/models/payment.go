@@ -19,3 +19,15 @@ type Payment struct {
     SyncModel
 }
 
+// CreatePaymentRequest defines payload for recording a supplier payment
+// Location and created_by are derived from context and not required in the request
+// PaymentDate maps to payment_date in the database
+type CreatePaymentRequest struct {
+    SupplierID      *int    `json:"supplier_id,omitempty"`
+    PurchaseID      *int    `json:"purchase_id,omitempty"`
+    Amount          float64 `json:"amount" validate:"required,gt=0"`
+    PaymentMethodID *int    `json:"payment_method_id,omitempty"`
+    PaymentDate     *string `json:"payment_date,omitempty"`
+    ReferenceNumber *string `json:"reference_number,omitempty"`
+    Notes           *string `json:"notes,omitempty"`
+}

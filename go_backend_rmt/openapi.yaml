@@ -2442,6 +2442,30 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
+  /payments:
+    get:
+      summary: GET /api/v1/payments
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+    post:
+      summary: POST /api/v1/payments
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
   /expenses:
     get:
       summary: GET /api/v1/expenses

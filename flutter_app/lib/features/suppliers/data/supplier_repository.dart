@@ -74,6 +74,55 @@ class SupplierRepository {
     return data.map((e) => SupplierPaymentDto.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  Future<List<Map<String, dynamic>>> getOutstandingPurchases({required int supplierId}) async {
+    final loc = _locationId;
+    if (loc == null) {
+      throw StateError('Location not selected');
+    }
+    final qp = <String, dynamic>{
+      'supplier_id': supplierId,
+      'location_id': loc,
+    };
+    final res = await _dio.get('/purchases/history', queryParameters: qp);
+    final data = _extractList(res);
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> getPaymentMethods() async {
+    final res = await _dio.get('/settings/payment-methods');
+    final data = _extractList(res);
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  Future<int> createPayment({
+    int? supplierId,
+    int? purchaseId,
+    required double amount,
+    int? paymentMethodId,
+    DateTime? paymentDate,
+    String? reference,
+    String? notes,
+  }) async {
+    final loc = _locationId;
+    if (loc == null) {
+      throw StateError('Location not selected');
+    }
+    final payload = <String, dynamic>{
+      'amount': amount,
+      if (supplierId != null) 'supplier_id': supplierId,
+      if (purchaseId != null) 'purchase_id': purchaseId,
+      if (paymentMethodId != null) 'payment_method_id': paymentMethodId,
+      if (paymentDate != null) 'payment_date': paymentDate.toIso8601String().split('T').first,
+      if (reference != null && reference.isNotEmpty) 'reference_number': reference,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+    };
+    final res = await _dio.post('/payments', data: payload, queryParameters: {'location_id': loc});
+    final body = res.data is Map && (res.data['data'] != null)
+        ? res.data['data'] as Map<String, dynamic>
+        : res.data as Map<String, dynamic>;
+    return (body['payment_id'] as int?) ?? 0;
+  }
+
   Future<SupplierDto> createSupplier({required String name, String? contact, String? phone, String? email, String? address, int? paymentTerms, double? creditLimit}) async {
     final body = <String, dynamic>{'name': name};
     if (contact != null) body['contact_person'] = contact;
@@ -107,4 +156,3 @@ final supplierRepositoryProvider = Provider<SupplierRepository>((ref) {
   final dio = ref.watch(dioProvider);
   return SupplierRepository(dio, ref);
 });
-

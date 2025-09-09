@@ -540,6 +540,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
             payments.Use(middleware.RequireCompanyAccess())
             {
                 payments.GET("", middleware.RequirePermission("VIEW_PURCHASES"), paymentHandler.GetPayments)
+                payments.POST("", middleware.RequirePermission("CREATE_PURCHASES"), paymentHandler.CreatePayment)
             }
 
 			// Currency routes
