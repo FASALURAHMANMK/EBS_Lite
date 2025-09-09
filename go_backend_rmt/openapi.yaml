@@ -154,6 +154,13 @@ paths:
   /dashboard/metrics:
     get:
       summary: GET /api/v1/dashboard/metrics
+      parameters:
+        - in: query
+          name: location_id
+          required: false
+          schema:
+            type: integer
+          description: Optional location scope. If omitted, aggregates across all company locations.
       responses:
         '200':
           description: Successful response
@@ -164,6 +171,13 @@ paths:
   /dashboard/quick-actions:
     get:
       summary: GET /api/v1/dashboard/quick-actions
+      parameters:
+        - in: query
+          name: location_id
+          required: false
+          schema:
+            type: integer
+          description: Optional location scope. If omitted, aggregates across all company locations.
       responses:
         '200':
           description: Successful response
