@@ -45,7 +45,7 @@ func main() {
 	routes.Initialize(router, cfg)
 
 	// Start server
-	port := os.Getenv("PORT")
+	port := os.Getenv("S_PORT")
 	if port == "" {
 		port = "8080"
 	}

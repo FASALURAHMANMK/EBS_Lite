@@ -305,12 +305,23 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			}
 
 			// Loyalty Settings and Award Points
-			loyaltyGeneral := protected.Group("/loyalty")
-			loyaltyGeneral.Use(middleware.RequireCompanyAccess())
-			{
-				loyaltyGeneral.GET("/settings", middleware.RequirePermission("VIEW_LOYALTY"), loyaltyHandler.GetLoyaltySettings)
-				loyaltyGeneral.POST("/award-points", middleware.RequirePermission("AWARD_POINTS"), loyaltyHandler.AwardPoints)
-			}
+            loyaltyGeneral := protected.Group("/loyalty")
+            loyaltyGeneral.Use(middleware.RequireCompanyAccess())
+            {
+                loyaltyGeneral.GET("/settings", middleware.RequirePermission("VIEW_LOYALTY"), loyaltyHandler.GetLoyaltySettings)
+                loyaltyGeneral.PUT("/settings", middleware.RequirePermission("MANAGE_SETTINGS"), loyaltyHandler.UpdateLoyaltySettings)
+                loyaltyGeneral.POST("/award-points", middleware.RequirePermission("AWARD_POINTS"), loyaltyHandler.AwardPoints)
+            }
+
+            // Loyalty tiers
+            tiers := protected.Group("/loyalty/tiers")
+            tiers.Use(middleware.RequireCompanyAccess())
+            {
+                tiers.GET("", middleware.RequirePermission("VIEW_LOYALTY"), loyaltyHandler.GetTiers)
+                tiers.POST("", middleware.RequirePermission("MANAGE_SETTINGS"), loyaltyHandler.CreateTier)
+                tiers.PUT("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), loyaltyHandler.UpdateTier)
+                tiers.DELETE("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), loyaltyHandler.DeleteTier)
+            }
 
 			// Promotions routes
 			promotions := protected.Group("/promotions")

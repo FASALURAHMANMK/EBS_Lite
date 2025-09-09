@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
-import 'package:ebs_lite/shared/pages/feature_detail_page.dart';
+import 'loyalty_management_page.dart';
 import 'customer_management_page.dart';
 
 class CustomersPage extends StatelessWidget {
@@ -17,21 +17,10 @@ class CustomersPage extends StatelessWidget {
         ),
       ),
       FeatureItem(
-        icon: Icons.payments_rounded,
-        label: 'Credit Collection Entry',
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-              builder: (_) =>
-                  const FeatureDetailPage(title: 'Credit Collection Entry')),
-        ),
-      ),
-      FeatureItem(
         icon: Icons.loyalty_rounded,
         label: 'Loyalty Management',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-              builder: (_) =>
-                  const FeatureDetailPage(title: 'Loyalty Management')),
+          MaterialPageRoute(builder: (_) => const LoyaltyManagementPage()),
         ),
       ),
     ];

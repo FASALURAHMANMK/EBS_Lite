@@ -547,16 +547,16 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 	_ = ledgerService.RecordSale(companyID, saleID, totalAmount, userID)
 
 	// Award loyalty points if customer is provided (async operation)
-	if req.CustomerID != nil {
-		go func() {
-			loyaltyService := NewLoyaltyService()
-			err := loyaltyService.AwardPoints(*req.CustomerID, totalAmount, saleID)
-			if err != nil {
-				// Log error but don't fail the sale
-				fmt.Printf("Warning: Failed to award loyalty points for sale %d: %v\n", saleID, err)
-			}
-		}()
-	}
+    if req.CustomerID != nil {
+        go func() {
+            loyaltyService := NewLoyaltyService()
+            err := loyaltyService.AwardPoints(companyID, *req.CustomerID, totalAmount, saleID)
+            if err != nil {
+                // Log error but don't fail the sale
+                fmt.Printf("Warning: Failed to award loyalty points for sale %d: %v\n", saleID, err)
+            }
+        }()
+    }
 
 	// Return created sale
 	return s.GetSaleByID(saleID, companyID)

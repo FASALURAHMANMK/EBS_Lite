@@ -118,6 +118,7 @@ class CustomerRepository {
     String? taxNumber,
     int? paymentTerms,
     double? creditLimit,
+    bool isLoyalty = false,
   }) async {
     final body = <String, dynamic>{'name': name};
     if (phone != null) body['phone'] = phone;
@@ -126,6 +127,7 @@ class CustomerRepository {
     if (taxNumber != null) body['tax_number'] = taxNumber;
     if (paymentTerms != null) body['payment_terms'] = paymentTerms;
     if (creditLimit != null) body['credit_limit'] = creditLimit;
+    body['is_loyalty'] = isLoyalty;
     final res = await _dio.post('/customers', data: body);
     final bodyRes = res.data is Map<String, dynamic> ? res.data['data'] : res.data;
     return CustomerDto.fromJson(bodyRes as Map<String, dynamic>);
@@ -140,6 +142,7 @@ class CustomerRepository {
     String? taxNumber,
     int? paymentTerms,
     double? creditLimit,
+    bool? isLoyalty,
     bool? isActive,
   }) async {
     final body = <String, dynamic>{};
@@ -150,6 +153,7 @@ class CustomerRepository {
     if (taxNumber != null) body['tax_number'] = taxNumber;
     if (paymentTerms != null) body['payment_terms'] = paymentTerms;
     if (creditLimit != null) body['credit_limit'] = creditLimit;
+    if (isLoyalty != null) body['is_loyalty'] = isLoyalty;
     if (isActive != null) body['is_active'] = isActive;
     final res = await _dio.put('/customers/$customerId', data: body);
     final bodyRes = res.data is Map<String, dynamic> ? res.data['data'] : res.data;

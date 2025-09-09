@@ -23,6 +23,7 @@ class _CustomerEditPageState extends ConsumerState<CustomerEditPage> {
   final _terms = TextEditingController();
   final _credit = TextEditingController();
   bool _active = true;
+  bool _isLoyalty = false;
 
   @override
   void initState() {
@@ -43,6 +44,7 @@ class _CustomerEditPageState extends ConsumerState<CustomerEditPage> {
       _terms.text = cust.paymentTerms.toString();
       _credit.text = cust.creditLimit.toString();
       _active = cust.isActive;
+      _isLoyalty = cust.isLoyalty;
       _loading = false;
     });
   }
@@ -72,6 +74,7 @@ class _CustomerEditPageState extends ConsumerState<CustomerEditPage> {
         taxNumber: _tax.text.trim().isEmpty ? null : _tax.text.trim(),
         paymentTerms: int.tryParse(_terms.text.trim()),
         creditLimit: double.tryParse(_credit.text.trim()),
+        isLoyalty: _isLoyalty,
         isActive: _active,
       );
       if (!mounted) return;
@@ -107,6 +110,7 @@ class _CustomerEditPageState extends ConsumerState<CustomerEditPage> {
                 ]),
                 const SizedBox(height: 8),
                 SwitchListTile(value: _active, onChanged: (v) => setState(() => _active = v), title: const Text('Active')),
+                SwitchListTile(value: _isLoyalty, onChanged: (v) => setState(() => _isLoyalty = v), title: const Text('Enroll in loyalty')),
                 const SizedBox(height: 12),
                 FilledButton.icon(onPressed: _saving ? null : _save, icon: const Icon(Icons.save_rounded), label: const Text('Save')),
               ],

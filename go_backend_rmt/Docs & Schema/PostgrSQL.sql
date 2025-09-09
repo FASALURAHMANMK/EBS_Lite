@@ -2060,6 +2060,7 @@ CREATE TABLE IF NOT EXISTS loyalty_settings (
     points_per_currency NUMERIC(5,2) DEFAULT 1.0, -- Points earned per currency unit
     point_value NUMERIC(5,4) DEFAULT 0.01, -- Value of each point in currency
     min_redemption_points INTEGER DEFAULT 100, -- Minimum points required to redeem
+    min_points_reserve INTEGER DEFAULT 0, -- Minimum points to keep (not redeemable)
     points_expiry_days INTEGER DEFAULT 365, -- Days after which points expire
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -2148,12 +2149,6 @@ CREATE TRIGGER update_credit_notes_updated_at
     BEFORE UPDATE ON credit_notes 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Insert default loyalty settings for existing companies
-INSERT INTO loyalty_settings (company_id, points_per_currency, point_value, min_redemption_points, points_expiry_days)
-SELECT company_id, 1.0, 0.01, 100, 365
-FROM companies
-WHERE company_id NOT IN (SELECT company_id FROM loyalty_settings)
-ON CONFLICT (company_id) DO NOTHING;
 
 -- Insert default return reasons
 INSERT INTO return_reasons (company_id, name, description, requires_approval) 
@@ -2548,3 +2543,52 @@ CREATE TABLE IF NOT EXISTS sale_payments (
 );
 CREATE INDEX IF NOT EXISTS idx_sale_payments_sale ON sale_payments(sale_id);
 CREATE INDEX IF NOT EXISTS idx_sale_payments_method ON sale_payments(method_id);
+
+-- loyalty additions
+-- Insert default loyalty settings for existing companies
+INSERT INTO loyalty_settings (company_id, points_per_currency, point_value, min_redemption_points, points_expiry_days)
+SELECT company_id, 1.0, 0.01, 100, 365
+FROM companies
+WHERE company_id NOT IN (SELECT company_id FROM loyalty_settings)
+ON CONFLICT (company_id) DO NOTHING;
+
+-- Loyalty Tiers: define tiers like Silver/Gold/Platinum with minimum points
+CREATE TABLE IF NOT EXISTS loyalty_tiers (
+    tier_id SERIAL PRIMARY KEY,
+    company_id INTEGER NOT NULL REFERENCES companies(company_id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    min_points NUMERIC(10,2) NOT NULL DEFAULT 0,
+    points_per_currency NUMERIC(10,2), -- optional per-tier earn ratio (points per 1 currency)
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(company_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_loyalty_tiers_company ON loyalty_tiers(company_id, is_active);
+
+-- Ensure customers table has foreign key only after tier table exists
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name='customers' AND column_name='loyalty_tier_id'
+    ) THEN
+        ALTER TABLE customers ADD COLUMN loyalty_tier_id INTEGER REFERENCES loyalty_tiers(tier_id);
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name='customers' AND column_name='is_loyalty'
+    ) THEN
+        ALTER TABLE customers ADD COLUMN is_loyalty BOOLEAN DEFAULT FALSE;
+    END IF;
+END $$;
+
+-- Add per-tier earn ratio column if missing
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name='loyalty_tiers' AND column_name='points_per_currency'
+    ) THEN
+        ALTER TABLE loyalty_tiers ADD COLUMN points_per_currency NUMERIC(10,2);
+    END IF;
+END $$;

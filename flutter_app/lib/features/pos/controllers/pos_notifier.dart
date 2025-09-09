@@ -180,6 +180,7 @@ class PosNotifier extends StateNotifier<PosState> {
     required int? paymentMethodId,
     required double paidAmount,
     List<PosPaymentLineDto>? payments,
+    double? redeemPoints,
   }) async {
     final result = await _repo.checkout(
       customerId: state.customer?.customerId,
@@ -189,6 +190,7 @@ class PosNotifier extends StateNotifier<PosState> {
       discountAmount: state.discount,
       saleId: state.activeSaleId,
       payments: payments,
+      redeemPoints: redeemPoints,
     );
     final nextPreview = await _repo.getNextReceiptPreview();
     state = state.copyWith(

@@ -72,21 +72,47 @@ type CreateReturnReasonRequest struct {
 
 // Enhanced Loyalty Models
 type LoyaltySettings struct {
-	SettingID           int     `json:"setting_id" db:"setting_id"`
-	CompanyID           int     `json:"company_id" db:"company_id"`
-	PointsPerCurrency   float64 `json:"points_per_currency" db:"points_per_currency"`
-	PointValue          float64 `json:"point_value" db:"point_value"`
-	MinRedemptionPoints int     `json:"min_redemption_points" db:"min_redemption_points"`
-	PointsExpiryDays    int     `json:"points_expiry_days" db:"points_expiry_days"`
-	IsActive            bool    `json:"is_active" db:"is_active"`
-	BaseModel
+    SettingID           int     `json:"setting_id" db:"setting_id"`
+    CompanyID           int     `json:"company_id" db:"company_id"`
+    PointsPerCurrency   float64 `json:"points_per_currency" db:"points_per_currency"`
+    PointValue          float64 `json:"point_value" db:"point_value"`
+    MinRedemptionPoints int     `json:"min_redemption_points" db:"min_redemption_points"`
+    MinPointsReserve    int     `json:"min_points_reserve" db:"min_points_reserve"`
+    PointsExpiryDays    int     `json:"points_expiry_days" db:"points_expiry_days"`
+    IsActive            bool    `json:"is_active" db:"is_active"`
+    BaseModel
 }
 
 type UpdateLoyaltySettingsRequest struct {
-	PointsPerCurrency   *float64 `json:"points_per_currency,omitempty" validate:"omitempty,gt=0"`
-	PointValue          *float64 `json:"point_value,omitempty" validate:"omitempty,gt=0"`
-	MinRedemptionPoints *int     `json:"min_redemption_points,omitempty" validate:"omitempty,gt=0"`
-	PointsExpiryDays    *int     `json:"points_expiry_days,omitempty" validate:"omitempty,gt=0"`
+    PointsPerCurrency   *float64 `json:"points_per_currency,omitempty" validate:"omitempty,gt=0"`
+    PointValue          *float64 `json:"point_value,omitempty" validate:"omitempty,gt=0"`
+    MinRedemptionPoints *int     `json:"min_redemption_points,omitempty" validate:"omitempty,gt=0"`
+    MinPointsReserve    *int     `json:"min_points_reserve,omitempty" validate:"omitempty,gte=0"`
+    PointsExpiryDays    *int     `json:"points_expiry_days,omitempty" validate:"omitempty,gt=0"`
+}
+
+// Loyalty tiers
+type LoyaltyTier struct {
+    TierID     int     `json:"tier_id" db:"tier_id"`
+    CompanyID  int     `json:"company_id" db:"company_id"`
+    Name       string  `json:"name" db:"name" validate:"required,min=2,max=100"`
+    MinPoints  float64 `json:"min_points" db:"min_points" validate:"gte=0"`
+    PointsPerCurrency *float64 `json:"points_per_currency,omitempty" db:"points_per_currency"`
+    IsActive   bool    `json:"is_active" db:"is_active"`
+    BaseModel
+}
+
+type CreateLoyaltyTierRequest struct {
+    Name      string  `json:"name" validate:"required,min=2,max=100"`
+    MinPoints float64 `json:"min_points" validate:"gte=0"`
+    PointsPerCurrency *float64 `json:"points_per_currency,omitempty"`
+}
+
+type UpdateLoyaltyTierRequest struct {
+    Name      *string  `json:"name,omitempty" validate:"omitempty,min=2,max=100"`
+    MinPoints *float64 `json:"min_points,omitempty" validate:"omitempty,gte=0"`
+    PointsPerCurrency *float64 `json:"points_per_currency,omitempty" validate:"omitempty,gte=0"`
+    IsActive  *bool    `json:"is_active,omitempty"`
 }
 
 // Promotion Usage Tracking

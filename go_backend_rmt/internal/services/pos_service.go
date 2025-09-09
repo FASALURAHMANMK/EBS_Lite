@@ -123,9 +123,42 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
         PaidAmount:      req.PaidAmount,
     }
 
+    // Apply loyalty points redemption as additional discount if requested
+    var plannedRedeemPoints float64
+    var plannedRedeemValue float64
+    if req.CustomerID != nil && req.RedeemPoints != nil && *req.RedeemPoints > 0 {
+        loyalty := NewLoyaltyService()
+        // Fetch current points
+        var current float64
+        if err := s.db.QueryRow(`SELECT COALESCE(points,0) FROM loyalty_programs WHERE customer_id=$1`, *req.CustomerID).Scan(&current); err != nil && err != sql.ErrNoRows {
+            return nil, fmt.Errorf("failed to get customer points: %w", err)
+        }
+        settings, err := loyalty.getLoyaltySettings(companyID)
+        if err != nil { return nil, fmt.Errorf("failed to get loyalty settings: %w", err) }
+        redeemable := current - float64(settings.MinPointsReserve)
+        if redeemable > 0 {
+            plannedRedeemPoints = *req.RedeemPoints
+            if plannedRedeemPoints > redeemable { plannedRedeemPoints = redeemable }
+            if settings.MinRedemptionPoints > 0 && plannedRedeemPoints < settings.MinRedemptionPoints { plannedRedeemPoints = 0 }
+            if plannedRedeemPoints > 0 {
+                plannedRedeemValue = plannedRedeemPoints * settings.PointValue
+                saleReq.DiscountAmount += plannedRedeemValue
+            }
+        }
+    }
+
     sale, err := s.salesService.CreateSale(companyID, locationID, userID, saleReq)
     if err != nil {
         return nil, fmt.Errorf("failed to process checkout: %w", err)
+    }
+
+    // After sale is created, persist redemption and reduce points
+    if sale != nil && req.CustomerID != nil && plannedRedeemPoints > 0 {
+        loyalty := NewLoyaltyService()
+        if _, _, err := loyalty.RedeemPointsForSale(companyID, *req.CustomerID, sale.SaleID, plannedRedeemPoints); err != nil {
+            // Log but do not fail sale; mismatch could happen if race condition
+            log.Printf("Warning: failed to persist loyalty redemption for sale %d: %v", sale.SaleID, err)
+        }
     }
 
     // Record payment breakdown if provided

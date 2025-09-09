@@ -21,9 +21,9 @@ func NewCustomerService() *CustomerService {
 
 // GetCustomers returns all customers for a company with optional filters
 func (s *CustomerService) GetCustomers(companyID int, filters map[string]string) ([]models.Customer, error) {
-	query := `
+    query := `
                 SELECT c.customer_id, c.company_id, c.name, c.phone, c.email, c.address, c.tax_number,
-                       c.credit_limit, c.payment_terms, c.is_active, c.created_by, c.updated_by,
+                       c.credit_limit, c.payment_terms, c.is_loyalty, c.loyalty_tier_id, c.is_active, c.created_by, c.updated_by,
                        c.sync_status, c.created_at, c.updated_at, c.is_deleted,
                        COALESCE(SUM(s.total_amount - s.paid_amount),0) AS credit_balance
                 FROM customers c
@@ -103,25 +103,25 @@ func (s *CustomerService) GetCustomers(companyID int, filters map[string]string)
 	var customers []models.Customer
 	for rows.Next() {
 		var c models.Customer
-		if err := rows.Scan(
-			&c.CustomerID, &c.CompanyID, &c.Name, &c.Phone, &c.Email, &c.Address,
-			&c.TaxNumber, &c.CreditLimit, &c.PaymentTerms, &c.IsActive,
-			&c.CreatedBy, &c.UpdatedBy, &c.SyncStatus, &c.CreatedAt, &c.UpdatedAt, &c.IsDeleted,
-			&c.CreditBalance,
-		); err != nil {
-			return nil, fmt.Errorf("failed to scan customer: %w", err)
-		}
-		customers = append(customers, c)
-	}
+        if err := rows.Scan(
+            &c.CustomerID, &c.CompanyID, &c.Name, &c.Phone, &c.Email, &c.Address,
+            &c.TaxNumber, &c.CreditLimit, &c.PaymentTerms, &c.IsLoyalty, &c.LoyaltyTierID, &c.IsActive,
+            &c.CreatedBy, &c.UpdatedBy, &c.SyncStatus, &c.CreatedAt, &c.UpdatedAt, &c.IsDeleted,
+            &c.CreditBalance,
+        ); err != nil {
+            return nil, fmt.Errorf("failed to scan customer: %w", err)
+        }
+        customers = append(customers, c)
+    }
 
 	return customers, nil
 }
 
 // GetCustomerByID retrieves a single customer with credit balance
 func (s *CustomerService) GetCustomerByID(customerID, companyID int) (*models.Customer, error) {
-	query := `
+    query := `
                SELECT c.customer_id, c.company_id, c.name, c.phone, c.email, c.address, c.tax_number,
-                      c.credit_limit, c.payment_terms, c.is_active, c.created_by, c.updated_by,
+                      c.credit_limit, c.payment_terms, c.is_loyalty, c.loyalty_tier_id, c.is_active, c.created_by, c.updated_by,
                       c.sync_status, c.created_at, c.updated_at, c.is_deleted,
                       COALESCE(SUM(s.total_amount - s.paid_amount),0) AS credit_balance
                FROM customers c
@@ -130,12 +130,12 @@ func (s *CustomerService) GetCustomerByID(customerID, companyID int) (*models.Cu
                GROUP BY c.customer_id`
 
 	var c models.Customer
-	err := s.db.QueryRow(query, customerID, companyID).Scan(
-		&c.CustomerID, &c.CompanyID, &c.Name, &c.Phone, &c.Email, &c.Address,
-		&c.TaxNumber, &c.CreditLimit, &c.PaymentTerms, &c.IsActive,
-		&c.CreatedBy, &c.UpdatedBy, &c.SyncStatus, &c.CreatedAt, &c.UpdatedAt, &c.IsDeleted,
-		&c.CreditBalance,
-	)
+    err := s.db.QueryRow(query, customerID, companyID).Scan(
+        &c.CustomerID, &c.CompanyID, &c.Name, &c.Phone, &c.Email, &c.Address,
+        &c.TaxNumber, &c.CreditLimit, &c.PaymentTerms, &c.IsLoyalty, &c.LoyaltyTierID, &c.IsActive,
+        &c.CreatedBy, &c.UpdatedBy, &c.SyncStatus, &c.CreatedAt, &c.UpdatedAt, &c.IsDeleted,
+        &c.CreditBalance,
+    )
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("customer not found")
@@ -148,17 +148,17 @@ func (s *CustomerService) GetCustomerByID(customerID, companyID int) (*models.Cu
 
 // CreateCustomer adds a new customer for the company
 func (s *CustomerService) CreateCustomer(companyID, userID int, req *models.CreateCustomerRequest) (*models.Customer, error) {
-	query := `
+    query := `
                 INSERT INTO customers (company_id, name, phone, email, address, tax_number,
-                                       credit_limit, payment_terms, created_by, updated_by)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9)
+                                       credit_limit, payment_terms, is_loyalty, loyalty_tier_id, created_by, updated_by)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11)
                 RETURNING customer_id, created_at, updated_at`
 
 	var c models.Customer
-	err := s.db.QueryRow(query,
-		companyID, req.Name, req.Phone, req.Email, req.Address, req.TaxNumber,
-		req.CreditLimit, req.PaymentTerms, userID,
-	).Scan(&c.CustomerID, &c.CreatedAt, &c.UpdatedAt)
+    err := s.db.QueryRow(query,
+        companyID, req.Name, req.Phone, req.Email, req.Address, req.TaxNumber,
+        req.CreditLimit, req.PaymentTerms, req.IsLoyalty, req.LoyaltyTierID, userID,
+    ).Scan(&c.CustomerID, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create customer: %w", err)
 	}
@@ -171,7 +171,9 @@ func (s *CustomerService) CreateCustomer(companyID, userID int, req *models.Crea
 	c.TaxNumber = req.TaxNumber
 	c.CreditLimit = req.CreditLimit
 	c.PaymentTerms = req.PaymentTerms
-	c.IsActive = true
+    c.IsLoyalty = req.IsLoyalty
+    c.LoyaltyTierID = req.LoyaltyTierID
+    c.IsActive = true
 	c.CreatedBy = userID
 	c.UpdatedBy = &userID
 	c.SyncStatus = "synced"
@@ -221,11 +223,23 @@ func (s *CustomerService) UpdateCustomer(customerID, companyID, userID int, req 
 		args = append(args, *req.PaymentTerms)
 		argCount++
 	}
-	if req.IsActive != nil {
-		updates = append(updates, fmt.Sprintf("is_active = $%d", argCount))
-		args = append(args, *req.IsActive)
-		argCount++
-	}
+    if req.IsActive != nil {
+        updates = append(updates, fmt.Sprintf("is_active = $%d", argCount))
+        args = append(args, *req.IsActive)
+        argCount++
+    }
+
+    if req.IsLoyalty != nil {
+        updates = append(updates, fmt.Sprintf("is_loyalty = $%d", argCount))
+        args = append(args, *req.IsLoyalty)
+        argCount++
+    }
+
+    if req.LoyaltyTierID != nil {
+        updates = append(updates, fmt.Sprintf("loyalty_tier_id = $%d", argCount))
+        args = append(args, *req.LoyaltyTierID)
+        argCount++
+    }
 
 	if len(updates) == 0 {
 		return s.GetCustomerByID(customerID, companyID)

@@ -131,8 +131,9 @@ type PromotionEligibilityResponse struct {
 }
 
 type LoyaltySettingsResponse struct {
-	PointsPerCurrency   float64 `json:"points_per_currency"`
-	PointValue          float64 `json:"point_value"`
-	MinRedemptionPoints float64 `json:"min_redemption_points"`
-	PointsExpiryDays    int     `json:"points_expiry_days"`
+    PointsPerCurrency   float64 `json:"points_per_currency"`
+    PointValue          float64 `json:"point_value"`
+    MinRedemptionPoints float64 `json:"min_redemption_points"`
+    MinPointsReserve    int     `json:"min_points_reserve"`
+    PointsExpiryDays    int     `json:"points_expiry_days"`
 }

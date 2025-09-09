@@ -131,6 +131,7 @@ type POSCheckoutRequest struct {
     DiscountAmount  float64                   `json:"discount_amount"`
     PaidAmount      float64                   `json:"paid_amount" validate:"gte=0"`
     Payments        []POSPaymentLine          `json:"payments,omitempty"`
+    RedeemPoints    *float64                  `json:"redeem_points,omitempty"`
 }
 
 type POSPrintRequest struct {

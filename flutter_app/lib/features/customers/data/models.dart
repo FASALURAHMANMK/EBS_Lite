@@ -7,6 +7,8 @@ class CustomerDto {
   final String? taxNumber;
   final int paymentTerms; // days
   final double creditLimit;
+  final bool isLoyalty;
+  final int? loyaltyTierId;
   final bool isActive;
   final double creditBalance;
 
@@ -19,6 +21,8 @@ class CustomerDto {
     this.taxNumber,
     required this.paymentTerms,
     required this.creditLimit,
+    required this.isLoyalty,
+    required this.loyaltyTierId,
     required this.isActive,
     required this.creditBalance,
   });
@@ -32,6 +36,8 @@ class CustomerDto {
         taxNumber: json['tax_number'] as String?,
         paymentTerms: (json['payment_terms'] as num?)?.toInt() ?? 0,
         creditLimit: (json['credit_limit'] as num?)?.toDouble() ?? 0,
+        isLoyalty: json['is_loyalty'] as bool? ?? false,
+        loyaltyTierId: json['loyalty_tier_id'] as int?,
         isActive: json['is_active'] as bool? ?? true,
         creditBalance: (json['credit_balance'] as num?)?.toDouble() ?? 0,
       );

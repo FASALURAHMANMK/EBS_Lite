@@ -284,22 +284,70 @@ func (h *LoyaltyHandler) CheckPromotionEligibility(c *gin.Context) {
 
 // GET /loyalty/settings
 func (h *LoyaltyHandler) GetLoyaltySettings(c *gin.Context) {
-	companyID := c.GetInt("company_id")
-	if companyID == 0 {
-		utils.ForbiddenResponse(c, "Company access required")
-		return
-	}
+    companyID := c.GetInt("company_id")
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
+    settings, err := h.loyaltyService.GetLoyaltySettings(companyID)
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get loyalty settings", err)
+        return
+    }
+    utils.SuccessResponse(c, "Loyalty settings retrieved successfully", settings)
+}
 
-	// For now, return default settings
-	// In a real implementation, you'd have company-specific settings
-	settings := models.LoyaltySettingsResponse{
-		PointsPerCurrency:   1.0,  // 1 point per $1
-		PointValue:          0.01, // 1 point = $0.01
-		MinRedemptionPoints: 100,  // Minimum 100 points to redeem
-		PointsExpiryDays:    365,  // Points expire after 1 year
-	}
+// PUT /loyalty/settings
+func (h *LoyaltyHandler) UpdateLoyaltySettings(c *gin.Context) {
+    companyID := c.GetInt("company_id")
+    if companyID == 0 { utils.ForbiddenResponse(c, "Company access required"); return }
+    var req models.UpdateLoyaltySettingsRequest
+    if err := c.ShouldBindJSON(&req); err != nil { utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err); return }
+    if err := utils.ValidateStruct(&req); err != nil { utils.ValidationErrorResponse(c, utils.GetValidationErrors(err)); return }
+    if err := h.loyaltyService.UpdateLoyaltySettings(companyID, &req); err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update loyalty settings", err)
+        return
+    }
+    utils.SuccessResponse(c, "Loyalty settings updated", nil)
+}
 
-	utils.SuccessResponse(c, "Loyalty settings retrieved successfully", settings)
+// Tiers
+// GET /loyalty/tiers
+func (h *LoyaltyHandler) GetTiers(c *gin.Context) {
+    companyID := c.GetInt("company_id"); if companyID == 0 { utils.ForbiddenResponse(c, "Company access required"); return }
+    tiers, err := h.loyaltyService.GetTiers(companyID)
+    if err != nil { utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get tiers", err); return }
+    utils.SuccessResponse(c, "Loyalty tiers retrieved successfully", tiers)
+}
+
+// POST /loyalty/tiers
+func (h *LoyaltyHandler) CreateTier(c *gin.Context) {
+    companyID := c.GetInt("company_id"); if companyID == 0 { utils.ForbiddenResponse(c, "Company access required"); return }
+    var req models.CreateLoyaltyTierRequest
+    if err := c.ShouldBindJSON(&req); err != nil { utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err); return }
+    if err := utils.ValidateStruct(&req); err != nil { utils.ValidationErrorResponse(c, utils.GetValidationErrors(err)); return }
+    tier, err := h.loyaltyService.CreateTier(companyID, &req)
+    if err != nil { utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create tier", err); return }
+    utils.CreatedResponse(c, "Loyalty tier created", tier)
+}
+
+// PUT /loyalty/tiers/:id
+func (h *LoyaltyHandler) UpdateTier(c *gin.Context) {
+    companyID := c.GetInt("company_id"); if companyID == 0 { utils.ForbiddenResponse(c, "Company access required"); return }
+    id, err := strconv.Atoi(c.Param("id")); if err != nil { utils.ErrorResponse(c, http.StatusBadRequest, "Invalid tier ID", err); return }
+    var req models.UpdateLoyaltyTierRequest
+    if err := c.ShouldBindJSON(&req); err != nil { utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err); return }
+    if err := utils.ValidateStruct(&req); err != nil { utils.ValidationErrorResponse(c, utils.GetValidationErrors(err)); return }
+    if err := h.loyaltyService.UpdateTier(companyID, id, &req); err != nil { utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update tier", err); return }
+    utils.SuccessResponse(c, "Loyalty tier updated", nil)
+}
+
+// DELETE /loyalty/tiers/:id
+func (h *LoyaltyHandler) DeleteTier(c *gin.Context) {
+    companyID := c.GetInt("company_id"); if companyID == 0 { utils.ForbiddenResponse(c, "Company access required"); return }
+    id, err := strconv.Atoi(c.Param("id")); if err != nil { utils.ErrorResponse(c, http.StatusBadRequest, "Invalid tier ID", err); return }
+    if err := h.loyaltyService.DeleteTier(companyID, id); err != nil { utils.ErrorResponse(c, http.StatusBadRequest, "Failed to delete tier", err); return }
+    utils.SuccessResponse(c, "Loyalty tier deleted", nil)
 }
 
 // POST /loyalty/award-points (Internal endpoint for sales integration)
@@ -328,7 +376,7 @@ func (h *LoyaltyHandler) AwardPoints(c *gin.Context) {
 		return
 	}
 
-	err := h.loyaltyService.AwardPoints(req.CustomerID, req.SaleAmount, req.SaleID)
+    err := h.loyaltyService.AwardPoints(companyID, req.CustomerID, req.SaleAmount, req.SaleID)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to award points", err)
 		return

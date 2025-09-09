@@ -134,11 +134,11 @@ func (s *LoyaltyService) RedeemPoints(companyID int, req *models.CreateLoyaltyRe
 		return nil, err
 	}
 
-	// Get current points
-	var currentPoints float64
-	err = s.db.QueryRow(`
-		SELECT COALESCE(points, 0) FROM loyalty_programs WHERE customer_id = $1
-	`, req.CustomerID).Scan(&currentPoints)
+    // Get current points
+    var currentPoints float64
+    err = s.db.QueryRow(`
+        SELECT COALESCE(points, 0) FROM loyalty_programs WHERE customer_id = $1
+    `, req.CustomerID).Scan(&currentPoints)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("customer has no loyalty program")
@@ -147,18 +147,29 @@ func (s *LoyaltyService) RedeemPoints(companyID int, req *models.CreateLoyaltyRe
 		return nil, fmt.Errorf("failed to get current points: %w", err)
 	}
 
-	// Check sufficient points
-	if currentPoints < req.PointsUsed {
-		return nil, fmt.Errorf("insufficient points available")
-	}
+    // Get loyalty settings for point value and constraints
+    settings, err := s.getLoyaltySettings(companyID)
+    if err != nil {
+        return nil, fmt.Errorf("failed to get loyalty settings: %w", err)
+    }
+    // Enforce reserve and min redemption thresholds
+    redeemable := currentPoints - float64(settings.MinPointsReserve)
+    if redeemable <= 0 {
+        return nil, fmt.Errorf("insufficient points available")
+    }
+    pointsToUse := req.PointsUsed
+    if pointsToUse > redeemable {
+        pointsToUse = redeemable
+    }
+    if pointsToUse <= 0 {
+        return nil, fmt.Errorf("insufficient points available")
+    }
+    // Enforce minimum redemption threshold if configured
+    if settings.MinRedemptionPoints > 0 && pointsToUse < settings.MinRedemptionPoints {
+        return nil, fmt.Errorf("insufficient points available")
+    }
 
-	// Get loyalty settings for point value
-	settings, err := s.getLoyaltySettings(companyID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get loyalty settings: %w", err)
-	}
-
-	valueRedeemed := req.PointsUsed * settings.PointValue
+    valueRedeemed := pointsToUse * settings.PointValue
 
 	// Start transaction
 	tx, err := s.db.Begin()
@@ -169,40 +180,44 @@ func (s *LoyaltyService) RedeemPoints(companyID int, req *models.CreateLoyaltyRe
 
 	// Create redemption record
 	var redemptionID int
-	err = tx.QueryRow(`
-		INSERT INTO loyalty_redemptions (customer_id, points_used, value_redeemed)
-		VALUES ($1, $2, $3)
-		RETURNING redemption_id
-	`, req.CustomerID, req.PointsUsed, valueRedeemed).Scan(&redemptionID)
+    err = tx.QueryRow(`
+        INSERT INTO loyalty_redemptions (customer_id, points_used, value_redeemed)
+        VALUES ($1, $2, $3)
+        RETURNING redemption_id
+    `, req.CustomerID, pointsToUse, valueRedeemed).Scan(&redemptionID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create redemption: %w", err)
 	}
 
-	// Update loyalty program
-	_, err = tx.Exec(`
-		UPDATE loyalty_programs 
-		SET points = points - $1, total_redeemed = total_redeemed + $1, last_updated = CURRENT_TIMESTAMP
-		WHERE customer_id = $2
-	`, req.PointsUsed, req.CustomerID)
+    // Update loyalty program
+    _, err = tx.Exec(`
+        UPDATE loyalty_programs 
+        SET points = points - $1, total_redeemed = total_redeemed + $1, last_updated = CURRENT_TIMESTAMP
+        WHERE customer_id = $2
+    `, pointsToUse, req.CustomerID)
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to update loyalty points: %w", err)
-	}
+    if err != nil {
+        return nil, fmt.Errorf("failed to update loyalty points: %w", err)
+    }
+
+    if err := s.updateCustomerTierTx(tx, companyID, req.CustomerID); err != nil {
+        return nil, err
+    }
 
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	remainingPoints := currentPoints - req.PointsUsed
+    remainingPoints := currentPoints - pointsToUse
 
 	return &models.LoyaltyRedemptionResponse{
 		RedemptionID:    redemptionID,
 		CustomerID:      req.CustomerID,
-		PointsUsed:      req.PointsUsed,
-		ValueRedeemed:   valueRedeemed,
-		RemainingPoints: remainingPoints,
+        PointsUsed:      pointsToUse,
+        ValueRedeemed:   valueRedeemed,
+        RemainingPoints: remainingPoints,
 		Message:         fmt.Sprintf("Successfully redeemed %.0f points for $%.2f", req.PointsUsed, valueRedeemed),
 	}, nil
 }
@@ -258,41 +273,141 @@ func (s *LoyaltyService) GetLoyaltyRedemptions(companyID int, customerID *int) (
 	return redemptions, nil
 }
 
-func (s *LoyaltyService) AwardPoints(customerID int, saleAmount float64, saleID int) error {
-	// Get loyalty settings
-	settings, err := s.getLoyaltySettings(0) // Default settings
-	if err != nil {
-		return fmt.Errorf("failed to get loyalty settings: %w", err)
-	}
+func (s *LoyaltyService) AwardPoints(companyID, customerID int, saleAmount float64, saleID int) error {
+    // Check if customer is enrolled in loyalty
+    var isLoyalty bool
+    if err := s.db.QueryRow(`SELECT is_loyalty FROM customers WHERE customer_id=$1`, customerID).Scan(&isLoyalty); err != nil {
+        if err == sql.ErrNoRows {
+            return fmt.Errorf("customer not found")
+        }
+        return fmt.Errorf("failed to check loyalty enrollment: %w", err)
+    }
+    if !isLoyalty {
+        return nil // do nothing if not enrolled
+    }
 
-	pointsEarned := saleAmount * settings.PointsPerCurrency
+    // Get loyalty settings
+    settings, err := s.getLoyaltySettings(companyID)
+    if err != nil {
+        return fmt.Errorf("failed to get loyalty settings: %w", err)
+    }
 
-	// Start transaction
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to start transaction: %w", err)
-	}
-	defer tx.Rollback()
+    // Determine earn rate: tier override if present
+    earnRate := settings.PointsPerCurrency
+    var tierRate sql.NullFloat64
+    if err := s.db.QueryRow(`SELECT lt.points_per_currency FROM customers c LEFT JOIN loyalty_tiers lt ON c.loyalty_tier_id = lt.tier_id WHERE c.customer_id=$1`, customerID).Scan(&tierRate); err == nil {
+        if tierRate.Valid && tierRate.Float64 > 0 {
+            earnRate = tierRate.Float64
+        }
+    }
 
-	// Update or create loyalty program
-	_, err = tx.Exec(`
-		INSERT INTO loyalty_programs (customer_id, points, total_earned, last_updated)
-		VALUES ($1, $2, $2, CURRENT_TIMESTAMP)
-		ON CONFLICT (customer_id)
-		DO UPDATE SET 
-			points = loyalty_programs.points + $2,
-			total_earned = loyalty_programs.total_earned + $2,
-			last_updated = CURRENT_TIMESTAMP
-	`, customerID, pointsEarned)
+    pointsEarned := saleAmount * earnRate
+    if pointsEarned <= 0 {
+        return nil
+    }
 
-	if err != nil {
-		return fmt.Errorf("failed to award points: %w", err)
-	}
+    // Start transaction
+    tx, err := s.db.Begin()
+    if err != nil {
+        return fmt.Errorf("failed to start transaction: %w", err)
+    }
+    defer tx.Rollback()
 
-	// Log the transaction (if you have a loyalty_transactions table)
-	// This is optional - you can create this table for detailed tracking
+    // Update or create loyalty program
+    _, err = tx.Exec(`
+        INSERT INTO loyalty_programs (customer_id, points, total_earned, last_updated)
+        VALUES ($1, $2, $2, CURRENT_TIMESTAMP)
+        ON CONFLICT (customer_id)
+        DO UPDATE SET 
+            points = loyalty_programs.points + $2,
+            total_earned = loyalty_programs.total_earned + $2,
+            last_updated = CURRENT_TIMESTAMP
+    `, customerID, pointsEarned)
+    if err != nil {
+        return fmt.Errorf("failed to award points: %w", err)
+    }
 
-	return tx.Commit()
+    // Optional: log to loyalty_transactions if table exists
+    _, _ = tx.Exec(`
+        INSERT INTO loyalty_transactions (customer_id, transaction_type, points, description, reference_type, reference_id, balance_after)
+        SELECT $1, 'EARNED', $2, 'Points earned on sale', 'SALE', $3, lp.points
+        FROM loyalty_programs lp WHERE lp.customer_id=$1
+    `, customerID, pointsEarned, saleID)
+
+    // Recompute and update customer's tier based on points
+    if err := s.updateCustomerTierTx(tx, companyID, customerID); err != nil {
+        return err
+    }
+
+    return tx.Commit()
+}
+
+// RedeemPointsForSale redeems points during a POS sale and binds redemption to sale_id.
+func (s *LoyaltyService) RedeemPointsForSale(companyID, customerID, saleID int, requestedPoints float64) (usedPoints float64, valueRedeemed float64, err error) {
+    // Validate customer belongs to company
+    if err := s.validateCustomerInCompany(customerID, companyID); err != nil { return 0, 0, err }
+
+    // Current balance
+    var currentPoints float64
+    if err := s.db.QueryRow(`SELECT COALESCE(points,0) FROM loyalty_programs WHERE customer_id=$1`, customerID).Scan(&currentPoints); err != nil {
+        if err == sql.ErrNoRows { return 0, 0, fmt.Errorf("customer has no loyalty program") }
+        return 0, 0, fmt.Errorf("failed to get current points: %w", err)
+    }
+
+    // Settings
+    settings, err2 := s.getLoyaltySettings(companyID)
+    if err2 != nil { return 0, 0, err2 }
+    redeemable := currentPoints - float64(settings.MinPointsReserve)
+    if redeemable <= 0 { return 0, 0, fmt.Errorf("insufficient points available") }
+
+    used := requestedPoints
+    if used > redeemable { used = redeemable }
+    if used <= 0 { return 0, 0, fmt.Errorf("insufficient points available") }
+    if settings.MinRedemptionPoints > 0 && used < settings.MinRedemptionPoints { return 0, 0, fmt.Errorf("insufficient points available") }
+
+    val := used * settings.PointValue
+
+    tx, err := s.db.Begin()
+    if err != nil { return 0, 0, fmt.Errorf("failed to start transaction: %w", err) }
+    defer tx.Rollback()
+
+    var redID int
+    if err := tx.QueryRow(`INSERT INTO loyalty_redemptions (sale_id, customer_id, points_used, value_redeemed) VALUES ($1,$2,$3,$4) RETURNING redemption_id`, saleID, customerID, used, val).Scan(&redID); err != nil {
+        return 0, 0, fmt.Errorf("failed to create redemption: %w", err)
+    }
+
+    if _, err := tx.Exec(`UPDATE loyalty_programs SET points = points - $1, total_redeemed = total_redeemed + $1, last_updated = CURRENT_TIMESTAMP WHERE customer_id=$2`, used, customerID); err != nil {
+        return 0, 0, fmt.Errorf("failed to update loyalty points: %w", err)
+    }
+
+    if err := s.updateCustomerTierTx(tx, companyID, customerID); err != nil { return 0, 0, err }
+
+    if err := tx.Commit(); err != nil { return 0, 0, fmt.Errorf("failed to commit transaction: %w", err) }
+    return used, val, nil
+}
+
+func (s *LoyaltyService) updateCustomerTierTx(tx *sql.Tx, companyID, customerID int) error {
+    // Get current points
+    var pts float64
+    if err := tx.QueryRow(`SELECT COALESCE(points,0) FROM loyalty_programs WHERE customer_id=$1`, customerID).Scan(&pts); err != nil {
+        return fmt.Errorf("failed to get current points: %w", err)
+    }
+    // Find highest tier with min_points <= pts
+    var tierID int
+    err := tx.QueryRow(`
+        SELECT tier_id FROM loyalty_tiers 
+        WHERE company_id=$1 AND is_active=TRUE AND min_points <= $2
+        ORDER BY min_points DESC
+        LIMIT 1`, companyID, pts).Scan(&tierID)
+    if err == sql.ErrNoRows {
+        // No active tier qualifies; set NULL
+        _, _ = tx.Exec(`UPDATE customers SET loyalty_tier_id = NULL WHERE customer_id=$1`, customerID)
+        return nil
+    } else if err != nil {
+        return fmt.Errorf("failed to compute tier: %w", err)
+    }
+    _, _ = tx.Exec(`UPDATE customers SET loyalty_tier_id=$1 WHERE customer_id=$2`, tierID, customerID)
+    return nil
 }
 
 // Promotions
@@ -677,14 +792,167 @@ func (s *LoyaltyService) verifyPromotionInCompany(promotionID, companyID int) er
 }
 
 func (s *LoyaltyService) getLoyaltySettings(companyID int) (*models.LoyaltySettingsResponse, error) {
-	// For now, return default settings
-	// In a real implementation, you'd store these in a settings table
-	return &models.LoyaltySettingsResponse{
-		PointsPerCurrency:   1.0,  // 1 point per $1
-		PointValue:          0.01, // 1 point = $0.01
-		MinRedemptionPoints: 100,  // Minimum 100 points to redeem
-		PointsExpiryDays:    365,  // Points expire after 1 year
-	}, nil
+    // Fetch company-specific settings; fall back to defaults if not present
+    var pointsPer float64
+    var pointValue float64
+    var minRedemption int
+    var minReserve int
+    var expiry int
+
+    err := s.db.QueryRow(`
+        SELECT points_per_currency, point_value, min_redemption_points, COALESCE(min_points_reserve,0), points_expiry_days
+        FROM loyalty_settings WHERE company_id = $1 AND is_active = TRUE
+    `, companyID).Scan(&pointsPer, &pointValue, &minRedemption, &minReserve, &expiry)
+
+    if err == sql.ErrNoRows {
+        // defaults
+        pointsPer = 1.0
+        pointValue = 0.01
+        minRedemption = 100
+        minReserve = 0
+        expiry = 365
+    } else if err != nil {
+        // Fallback for older DBs missing min_points_reserve column
+        var fallbackErr error
+        fallbackErr = s.db.QueryRow(`
+            SELECT points_per_currency, point_value, min_redemption_points, points_expiry_days
+            FROM loyalty_settings WHERE company_id = $1 AND is_active = TRUE
+        `, companyID).Scan(&pointsPer, &pointValue, &minRedemption, &expiry)
+        if fallbackErr == sql.ErrNoRows {
+            pointsPer = 1.0; pointValue = 0.01; minRedemption = 100; minReserve = 0; expiry = 365
+        } else if fallbackErr != nil {
+            return nil, fmt.Errorf("failed to get loyalty settings: %w", err)
+        }
+    }
+
+    return &models.LoyaltySettingsResponse{
+        PointsPerCurrency:   pointsPer,
+        PointValue:          pointValue,
+        MinRedemptionPoints: float64(minRedemption),
+        MinPointsReserve:    minReserve,
+        PointsExpiryDays:    expiry,
+    }, nil
+}
+
+// GetLoyaltySettings exposes company settings outside services package
+func (s *LoyaltyService) GetLoyaltySettings(companyID int) (*models.LoyaltySettingsResponse, error) {
+    return s.getLoyaltySettings(companyID)
+}
+
+// Loyalty tiers CRUD
+func (s *LoyaltyService) GetTiers(companyID int) ([]models.LoyaltyTier, error) {
+    rows, err := s.db.Query(`SELECT tier_id, company_id, name, min_points, points_per_currency, is_active, created_at, updated_at FROM loyalty_tiers WHERE company_id=$1 ORDER BY min_points ASC`, companyID)
+    if err != nil { return nil, fmt.Errorf("failed to get tiers: %w", err) }
+    defer rows.Close()
+    var tiers []models.LoyaltyTier
+    for rows.Next() {
+        var t models.LoyaltyTier
+        if err := rows.Scan(&t.TierID, &t.CompanyID, &t.Name, &t.MinPoints, &t.PointsPerCurrency, &t.IsActive, &t.CreatedAt, &t.UpdatedAt); err != nil {
+            return nil, fmt.Errorf("failed to scan tier: %w", err)
+        }
+        tiers = append(tiers, t)
+    }
+    return tiers, nil
+}
+
+func (s *LoyaltyService) CreateTier(companyID int, req *models.CreateLoyaltyTierRequest) (*models.LoyaltyTier, error) {
+    var t models.LoyaltyTier
+    var err error
+    if req.PointsPerCurrency != nil {
+        err = s.db.QueryRow(`INSERT INTO loyalty_tiers (company_id, name, min_points, points_per_currency) VALUES ($1,$2,$3,$4) RETURNING tier_id, created_at, updated_at`, companyID, req.Name, req.MinPoints, *req.PointsPerCurrency).
+            Scan(&t.TierID, &t.CreatedAt, &t.UpdatedAt)
+    } else {
+        err = s.db.QueryRow(`INSERT INTO loyalty_tiers (company_id, name, min_points) VALUES ($1,$2,$3) RETURNING tier_id, created_at, updated_at`, companyID, req.Name, req.MinPoints).
+            Scan(&t.TierID, &t.CreatedAt, &t.UpdatedAt)
+    }
+    if err != nil { return nil, fmt.Errorf("failed to create tier: %w", err) }
+    t.CompanyID = companyID; t.Name = req.Name; t.MinPoints = req.MinPoints; t.IsActive = true; t.PointsPerCurrency = req.PointsPerCurrency
+    return &t, nil
+}
+
+func (s *LoyaltyService) UpdateTier(companyID, tierID int, req *models.UpdateLoyaltyTierRequest) error {
+    // Ensure tier belongs to company
+    var count int
+    if err := s.db.QueryRow(`SELECT COUNT(*) FROM loyalty_tiers WHERE tier_id=$1 AND company_id=$2`, tierID, companyID).Scan(&count); err != nil {
+        return fmt.Errorf("failed to verify tier: %w", err)
+    }
+    if count == 0 { return fmt.Errorf("tier not found") }
+
+    parts := []string{}
+    args := []interface{}{}
+    n := 0
+    if req.Name != nil { n++; parts = append(parts, fmt.Sprintf("name=$%d", n)); args = append(args, *req.Name) }
+    if req.MinPoints != nil { n++; parts = append(parts, fmt.Sprintf("min_points=$%d", n)); args = append(args, *req.MinPoints) }
+    if req.PointsPerCurrency != nil { n++; parts = append(parts, fmt.Sprintf("points_per_currency=$%d", n)); args = append(args, *req.PointsPerCurrency) }
+    if req.IsActive != nil { n++; parts = append(parts, fmt.Sprintf("is_active=$%d", n)); args = append(args, *req.IsActive) }
+    if len(parts) == 0 { return nil }
+    parts = append(parts, "updated_at = CURRENT_TIMESTAMP")
+    q := fmt.Sprintf("UPDATE loyalty_tiers SET %s WHERE tier_id=$%d", strings.Join(parts, ", "), n+1)
+    args = append(args, tierID)
+    _, err := s.db.Exec(q, args...)
+    if err != nil { return fmt.Errorf("failed to update tier: %w", err) }
+    return nil
+}
+
+func (s *LoyaltyService) DeleteTier(companyID, tierID int) error {
+    res, err := s.db.Exec(`DELETE FROM loyalty_tiers WHERE tier_id=$1 AND company_id=$2`, tierID, companyID)
+    if err != nil { return fmt.Errorf("failed to delete tier: %w", err) }
+    rows, _ := res.RowsAffected()
+    if rows == 0 { return fmt.Errorf("tier not found") }
+    // Null out customers referencing this tier
+    _, _ = s.db.Exec(`UPDATE customers SET loyalty_tier_id = NULL WHERE loyalty_tier_id=$1`, tierID)
+    return nil
+}
+
+func (s *LoyaltyService) UpdateLoyaltySettings(companyID int, req *models.UpdateLoyaltySettingsRequest) error {
+    // Upsert settings row for company
+    // Build dynamic update set for partial updates
+    setParts := []string{}
+    args := []interface{}{}
+    idx := 0
+
+    if req.PointsPerCurrency != nil {
+        idx++
+        setParts = append(setParts, fmt.Sprintf("points_per_currency = $%d", idx))
+        args = append(args, *req.PointsPerCurrency)
+    }
+    if req.PointValue != nil {
+        idx++
+        setParts = append(setParts, fmt.Sprintf("point_value = $%d", idx))
+        args = append(args, *req.PointValue)
+    }
+    if req.MinRedemptionPoints != nil {
+        idx++
+        setParts = append(setParts, fmt.Sprintf("min_redemption_points = $%d", idx))
+        args = append(args, *req.MinRedemptionPoints)
+    }
+    if req.MinPointsReserve != nil {
+        idx++
+        setParts = append(setParts, fmt.Sprintf("min_points_reserve = $%d", idx))
+        args = append(args, *req.MinPointsReserve)
+    }
+    if req.PointsExpiryDays != nil {
+        idx++
+        setParts = append(setParts, fmt.Sprintf("points_expiry_days = $%d", idx))
+        args = append(args, *req.PointsExpiryDays)
+    }
+
+    if len(setParts) == 0 {
+        return nil
+    }
+
+    // Ensure a row exists
+    _, _ = s.db.Exec(`INSERT INTO loyalty_settings (company_id) VALUES ($1) ON CONFLICT (company_id) DO NOTHING`, companyID)
+
+    // Apply update
+    setParts = append(setParts, "updated_at = CURRENT_TIMESTAMP")
+    query := fmt.Sprintf("UPDATE loyalty_settings SET %s WHERE company_id = $%d", strings.Join(setParts, ", "), idx+1)
+    args = append(args, companyID)
+    _, err := s.db.Exec(query, args...)
+    if err != nil {
+        return fmt.Errorf("failed to update loyalty settings: %w", err)
+    }
+    return nil
 }
 
 func (s *LoyaltyService) getLoyaltyTransactions(customerID int, limit int) ([]models.LoyaltyTransaction, error) {

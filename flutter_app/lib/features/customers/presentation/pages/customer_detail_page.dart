@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models.dart';
 import '../../data/customer_repository.dart';
 import 'customer_edit_page.dart';
+import '../../../loyalty/data/loyalty_repository.dart';
 
 class CustomerDetailPage extends ConsumerStatefulWidget {
   const CustomerDetailPage({super.key, required this.customerId});
@@ -15,6 +16,8 @@ class CustomerDetailPage extends ConsumerStatefulWidget {
 class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
   late Future<CustomerDto> _customerFuture;
   late Future<CustomerSummaryDto> _summaryFuture;
+  late Future<List<LoyaltyTierDto>> _tiersFuture;
+  late Future<LoyaltySettingsDto> _loySettingsFuture;
   late Future<List<Map<String, dynamic>>> _salesFuture;
   late Future<List<Map<String, dynamic>>> _returnsFuture;
   late Future<List<CustomerCollectionDto>> _collectionsFuture;
@@ -29,6 +32,9 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
     final repo = ref.read(customerRepositoryProvider);
     _customerFuture = repo.getCustomer(widget.customerId);
     _summaryFuture = repo.getCustomerSummary(widget.customerId);
+    final loyRepo = ref.read(loyaltyRepositoryProvider);
+    _tiersFuture = loyRepo.getTiers();
+    _loySettingsFuture = loyRepo.getSettings();
     _salesFuture = repo.getSales(customerId: widget.customerId);
     _returnsFuture = repo.getSaleReturns(customerId: widget.customerId);
     _collectionsFuture = repo.getCollections(customerId: widget.customerId);
@@ -74,31 +80,78 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
                   color: theme.colorScheme.surfaceContainerHighest,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
-                  child: ListTile(
-                    title: Text(cu.name,
-                        style: theme.textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700)),
-                    subtitle: Text([
-                      if ((cu.phone ?? '').isNotEmpty) 'Phone: ${cu.phone}',
-                      if ((cu.email ?? '').isNotEmpty) 'Email: ${cu.email}',
-                      if ((cu.address ?? '').isNotEmpty)
-                        'Address: ${cu.address}',
-                      if ((cu.taxNumber ?? '').isNotEmpty)
-                        'Tax#: ${cu.taxNumber}',
-                      'Credit Limit: ${cu.creditLimit.toStringAsFixed(2)} | Terms: ${cu.paymentTerms} days',
-                    ].join('\n')),
-                    isThreeLine: true,
-                    trailing: IconButton(
-                      tooltip: 'Edit',
-                      icon: const Icon(Icons.edit_outlined),
-                      onPressed: () async {
-                        final updated = await Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  CustomerEditPage(customerId: cu.customerId)),
-                        );
-                        if (updated == true && mounted) _reload();
-                      },
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(cu.name,
+                                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                                  const SizedBox(height: 4),
+                                  Text([
+                                    if ((cu.phone ?? '').isNotEmpty) 'Phone: ${cu.phone}',
+                                    if ((cu.email ?? '').isNotEmpty) 'Email: ${cu.email}',
+                                    if ((cu.address ?? '').isNotEmpty) 'Address: ${cu.address}',
+                                    if ((cu.taxNumber ?? '').isNotEmpty) 'Tax#: ${cu.taxNumber}',
+                                    'Credit Limit: ${cu.creditLimit.toStringAsFixed(2)} | Terms: ${cu.paymentTerms} days',
+                                  ].join('\n')),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Edit',
+                              icon: const Icon(Icons.edit_outlined),
+                              onPressed: () async {
+                                final updated = await Navigator.of(context).push(
+                                  MaterialPageRoute(builder: (_) => CustomerEditPage(customerId: cu.customerId)),
+                                );
+                                if (updated == true && mounted) _reload();
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        FutureBuilder<List<LoyaltyTierDto>>(
+                          future: _tiersFuture,
+                          builder: (context, ts) {
+                            if (!ts.hasData) return const SizedBox.shrink();
+                            final tiers = ts.data!;
+                            final tierName = tiers.firstWhere(
+                              (t) => t.tierId == (cu.loyaltyTierId ?? -1),
+                              orElse: () => LoyaltyTierDto(tierId: -1, name: 'Member', minPoints: 0, isActive: true),
+                            ).name;
+                            return Wrap(spacing: 8, runSpacing: 4, children: [
+                              if (cu.isLoyalty) Chip(label: Text('Tier: $tierName')),
+                              FutureBuilder<CustomerSummaryDto>(
+                                future: _summaryFuture,
+                                builder: (context, ss) {
+                                  if (!ss.hasData) return const SizedBox.shrink();
+                                  final pts = ss.data!.loyaltyPoints;
+                                  return Row(mainAxisSize: MainAxisSize.min, children: [
+                                    Chip(label: Text('Points: ${pts.toStringAsFixed(0)}')),
+                                    const SizedBox(width: 6),
+                                    FutureBuilder<LoyaltySettingsDto>(
+                                      future: _loySettingsFuture,
+                                      builder: (context, ls) {
+                                        if (!ls.hasData) return const SizedBox.shrink();
+                                        final avail = (pts - ls.data!.minPointsReserve).clamp(0, double.infinity);
+                                        return Chip(label: Text('Avail: ${avail.toStringAsFixed(0)}'));
+                                      },
+                                    ),
+                                  ]);
+                                },
+                              ),
+                            ]);
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 );

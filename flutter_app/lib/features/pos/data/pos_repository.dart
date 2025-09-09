@@ -103,6 +103,7 @@ class PosRepository {
     double discountAmount = 0.0,
     int? saleId,
     List<PosPaymentLineDto>? payments,
+    double? redeemPoints,
   }) async {
     final loc = _ref.read(locationNotifierProvider).selected;
     if (loc == null) {
@@ -124,6 +125,7 @@ class PosRepository {
       'discount_amount': discountAmount,
       if (payments != null && payments.isNotEmpty)
         'payments': payments.map((p) => p.toJson()).toList(),
+      if (redeemPoints != null && redeemPoints > 0) 'redeem_points': redeemPoints,
     };
     final res = await _dio.post(
       '/pos/checkout',
