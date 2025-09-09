@@ -4,12 +4,17 @@ package models
 // includes credit outstanding, inventory value, today's totals and cash summary
 
 type DashboardMetrics struct {
-	CreditOutstanding float64 `json:"credit_outstanding"`
-	InventoryValue    float64 `json:"inventory_value"`
-	TodaySales        float64 `json:"today_sales"`
-	TodayPurchases    float64 `json:"today_purchases"`
-	CashIn            float64 `json:"cash_in"`
-	CashOut           float64 `json:"cash_out"`
+    CreditOutstanding float64 `json:"credit_outstanding"`
+    InventoryValue    float64 `json:"inventory_value"`
+    TodaySales        float64 `json:"today_sales"`
+    TodayPurchases    float64 `json:"today_purchases"`
+    CashIn            float64 `json:"cash_in"`
+    CashOut           float64 `json:"cash_out"`
+    // Optional total aggregates for clients that want non-daily views
+    TotalSales        float64 `json:"total_sales,omitempty"`
+    TotalPurchases    float64 `json:"total_purchases,omitempty"`
+    CashInTotal       float64 `json:"cash_in_total,omitempty"`
+    CashOutTotal      float64 `json:"cash_out_total,omitempty"`
 }
 
 // QuickActionCounts represents counts for quick dashboard actions

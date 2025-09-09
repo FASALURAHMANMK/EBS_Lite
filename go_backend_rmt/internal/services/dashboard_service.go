@@ -146,6 +146,88 @@ func (s *DashboardService) GetMetrics(companyID int, locationID *int) (*models.D
     }
     metrics.CashOut = supplierPayments + expenses
 
+    // Totals (all-time aggregates) for convenience in UI when today's values are zero
+    {
+        // Total sales
+        q := fmt.Sprintf(`
+            SELECT COALESCE(SUM(s.total_amount),0)
+            FROM sales s
+            JOIN locations l ON s.location_id = l.location_id
+            WHERE l.company_id = $1%s AND s.is_deleted = FALSE`, fmt.Sprintf(locFilter, "s"))
+        if err := s.db.QueryRow(q, args...).Scan(&metrics.TotalSales); err != nil {
+            return nil, fmt.Errorf("failed to get total sales: %w", err)
+        }
+    }
+    {
+        // Total purchases
+        q := fmt.Sprintf(`
+            SELECT COALESCE(SUM(p.total_amount),0)
+            FROM purchases p
+            JOIN locations l ON p.location_id = l.location_id
+            WHERE l.company_id = $1%s AND p.is_deleted = FALSE`, fmt.Sprintf(locFilter, "p"))
+        if err := s.db.QueryRow(q, args...).Scan(&metrics.TotalPurchases); err != nil {
+            return nil, fmt.Errorf("failed to get total purchases: %w", err)
+        }
+    }
+    {
+        // Total cash in
+        var totalSalesPaid, totalCollections float64
+        q1 := fmt.Sprintf(`
+            SELECT COALESCE(SUM(sp.base_amount),0)
+            FROM sale_payments sp
+            JOIN sales s ON sp.sale_id = s.sale_id
+            JOIN locations l ON s.location_id = l.location_id
+            WHERE l.company_id = $1%s AND s.is_deleted = FALSE`, fmt.Sprintf(locFilter, "s"))
+        if err := s.db.QueryRow(q1, args...).Scan(&totalSalesPaid); err != nil {
+            return nil, fmt.Errorf("failed to get total sales payments: %w", err)
+        }
+        q2 := fmt.Sprintf(`
+            SELECT COALESCE(SUM(c.amount),0)
+            FROM collections c
+            JOIN customers cu ON c.customer_id = cu.customer_id
+            WHERE cu.company_id = $1%s`, func() string {
+                if locationID != nil {
+                    return " AND c.location_id = $2"
+                }
+                return ""
+            }())
+        if err := s.db.QueryRow(q2, args...).Scan(&totalCollections); err != nil {
+            return nil, fmt.Errorf("failed to get total collections: %w", err)
+        }
+        metrics.CashInTotal = totalSalesPaid + totalCollections
+    }
+    {
+        // Total cash out
+        var totalSupplierPayments, totalExpenses float64
+        q1 := fmt.Sprintf(`
+            SELECT COALESCE(SUM(pay.amount),0)
+            FROM payments pay
+            JOIN locations l ON pay.location_id = l.location_id
+            WHERE l.company_id = $1%s AND pay.is_deleted = FALSE`, func() string {
+                if locationID != nil {
+                    return " AND pay.location_id = $2"
+                }
+                return ""
+            }())
+        if err := s.db.QueryRow(q1, args...).Scan(&totalSupplierPayments); err != nil {
+            return nil, fmt.Errorf("failed to get total supplier payments: %w", err)
+        }
+        q2 := fmt.Sprintf(`
+            SELECT COALESCE(SUM(e.amount),0)
+            FROM expenses e
+            JOIN locations l ON e.location_id = l.location_id
+            WHERE l.company_id = $1%s AND e.is_deleted = FALSE`, func() string {
+                if locationID != nil {
+                    return " AND e.location_id = $2"
+                }
+                return ""
+            }())
+        if err := s.db.QueryRow(q2, args...).Scan(&totalExpenses); err != nil {
+            return nil, fmt.Errorf("failed to get total expenses: %w", err)
+        }
+        metrics.CashOutTotal = totalSupplierPayments + totalExpenses
+    }
+
     return metrics, nil
 }
 

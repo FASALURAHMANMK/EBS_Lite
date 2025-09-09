@@ -30,7 +30,7 @@ class DashboardContent extends ConsumerWidget {
     final size = MediaQuery.of(context).size;
     final shortest = size.shortestSide;
 
-    // Responsive grid
+    // Responsive grid columns
     final crossAxisCount = shortest >= 1100
         ? 4
         : shortest >= 900
@@ -38,94 +38,83 @@ class DashboardContent extends ConsumerWidget {
             : shortest >= 600
                 ? 2
                 : 1;
+    final aspect = size.width < 900 ? 1.25 : 1.5;
 
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          sliver: SliverToBoxAdapter(
-            child: Text(
-              'Overview',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800),
-            ),
-          ),
+    // Non-sliver grid blocks layout
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      children: [
+        Text(
+          'Overview',
+          style: Theme.of(context)
+              .textTheme
+              .titleLarge
+              ?.copyWith(fontWeight: FontWeight.w800),
         ),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: SliverGrid(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: size.width < 900 ? 1.25 : 1.5,
+        const SizedBox(height: 12),
+        GridView.count(
+          crossAxisCount: crossAxisCount,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: aspect,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            StatCard(
+              icon: Icons.credit_card_rounded,
+              title: 'Total Credit Outstanding',
+              value: _fmt(metrics?.creditOutstanding),
+              subtitle: 'All customers',
+              color: Colors.indigo,
             ),
-            delegate: SliverChildListDelegate([
-              StatCard(
-                icon: Icons.credit_card_rounded,
-                title: 'Total Credit Outstanding',
-                value: _fmt(metrics?.creditOutstanding),
-                subtitle: 'All customers',
-                color: Colors.indigo,
-              ),
-              StatCard(
-                icon: Icons.inventory_2_rounded,
-                title: 'Total Inventory Value',
-                value: _fmt(metrics?.inventoryValue),
-                subtitle: 'Across warehouses',
-                color: Colors.teal,
-              ),
-              StatCard(
-                icon: Icons.swap_horiz_rounded,
-                title: "Today's Sales",
-                value: _fmt(metrics?.todaySales),
-                subtitle: 'Net transactions',
-                color: Colors.orange,
-              ),
-              StatCard(
-                icon: Icons.shopping_bag_rounded,
-                title: "Today's Purchases",
-                value: _fmt(metrics?.todayPurchases),
-                subtitle: 'Supplier orders',
-                color: Colors.purple,
-              ),
-              StatCard(
-                icon: Icons.attach_money_rounded,
-                title: 'Daily Cash Summary',
-                value: _fmt(metrics?.dailyCashSummary),
-                subtitle: 'Cash flow',
-                color: Colors.green,
-              ),
-            ]),
-          ),
+            StatCard(
+              icon: Icons.inventory_2_rounded,
+              title: 'Total Inventory Value',
+              value: _fmt(metrics?.inventoryValue),
+              subtitle: 'Across warehouses',
+              color: Colors.teal,
+            ),
+            StatCard(
+              icon: Icons.swap_horiz_rounded,
+              title: "Today's Sales",
+              value: _fmt(metrics?.todaySales),
+              subtitle: 'Net transactions',
+              color: Colors.orange,
+            ),
+            StatCard(
+              icon: Icons.shopping_bag_rounded,
+              title: "Today's Purchases",
+              value: _fmt(metrics?.todayPurchases),
+              subtitle: 'Supplier orders',
+              color: Colors.purple,
+            ),
+            StatCard(
+              icon: Icons.attach_money_rounded,
+              title: 'Daily Cash Summary',
+              value: _fmt(metrics?.dailyCashSummary),
+              subtitle: 'Cash flow',
+              color: Colors.green,
+            ),
+          ],
         ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          sliver: SliverToBoxAdapter(
-            child: Text(
-              'Shortcuts',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800),
-            ),
-          ),
+        const SizedBox(height: 16),
+        Text(
+          'Shortcuts',
+          style: Theme.of(context)
+              .textTheme
+              .titleLarge
+              ?.copyWith(fontWeight: FontWeight.w800),
         ),
-        SliverToBoxAdapter(
-          child: SizedBox(
-            height: 280,
-            child: FeatureGrid(
-              items: const [
-                FeatureItem(
-                    icon: Icons.point_of_sale_rounded, label: 'New Sale'),
-                FeatureItem(icon: Icons.inventory_2_rounded, label: 'Products'),
-                FeatureItem(icon: Icons.people_alt_rounded, label: 'Customers'),
-                FeatureItem(
-                    icon: Icons.point_of_sale_rounded, label: 'Cash Register'),
-              ],
-            ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 280,
+          child: FeatureGrid(
+            items: const [
+              FeatureItem(icon: Icons.point_of_sale_rounded, label: 'New Sale'),
+              FeatureItem(icon: Icons.inventory_2_rounded, label: 'Products'),
+              FeatureItem(icon: Icons.people_alt_rounded, label: 'Customers'),
+              FeatureItem(icon: Icons.point_of_sale_rounded, label: 'Cash Register'),
+            ],
           ),
         ),
       ],

@@ -4,6 +4,10 @@ class DashboardMetrics {
   final double todaySales;
   final double todayPurchases;
   final double dailyCashSummary;
+  final double? totalSales; // optional fallback support
+  final double? totalPurchases;
+  final double? cashInTotal;
+  final double? cashOutTotal;
 
   DashboardMetrics({
     required this.creditOutstanding,
@@ -11,14 +15,18 @@ class DashboardMetrics {
     required this.todaySales,
     required this.todayPurchases,
     required this.dailyCashSummary,
+    this.totalSales,
+    this.totalPurchases,
+    this.cashInTotal,
+    this.cashOutTotal,
   });
 
   factory DashboardMetrics.fromJson(Map<String, dynamic> json) {
     final creditOutstanding =
         (json['credit_outstanding'] as num?)?.toDouble() ?? 0;
     final inventoryValue = (json['inventory_value'] as num?)?.toDouble() ?? 0;
-    final todaySales = (json['today_sales'] as num?)?.toDouble() ?? 0;
-    final todayPurchases =
+    var todaySales = (json['today_sales'] as num?)?.toDouble() ?? 0;
+    var todayPurchases =
         (json['today_purchases'] as num?)?.toDouble() ?? 0;
 
     // Backend exposes cash_in and cash_out. If daily_cash_summary is not
@@ -26,8 +34,23 @@ class DashboardMetrics {
     final dailyCash = (json['daily_cash_summary'] as num?)?.toDouble();
     final cashIn = (json['cash_in'] as num?)?.toDouble();
     final cashOut = (json['cash_out'] as num?)?.toDouble();
-    final dailyCashSummary = dailyCash ??
+    var dailyCashSummary = dailyCash ??
         ((cashIn != null && cashOut != null) ? (cashIn - cashOut) : 0);
+
+    // Optional totals for non-daily fallback
+    final tSales = (json['total_sales'] as num?)?.toDouble();
+    final tPurchases = (json['total_purchases'] as num?)?.toDouble();
+    final tCashIn = (json['cash_in_total'] as num?)?.toDouble();
+    final tCashOut = (json['cash_out_total'] as num?)?.toDouble();
+
+    // If today's values are zero and totals exist, use totals as a fallback so the dashboard isn't empty
+    if ((todaySales == 0) && (tSales != null)) todaySales = tSales;
+    if ((todayPurchases == 0) && (tPurchases != null)) todayPurchases = tPurchases;
+
+    // Fallback cash summary using totals if daily is zero
+    if (dailyCashSummary == 0 && tCashIn != null && tCashOut != null) {
+      dailyCashSummary = tCashIn - tCashOut;
+    }
 
     return DashboardMetrics(
       creditOutstanding: creditOutstanding,
@@ -35,6 +58,10 @@ class DashboardMetrics {
       todaySales: todaySales,
       todayPurchases: todayPurchases,
       dailyCashSummary: dailyCashSummary,
+      totalSales: tSales,
+      totalPurchases: tPurchases,
+      cashInTotal: tCashIn,
+      cashOutTotal: tCashOut,
     );
   }
 }
