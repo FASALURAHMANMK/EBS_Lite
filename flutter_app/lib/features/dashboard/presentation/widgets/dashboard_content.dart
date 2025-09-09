@@ -57,84 +57,99 @@ class DashboardContent extends ConsumerWidget {
                 : 1;
     final aspect = size.width < 900 ? 1.25 : 1.5;
 
-    // Non-sliver grid blocks layout
-    return ListView(
+    // Pure GridView experience as requested (no Slivers)
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      children: [
-        Text(
-          'Overview',
-          style: Theme.of(context)
-              .textTheme
-              .titleLarge
-              ?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: aspect,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          children: [
-            StatCard(
-              icon: Icons.credit_card_rounded,
-              title: 'Total Credit Outstanding',
-              value: _fmt(metrics?.creditOutstanding),
-              subtitle: 'All customers',
-              color: Colors.indigo,
-            ),
-            StatCard(
-              icon: Icons.inventory_2_rounded,
-              title: 'Total Inventory Value',
-              value: _fmt(metrics?.inventoryValue),
-              subtitle: 'Across warehouses',
-              color: Colors.teal,
-            ),
-            StatCard(
-              icon: Icons.swap_horiz_rounded,
-              title: "Today's Sales",
-              value: _fmt(metrics?.todaySales),
-              subtitle: 'Net transactions',
-              color: Colors.orange,
-            ),
-            StatCard(
-              icon: Icons.shopping_bag_rounded,
-              title: "Today's Purchases",
-              value: _fmt(metrics?.todayPurchases),
-              subtitle: 'Supplier orders',
-              color: Colors.purple,
-            ),
-            StatCard(
-              icon: Icons.attach_money_rounded,
-              title: 'Daily Cash Summary',
-              value: _fmt(metrics?.dailyCashSummary),
-              subtitle: 'Cash flow',
-              color: Colors.green,
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Shortcuts',
-          style: Theme.of(context)
-              .textTheme
-              .titleLarge
-              ?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 280,
-          child: FeatureGrid(
-            items: const [
-              FeatureItem(icon: Icons.point_of_sale_rounded, label: 'New Sale'),
-              FeatureItem(icon: Icons.inventory_2_rounded, label: 'Products'),
-              FeatureItem(icon: Icons.people_alt_rounded, label: 'Customers'),
-              FeatureItem(icon: Icons.point_of_sale_rounded, label: 'Cash Register'),
-            ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Overview',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.w800),
           ),
-        ),
-      ],
+          const SizedBox(height: 12),
+          // Grid takes the remaining space and scrolls
+          Expanded(
+            child: GridView.count(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: aspect,
+              children: [
+                StatCard(
+                  icon: Icons.credit_card_rounded,
+                  title: 'Total Credit Outstanding',
+                  value: _fmt(metrics?.creditOutstanding),
+                  subtitle: 'All customers',
+                  color: Colors.indigo,
+                ),
+                StatCard(
+                  icon: Icons.inventory_2_rounded,
+                  title: 'Total Inventory Value',
+                  value: _fmt(metrics?.inventoryValue),
+                  subtitle: 'Across warehouses',
+                  color: Colors.teal,
+                ),
+                StatCard(
+                  icon: Icons.swap_horiz_rounded,
+                  title: "Today's Sales",
+                  value: _fmt(metrics?.todaySales),
+                  subtitle: 'Net transactions',
+                  color: Colors.orange,
+                ),
+                StatCard(
+                  icon: Icons.shopping_bag_rounded,
+                  title: "Today's Purchases",
+                  value: _fmt(metrics?.todayPurchases),
+                  subtitle: 'Supplier orders',
+                  color: Colors.purple,
+                ),
+                StatCard(
+                  icon: Icons.attach_money_rounded,
+                  title: 'Daily Cash Summary',
+                  value: _fmt(metrics?.dailyCashSummary),
+                  subtitle: 'Cash flow',
+                  color: Colors.green,
+                ),
+                // Shortcuts block as a grid tile
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Shortcuts',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: FeatureGrid(
+                          items: const [
+                            FeatureItem(icon: Icons.point_of_sale_rounded, label: 'New Sale'),
+                            FeatureItem(icon: Icons.inventory_2_rounded, label: 'Products'),
+                            FeatureItem(icon: Icons.people_alt_rounded, label: 'Customers'),
+                            FeatureItem(icon: Icons.point_of_sale_rounded, label: 'Cash Register'),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
