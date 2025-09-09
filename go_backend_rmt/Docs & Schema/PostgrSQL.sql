@@ -2053,20 +2053,6 @@ CREATE TABLE IF NOT EXISTS promotion_usage (
     used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Loyalty Settings Table (company-specific loyalty program settings)
-CREATE TABLE IF NOT EXISTS loyalty_settings (
-    setting_id SERIAL PRIMARY KEY,
-    company_id INTEGER NOT NULL REFERENCES companies(company_id) ON DELETE CASCADE,
-    points_per_currency NUMERIC(5,2) DEFAULT 1.0, -- Points earned per currency unit
-    point_value NUMERIC(5,4) DEFAULT 0.01, -- Value of each point in currency
-    min_redemption_points INTEGER DEFAULT 100, -- Minimum points required to redeem
-    min_points_reserve INTEGER DEFAULT 0, -- Minimum points to keep (not redeemable)
-    points_expiry_days INTEGER DEFAULT 365, -- Days after which points expire
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(company_id)
-);
 
 -- Return Reasons Table (predefined reasons for returns)
 CREATE TABLE IF NOT EXISTS return_reasons (
@@ -2545,12 +2531,6 @@ CREATE INDEX IF NOT EXISTS idx_sale_payments_sale ON sale_payments(sale_id);
 CREATE INDEX IF NOT EXISTS idx_sale_payments_method ON sale_payments(method_id);
 
 -- loyalty additions
--- Insert default loyalty settings for existing companies
-INSERT INTO loyalty_settings (company_id, points_per_currency, point_value, min_redemption_points, points_expiry_days)
-SELECT company_id, 1.0, 0.01, 100, 365
-FROM companies
-WHERE company_id NOT IN (SELECT company_id FROM loyalty_settings)
-ON CONFLICT (company_id) DO NOTHING;
 
 -- Loyalty Tiers: define tiers like Silver/Gold/Platinum with minimum points
 CREATE TABLE IF NOT EXISTS loyalty_tiers (
@@ -2592,3 +2572,27 @@ DO $$ BEGIN
         ALTER TABLE loyalty_tiers ADD COLUMN points_per_currency NUMERIC(10,2);
     END IF;
 END $$;
+
+-- drop existing loyalty settings if they exist
+DROP TABLE IF EXISTS loyalty_settings;
+
+CREATE TABLE IF NOT EXISTS loyalty_settings (
+    setting_id SERIAL PRIMARY KEY,
+    company_id INTEGER NOT NULL REFERENCES companies(company_id) ON DELETE CASCADE,
+    points_per_currency NUMERIC(5,2) DEFAULT 1.0, -- Points earned per currency unit
+    point_value NUMERIC(5,4) DEFAULT 0.01, -- Value of each point in currency
+    min_redemption_points INTEGER DEFAULT 100, -- Minimum points required to redeem
+    min_points_reserve INTEGER DEFAULT 0, -- Minimum points to keep (not redeemable)
+    points_expiry_days INTEGER DEFAULT 365, -- Days after which points expire
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(company_id)
+);
+
+-- Backfill default loyalty settings for existing companies
+ INSERT INTO loyalty_settings (company_id, points_per_currency, point_value, min_redemption_points, points_expiry_days)
+SELECT company_id, 1.0, 0.01, 100, 365
+FROM companies
+WHERE company_id NOT IN (SELECT company_id FROM loyalty_settings)
+ON CONFLICT (company_id) DO NOTHING;
