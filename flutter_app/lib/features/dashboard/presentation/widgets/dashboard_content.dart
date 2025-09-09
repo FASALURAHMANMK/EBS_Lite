@@ -30,6 +30,23 @@ class DashboardContent extends ConsumerWidget {
     final size = MediaQuery.of(context).size;
     final shortest = size.shortestSide;
 
+    // Loading and error states so we don't show zeros by default
+    if (state.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (state.error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            state.error!,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.redAccent),
+          ),
+        ),
+      );
+    }
+
     // Responsive grid columns
     final crossAxisCount = shortest >= 1100
         ? 4

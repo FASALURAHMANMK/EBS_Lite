@@ -284,19 +284,14 @@ func (s *DashboardService) GetQuickActionCounts(companyID int, locationID *int) 
         }
     }
 
-    // Payments today (vouchers) — keep for parity where used in UI
+    // Payments today (vouchers) — filter by company via creator user; vouchers have no location
     {
-        q := fmt.Sprintf(`
+        q := `
             SELECT COUNT(*)
             FROM vouchers v
-            JOIN locations l ON v.location_id = l.location_id
-            WHERE l.company_id = $1%s AND v.date = CURRENT_DATE AND v.type = 'PAYMENT' AND v.is_deleted = FALSE`, func() string {
-                if locationID != nil {
-                    return " AND v.location_id = $2"
-                }
-                return ""
-            }())
-        if err := s.db.QueryRow(q, args...).Scan(&counts.PaymentsToday); err != nil {
+            JOIN users u ON v.created_by = u.user_id
+            WHERE u.company_id = $1 AND v.date = CURRENT_DATE AND v.type = 'PAYMENT' AND v.is_deleted = FALSE`
+        if err := s.db.QueryRow(q, companyID).Scan(&counts.PaymentsToday); err != nil {
             return nil, fmt.Errorf("failed to get payments count: %w", err)
         }
     }
@@ -318,36 +313,26 @@ func (s *DashboardService) GetQuickActionCounts(companyID int, locationID *int) 
         }
     }
 
-    // Receipts today
+    // Receipts today (vouchers) — filter by company via creator user
     {
-        q := fmt.Sprintf(`
+        q := `
             SELECT COUNT(*)
             FROM vouchers v
-            JOIN locations l ON v.location_id = l.location_id
-            WHERE l.company_id = $1%s AND v.date = CURRENT_DATE AND v.type = 'RECEIPT' AND v.is_deleted = FALSE`, func() string {
-                if locationID != nil {
-                    return " AND v.location_id = $2"
-                }
-                return ""
-            }())
-        if err := s.db.QueryRow(q, args...).Scan(&counts.ReceiptsToday); err != nil {
+            JOIN users u ON v.created_by = u.user_id
+            WHERE u.company_id = $1 AND v.date = CURRENT_DATE AND v.type = 'RECEIPT' AND v.is_deleted = FALSE`
+        if err := s.db.QueryRow(q, companyID).Scan(&counts.ReceiptsToday); err != nil {
             return nil, fmt.Errorf("failed to get receipts count: %w", err)
         }
     }
 
-    // Journals today
+    // Journals today (vouchers) — filter by company via creator user
     {
-        q := fmt.Sprintf(`
+        q := `
             SELECT COUNT(*)
             FROM vouchers v
-            JOIN locations l ON v.location_id = l.location_id
-            WHERE l.company_id = $1%s AND v.date = CURRENT_DATE AND v.type = 'JOURNAL' AND v.is_deleted = FALSE`, func() string {
-                if locationID != nil {
-                    return " AND v.location_id = $2"
-                }
-                return ""
-            }())
-        if err := s.db.QueryRow(q, args...).Scan(&counts.JournalsToday); err != nil {
+            JOIN users u ON v.created_by = u.user_id
+            WHERE u.company_id = $1 AND v.date = CURRENT_DATE AND v.type = 'JOURNAL' AND v.is_deleted = FALSE`
+        if err := s.db.QueryRow(q, companyID).Scan(&counts.JournalsToday); err != nil {
             return nil, fmt.Errorf("failed to get journals count: %w", err)
         }
     }
