@@ -3,12 +3,14 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:intl/intl.dart';
 
 class InvoicePdfBuilder {
   static Future<Uint8List> buildPdfFromWidgets(
     Map<String, dynamic> sale,
     Map<String, dynamic> company, {
     PdfPageFormat? format,
+    String? logoUrl,
   }) async {
     final doc = pw.Document();
 
@@ -20,11 +22,18 @@ class InvoicePdfBuilder {
     final discount = _asDouble(sale['discount_amount']);
     final total = _asDouble(sale['total_amount']);
 
+    pw.ImageProvider? logoProvider;
+    if (logoUrl != null && logoUrl.isNotEmpty) {
+      try {
+        logoProvider = await networkImage(logoUrl);
+      } catch (_) {}
+    }
+
     doc.addPage(
       pw.MultiPage(
         pageFormat: format ?? PdfPageFormat.a4,
         build: (context) => [
-          _header(company, saleNumber),
+          _header(company, saleNumber, logoProvider: logoProvider),
           pw.SizedBox(height: 16),
           _itemsTable(items),
           pw.SizedBox(height: 12),
@@ -42,7 +51,7 @@ class InvoicePdfBuilder {
     return doc.save();
   }
 
-  static pw.Widget _header(Map<String, dynamic> company, String saleNumber) {
+  static pw.Widget _header(Map<String, dynamic> company, String saleNumber, {pw.ImageProvider? logoProvider}) {
     final name = (company['name'] as String?) ?? '';
     final address = (company['address'] as String?) ?? '';
     final phone = (company['phone'] as String?) ?? '';
@@ -51,11 +60,21 @@ class InvoicePdfBuilder {
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
-        pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          if (logoProvider != null) ...[
+            pw.Container(
+              margin: const pw.EdgeInsets.only(right: 12),
+              width: 56,
+              height: 56,
+              child: pw.Image(logoProvider, fit: pw.BoxFit.contain),
+            ),
+          ],
+          pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
           pw.Text(name, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
           if (address.isNotEmpty) pw.Text(address),
           if (phone.isNotEmpty) pw.Text('Phone: $phone'),
           if (email.isNotEmpty) pw.Text('Email: $email'),
+          ]),
         ]),
         pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
           pw.Text('INVOICE', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
@@ -84,7 +103,7 @@ class InvoicePdfBuilder {
       ];
     }).toList();
 
-    return pw.Table.fromTextArray(
+    return pw.TableHelper.fromTextArray(
       headers: headers,
       data: data,
       border: null,
@@ -134,15 +153,16 @@ class InvoicePdfBuilder {
     Map<String, dynamic> sale,
     Map<String, dynamic> company, {
     PdfPageFormat? format,
+    String? logoUrl,
   }) async {
-    final html = _buildHtml(sale, company);
+    final html = _buildHtml(sale, company, logoUrl: logoUrl);
     return await Printing.convertHtml(
       format: format ?? PdfPageFormat.a4,
       html: html,
     );
   }
 
-  static String _buildHtml(Map<String, dynamic> sale, Map<String, dynamic> company) {
+  static String _buildHtml(Map<String, dynamic> sale, Map<String, dynamic> company, {String? logoUrl}) {
     final saleNumber = (sale['sale_number'] as String?) ?? '';
     final items = (sale['items'] as List<dynamic>? ?? const [])
         .cast<Map<String, dynamic>>();
@@ -173,6 +193,8 @@ class InvoicePdfBuilder {
           '</tr>';
     }).join();
 
+    final logoImg = (logoUrl != null && logoUrl.isNotEmpty) ? '<img src="$logoUrl" style="max-height:56px;max-width:56px;margin-right:12px" />' : '';
+
     return '''
 <!DOCTYPE html>
 <html>
@@ -197,11 +219,14 @@ class InvoicePdfBuilder {
   </head>
   <body>
     <div class="header">
-      <div>
+      <div style="display:flex;align-items:flex-start;">
+        $logoImg
         <div class="title">$name</div>
-        <div class="muted">$address</div>
-        <div class="muted">$phone</div>
-        <div class="muted">$email</div>
+        <div style="display:block">
+          <div class="muted">$address</div>
+          <div class="muted">$phone</div>
+          <div class="muted">$email</div>
+        </div>
       </div>
       <div>
         <div class="title">INVOICE</div>
@@ -248,6 +273,8 @@ class InvoicePdfBuilder {
     return 0.0;
   }
 
-  static String _fmt(double v) => v.toStringAsFixed(2);
+  static String _fmt(double v) {
+    final nf = NumberFormat.decimalPattern();
+    return nf.format(v);
+  }
 }
-
