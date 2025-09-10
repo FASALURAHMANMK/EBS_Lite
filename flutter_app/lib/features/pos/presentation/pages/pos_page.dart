@@ -6,7 +6,7 @@ import '../../controllers/pos_notifier.dart';
 import '../../data/models.dart';
 import '../../data/pos_repository.dart';
 import '../widgets/customer_selector_dialog.dart';
-import '../widgets/payment_dialog.dart';
+import 'payment_page.dart';
 
 class PosPage extends ConsumerWidget {
   const PosPage({super.key});
@@ -359,21 +359,9 @@ class _BottomBar extends ConsumerWidget {
                   onPressed: state.cart.isEmpty
                       ? null
                       : () async {
-                          final result = await showDialog<PosCheckoutResult>(
-                            context: context,
-                            builder: (_) => const PaymentDialog(),
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const PaymentPage()),
                           );
-                          if (result != null && context.mounted) {
-                            // Force preview refresh on successful finalize
-                            await ref
-                                .read(posNotifierProvider.notifier)
-                                .refreshPreview();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text(
-                                      'Sale completed: ${result.saleNumber}')),
-                            );
-                          }
                         },
                   icon: const Icon(Icons.arrow_forward_rounded),
                   label: const Text('Payment'),

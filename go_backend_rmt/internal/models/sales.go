@@ -135,7 +135,15 @@ type POSCheckoutRequest struct {
 }
 
 type POSPrintRequest struct {
-	InvoiceID int `json:"invoice_id" validate:"required"`
+	InvoiceID  *int    `json:"invoice_id,omitempty"`
+	SaleNumber *string `json:"sale_number,omitempty"`
+}
+
+// POSPrintDataResponse is returned to client apps so they can render
+// and print invoices locally.
+type POSPrintDataResponse struct {
+	Sale    Sale    `json:"sale"`
+	Company Company `json:"company"`
 }
 
 type POSProductResponse struct {

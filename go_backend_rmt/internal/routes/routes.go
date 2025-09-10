@@ -54,7 +54,6 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 	dashboardHandler := handlers.NewDashboardHandler()
 	languageHandler := handlers.NewLanguageHandler()
 	translationHandler := handlers.NewTranslationHandler()
-	printHandler := handlers.NewPrintHandler()
 	numberingSequenceHandler := handlers.NewNumberingSequenceHandler()
 	invoiceTemplateHandler := handlers.NewInvoiceTemplateHandler()
 	currencyHandler := handlers.NewCurrencyHandler()
@@ -656,12 +655,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				invoiceTemplates.DELETE("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), invoiceTemplateHandler.DeleteInvoiceTemplate)
 			}
 
-			// Printing routes
-			printGroup := protected.Group("/print")
-			printGroup.Use(middleware.RequireCompanyAccess())
-			{
-				printGroup.POST("/receipt", middleware.RequirePermission("PRINT_RECEIPTS"), printHandler.PrintReceipt)
-			}
+            // Printing now handled client-side; server returns print data via /pos/print
 
 			// Workflow & Approvals routes
 			workflow := protected.Group("/workflow-requests")

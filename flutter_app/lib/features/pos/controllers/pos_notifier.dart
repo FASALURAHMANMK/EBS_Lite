@@ -56,12 +56,13 @@ class PosState {
     int? activeSaleId,
     bool clearCommittedReceipt = false,
     bool clearActiveSaleId = false,
+    bool clearCustomer = false,
   }) {
     return PosState(
       receiptPreview: receiptPreview ?? this.receiptPreview,
       committedReceipt: clearCommittedReceipt ? null : (committedReceipt ?? this.committedReceipt),
-      customer: customer ?? this.customer,
-      customerLabel: customerLabel ?? this.customerLabel,
+      customer: clearCustomer ? null : (customer ?? this.customer),
+      customerLabel: clearCustomer ? 'Walk in' : (customerLabel ?? this.customerLabel),
       query: query ?? this.query,
       suggestions: suggestions ?? this.suggestions,
       cart: cart ?? this.cart,
@@ -196,6 +197,7 @@ class PosNotifier extends StateNotifier<PosState> {
     state = state.copyWith(
       clearCommittedReceipt: true,
       clearActiveSaleId: true,
+      clearCustomer: true,
       receiptPreview: nextPreview,
       cart: const [],
       suggestions: const [],

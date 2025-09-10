@@ -220,6 +220,16 @@ class PosRepository {
     return list.map((e) => CurrencyDto.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  Future<Map<String, dynamic>> getPrintData({int? invoiceId, String? saleNumber}) async {
+    final payload = <String, dynamic>{
+      if (invoiceId != null) 'invoice_id': invoiceId,
+      if (saleNumber != null && saleNumber.isNotEmpty) 'sale_number': saleNumber,
+    };
+    final res = await _dio.post('/pos/print', data: payload);
+    final body = (res.data is Map<String, dynamic>) ? (res.data['data'] as Map<String, dynamic>?) : null;
+    return body ?? <String, dynamic>{};
+  }
+
   Future<CustomerDetailDto> getCustomerDetail(int customerId) async {
     final res = await _dio.get('/customers/$customerId');
     final body = res.data is Map<String, dynamic> ? res.data['data'] : res.data;

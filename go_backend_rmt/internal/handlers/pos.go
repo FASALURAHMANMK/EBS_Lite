@@ -12,7 +12,7 @@ import (
 )
 
 type POSHandler struct {
-	posService *services.POSService
+    posService *services.POSService
 }
 
 func NewPOSHandler() *POSHandler {
@@ -145,36 +145,51 @@ func (h *POSHandler) ProcessCheckout(c *gin.Context) {
 
 // POST /pos/print
 func (h *POSHandler) PrintInvoice(c *gin.Context) {
-	companyID := c.GetInt("company_id")
-	if companyID == 0 {
-		utils.ForbiddenResponse(c, "Company access required")
-		return
-	}
+    companyID := c.GetInt("company_id")
+    if companyID == 0 {
+        utils.ForbiddenResponse(c, "Company access required")
+        return
+    }
 
-	var req models.POSPrintRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
-		return
-	}
+    var req models.POSPrintRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+        return
+    }
 
-	// Validate request
-	if err := utils.ValidateStruct(&req); err != nil {
-		validationErrors := utils.GetValidationErrors(err)
-		utils.ValidationErrorResponse(c, validationErrors)
-		return
-	}
+    // Require either invoice_id or sale_number
+    if (req.InvoiceID == nil || *req.InvoiceID == 0) && (req.SaleNumber == nil || *req.SaleNumber == "") {
+        utils.ErrorResponse(c, http.StatusBadRequest, "invoice_id or sale_number is required", nil)
+        return
+    }
 
-	err := h.posService.PrintInvoice(req.InvoiceID, companyID)
-	if err != nil {
-		if err.Error() == "invoice not found" {
-			utils.NotFoundResponse(c, "Invoice not found")
-			return
-		}
-		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to print invoice", err)
-		return
-	}
+    // Resolve sale
+    salesSvc := services.NewSalesService()
+    var sale *models.Sale
+    var err error
+    if req.InvoiceID != nil && *req.InvoiceID > 0 {
+        sale, err = salesSvc.GetSaleByID(*req.InvoiceID, companyID)
+    } else if req.SaleNumber != nil {
+        sale, err = salesSvc.GetSaleByNumber(*req.SaleNumber, companyID)
+    }
+    if err != nil {
+        if err.Error() == "sale not found" {
+            utils.NotFoundResponse(c, "Invoice not found")
+            return
+        }
+        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to get invoice", err)
+        return
+    }
 
-	utils.SuccessResponse(c, "Invoice sent to printer successfully", nil)
+    // Company details for header/branding
+    companySvc := services.NewCompanyService()
+    company, err := companySvc.GetCompanyByID(companyID)
+    if err != nil {
+        utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to load company", err)
+        return
+    }
+
+    utils.SuccessResponse(c, "Print data", models.POSPrintDataResponse{Sale: *sale, Company: *company})
 }
 
 // GET /pos/held-sales

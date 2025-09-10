@@ -13,7 +13,7 @@ import (
 )
 
 type SalesService struct {
-	db *sql.DB
+    db *sql.DB
 }
 
 func NewSalesService() *SalesService {
@@ -213,6 +213,24 @@ func (s *SalesService) GetSaleByID(saleID, companyID int) (*models.Sale, error) 
 	sale.Items = items
 
 	return &sale, nil
+}
+
+// GetSaleByNumber fetches a sale by its sale_number within a company.
+func (s *SalesService) GetSaleByNumber(saleNumber string, companyID int) (*models.Sale, error) {
+    query := `
+        SELECT s.sale_id
+        FROM sales s
+        JOIN locations l ON s.location_id = l.location_id
+        WHERE s.sale_number = $1 AND l.company_id = $2 AND s.is_deleted = FALSE
+    `
+    var saleID int
+    if err := s.db.QueryRow(query, saleNumber, companyID).Scan(&saleID); err != nil {
+        if err == sql.ErrNoRows {
+            return nil, fmt.Errorf("sale not found")
+        }
+        return nil, fmt.Errorf("failed to resolve sale by number: %w", err)
+    }
+    return s.GetSaleByID(saleID, companyID)
 }
 
 // func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models.CreateSaleRequest) (*models.Sale, error) {

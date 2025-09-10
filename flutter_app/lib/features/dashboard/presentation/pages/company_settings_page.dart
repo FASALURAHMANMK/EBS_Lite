@@ -11,6 +11,7 @@ import 'package:file_picker/file_picker.dart';
 import '../../../auth/controllers/auth_notifier.dart';
 import '../../../../core/api_client.dart';
 import 'locations_management_page.dart';
+import 'printer_settings_page.dart';
 
 class CompanySettingsPage extends ConsumerStatefulWidget {
   const CompanySettingsPage({super.key});
@@ -191,6 +192,20 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                         return 'Company name is required';
                       }
                       return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    leading: const Icon(Icons.print_rounded),
+                    title: const Text('Printer Settings (Device)'),
+                    subtitle: const Text('Configure thermal printer connectivity'),
+                    tileColor: theme.colorScheme.surface,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const PrinterSettingsPage()),
+                      );
                     },
                   ),
                   const SizedBox(height: 12),
