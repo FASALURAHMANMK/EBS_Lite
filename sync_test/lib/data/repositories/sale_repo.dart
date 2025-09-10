@@ -1,10 +1,17 @@
+import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../app_providers.dart';
 import '../db.dart';
 import 'generic_repo.dart';
 
-final saleRepoProvider = Provider<SaleRepo>((ref) => SaleRepo(ref.read(dbProvider), ref.read(scopeCompanyIdProvider), ref.read(scopeLocationIdProvider)));
+final saleRepoProvider = Provider<SaleRepo>(
+  (ref) => SaleRepo(
+    ref.read(dbProvider),
+    ref.read(scopeCompanyIdProvider),
+    ref.read(scopeLocationIdProvider),
+  ),
+);
 
 class SaleRepo extends OutboxableRepo<SalesCompanion> {
   SaleRepo(this.db, this.companyId, this.locationId);
@@ -17,14 +24,14 @@ class SaleRepo extends OutboxableRepo<SalesCompanion> {
 
   @override
   Map<String, Object?> toServerJson(SalesCompanion row) => {
-        'id': row.id.value,
-        'company_id': row.companyId.value,
-        'location_id': row.locationId.value,
-        'txn_date': row.txnDate.value.toUtc().toIso8601String(),
-        'total': row.total.value,
-        'deleted': row.deleted.present ? row.deleted.value : false,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      };
+    'id': row.id.value,
+    'company_id': row.companyId.value,
+    'location_id': row.locationId.value,
+    'txn_date': row.txnDate.value.toUtc().toIso8601String(),
+    'total': row.total.value,
+    'deleted': row.deleted.present ? row.deleted.value : false,
+    'updated_at': DateTime.now().toUtc().toIso8601String(),
+  };
 
   @override
   Future<void> upsertLocal(SalesCompanion row) async {

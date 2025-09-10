@@ -3,18 +3,27 @@ import 'package:drift/drift.dart';
 class SyncMeta extends Table {
   TextColumn get scopeCompanyId => text()();
   TextColumn get scopeLocationId => text()();
-  TextColumn get tableName => text()();
+  // renamed from tableName → tblName to avoid colliding with Table.tableName
+  TextColumn get tblName => text()();
   DateTimeColumn get lastServerUpdatedAt => dateTime().nullable()();
   DateTimeColumn get lastLocalPushedAt => dateTime().nullable()();
   @override
-  Set<Column<Object>> get primaryKey => {scopeCompanyId, scopeLocationId, tableName};
+  Set<Column<Object>> get primaryKey => {
+    scopeCompanyId,
+    scopeLocationId,
+    tblName,
+  };
 }
 
 class Outbox extends Table {
   TextColumn get id => text()();
-  TextColumn get tableName => text()();
+  TextColumn get tblName => text()();
   TextColumn get op => text()();
   TextColumn get payloadJson => text()();
+
+  // NEW: store the target row's primary key for safe lookups
+  TextColumn get rowId => text().nullable()();
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get nextAttemptAt => dateTime().nullable()();
   IntColumn get attempts => integer().withDefault(const Constant(0))();

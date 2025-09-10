@@ -5,7 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'drift_tables.dart';
-import 'db.g.dart';
+part 'db.g.dart';
 
 @DriftDatabase(tables: [SyncMeta, Outbox, Products, Sales])
 class AppDatabase extends _$AppDatabase {
@@ -18,6 +18,7 @@ LazyDatabase _open() {
   return LazyDatabase(() async {
     final dir = await getApplicationDocumentsDirectory();
     final file = File(p.join(dir.path, 'sync_demo.sqlite'));
+    // NativeDatabase.createInBackground is valid
     return NativeDatabase.createInBackground(file);
   });
 }
