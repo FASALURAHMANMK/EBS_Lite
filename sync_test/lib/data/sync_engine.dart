@@ -28,6 +28,8 @@ class SyncEngine {
   bool _running = false;
   Timer? _pullTimer;
   Timer? _pushTimer;
+  Timer? _flushDebounce;
+  StreamSubscription<List<OutboxData>>? _outboxSub;
 
   Future<void> start() async {
     if (_running) return;
@@ -35,7 +37,11 @@ class SyncEngine {
     _log('Starting sync…');
     await _ensureBootstrap();
     _subscribeRealtime();
+    _subscribeOutbox();
     _scheduleLoops();
+    // Kick off immediate catch-up and push for snappier UX
+    await _catchUp();
+    await _flushOutbox();
   }
 
   Future<void> stop() async {
@@ -43,8 +49,10 @@ class SyncEngine {
     _log('Stopping sync…');
     await _prodChan?.unsubscribe();
     await _saleChan?.unsubscribe();
+    await _outboxSub?.cancel();
     _pullTimer?.cancel();
     _pushTimer?.cancel();
+    _flushDebounce?.cancel();
   }
 
   void dispose() {
@@ -135,60 +143,105 @@ class SyncEngine {
   }
 
   void _scheduleLoops() {
-    _pullTimer = Timer.periodic(const Duration(seconds: 25), (_) async {
+    _pullTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
       if (_running) await _catchUp();
     });
-    _pushTimer = Timer.periodic(const Duration(seconds: 20), (_) async {
+    _pushTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       if (_running) await _flushOutbox();
+    });
+  }
+
+  void _subscribeOutbox() {
+    _outboxSub?.cancel();
+    _outboxSub = (db.select(db.outbox).watch()).listen((rows) {
+      if (!_running) return;
+      final now = DateTime.now();
+      final hasReady = rows.any((r) => r.nextAttemptAt == null || (r.nextAttemptAt != null && r.nextAttemptAt!.isBefore(now)));
+      if (hasReady) {
+        _flushDebounce?.cancel();
+        _flushDebounce = Timer(const Duration(milliseconds: 200), () {
+          if (_running) {
+            _flushOutbox();
+          }
+        });
+      }
     });
   }
 
   Future<void> _pagedPullProducts() async {
     const pageSize = 1000;
     int from = 0;
+    final since = DateTime.fromMillisecondsSinceEpoch(0).toUtc().toIso8601String();
     while (true) {
-      final q = supabase
-          .from('products')
-          .select()
-          // move filters before order OR use .filter(...)
-          .filter('company_id', 'eq', companyId)
-          .or('location_id.is.null,location_id.eq.${locationId}')
-          .order('updated_at', ascending: true)
-          .range(from, from + pageSize - 1);
-      final rows = await q as List<dynamic>;
-      if (rows.isEmpty) break;
-      await db.transaction(() async {
-        for (final r in rows.cast<Map<String, dynamic>>()) {
-          await _applyProduct(r);
+      try {
+        final res = await supabase.functions.invoke(
+          'sync-pull',
+          body: {
+            'table': 'products',
+            'company_id': companyId,
+            'location_id': locationId,
+            'since': since,
+            'use_gt': false,
+            'from': from,
+            'limit': pageSize,
+          },
+        );
+        if (res.status != 200) {
+          _log('Bootstrap products pull failed: ${res.status}, data: ${res.data}');
+          break;
         }
-      });
-      if (rows.length < pageSize) break;
-      from += pageSize;
+        final rows = (res.data as List).cast<Map<String, dynamic>>();
+        if (rows.isEmpty) break;
+        await db.transaction(() async {
+          for (final r in rows) {
+            await _applyProduct(r);
+          }
+        });
+        if (rows.length < pageSize) break;
+        from += pageSize;
+      } catch (e) {
+        _log('Bootstrap products pull error: $e');
+        break;
+      }
     }
   }
 
   Future<void> _pagedPullSales() async {
     const pageSize = 1000;
     int from = 0;
-    final since = DateTime.now().subtract(const Duration(days: 30));
+    final since = DateTime.fromMillisecondsSinceEpoch(0).toUtc().toIso8601String();
     while (true) {
-      final q = supabase
-          .from('sales')
-          .select()
-          .filter('company_id', 'eq', companyId)
-          .filter('location_id', 'eq', locationId)
-          .filter('txn_date', 'gte', since.toIso8601String())
-          .order('updated_at', ascending: true)
-          .range(from, from + pageSize - 1);
-      final rows = await q as List<dynamic>;
-      if (rows.isEmpty) break;
-      await db.transaction(() async {
-        for (final r in rows.cast<Map<String, dynamic>>()) {
-          await _applySale(r);
+      try {
+        final res = await supabase.functions.invoke(
+          'sync-pull',
+          body: {
+            'table': 'sales',
+            'company_id': companyId,
+            'location_id': locationId,
+            'since': since,
+            'use_gt': false,
+            'from': from,
+            'limit': pageSize,
+            'days': 30,
+          },
+        );
+        if (res.status != 200) {
+          _log('Bootstrap sales pull failed: ${res.status}, data: ${res.data}');
+          break;
         }
-      });
-      if (rows.length < pageSize) break;
-      from += pageSize;
+        final rows = (res.data as List).cast<Map<String, dynamic>>();
+        if (rows.isEmpty) break;
+        await db.transaction(() async {
+          for (final r in rows) {
+            await _applySale(r);
+          }
+        });
+        if (rows.length < pageSize) break;
+        from += pageSize;
+      } catch (e) {
+        _log('Bootstrap sales pull error: $e');
+        break;
+      }
     }
   }
 
@@ -210,33 +263,37 @@ class SyncEngine {
             .getSingle();
     final since =
         meta.lastServerUpdatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-    final base = supabase
-        .from(table)
-        .select()
-        .filter('updated_at', 'gte', since.toIso8601String())
-        .filter('company_id', 'eq', companyId);
-
-    if (table == 'products') {
-      base.or('location_id.is.null,location_id.eq.${locationId}');
-    } else {
-      base
-          .filter('location_id', 'eq', locationId)
-          .filter(
-            'txn_date',
-            'gte',
-            DateTime.now().subtract(const Duration(days: 30)).toIso8601String(),
-          );
+    List<Map<String, dynamic>> rows = const [];
+    try {
+      final res = await supabase.functions.invoke(
+        'sync-pull',
+        body: {
+          'table': table,
+          'company_id': companyId,
+          'location_id': locationId,
+          'since': since.toIso8601String(),
+          'use_gt': meta.lastServerUpdatedAt != null,
+          'from': 0,
+          'limit': 1000,
+          'days': 30,
+        },
+      );
+      if (res.status != 200) {
+        _log('Delta pull failed for $table: ${res.status}, data: ${res.data}');
+        return;
+      }
+      rows = (res.data as List).cast<Map<String, dynamic>>();
+    } catch (e) {
+      _log('Delta pull exception for $table: $e');
+      return;
     }
-
-    final rows =
-        await base.order('updated_at', ascending: true) as List<dynamic>;
 
     if (rows.isEmpty) return;
     await db.transaction(() async {
-      late DateTime maxTs;
-      for (final r in rows.cast<Map<String, dynamic>>()) {
+      DateTime? maxTs;
+      for (final r in rows) {
         final ts = DateTime.parse((r['updated_at'] as String));
-        maxTs = (maxTs == null) ? ts : (ts.isAfter(maxTs) ? ts : maxTs);
+        maxTs = (maxTs == null) ? ts : (ts.isAfter(maxTs!) ? ts : maxTs);
         if (table == 'products') {
           await _applyProduct(r);
         } else {
@@ -249,7 +306,7 @@ class SyncEngine {
                 m.scopeLocationId.equals(locationId) &
                 m.tblName.equals(table),
           ))
-          .write(SyncMetaCompanion(lastServerUpdatedAt: Value(maxTs)));
+          .write(SyncMetaCompanion(lastServerUpdatedAt: Value(maxTs!)));
     });
     _log('Pulled ${rows.length} from $table.');
   }
@@ -332,9 +389,11 @@ class SyncEngine {
           }
         });
         _log('Pushed ${items.length} outbox items.');
+        // Pull immediately after push to reflect server-side changes
+        await _catchUp();
       } else {
         await _backoff(items);
-        _log('Push failed status ${res.status}.');
+        _log('Push failed status ${res.status}, data: ${res.data}');
       }
     } catch (e) {
       await _backoff(items);

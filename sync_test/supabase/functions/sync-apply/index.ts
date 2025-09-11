@@ -8,8 +8,8 @@ serve(async (req) => {
   try {
     const { items, company_id, location_id } = await req.json();
     const url = Deno.env.get('SUPABASE_URL')!;
-    const anon = Deno.env.get('SUPABASE_ANON_KEY')!; // Use JWT from client to keep RLS in force
-    const supabase = createClient(url, anon, { global: { headers: { Authorization: req.headers.get('Authorization')! } } });
+    const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!; // Bypass RLS inside function
+    const supabase = createClient(url, serviceRole);
 
     for (const it of items as Item[]) {
       const row = it.row as Record<string, unknown>;
@@ -27,6 +27,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   } catch (e) {
+    console.error('sync-apply error', e);
     return new Response(JSON.stringify({ ok: false, error: String(e) }), { status: 400 });
   }
 });
