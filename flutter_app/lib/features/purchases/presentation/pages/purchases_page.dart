@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
-import 'package:ebs_lite/shared/pages/feature_detail_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/purchase_returns_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/purchase_orders_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/goods_receipts_page.dart';

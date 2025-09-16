@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math';
-import 'package:collection/collection.dart';
 import 'package:drift/drift.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'db.dart';
@@ -119,7 +118,7 @@ class SyncEngine {
         schema: 'public',
         table: 'products',
         callback: (payload) async {
-          final row = payload.newRecord ?? payload.oldRecord ?? {};
+          final row = payload.newRecord;
           await _applyProduct(row);
           _log('Realtime products ${payload.eventType.name}: ${row['id']}');
         },
@@ -132,7 +131,7 @@ class SyncEngine {
         schema: 'public',
         table: 'sales',
         callback: (payload) async {
-          final row = payload.newRecord ?? payload.oldRecord ?? {};
+          final row = payload.newRecord;
           await _applySale(row);
           _log('Realtime sales ${payload.eventType.name}: ${row['id']}');
         },
@@ -293,7 +292,7 @@ class SyncEngine {
       DateTime? maxTs;
       for (final r in rows) {
         final ts = DateTime.parse((r['updated_at'] as String));
-        maxTs = (maxTs == null) ? ts : (ts.isAfter(maxTs!) ? ts : maxTs);
+        maxTs = (maxTs == null) ? ts : (ts.isAfter(maxTs) ? ts : maxTs);
         if (table == 'products') {
           await _applyProduct(r);
         } else {

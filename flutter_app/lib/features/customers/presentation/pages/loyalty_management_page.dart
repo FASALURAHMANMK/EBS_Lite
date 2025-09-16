@@ -150,8 +150,9 @@ class _LoyaltyManagementPageState extends ConsumerState<LoyaltyManagementPage> {
                         child: const Text('Retry')),
                   ]);
                 }
-                if (!snap.hasData)
+                if (!snap.hasData) {
                   return const LinearProgressIndicator(minHeight: 2);
+                }
                 final s = snap.data!;
                 _pointsPerCurrency.text = s.pointsPerCurrency.toString();
                 _pointValue.text = s.pointValue.toString();
@@ -258,8 +259,9 @@ class _LoyaltyManagementPageState extends ConsumerState<LoyaltyManagementPage> {
                         child: const Text('Retry')),
                   ]);
                 }
-                if (!snap.hasData)
+                if (!snap.hasData) {
                   return const LinearProgressIndicator(minHeight: 2);
+                }
                 final tiers = snap.data!;
                 if (tiers.isEmpty) return const Text('No tiers defined');
                 return Column(

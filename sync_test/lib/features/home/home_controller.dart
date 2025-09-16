@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app_providers.dart';
-import '../../data/sync_engine.dart';
 import '../../data/repositories/product_repo.dart';
 import '../../data/repositories/sale_repo.dart';
 
@@ -36,7 +35,7 @@ class HomeController extends StateNotifier<HomeState> {
   }
 
   void _append(String s) {
-    state = state.copyWith(log: state.log + s + '\n');
+    state = state.copyWith(log: '${state.log}$s\n');
   }
 
   Future<void> seedLocalData() async {

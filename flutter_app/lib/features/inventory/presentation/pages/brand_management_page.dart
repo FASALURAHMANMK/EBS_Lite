@@ -261,7 +261,7 @@ Future<bool?> _showBrandDialog(BuildContext context, {required WidgetRef ref, Br
                     setState(() => saving = true);
                     try {
                       if (isEdit) {
-                        await repo.updateBrand(id: existing!.brandId, name: controller.text.trim(), isActive: active);
+                        await repo.updateBrand(id: existing.brandId, name: controller.text.trim(), isActive: active);
                       } else {
                         await repo.createBrand(name: controller.text.trim());
                       }

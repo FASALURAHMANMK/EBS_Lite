@@ -30,7 +30,6 @@ class _StockTransferFormPageState extends ConsumerState<StockTransferFormPage> {
   @override
   void initState() {
     super.initState();
-    final sel = ref.read(locationNotifierProvider).selected;
     if (widget.mode == TransferMode.transfer) {
       // Source = selected; choose destination
       _toLocationId = null;
@@ -382,7 +381,7 @@ class _ProductPicker extends ConsumerWidget {
                       final p = results[i];
                       return ListTile(
                         title: Text(p.name),
-                        subtitle: Text([(p.sku ?? ''), if ((p.categoryName ?? '').isNotEmpty) p.categoryName!].where((e) => e != null && e.toString().isNotEmpty).join(' · ')),
+                        subtitle: Text([(p.sku ?? ''), if ((p.categoryName ?? '').isNotEmpty) p.categoryName!].where((e) => e.toString().isNotEmpty).join(' · ')),
                         onTap: () => Navigator.of(context).pop(p),
                       );
                     },

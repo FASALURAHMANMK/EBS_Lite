@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'home_controller.dart';
-import '../../data/db.dart';
 import '../../app_providers.dart';
 
 class HomeScreen extends ConsumerWidget {

@@ -75,7 +75,7 @@ class _StockAdjustmentDocumentDetailPageState extends ConsumerState<StockAdjustm
                         style: TextStyle(color: color, fontWeight: FontWeight.w700)),
                   ),
                 );
-              }).toList(),
+              }),
           ],
         ),
       ),

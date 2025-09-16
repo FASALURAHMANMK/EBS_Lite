@@ -136,7 +136,7 @@ class _PurchaseReturnsPageState extends ConsumerState<PurchaseReturnsPage> {
 }
 
 class _ReturnFormPage extends ConsumerStatefulWidget {
-  const _ReturnFormPage({super.key});
+  const _ReturnFormPage();
   @override
   ConsumerState<_ReturnFormPage> createState() => _ReturnFormPageState();
 }
@@ -264,7 +264,6 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
 
   @override
   Widget build(BuildContext context) {
-    final purchase = _linkedPurchase;
     return Scaffold(
       appBar: AppBar(title: const Text('New Purchase Return')),
       body: SafeArea(
@@ -343,7 +342,7 @@ class _RetLine {
 
 extension on _ReturnFormPageState {
   List<Widget> _buildLines(BuildContext context) {
-    final theme = Theme.of(context);
+    Theme.of(context);
     final details = ((_linkedPurchase?['items'] as List?) ?? const <dynamic>[])
         .cast<Map<String, dynamic>>();
     final Map<int, double> defaultPrices = {

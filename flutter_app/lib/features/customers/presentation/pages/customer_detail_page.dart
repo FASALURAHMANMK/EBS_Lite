@@ -73,8 +73,9 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
             FutureBuilder<CustomerDto>(
               future: _customerFuture,
               builder: (context, s) {
-                if (!s.hasData)
+                if (!s.hasData) {
                   return const LinearProgressIndicator(minHeight: 2);
+                }
                 final cu = s.data!;
                 return Card(
                   elevation: 0,
@@ -415,7 +416,9 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
     _amount.dispose();
     _reference.dispose();
     _notes.dispose();
-    for (final c in _alloc.values) c.dispose();
+    for (final c in _alloc.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 

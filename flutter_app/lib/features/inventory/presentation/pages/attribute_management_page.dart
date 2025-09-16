@@ -252,7 +252,7 @@ Future<bool?> _showAttributeDialog(BuildContext context, {required WidgetRef ref
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: type,
+                initialValue: type,
                 items: AttributeManagementPage._types
                     .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                     .toList(),
@@ -298,7 +298,7 @@ Future<bool?> _showAttributeDialog(BuildContext context, {required WidgetRef ref
                       if (confirm == true) {
                         setState(() => saving = true);
                         try {
-                          await repo.deleteAttributeDefinition(existing!.attributeId);
+                          await repo.deleteAttributeDefinition(existing.attributeId);
                           // Return true to trigger reload
                           // ignore: use_build_context_synchronously
                           Navigator.of(context).pop(true);
@@ -328,7 +328,7 @@ Future<bool?> _showAttributeDialog(BuildContext context, {required WidgetRef ref
                           : <String>[];
                       if (isEdit) {
                         await repo.updateAttributeDefinition(
-                          existing!.attributeId,
+                          existing.attributeId,
                           name: nameController.text.trim(),
                           type: type,
                           isRequired: isRequired,

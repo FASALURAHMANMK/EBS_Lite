@@ -164,7 +164,7 @@ class _StockAdjustmentsPageState extends ConsumerState<StockAdjustmentsPage> {
 
 
 class _AdjustmentDocumentFormPage extends ConsumerStatefulWidget {
-  const _AdjustmentDocumentFormPage({super.key});
+  const _AdjustmentDocumentFormPage();
 
   @override
   ConsumerState<_AdjustmentDocumentFormPage> createState() => _AdjustmentDocumentFormPageState();

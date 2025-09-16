@@ -208,7 +208,7 @@ class PosNotifier extends StateNotifier<PosState> {
   }
 
   Future<void> holdCurrent() async {
-    final res = await _repo.holdSale(
+    await _repo.holdSale(
       customerId: state.customer?.customerId,
       items: state.cart,
       discountAmount: state.discount,

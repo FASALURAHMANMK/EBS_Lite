@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/models.dart';
 import '../../data/supplier_repository.dart';
 
 class SupplierEditPage extends ConsumerStatefulWidget {
@@ -12,7 +11,6 @@ class SupplierEditPage extends ConsumerStatefulWidget {
 }
 
 class _SupplierEditPageState extends ConsumerState<SupplierEditPage> {
-  SupplierDto? _supplier;
   bool _loading = true;
   bool _saving = false;
   final _name = TextEditingController();
@@ -34,7 +32,6 @@ class _SupplierEditPageState extends ConsumerState<SupplierEditPage> {
     final repo = ref.read(supplierRepositoryProvider);
     final sup = await repo.getSupplier(widget.supplierId);
     setState(() {
-      _supplier = sup;
       _name.text = sup.name;
       _contact.text = sup.contactPerson ?? '';
       _phone.text = sup.phone ?? '';

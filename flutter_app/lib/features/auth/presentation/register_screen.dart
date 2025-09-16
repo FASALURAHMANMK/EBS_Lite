@@ -47,8 +47,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (value.isEmpty) return 'Username is required';
     if (value.length < 3) return 'Username must be at least 3 characters';
     final rx = RegExp(r'^[a-zA-Z0-9._-]+$');
-    if (!rx.hasMatch(value))
+    if (!rx.hasMatch(value)) {
       return 'Only letters, numbers, dot, underscore, hyphen';
+    }
     return null;
   }
 

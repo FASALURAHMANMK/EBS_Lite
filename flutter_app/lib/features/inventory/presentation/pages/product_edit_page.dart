@@ -266,17 +266,6 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
 
   
 
-  Map<int, String> _buildAttributesMapWithTax() {
-    final map = _buildAttributesMap();
-    final tid = _taxId;
-    if (tid != null) {
-      try {
-        final def = _attrDefs.firstWhere((d) => d.name.toLowerCase() == 'default tax' || d.name.toLowerCase() == 'tax');
-        map[def.attributeId] = tid.toString();
-      } catch (_) {}
-    }
-    return map;
-  }
 
   Future<void> _delete() async {
     final ok = await showDialog<bool>(
@@ -555,7 +544,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                     if (_attrDefs.isNotEmpty) ...[
                       Text('Attributes', style: theme.textTheme.titleMedium),
                       const SizedBox(height: 8),
-                      ..._attrDefs.map((d) => _buildAttrField(d)).toList(),
+                      ..._attrDefs.map((d) => _buildAttrField(d)),
                       const SizedBox(height: 8),
                       const Divider(height: 24),
                     ],
@@ -672,8 +661,9 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
             }
           },
           validator: (v) {
-            if (d.isRequired && (v == null || v.trim().isEmpty))
+            if (d.isRequired && (v == null || v.trim().isEmpty)) {
               return 'Required';
+            }
             return null;
           },
         );
@@ -688,8 +678,9 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
               ? const TextInputType.numberWithOptions(decimal: true)
               : TextInputType.text,
           validator: (v) {
-            if (d.isRequired && (v == null || v.trim().isEmpty))
+            if (d.isRequired && (v == null || v.trim().isEmpty)) {
               return 'Required';
+            }
             if ((v ?? '').isNotEmpty &&
                 d.type == 'NUMBER' &&
                 double.tryParse(v!.trim()) == null) {

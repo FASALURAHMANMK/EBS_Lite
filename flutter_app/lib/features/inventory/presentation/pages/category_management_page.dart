@@ -239,7 +239,7 @@ Future<bool?> _showCategoryDialog(BuildContext context, {required WidgetRef ref,
               setState(() => saving = true);
               try {
                 if (isEdit) {
-                  await repo.updateCategory(id: existing!.categoryId, name: controller.text.trim());
+                  await repo.updateCategory(id: existing.categoryId, name: controller.text.trim());
                 } else {
                   await repo.createCategory(name: controller.text.trim());
                 }
@@ -262,7 +262,7 @@ Future<bool?> _showCategoryDialog(BuildContext context, {required WidgetRef ref,
                     setState(() => saving = true);
                     try {
                       if (isEdit) {
-                        await repo.updateCategory(id: existing!.categoryId, name: controller.text.trim());
+                        await repo.updateCategory(id: existing.categoryId, name: controller.text.trim());
                       } else {
                         await repo.createCategory(name: controller.text.trim());
                       }

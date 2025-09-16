@@ -49,7 +49,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   final _brandController = TextEditingController();
   final _supplierController = TextEditingController();
   // Barcodes handled via dialog
-  List<ProductBarcodeDto> _barcodes = [];
+  final List<ProductBarcodeDto> _barcodes = [];
 
   @override
   void dispose() {
@@ -235,26 +235,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     return map;
   }
 
-  Map<int, String> _buildAttributesMapWithTax() {
-    final map = _buildAttributesMap();
-    final tid = _taxId;
-    if (tid != null) {
-      final def = _attrDefs.firstWhere(
-        (d) => d.name.toLowerCase() == 'default tax' || d.name.toLowerCase() == 'tax',
-        orElse: () => ProductAttributeDefinitionDto(
-          attributeId: -1,
-          name: '',
-          type: 'TEXT',
-          isRequired: false,
-          options: const [],
-        ),
-      );
-      if (def.attributeId > 0) {
-        map[def.attributeId] = tid.toString();
-      }
-    }
-    return map;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -454,7 +434,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                     if (_attrDefs.isNotEmpty) ...[
                       Text('Attributes', style: theme.textTheme.titleMedium),
                       const SizedBox(height: 8),
-                      ..._attrDefs.map((d) => _buildAttrField(d)).toList(),
+                      ..._attrDefs.map((d) => _buildAttrField(d)),
                       const SizedBox(height: 8),
                       const Divider(height: 24),
                     ],
@@ -1044,7 +1024,7 @@ class _SelectField extends StatelessWidget {
 }
 
 class _BarcodeRow extends StatefulWidget {
-  const _BarcodeRow({super.key, required this.value, required this.onChanged, required this.onDelete, required this.onPrimary, required this.isPrimary});
+  const _BarcodeRow({required this.value, required this.onChanged, required this.onDelete, required this.onPrimary, required this.isPrimary});
   final ProductBarcodeDto value;
   final ValueChanged<ProductBarcodeDto> onChanged;
   final VoidCallback onDelete;

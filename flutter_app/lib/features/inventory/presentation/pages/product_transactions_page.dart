@@ -343,7 +343,7 @@ class _TypeChip extends StatelessWidget {
         return theme.colorScheme.errorContainer;
       case 'ADJUSTMENT':
       default:
-        return theme.colorScheme.surfaceVariant;
+        return theme.colorScheme.surfaceContainerHighest;
     }
   }
 

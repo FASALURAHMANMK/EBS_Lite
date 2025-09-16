@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
-import '../../../../shared/pages/feature_detail_page.dart';
 import 'stock_adjustments_page.dart';
 import 'inventory_management_page.dart';
 import 'inventory_view_page.dart';

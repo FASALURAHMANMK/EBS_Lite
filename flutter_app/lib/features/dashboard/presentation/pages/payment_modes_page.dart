@@ -66,7 +66,7 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
                   child: ListTile(
                     leading: const Icon(Icons.account_balance_wallet_rounded),
                     title: Text(m.name),
-                    subtitle: Text('${m.type}${m.isActive ? '' : ' • Inactive'}' + (list.isEmpty ? '' : ' • ${list.length} currencies')),
+                    subtitle: Text('${m.type}${m.isActive ? '' : ' • Inactive'}${list.isEmpty ? '' : ' • ${list.length} currencies'}'),
                     onTap: () => _openCurrencies(context, m),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -135,7 +135,7 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   decoration: const InputDecoration(labelText: 'Type'),
-                  value: type,
+                  initialValue: type,
                   items: types.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
                   onChanged: (v) => setInner(() => type = v ?? type),
                 ),

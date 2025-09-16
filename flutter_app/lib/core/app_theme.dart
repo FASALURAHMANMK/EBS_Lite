@@ -6,9 +6,7 @@ const Color _brandGray = Color(0xFFB5B8BD); // light logo gray
 const Color _brandGrayDark = Color(0xFF8F9398); // darker logo gray
 
 // Neutrals
-const Color _bgLight = Color(0xFFFFFFFF);
 const Color _surfaceLight = Color(0xFFF7F8FA);
-const Color _bgDark = Color(0xFF0F1114);
 const Color _surfaceDark = Color(0xFF15181C);
 
 // Shared radii
@@ -23,11 +21,9 @@ ColorScheme _lightScheme() {
     onPrimary: Colors.white,
     secondary: _brandGrayDark,
     onSecondary: Colors.white,
-    background: _bgLight,
-    onBackground: const Color(0xFF111418),
     surface: _surfaceLight,
     onSurface: const Color(0xFF1A1E23),
-    surfaceVariant: const Color(0xFFEAECEF),
+    surfaceContainerHighest: const Color(0xFFEAECEF),
     outline: const Color(0xFFE0E3E7),
     outlineVariant: const Color(0xFFD6DADF),
     primaryContainer: const Color(0xFFFFE6EC),
@@ -47,11 +43,9 @@ ColorScheme _darkScheme() {
     onPrimary: Colors.white,
     secondary: _brandGray,
     onSecondary: Colors.black,
-    background: _bgDark,
-    onBackground: Colors.white,
     surface: _surfaceDark,
     onSurface: Colors.white,
-    surfaceVariant: const Color(0xFF23272D),
+    surfaceContainerHighest: const Color(0xFF23272D),
     outline: const Color(0xFF2E343B),
     outlineVariant: const Color(0xFF2A2F36),
     primaryContainer: const Color(0xFF3A0B16),
@@ -69,24 +63,24 @@ final ThemeData lightTheme = () {
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
-    scaffoldBackgroundColor: scheme.background,
+    scaffoldBackgroundColor: scheme.surface,
     splashFactory: InkSparkle.splashFactory,
 
     // AppBar
     appBarTheme: AppBarTheme(
-      backgroundColor: scheme.background,
-      foregroundColor: scheme.onBackground,
+      backgroundColor: scheme.surface,
+      foregroundColor: scheme.onSurface,
       elevation: 0,
       centerTitle: true,
       titleTextStyle: TextStyle(
         fontSize: 20,
         fontWeight: FontWeight.w700,
-        color: scheme.onBackground,
+        color: scheme.onSurface,
       ),
       toolbarHeight: 56,
       surfaceTintColor: Colors.transparent,
-      iconTheme: IconThemeData(color: scheme.onBackground),
-      actionsIconTheme: IconThemeData(color: scheme.onBackground),
+      iconTheme: IconThemeData(color: scheme.onSurface),
+      actionsIconTheme: IconThemeData(color: scheme.onSurface),
     ),
 
     // Cards
@@ -159,17 +153,17 @@ final ThemeData lightTheme = () {
 
     // Selection controls
     checkboxTheme: CheckboxThemeData(
-      fillColor: MaterialStateProperty.resolveWith((s) =>
-          s.contains(MaterialState.selected) ? scheme.primary : scheme.outline),
+      fillColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected) ? scheme.primary : scheme.outline),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
     ),
     radioTheme:
-        RadioThemeData(fillColor: MaterialStatePropertyAll(scheme.primary)),
+        RadioThemeData(fillColor: WidgetStatePropertyAll(scheme.primary)),
     switchTheme: SwitchThemeData(
-      thumbColor: MaterialStateProperty.resolveWith((s) =>
-          s.contains(MaterialState.selected) ? scheme.primary : scheme.outline),
-      trackColor: MaterialStateProperty.resolveWith((s) =>
-          s.contains(MaterialState.selected)
+      thumbColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected) ? scheme.primary : scheme.outline),
+      trackColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected)
               ? scheme.primary.withOpacity(.25)
               : scheme.outline.withOpacity(.4)),
     ),
@@ -178,7 +172,7 @@ final ThemeData lightTheme = () {
     chipTheme: ChipThemeData(
       backgroundColor: scheme.surface,
       selectedColor: scheme.primary.withOpacity(0.15),
-      disabledColor: scheme.surfaceVariant,
+      disabledColor: scheme.surfaceContainerHighest,
       labelStyle: TextStyle(color: scheme.onSurface),
       side: BorderSide(color: scheme.outline),
       shape: RoundedRectangleBorder(borderRadius: _rMd),
@@ -192,19 +186,19 @@ final ThemeData lightTheme = () {
       // Remove the selected indicator “chip”
       indicatorColor: Colors.transparent,
       // Smaller labels; fill selected label with primary color
-      labelTextStyle: MaterialStateProperty.resolveWith(
+      labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
           fontSize: 12,
           fontWeight:
-              states.contains(MaterialState.selected) ? FontWeight.w700 : FontWeight.w600,
-          color: states.contains(MaterialState.selected)
+              states.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w600,
+          color: states.contains(WidgetState.selected)
               ? scheme.primary
               : scheme.onSurface.withOpacity(.70),
         ),
       ),
-      iconTheme: MaterialStateProperty.resolveWith(
+      iconTheme: WidgetStateProperty.resolveWith(
         (s) => IconThemeData(
-            color: s.contains(MaterialState.selected)
+            color: s.contains(WidgetState.selected)
                 ? scheme.primary
                 : scheme.onSurface.withOpacity(.70)),
       ),
@@ -291,21 +285,21 @@ final ThemeData darkTheme = () {
   return ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
-    scaffoldBackgroundColor: scheme.background,
+    scaffoldBackgroundColor: scheme.surface,
     splashFactory: InkSparkle.splashFactory,
     appBarTheme: AppBarTheme(
-      backgroundColor: scheme.background,
-      foregroundColor: scheme.onBackground,
+      backgroundColor: scheme.surface,
+      foregroundColor: scheme.onSurface,
       elevation: 0,
       centerTitle: true,
       titleTextStyle: TextStyle(
         fontSize: 20,
         fontWeight: FontWeight.w700,
-        color: scheme.onBackground,
+        color: scheme.onSurface,
       ),
       surfaceTintColor: Colors.transparent,
-      iconTheme: IconThemeData(color: scheme.onBackground),
-      actionsIconTheme: IconThemeData(color: scheme.onBackground),
+      iconTheme: IconThemeData(color: scheme.onSurface),
+      actionsIconTheme: IconThemeData(color: scheme.onSurface),
     ),
     cardTheme: CardThemeData(
       color: scheme.surface,
@@ -370,24 +364,24 @@ final ThemeData darkTheme = () {
       ),
     ),
     checkboxTheme: CheckboxThemeData(
-      fillColor: MaterialStateProperty.resolveWith((s) =>
-          s.contains(MaterialState.selected) ? scheme.primary : scheme.outline),
+      fillColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected) ? scheme.primary : scheme.outline),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
     ),
     radioTheme:
-        RadioThemeData(fillColor: MaterialStatePropertyAll(scheme.primary)),
+        RadioThemeData(fillColor: WidgetStatePropertyAll(scheme.primary)),
     switchTheme: SwitchThemeData(
-      thumbColor: MaterialStateProperty.resolveWith((s) =>
-          s.contains(MaterialState.selected) ? scheme.primary : scheme.outline),
-      trackColor: MaterialStateProperty.resolveWith((s) =>
-          s.contains(MaterialState.selected)
+      thumbColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected) ? scheme.primary : scheme.outline),
+      trackColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected)
               ? scheme.primary.withOpacity(.35)
               : scheme.outline.withOpacity(.5)),
     ),
     chipTheme: ChipThemeData(
       backgroundColor: scheme.surface,
       selectedColor: scheme.primary.withOpacity(0.18),
-      disabledColor: scheme.surfaceVariant,
+      disabledColor: scheme.surfaceContainerHighest,
       labelStyle: TextStyle(color: scheme.onSurface),
       side: BorderSide(color: scheme.outline),
       shape: RoundedRectangleBorder(borderRadius: _rMd),
@@ -399,19 +393,19 @@ final ThemeData darkTheme = () {
       // Remove the selected indicator “chip”
       indicatorColor: Colors.transparent,
       // Smaller labels; fill selected label with primary color
-      labelTextStyle: MaterialStateProperty.resolveWith(
+      labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
           fontSize: 12,
           fontWeight:
-              states.contains(MaterialState.selected) ? FontWeight.w700 : FontWeight.w600,
-          color: states.contains(MaterialState.selected)
+              states.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w600,
+          color: states.contains(WidgetState.selected)
               ? scheme.primary
               : scheme.onSurface.withOpacity(.75),
         ),
       ),
-      iconTheme: MaterialStateProperty.resolveWith(
+      iconTheme: WidgetStateProperty.resolveWith(
         (s) => IconThemeData(
-            color: s.contains(MaterialState.selected)
+            color: s.contains(WidgetState.selected)
                 ? scheme.primary
                 : scheme.onSurface.withOpacity(.75)),
       ),

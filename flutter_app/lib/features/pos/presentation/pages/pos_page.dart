@@ -96,7 +96,7 @@ class PosPage extends ConsumerWidget {
 
 class _SearchBar extends ConsumerWidget {
   final _controller = TextEditingController();
-  _SearchBar({super.key});
+  _SearchBar();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

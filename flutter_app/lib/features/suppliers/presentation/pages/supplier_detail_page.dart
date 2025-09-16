@@ -309,7 +309,9 @@ class _PaySheetState extends ConsumerState<_PaySheet> {
     _amount.dispose();
     _reference.dispose();
     _notes.dispose();
-    for (final c in _alloc.values) c.dispose();
+    for (final c in _alloc.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 

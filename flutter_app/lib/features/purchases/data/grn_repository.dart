@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api_client.dart';
 import '../../dashboard/controllers/location_notifier.dart';
-import '../../inventory/data/inventory_repository.dart';
 import 'models.dart';
 
 class GrnRepository {

@@ -35,15 +35,6 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
     super.dispose();
   }
 
-  Future<void> _pickCustomer() async {
-    final picked = await showDialog<PosCustomerDto>(
-      context: context,
-      builder: (_) => const CustomerSelectorDialog(),
-    );
-    if (picked != null) {
-      setState(() => _customer = picked);
-    }
-  }
 
   Future<void> _findInvoice() async {
     final code = _invoiceCtrl.text.trim();
@@ -206,7 +197,7 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
   }
 
   List<Widget> _buildLines(BuildContext context) {
-    final theme = Theme.of(context);
+    Theme.of(context);
     // Defaults from linked sale if present
     final saleItems = (_linkedSale?.items ?? const <SaleItemDto>[]);
     final defaultPrices = <int, double>{
@@ -304,7 +295,6 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
 
   @override
   Widget build(BuildContext context) {
-    final line = widget.line;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

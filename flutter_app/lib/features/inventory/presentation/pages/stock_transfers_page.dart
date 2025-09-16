@@ -157,7 +157,7 @@ class _TransferTile extends ConsumerWidget {
       case 'CANCELLED':
         return theme.colorScheme.errorContainer;
       default:
-        return theme.colorScheme.surfaceVariant;
+        return theme.colorScheme.surfaceContainerHighest;
     }
   }
 

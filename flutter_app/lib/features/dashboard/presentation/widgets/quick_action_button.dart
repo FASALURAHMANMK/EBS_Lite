@@ -193,7 +193,7 @@ class _QuickActionButtonState extends State<QuickActionButton>
               );
 
               final action = actions[i];
-              final heroTag = '${action.label}_${action.icon}_$i${hashCode}';
+              final heroTag = '${action.label}_${action.icon}_$i$hashCode';
 
               // On wide layouts, show extended FABs with labels.
               final showExtended = widget.useExtendedLabelsOnWide && isWide;

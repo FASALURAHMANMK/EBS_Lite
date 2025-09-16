@@ -6,7 +6,6 @@ import '../../data/purchases_repository.dart';
 import '../../data/models.dart';
 import 'grn_form_page.dart';
 import 'grn_detail_page.dart';
-import 'purchase_orders_page.dart';
 
 class GoodsReceiptsPage extends ConsumerStatefulWidget {
   const GoodsReceiptsPage({super.key});
@@ -46,7 +45,7 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    Theme.of(context);
     final q = _search.text.trim().toLowerCase();
     final filtered = q.isEmpty
         ? _list
