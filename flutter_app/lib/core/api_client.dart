@@ -11,8 +11,8 @@ class ApiClient {
     this._prefs,
     this._secureStorage, {
     //String baseUrl = 'http://192.168.100.128:8080/api/v1',
-    String baseUrl = 'http://127.0.0.1:8080/api/v1',
-    //String baseUrl = 'http://10.0.2.2:8080/api/v1',
+    //String baseUrl = 'http://127.0.0.1:8080/api/v1',
+    String baseUrl = 'http://10.0.2.2:8080/api/v1',
   }) : dio = Dio(BaseOptions(baseUrl: baseUrl)) {
     dio.interceptors.add(
       InterceptorsWrapper(
