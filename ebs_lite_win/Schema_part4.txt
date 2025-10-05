@@ -1,0 +1,250 @@
+    IF v_loyalty_points > 0 THEN
+      INSERT INTO loyalty_ledger(customer_id, points, ref_type, ref_id, note)
+      VALUES (v_cust_id, v_loyalty_points, 'SALE', p_head_id, 'Earn on sale');
+    END IF;
+
+    SELECT COALESCE(sum(amount),0) INTO v_paid FROM sale_payments WHERE head_id = p_head_id;
+    IF v_head.net - v_paid > 0 THEN
+      INSERT INTO customer_ledger(customer_id, debit, credit, ref_type, ref_id, note)
+      VALUES (v_cust_id, v_head.net - v_paid, 0, 'SALE', p_head_id, 'Credit sale');
+    END IF;
+  END IF;
+
+  INSERT INTO audit_log(user_id, action, entity, entity_id, payload_json)
+  VALUES (p_user_id, 'POST', 'sale_head', p_head_id, jsonb_build_object('doc_no', v_head.doc_no));
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- 3.3 Post Return (increase stock)
+CREATE OR REPLACE FUNCTION sp_post_return(p_return_id bigint, p_user_id bigint DEFAULT NULL)
+RETURNS void AS $$
+DECLARE
+  v_ret sale_returns%ROWTYPE;
+  v_head sale_head%ROWTYPE;
+  v_line record;
+  v_qty numeric; v_old_qty numeric; v_new_qty numeric; v_wac numeric;
+BEGIN
+  SELECT * INTO v_ret FROM sale_returns WHERE id = p_return_id FOR UPDATE;
+  SELECT * INTO v_head FROM sale_head WHERE id = v_ret.sale_head_id FOR UPDATE;
+
+  FOR v_line IN
+    SELECT sl.* FROM sale_line sl WHERE sl.head_id = v_head.id
+  LOOP
+    PERFORM fn_ensure_stock(v_line.product_id, v_head.location_id);
+    SELECT qty, p.cost_wac INTO v_old_qty, v_wac
+    FROM stock s JOIN products p ON p.id = v_line.product_id
+    WHERE s.product_id = v_line.product_id AND s.location_id = v_head.location_id
+    FOR UPDATE;
+
+    v_qty := v_line.qty;
+    v_new_qty := v_old_qty + v_qty;
+
+    UPDATE stock SET qty = v_new_qty
+    WHERE product_id = v_line.product_id AND location_id = v_head.location_id;
+
+    INSERT INTO stock_ledger (product_id, location_id, ref_type, ref_id, in_qty, out_qty, cost_wac_after, note)
+    VALUES (v_line.product_id, v_head.location_id, 'RET', v_ret.id, v_qty, 0, v_wac, 'Sale return');
+  END LOOP;
+
+  INSERT INTO audit_log(user_id, action, entity, entity_id, payload_json)
+  VALUES (p_user_id, 'POST', 'sale_returns', p_return_id, jsonb_build_object('sale_doc', v_head.doc_no));
+END;
+$$ LANGUAGE plpgsql;
+
+-- =========================================================
+-- 4) Generic change audit trigger (INSERT/UPDATE/DELETE)
+-- =========================================================
+CREATE OR REPLACE FUNCTION trg_audit()
+RETURNS trigger AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO audit_log(action, entity, entity_id, payload_json)
+    VALUES ('INSERT', TG_TABLE_NAME, NEW.id, to_jsonb(NEW));
+    RETURN NEW;
+  ELSIF TG_OP = 'UPDATE' THEN
+    INSERT INTO audit_log(action, entity, entity_id, payload_json)
+    VALUES ('UPDATE', TG_TABLE_NAME, NEW.id, jsonb_build_object('old', to_jsonb(OLD), 'new', to_jsonb(NEW)));
+    RETURN NEW;
+  ELSE
+    INSERT INTO audit_log(action, entity, entity_id, payload_json)
+    VALUES ('DELETE', TG_TABLE_NAME, OLD.id, to_jsonb(OLD));
+    RETURN OLD;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Attach audit to sensitive tables
+CREATE TRIGGER audit_products      AFTER INSERT OR UPDATE OR DELETE ON products       FOR EACH ROW EXECUTE FUNCTION trg_audit();
+CREATE TRIGGER audit_customers     AFTER INSERT OR UPDATE OR DELETE ON customers      FOR EACH ROW EXECUTE FUNCTION trg_audit();
+CREATE TRIGGER audit_purchase_head AFTER INSERT OR UPDATE OR DELETE ON purchase_head  FOR EACH ROW EXECUTE FUNCTION trg_audit();
+CREATE TRIGGER audit_sale_head     AFTER INSERT OR UPDATE OR DELETE ON sale_head      FOR EACH ROW EXECUTE FUNCTION trg_audit();
+CREATE TRIGGER audit_stock_adj     AFTER INSERT OR UPDATE OR DELETE ON stock          FOR EACH ROW EXECUTE FUNCTION trg_audit();
+
+-- =========================================================
+-- 5) Convenience Views (reports & lookups)
+-- =========================================================
+
+-- 5.1 Sales Register (head + totals)
+CREATE OR REPLACE VIEW v_sales_register AS
+SELECT
+  h.id, h.doc_no, h.doc_date, h.ts,
+  c.name AS customer_name,
+  u.username AS cashier,
+  l.name AS location,
+  h.gross, h.discount, h.tax, h.net, h.status
+FROM sale_head h
+LEFT JOIN customers c ON c.id = h.customer_id
+LEFT JOIN users u ON u.id = h.cashier_id
+JOIN locations l ON l.id = h.location_id;
+
+-- 5.2 Sales Item-wise (lines exploded)
+CREATE OR REPLACE VIEW v_sales_itemwise AS
+SELECT
+  h.doc_no, h.doc_date, h.ts, h.status,
+  p.code product_code, p.name product_name,
+  sl.qty, sl.unit_price, sl.line_discount, sl.line_tax_amt,
+  (sl.qty * sl.unit_price) AS line_amount,
+  (sl.qty * sl.unit_price) - sl.line_discount + sl.line_tax_amt AS line_total
+FROM sale_line sl
+JOIN sale_head h ON h.id = sl.head_id
+JOIN products p  ON p.id = sl.product_id;
+
+-- 5.3 Tax Summary (period wise)
+CREATE OR REPLACE VIEW v_tax_summary AS
+SELECT
+  doc_date,
+  sum(tax)  AS total_output_tax,
+  sum(net)  AS total_net,
+  sum(gross) AS total_gross
+FROM sale_head
+WHERE status = 'POSTED'
+GROUP BY doc_date
+ORDER BY doc_date;
+
+-- 5.4 Stock On Hand (by product & location)
+CREATE OR REPLACE VIEW v_stock_on_hand AS
+SELECT s.product_id, p.code, p.name, s.location_id, l.name AS location,
+       s.qty, p.cost_wac, (s.qty * p.cost_wac) AS stock_value
+FROM stock s
+JOIN products p ON p.id = s.product_id
+JOIN locations l ON l.id = s.location_id;
+
+-- 5.5 Customer Statement (ledger with running balance per customer per day)
+-- (client app can compute running totals; this view returns raw lines)
+CREATE OR REPLACE VIEW v_customer_ledger AS
+SELECT cl.id, cl.ts::date AS dt, cl.customer_id, c.name customer_name,
+       cl.debit, cl.credit, cl.ref_type, cl.ref_id, cl.note
+FROM customer_ledger cl
+JOIN customers c ON c.id = cl.customer_id
+ORDER BY cl.customer_id, cl.ts;
+
+-- 5.6 Purchase Register
+CREATE OR REPLACE VIEW v_purchase_register AS
+SELECT
+  h.id, h.doc_no, h.doc_date, s.name supplier, l.name location,
+  h.subtotal, h.tax_amount, h.expenses, h.grand_total, h.status
+FROM purchase_head h
+JOIN suppliers s ON s.id = h.supplier_id
+JOIN locations l ON l.id = h.location_id;
+
+
+-- Flag to mark which products are serial-tracked (IMEI/SN)
+ALTER TABLE products
+  ADD COLUMN IF NOT EXISTS serial_tracked boolean NOT NULL DEFAULT false;
+
+-- Batch table (if not already created)
+CREATE TABLE IF NOT EXISTS product_batches (
+  id            bigserial PRIMARY KEY,
+  product_id    bigint NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  batch_no      text NOT NULL,
+  expiry_date   date,
+  UNIQUE(product_id, batch_no)
+);
+
+CREATE OR REPLACE FUNCTION sp_batch_upsert(
+  p_product_id  bigint,
+  p_batch_no    text,
+  p_expiry_date date DEFAULT NULL
+) RETURNS bigint AS $$
+DECLARE
+  v_id bigint;
+BEGIN
+  INSERT INTO product_batches(product_id, batch_no, expiry_date)
+  VALUES (p_product_id, p_batch_no, p_expiry_date)
+  ON CONFLICT (product_id, batch_no)
+  DO UPDATE SET
+    expiry_date = COALESCE(EXCLUDED.expiry_date, product_batches.expiry_date)
+  RETURNING id INTO v_id;
+
+  RETURN v_id;
+END;
+$$ LANGUAGE plpgsql;
+
+------------------------------------------------------------
+SELECT sp_batch_upsert(:product_id, :batch_no, :expiry_date) AS batch_id;
+-- then set purchase_line.batch_id = :batch_id
+------------------------------------------------------------
+
+-- Common integer check
+CREATE OR REPLACE FUNCTION fn_is_integer_qty(p_qty numeric)
+RETURNS boolean AS $$
+BEGIN
+  RETURN p_qty IS NOT NULL AND p_qty = floor(p_qty);
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+-- Check a SALE line's serial count vs qty
+CREATE OR REPLACE FUNCTION trg_check_sale_line_serials_fn(p_line_id bigint)
+RETURNS void AS $$
+DECLARE
+  v_qty       numeric;
+  v_prod_id   bigint;
+  v_tracked   boolean;
+  v_count     int;
+BEGIN
+  SELECT sl.qty, sl.product_id, p.serial_tracked
+    INTO v_qty, v_prod_id, v_tracked
+  FROM sale_line sl
+  JOIN products p ON p.id = sl.product_id
+  WHERE sl.id = p_line_id;
+
+  IF NOT FOUND THEN
+    -- Line removed; nothing to check
+    RETURN;
+  END IF;
+
+  IF coalesce(v_tracked, false) IS FALSE THEN
+    RETURN; -- Not a serial-tracked product, ignore
+  END IF;
+
+  IF NOT fn_is_integer_qty(v_qty) THEN
+    RAISE EXCEPTION 'Serial-tracked product % must have integer quantity (got %).', v_prod_id, v_qty;
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM sale_line_serials
+  WHERE line_id = p_line_id;
+
+  IF v_count <> v_qty::int THEN
+    RAISE EXCEPTION 'Sale line % requires % serial(s) but has %.', p_line_id, v_qty::int, v_count;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Check a PURCHASE line's serial count vs qty
+CREATE OR REPLACE FUNCTION trg_check_purchase_line_serials_fn(p_line_id bigint)
+RETURNS void AS $$
+DECLARE
+  v_qty       numeric;
+  v_prod_id   bigint;
+  v_tracked   boolean;
+  v_count     int;
+BEGIN
+  SELECT pl.qty, pl.product_id, p.serial_tracked
+    INTO v_qty, v_prod_id, v_tracked
+  FROM purchase_line pl
+  JOIN products p ON p.id = pl.product_id
+  WHERE pl.id = p_line_id;
+
+  IF NOT FOUND THEN

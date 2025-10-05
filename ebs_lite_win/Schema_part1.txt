@@ -1,0 +1,250 @@
+-- =========================================================
+-- 0) Extensions & settings
+-- =========================================================
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- =========================================================
+-- 1) Core reference tables
+-- =========================================================
+CREATE TABLE settings (
+  key         text PRIMARY KEY,
+  value       jsonb NOT NULL DEFAULT '{}'::jsonb
+);
+
+CREATE TABLE roles (
+  id          bigserial PRIMARY KEY,
+  name        text UNIQUE NOT NULL
+);
+
+CREATE TABLE role_permissions (
+  role_id     bigint REFERENCES roles(id) ON DELETE CASCADE,
+  perm_code   text NOT NULL,
+  PRIMARY KEY (role_id, perm_code)
+);
+
+CREATE TABLE users (
+  id          bigserial PRIMARY KEY,
+  username    text UNIQUE NOT NULL,
+  pw_hash     text NOT NULL,
+  role_id     bigint NOT NULL REFERENCES roles(id),
+  is_active   boolean NOT NULL DEFAULT true,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- Document numbering
+CREATE TABLE number_series (
+  id          bigserial PRIMARY KEY,
+  code        text UNIQUE NOT NULL,                 -- e.g. 'INV','GRN','RET'
+  prefix      text NOT NULL DEFAULT '',
+  next_no     integer NOT NULL DEFAULT 1,
+  width       integer NOT NULL DEFAULT 6
+);
+
+-- Masters
+CREATE TABLE categories (
+  id          bigserial PRIMARY KEY,
+  name        text UNIQUE NOT NULL
+);
+
+CREATE TABLE brands (
+  id          bigserial PRIMARY KEY,
+  name        text UNIQUE NOT NULL
+);
+
+CREATE TABLE units (
+  id          bigserial PRIMARY KEY,
+  name        text UNIQUE NOT NULL,                 -- e.g. PCS, BOX
+  factor      numeric(18,6) NOT NULL DEFAULT 1     -- optional conversion factor
+);
+
+CREATE TABLE tax_groups (
+  id          bigserial PRIMARY KEY,
+  name        text UNIQUE NOT NULL,
+  is_inclusive boolean NOT NULL DEFAULT false       -- default behavior for items in this group
+);
+
+CREATE TABLE tax_rates (
+  id              bigserial PRIMARY KEY,
+  tax_group_id    bigint NOT NULL REFERENCES tax_groups(id) ON DELETE CASCADE,
+  rate_percent    numeric(9,4) NOT NULL CHECK (rate_percent >= 0),
+  effective_from  date NOT NULL DEFAULT CURRENT_DATE
+);
+CREATE INDEX ON tax_rates (tax_group_id, effective_from DESC);
+
+-- Products
+CREATE TABLE products (
+  id              bigserial PRIMARY KEY,
+  code            text UNIQUE NOT NULL,
+  name            text NOT NULL,
+  category_id     bigint REFERENCES categories(id),
+  brand_id        bigint REFERENCES brands(id),
+  unit_id         bigint REFERENCES units(id),
+  tax_group_id    bigint REFERENCES tax_groups(id),
+  price_retail    numeric(18,4) NOT NULL DEFAULT 0,
+  price_wholesale numeric(18,4) NOT NULL DEFAULT 0,
+  cost_wac        numeric(18,6) NOT NULL DEFAULT 0,
+  reorder_qty     numeric(18,3) NOT NULL DEFAULT 0,
+  is_active       boolean NOT NULL DEFAULT true,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX ON products (code);
+CREATE INDEX products_name_trgm ON products USING gin (name gin_trgm_ops);
+
+CREATE TABLE product_barcodes (
+  id          bigserial PRIMARY KEY,
+  product_id  bigint NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  barcode     text NOT NULL UNIQUE
+);
+CREATE INDEX ON product_barcodes (product_id);
+
+-- Suppliers / Customers
+CREATE TABLE suppliers (
+  id          bigserial PRIMARY KEY,
+  name        text NOT NULL,
+  phone       text,
+  is_active   boolean NOT NULL DEFAULT true
+);
+
+CREATE TABLE customers (
+  id           bigserial PRIMARY KEY,
+  name         text NOT NULL,
+  phone        text,
+  price_level  text NOT NULL DEFAULT 'retail',          -- 'retail'|'wholesale'
+  credit_limit numeric(18,4) NOT NULL DEFAULT 0,
+  opening_balance numeric(18,4) NOT NULL DEFAULT 0,
+  is_active    boolean NOT NULL DEFAULT true
+);
+CREATE INDEX ON customers (name);
+CREATE INDEX ON customers (phone);
+
+-- Locations & Stock
+CREATE TABLE locations (
+  id          bigserial PRIMARY KEY,
+  name        text UNIQUE NOT NULL
+);
+
+CREATE TABLE stock (
+  product_id  bigint NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  location_id bigint NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+  qty         numeric(18,3) NOT NULL DEFAULT 0,
+  PRIMARY KEY (product_id, location_id)
+);
+
+CREATE TABLE stock_ledger (
+  id              bigserial PRIMARY KEY,
+  ts              timestamptz NOT NULL DEFAULT now(),
+  product_id      bigint NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  location_id     bigint NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+  ref_type        text NOT NULL,   -- 'GRN','SALE','RET','ADJ+','ADJ-'
+  ref_id          bigint,          -- head id
+  in_qty          numeric(18,3) NOT NULL DEFAULT 0,
+  out_qty         numeric(18,3) NOT NULL DEFAULT 0,
+  cost_wac_after  numeric(18,6) NOT NULL DEFAULT 0,
+  note            text
+);
+CREATE INDEX ON stock_ledger (product_id, location_id, ts);
+
+-- Purchases (GRN)
+CREATE TABLE purchase_head (
+  id          bigserial PRIMARY KEY,
+  ts          timestamptz NOT NULL DEFAULT now(),
+  doc_no      text UNIQUE NOT NULL,
+  doc_date    date NOT NULL DEFAULT CURRENT_DATE,
+  supplier_id bigint NOT NULL REFERENCES suppliers(id),
+  location_id bigint NOT NULL REFERENCES locations(id),
+  subtotal    numeric(18,4) NOT NULL DEFAULT 0,
+  tax_amount  numeric(18,4) NOT NULL DEFAULT 0,
+  expenses    numeric(18,4) NOT NULL DEFAULT 0,
+  grand_total numeric(18,4) NOT NULL DEFAULT 0,
+  status      text NOT NULL DEFAULT 'DRAFT',           -- 'DRAFT'|'POSTED'|'VOID'
+  notes       text
+);
+
+CREATE TABLE purchase_line (
+  id              bigserial PRIMARY KEY,
+  head_id         bigint NOT NULL REFERENCES purchase_head(id) ON DELETE CASCADE,
+  product_id      bigint NOT NULL REFERENCES products(id),
+  qty             numeric(18,3) NOT NULL,
+  unit_cost       numeric(18,6) NOT NULL,              -- pre-tax unit cost
+  tax_group_id    bigint REFERENCES tax_groups(id),
+  line_tax_amt    numeric(18,4) NOT NULL DEFAULT 0
+);
+CREATE INDEX ON purchase_line (head_id);
+CREATE INDEX ON purchase_line (product_id);
+
+-- Sales
+CREATE TABLE sale_head (
+  id              bigserial PRIMARY KEY,
+  ts              timestamptz NOT NULL DEFAULT now(),
+  doc_no          text UNIQUE NOT NULL,
+  doc_date        date NOT NULL DEFAULT CURRENT_DATE,
+  customer_id     bigint REFERENCES customers(id),
+  cashier_id      bigint REFERENCES users(id),
+  location_id     bigint NOT NULL REFERENCES locations(id),
+  tax_inclusive   boolean NOT NULL DEFAULT true,
+  gross           numeric(18,4) NOT NULL DEFAULT 0,
+  discount        numeric(18,4) NOT NULL DEFAULT 0,
+  tax             numeric(18,4) NOT NULL DEFAULT 0,
+  net             numeric(18,4) NOT NULL DEFAULT 0,
+  status          text NOT NULL DEFAULT 'DRAFT'        -- 'DRAFT'|'POSTED'|'VOID'
+);
+
+CREATE TABLE sale_line (
+  id              bigserial PRIMARY KEY,
+  head_id         bigint NOT NULL REFERENCES sale_head(id) ON DELETE CASCADE,
+  product_id      bigint NOT NULL REFERENCES products(id),
+  qty             numeric(18,3) NOT NULL,
+  unit_price      numeric(18,6) NOT NULL,
+  line_discount   numeric(18,4) NOT NULL DEFAULT 0,
+  tax_group_id    bigint REFERENCES tax_groups(id),
+  line_tax_amt    numeric(18,4) NOT NULL DEFAULT 0
+);
+CREATE INDEX ON sale_line (head_id);
+CREATE INDEX ON sale_line (product_id);
+
+CREATE TABLE sale_payments (
+  id          bigserial PRIMARY KEY,
+  head_id     bigint NOT NULL REFERENCES sale_head(id) ON DELETE CASCADE,
+  mode        text NOT NULL,                            -- 'CASH','CARD','MIX','OTHER'
+  amount      numeric(18,4) NOT NULL,
+  ref         text
+);
+
+-- Returns (head only, lines  same as sale_lines with negative qty)
+CREATE TABLE sale_returns (
+  id              bigserial PRIMARY KEY,
+  sale_head_id    bigint NOT NULL REFERENCES sale_head(id) ON DELETE CASCADE,
+  ts              timestamptz NOT NULL DEFAULT now(),
+  reason          text
+);
+
+-- Loyalty & AR
+CREATE TABLE loyalty_rules (
+  id            bigserial PRIMARY KEY,
+  type          text NOT NULL DEFAULT 'percent',        -- 'percent'|'slab'
+  earn_rate     numeric(18,6) NOT NULL DEFAULT 0,       -- points per 1.00 of net
+  redeem_rate   numeric(18,6) NOT NULL DEFAULT 0,       -- 1 point = ? amount
+  min_points    numeric(18,2) NOT NULL DEFAULT 0,
+  max_redeem_pct numeric(5,2) NOT NULL DEFAULT 100
+);
+
+CREATE TABLE loyalty_ledger (
+  id            bigserial PRIMARY KEY,
+  ts            timestamptz NOT NULL DEFAULT now(),
+  customer_id   bigint NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  points        numeric(18,2) NOT NULL,
+  ref_type      text NOT NULL,                          -- 'SALE','ADJUST'
+  ref_id        bigint,
+  note          text
+);
+
+CREATE TABLE customer_ledger (
+  id            bigserial PRIMARY KEY,
+  ts            timestamptz NOT NULL DEFAULT now(),
+  customer_id   bigint NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  debit         numeric(18,4) NOT NULL DEFAULT 0,       -- sale increases AR
+  credit        numeric(18,4) NOT NULL DEFAULT 0,       -- payment reduces AR
+  ref_type      text NOT NULL,                          -- 'SALE','PAYMENT','ADJUST'
+  ref_id        bigint,

@@ -1,0 +1,133 @@
+📦 Complete Module & Feature List
+
+Below is a clear backlog you can drive directly into WinForms screens and services.
+
+1) Billing (POS,both touch & keyboard friendly)
+
+Scan/search item by barcode/code/name (fast)
+
+Price levels: Retail/Wholesale (per customer default)
+
+Line discount %, bill discount, tax inclusive/exclusive
+
+Payments: Cash, Card, Split(multiple payment methods), quick tender, change calc,customer credit
+
+Each payment method can have multiple currencies and exchange rates (to the base currency)
+
+Attach customer (optional), loyalty earn/redeem, credit limit check
+
+Hold/Resume, Return by reference, Reprint
+
+Day Open/Close, X/Z reports
+
+Receipt printing: 80mm/58mm ESC/POS; A4/A5 invoice (RDLC)
+
+Hotkeys: F2 Search, F3 Qty, F4 Discount, F5 Customer, F10 Pay, Esc Void
+
+2) Inventory (Minimal but complete)
+
+Product Master: code, name, multi-barcode, category/brand/unit, tax group, active
+
+Price management: retail/wholesale; bulk update by %/amount
+
+Purchases (GRN): supplier, location, costs, taxes, expenses → updates WAC + stock
+
+Stock Adjustments: increase/decrease with reasons (UI calls stock_ledger with ADJ+/ADJ-)
+
+Stock Ledger & Stock on Hand view; low stock report
+
+Barcode Manager: generate/assign Code128; label printing
+
+3) Customers (Loyalty & Credit)
+
+Customer master: name, phone, price level, credit limit, opening balance
+
+Loyalty rules (percent/slab) + points ledger (earn on sale; optional redeem logic in app)
+
+Customer ledger (AR): credit sales, payments, adjustments; customer statement
+
+4) Tax
+
+Tax groups: inclusive/exclusive default per item
+
+Tax rates with effective dates; sales & purchase tax calculation
+
+Tax reports: output tax (sales), input tax (purchases), tax summary by day/period
+
+Configurable rounding (app-level)
+
+5) Purchases
+
+GRN entry with supplier/location; post to finalize
+
+Print GRN (A4), purchase register by period/supplier
+
+Supplier master, contact details
+
+6) Administration & Security
+
+Users, Roles, Permissions (override price/discount, returns, day-close, etc.)
+
+Number Series: INV/GRN/RET maintained atomically
+
+Settings (JSON): company profile, logo path, print options, currency/date formats,tax config, loyalty rules, POS options
+
+Audit log: inserts/updates/deletes & postings
+
+7) Reports (starter pack)
+
+Sales: day summary, cashier-wise, item-wise, category-wise, customer-wise
+
+Stock: on hand, valuation (WAC), ledger, low stock
+
+Purchases: register, supplier-wise
+
+Tax: daily/period summary
+
+Customers: statement, loyalty ledger
+
+8) Business-Type Enhancements (configurable)
+
+Textiles: optional attributes (size/color) via a KV UI (store in settings or extra table)
+
+Electronics/Mobile: IMEI/serial capture (add columns to sale_line), warranty print
+
+Wholesale: default price level = wholesale; bulk qty steps; bigger invoice format
+
+9) Accounts Chart of Accounts (COA): basic structure with AR, Sales, Inventory, COGS, Expenses, Tax, Cash/Bank
+
+10) Deployment & Ops
+
+Single PC: PostgreSQL service on localhost; nightly pg_dump backup
+
+LAN: PostgreSQL on mini-PC server; client apps point by IP; firewall scoped to subnet
+
+Migrations: FluentMigrator runs at app start if schema drift detected
+
+Role: ebs_app least-privilege (DML + EXECUTE), no superuser
+
+11) Notes / Customizing
+
+Redeem loyalty: Adjust your POS payment dialog to capture redeem points → convert to discount amount using loyalty_rules.redeem_rate, enforce max_redeem_pct, and write to loyalty_ledger (negative points). (You can add a small sp_loyalty_redeem(head_id, points) if you want this on the server side.)
+
+Adjustments: For stock adjustments, create small UI that writes stock_ledger with ref_type='ADJ+'/'ADJ-' and updates stock.qty. (Alternatively, add sp_stock_adjust(product_id, location_id, delta, note).)
+
+Serial/IMEI: Add sale_line_imei(serial text) & (optional) purchase_line_serials to track incoming S/N.
+
+12) Minimal Toolkit for the UI (what to show)
+
+Products: add “Variants” sub-tab to manage size_label, color_label, sku, and variant barcodes.
+
+Purchases (GRN): optional columns for Batch No, Expiry Date, Serials (multi-entry dialog → writes purchase_line_serials, optionally Auto-create batch → product_batches).
+
+POS: when a product is serial-tracked, on adding the line show a serial capture dialog (exactly qty serials) → writes sale_line_serials.
+
+Stock Adjustments: form with Product, Location, Batch (optional), Delta (+/–), Reason, Unit Cost (optional) → calls sp_stock_adjust.
+
+Reports:
+
+Serial movement (from product_serials by status & dates)
+
+Batch report (near expiry), stock by batch (stock_batches)
+
+Variant sell-through (join sales lines by variant_id)
