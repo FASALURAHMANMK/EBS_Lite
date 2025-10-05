@@ -1,0 +1,250 @@
+  note          text
+);
+
+-- Audit
+CREATE TABLE audit_log (
+  id            bigserial PRIMARY KEY,
+  ts            timestamptz NOT NULL DEFAULT now(),
+  user_id       bigint REFERENCES users(id),
+  action        text NOT NULL,          -- 'INSERT','UPDATE','DELETE','POST','VOID'
+  entity        text NOT NULL,          -- table name or domain entity
+  entity_id     bigint,
+  payload_json  jsonb
+);
+
+-- ============================
+-- 1.A  Product Variants (size/color)
+-- ============================
+CREATE TABLE IF NOT EXISTS product_variants (
+  id           bigserial PRIMARY KEY,
+  product_id   bigint NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  sku          text UNIQUE,                 -- optional merchant SKU for variant
+  size_label   text,                        -- e.g. S,M,L,XL / 28,30,32 ...
+  color_label  text,                        -- e.g. Red, Blue ...
+  extra_json   jsonb NOT NULL DEFAULT '{}'::jsonb  -- extensible attrs
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_variant_identity
+  ON product_variants(product_id, COALESCE(size_label,''), COALESCE(color_label,''));
+
+CREATE TABLE IF NOT EXISTS product_variant_barcodes (
+  id           bigserial PRIMARY KEY,
+  variant_id   bigint NOT NULL REFERENCES product_variants(id) ON DELETE CASCADE,
+  barcode      text NOT NULL UNIQUE
+);
+
+-- Wire variants to lines (optional use)
+ALTER TABLE IF NOT EXISTS purchase_line ADD COLUMN IF NOT EXISTS variant_id bigint REFERENCES product_variants(id);
+ALTER TABLE IF NOT EXISTS sale_line     ADD COLUMN IF NOT EXISTS variant_id bigint REFERENCES product_variants(id);
+
+-- ============================
+-- 1.B  Batch / Expiry (per location)
+-- ============================
+CREATE TABLE IF NOT EXISTS product_batches (
+  id            bigserial PRIMARY KEY,
+  product_id    bigint NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  batch_no      text NOT NULL,
+  expiry_date   date,                        -- nullable if no expiry
+  UNIQUE(product_id, batch_no)
+);
+
+-- Optional variant+batch stock per location (fine-grained); qty can be zero
+CREATE TABLE IF NOT EXISTS stock_batches (
+  product_id    bigint NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  location_id   bigint NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+  batch_id      bigint NOT NULL REFERENCES product_batches(id) ON DELETE CASCADE,
+  qty           numeric(18,3) NOT NULL DEFAULT 0,
+  PRIMARY KEY (product_id, location_id, batch_id)
+);
+
+-- Link lines to a batch directly (optional use)
+ALTER TABLE IF NOT EXISTS purchase_line ADD COLUMN IF NOT EXISTS batch_id bigint REFERENCES product_batches(id);
+ALTER TABLE IF NOT EXISTS sale_line     ADD COLUMN IF NOT EXISTS batch_id bigint REFERENCES product_batches(id);
+
+-- Also keep the common case: purchase_line has the known expiry even without batch record
+ALTER TABLE IF NOT EXISTS purchase_line ADD COLUMN IF NOT EXISTS expiry_date date;
+
+-- ============================
+-- 1.C  Serial / IMEI management
+-- ============================
+-- Central registry of serials; reflects current status.
+CREATE TYPE IF NOT EXISTS serial_status AS ENUM('IN_STOCK','RESERVED','SOLD','RETURNED','VOID');
+
+CREATE TABLE IF NOT EXISTS product_serials (
+  id               bigserial PRIMARY KEY,
+  product_id       bigint NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  location_id      bigint REFERENCES locations(id),             -- where it sits (nullable until posted)
+  serial_no        text NOT NULL UNIQUE,                        -- IMEI / S/N
+  status           serial_status NOT NULL DEFAULT 'IN_STOCK',
+  purchase_line_id bigint REFERENCES purchase_line(id) ON DELETE SET NULL,
+  sale_line_id     bigint REFERENCES sale_line(id) ON DELETE SET NULL,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  updated_at       timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ix_serials_product ON product_serials(product_id);
+CREATE INDEX IF NOT EXISTS ix_serials_location ON product_serials(location_id);
+
+-- Serial lists captured per line (many serials per line qty)
+CREATE TABLE IF NOT EXISTS purchase_line_serials (
+  id            bigserial PRIMARY KEY,
+  line_id       bigint NOT NULL REFERENCES purchase_line(id) ON DELETE CASCADE,
+  serial_no     text NOT NULL,
+  UNIQUE(line_id, serial_no)
+);
+
+CREATE TABLE IF NOT EXISTS sale_line_serials (
+  id            bigserial PRIMARY KEY,
+  line_id       bigint NOT NULL REFERENCES sale_line(id) ON DELETE CASCADE,
+  serial_no     text NOT NULL,
+  UNIQUE(line_id, serial_no)
+);
+
+
+-- =========================================================
+-- 2) Utility Functions
+-- =========================================================
+
+-- 2.1 Get active tax rate for a tax_group at a date
+CREATE OR REPLACE FUNCTION fn_tax_rate(p_tax_group_id bigint, p_on date)
+RETURNS numeric AS $$
+DECLARE r numeric;
+BEGIN
+  SELECT tr.rate_percent
+  INTO r
+  FROM tax_rates tr
+  WHERE tr.tax_group_id = p_tax_group_id AND tr.effective_from <= p_on
+  ORDER BY tr.effective_from DESC
+  LIMIT 1;
+  RETURN COALESCE(r, 0);
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+-- 2.2 Compute tax for a line amount given group & inclusive flag
+-- Returns (line_tax, line_net, line_gross)
+CREATE OR REPLACE FUNCTION fn_calc_tax(
+  p_amount numeric,            -- amount after discount for qty (price*qty - discount)
+  p_tax_group_id bigint,
+  p_doc_date date,
+  p_is_inclusive boolean
+) RETURNS TABLE (tax numeric, net numeric, gross numeric)
+AS $$
+DECLARE rate numeric := fn_tax_rate(p_tax_group_id, p_doc_date);
+BEGIN
+  IF p_is_inclusive THEN
+    -- amount is gross, extract tax
+    tax := p_amount - (p_amount / (1 + (rate/100)));
+    net := p_amount - tax;
+    gross := p_amount;
+  ELSE
+    tax := p_amount * (rate/100);
+    net := p_amount;
+    gross := p_amount + tax;
+  END IF;
+  RETURN NEXT;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+-- 2.3 Atomic next document number
+CREATE OR REPLACE FUNCTION fn_next_number(p_code text)
+RETURNS text AS $$
+DECLARE v_id bigint; v_prefix text; v_next int; v_width int; v_doc text;
+BEGIN
+  SELECT id, prefix, next_no, width
+    INTO v_id, v_prefix, v_next, v_width
+  FROM number_series WHERE code = p_code
+  FOR UPDATE;
+  IF v_id IS NULL THEN
+    RAISE EXCEPTION 'number_series % not found', p_code;
+  END IF;
+  UPDATE number_series SET next_no = v_next + 1 WHERE id = v_id;
+  v_doc := v_prefix || lpad(v_next::text, v_width, '0');
+  RETURN v_doc;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 2.4 Safety: ensure stock row exists (UPSERT helper)
+CREATE OR REPLACE FUNCTION fn_ensure_stock(p_product_id bigint, p_location_id bigint)
+RETURNS void AS $$
+BEGIN
+  INSERT INTO stock(product_id, location_id, qty)
+  VALUES (p_product_id, p_location_id, 0)
+  ON CONFLICT (product_id, location_id) DO NOTHING;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION sp_stock_adjust(
+  p_product_id  bigint,
+  p_location_id bigint,
+  p_delta       numeric,               -- +ve add, -ve remove
+  p_reason      text,
+  p_user_id     bigint DEFAULT NULL,
+  p_batch_id    bigint DEFAULT NULL,   -- optional: adjust specific batch
+  p_unit_cost   numeric DEFAULT NULL   -- optional: when adding stock, touch WAC
+)
+RETURNS void AS $$
+DECLARE
+  v_old_qty   numeric;
+  v_new_qty   numeric;
+  v_old_wac   numeric;
+  v_new_wac   numeric;
+BEGIN
+  -- Ensure stock row exists
+  PERFORM fn_ensure_stock(p_product_id, p_location_id);
+
+  -- Lock stock row
+  SELECT qty, p.cost_wac INTO v_old_qty, v_old_wac
+  FROM stock s JOIN products p ON p.id = s.product_id
+  WHERE s.product_id = p_product_id AND s.location_id = p_location_id
+  FOR UPDATE;
+
+  v_new_qty := v_old_qty + p_delta;
+  IF v_new_qty < 0 THEN
+    RAISE EXCEPTION 'Stock adjust would go negative (prod %, loc %): have %, delta %',
+      p_product_id, p_location_id, v_old_qty, p_delta;
+  END IF;
+
+  -- Optional WAC touch when adding stock and unit cost supplied
+  IF p_delta > 0 AND p_unit_cost IS NOT NULL THEN
+    v_new_wac := ((v_old_qty * v_old_wac) + (p_delta * p_unit_cost)) / NULLIF(v_old_qty + p_delta,0);
+  ELSE
+    v_new_wac := v_old_wac;
+  END IF;
+
+  UPDATE stock SET qty = v_new_qty WHERE product_id = p_product_id AND location_id = p_location_id;
+  UPDATE products SET cost_wac = v_new_wac, updated_at = now() WHERE id = p_product_id;
+
+  -- Batch-level update (if provided)
+  IF p_batch_id IS NOT NULL THEN
+    INSERT INTO stock_batches(product_id, location_id, batch_id, qty)
+    VALUES (p_product_id, p_location_id, p_batch_id, GREATEST(p_delta,0))  -- insert with +ve; fixed below
+    ON CONFLICT (product_id, location_id, batch_id)
+    DO UPDATE SET qty = stock_batches.qty + EXCLUDED.qty;
+    -- If delta negative, correct:
+    IF p_delta < 0 THEN
+      UPDATE stock_batches
+      SET qty = qty + p_delta
+      WHERE product_id = p_product_id AND location_id = p_location_id AND batch_id = p_batch_id;
+      -- guard:
+      IF (SELECT qty FROM stock_batches WHERE product_id = p_product_id AND location_id = p_location_id AND batch_id = p_batch_id) < 0 THEN
+        RAISE EXCEPTION 'Batch stock negative for product %, location %, batch %', p_product_id, p_location_id, p_batch_id;
+      END IF;
+    END IF;
+  END IF;
+
+  -- Ledger
+  INSERT INTO stock_ledger(product_id, location_id, ref_type, ref_id, in_qty, out_qty, cost_wac_after, note)
+  VALUES (p_product_id, p_location_id,
+          CASE WHEN p_delta>=0 THEN 'ADJ+' ELSE 'ADJ-' END,
+          NULL, GREATEST(p_delta,0), GREATEST(-p_delta,0),
+          v_new_wac, coalesce(p_reason,'Stock adjust'));
+
+  -- Audit
+  INSERT INTO audit_log(user_id, action, entity, entity_id, payload_json)
+  VALUES (p_user_id, 'POST', 'stock_adjust', NULL,
+          jsonb_build_object('product_id',p_product_id,'location_id',p_location_id,'delta',p_delta,'reason',p_reason,'batch_id',p_batch_id,'unit_cost',p_unit_cost));
+END;
+$$ LANGUAGE plpgsql;
+
+-- Helper: compute current earned/available points for a customer
+CREATE OR REPLACE FUNCTION fn_loyalty_points(customer_id bigint)
+RETURNS numeric AS $$
+DECLARE v numeric;

@@ -1,0 +1,250 @@
+BEGIN
+  SELECT COALESCE(SUM(points),0) INTO v FROM loyalty_ledger WHERE customer_id = fn_loyalty_points.customer_id;
+  RETURN v;
+END; $$ LANGUAGE plpgsql STABLE;
+
+-- sp_loyalty_redeem: decide how much to redeem for a sale & write ledger
+-- Returns (OUT o_redeem_amount money, OUT o_points_used numeric)
+CREATE OR REPLACE FUNCTION sp_loyalty_redeem(
+  p_head_id bigint,
+  p_points  numeric DEFAULT NULL,   -- optional: if NULL, use max allowed by rules
+  p_user_id bigint DEFAULT NULL,
+  OUT o_redeem_amount numeric,
+  OUT o_points_used numeric
+) AS $$
+DECLARE
+  v_head sale_head%ROWTYPE;
+  v_rules loyalty_rules%ROWTYPE;
+  v_have_points numeric;
+  v_rate numeric;            -- redeem_rate (1 point = v_rate amount)
+  v_max_pct numeric;         -- max percent of net
+  v_want_points numeric;
+  v_cap_amount numeric;
+BEGIN
+  SELECT * INTO v_head FROM sale_head WHERE id = p_head_id;
+  IF v_head.status <> 'DRAFT' THEN
+    RAISE EXCEPTION 'Sale % is not DRAFT', p_head_id;
+  END IF;
+  IF v_head.customer_id IS NULL THEN
+    RAISE EXCEPTION 'No customer on sale % for redeem', p_head_id;
+  END IF;
+
+  SELECT * INTO v_rules FROM loyalty_rules ORDER BY id LIMIT 1;
+  v_rate := COALESCE(v_rules.redeem_rate,0);       -- amount per point
+  v_max_pct := COALESCE(v_rules.max_redeem_pct,100);
+
+  IF v_rate <= 0 THEN
+    RAISE EXCEPTION 'Redeem rate not configured';
+  END IF;
+
+  v_have_points := fn_loyalty_points(v_head.customer_id);
+
+  -- maximum money you may redeem on this sale:
+  v_cap_amount := (v_head.net * v_max_pct / 100.0);
+
+  -- If p_points not specified, use min(points for cap, points available)
+  IF p_points IS NULL THEN
+    v_want_points := LEAST( v_have_points, floor( v_cap_amount / v_rate ) );
+  ELSE
+    v_want_points := LEAST( p_points, v_have_points, floor( v_cap_amount / v_rate ) );
+  END IF;
+
+  IF v_want_points <= 0 THEN
+    o_redeem_amount := 0; o_points_used := 0; RETURN;
+  END IF;
+
+  o_points_used := v_want_points;
+  o_redeem_amount := o_points_used * v_rate;
+
+  -- write negative points (redeem)
+  INSERT INTO loyalty_ledger(customer_id, points, ref_type, ref_id, note)
+  VALUES (v_head.customer_id, -o_points_used, 'SALE', p_head_id, 'Redeem on sale');
+
+  -- audit
+  INSERT INTO audit_log(user_id, action, entity, entity_id, payload_json)
+  VALUES (p_user_id, 'POST', 'loyalty_redeem', p_head_id,
+          jsonb_build_object('points_used',o_points_used,'redeem_amount',o_redeem_amount));
+
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- =========================================================
+-- 3) Posting Procedures (as transaction-safe functions)
+-- =========================================================
+
+-- 3.1 Post GRN (purchase_head.id) → updates stock, WAC, ledger, totals
+CREATE OR REPLACE FUNCTION sp_post_grn(p_head_id bigint, p_user_id bigint DEFAULT NULL)
+RETURNS void AS $$
+DECLARE
+  v_head purchase_head%ROWTYPE;
+  v_line record;
+  v_amount numeric;
+  v_rate numeric;
+  v_old_qty numeric; v_old_wac numeric; v_new_qty numeric; v_new_wac numeric;
+BEGIN
+  SELECT * INTO v_head FROM purchase_head WHERE id = p_head_id FOR UPDATE;
+  IF v_head.status <> 'DRAFT' THEN RAISE EXCEPTION 'GRN % is not DRAFT', p_head_id; END IF;
+
+  v_head.subtotal := 0; v_head.tax_amount := 0; v_head.grand_total := 0;
+
+  FOR v_line IN
+    SELECT pl.*, COALESCE(pl.tax_group_id, p.tax_group_id) AS eff_tax_group_id
+    FROM purchase_line pl
+    JOIN products p ON p.id = pl.product_id
+    WHERE pl.head_id = p_head_id
+  LOOP
+    PERFORM fn_ensure_stock(v_line.product_id, v_head.location_id);
+
+    v_amount := v_line.qty * v_line.unit_cost;
+
+    SELECT tr.rate_percent INTO v_rate
+    FROM tax_rates tr
+    WHERE tr.tax_group_id = v_line.eff_tax_group_id AND tr.effective_from <= v_head.doc_date
+    ORDER BY effective_from DESC LIMIT 1;
+    v_rate := COALESCE(v_rate,0);
+
+    v_head.subtotal  := v_head.subtotal  + v_amount;
+    v_head.tax_amount:= v_head.tax_amount+ (v_amount * (v_rate/100));
+
+    -- WAC compute
+    SELECT qty, p.cost_wac INTO v_old_qty, v_old_wac
+    FROM stock s JOIN products p ON p.id = v_line.product_id
+    WHERE s.product_id = v_line.product_id AND s.location_id = v_head.location_id
+    FOR UPDATE;
+
+    v_new_qty := v_old_qty + v_line.qty;
+    v_new_wac := CASE WHEN v_new_qty>0
+                      THEN ((v_old_qty*v_old_wac)+(v_line.qty*v_line.unit_cost))/v_new_qty
+                      ELSE v_line.unit_cost END;
+
+    UPDATE stock SET qty = v_new_qty
+    WHERE product_id = v_line.product_id AND location_id = v_head.location_id;
+
+    UPDATE products SET cost_wac = v_new_wac, updated_at = now()
+    WHERE id = v_line.product_id;
+
+    -- Batch stock if batch_id present
+    IF v_line.batch_id IS NOT NULL THEN
+      INSERT INTO stock_batches(product_id, location_id, batch_id, qty)
+      VALUES (v_line.product_id, v_head.location_id, v_line.batch_id, v_line.qty)
+      ON CONFLICT (product_id, location_id, batch_id)
+      DO UPDATE SET qty = stock_batches.qty + EXCLUDED.qty;
+    END IF;
+
+    -- Serials: if purchase_line_serials exist, register them as IN_STOCK at location
+    INSERT INTO product_serials(product_id, location_id, serial_no, status, purchase_line_id)
+    SELECT v_line.product_id, v_head.location_id, pls.serial_no, 'IN_STOCK', v_line.id
+    FROM purchase_line_serials pls
+    WHERE pls.line_id = v_line.id
+    ON CONFLICT (serial_no) DO NOTHING;
+
+    INSERT INTO stock_ledger(product_id, location_id, ref_type, ref_id, in_qty, out_qty, cost_wac_after, note)
+    VALUES (v_line.product_id, v_head.location_id, 'GRN', v_head.id, v_line.qty, 0, v_new_wac,
+            COALESCE('GRN '||v_head.doc_no,'GRN'));
+  END LOOP;
+
+  v_head.grand_total := v_head.subtotal + v_head.tax_amount + v_head.expenses;
+
+  UPDATE purchase_head
+  SET subtotal=v_head.subtotal, tax_amount=v_head.tax_amount, grand_total=v_head.grand_total, status='POSTED'
+  WHERE id = p_head_id;
+
+  INSERT INTO audit_log(user_id, action, entity, entity_id, payload_json)
+  VALUES (p_user_id, 'POST', 'purchase_head', p_head_id, jsonb_build_object('doc_no', v_head.doc_no));
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- 3.2 Post Sale (sale_head.id) → totals, stock out, ledger, loyalty, AR
+CREATE OR REPLACE FUNCTION sp_post_sale(p_head_id bigint, p_user_id bigint DEFAULT NULL)
+RETURNS void AS $$
+DECLARE
+  v_head sale_head%ROWTYPE;
+  v_line record;
+  v_amount numeric; v_tax numeric; v_net numeric; v_gross numeric;
+  v_is_inc boolean; v_qty numeric; v_old_qty numeric; v_new_qty numeric; v_wac numeric;
+  v_cust_id bigint; v_loyalty_points numeric; v_paid numeric;
+BEGIN
+  SELECT * INTO v_head FROM sale_head WHERE id = p_head_id FOR UPDATE;
+  IF v_head.status <> 'DRAFT' THEN RAISE EXCEPTION 'SALE % is not DRAFT', p_head_id; END IF;
+
+  v_is_inc := v_head.tax_inclusive;
+  v_head.gross := 0; v_head.discount := 0; v_head.tax := 0; v_head.net := 0;
+
+  FOR v_line IN
+    SELECT sl.*, COALESCE(sl.tax_group_id, p.tax_group_id) AS eff_tax_group_id
+    FROM sale_line sl
+    JOIN products p ON p.id = sl.product_id
+    WHERE sl.head_id = p_head_id
+  LOOP
+    v_qty := v_line.qty;
+    v_amount := (v_line.unit_price * v_qty) - v_line.line_discount;
+
+    SELECT tax, net, gross INTO v_tax, v_net, v_gross
+    FROM fn_calc_tax(v_amount, v_line.eff_tax_group_id, v_head.doc_date, v_is_inc);
+
+    v_head.tax := v_head.tax + v_tax;
+    v_head.net := v_head.net + v_net;
+    v_head.gross := v_head.gross + v_gross;
+    v_head.discount := v_head.discount + COALESCE(v_line.line_discount,0);
+
+    -- Stock OUT
+    PERFORM fn_ensure_stock(v_line.product_id, v_head.location_id);
+    SELECT qty, p.cost_wac INTO v_old_qty, v_wac
+    FROM stock s JOIN products p ON p.id = v_line.product_id
+    WHERE s.product_id = v_line.product_id AND s.location_id = v_head.location_id
+    FOR UPDATE;
+
+    IF v_old_qty < v_qty THEN
+      RAISE EXCEPTION 'Insufficient stock for product %: have %, need %', v_line.product_id, v_old_qty, v_qty;
+    END IF;
+
+    v_new_qty := v_old_qty - v_qty;
+    UPDATE stock SET qty = v_new_qty
+    WHERE product_id = v_line.product_id AND location_id = v_head.location_id;
+
+    -- Batch decrement if line bound to batch
+    IF v_line.batch_id IS NOT NULL THEN
+      UPDATE stock_batches
+      SET qty = qty - v_qty
+      WHERE product_id = v_line.product_id AND location_id = v_head.location_id AND batch_id = v_line.batch_id;
+      IF (SELECT qty FROM stock_batches WHERE product_id=v_line.product_id AND location_id=v_head.location_id AND batch_id=v_line.batch_id) < 0 THEN
+        RAISE EXCEPTION 'Batch stock negative (prod %, loc %, batch %)', v_line.product_id, v_head.location_id, v_line.batch_id;
+      END IF;
+    END IF;
+
+    -- Serials: if sale_line_serials exist, ensure they are available and mark SOLD
+    IF EXISTS (SELECT 1 FROM sale_line_serials WHERE line_id = v_line.id) THEN
+      -- validate availability
+      IF EXISTS (
+        SELECT 1
+        FROM sale_line_serials sls
+        LEFT JOIN product_serials ps ON ps.serial_no = sls.serial_no
+        WHERE sls.line_id = v_line.id
+          AND (ps.serial_no IS NULL OR ps.status <> 'IN_STOCK' OR ps.product_id <> v_line.product_id OR ps.location_id <> v_head.location_id)
+      ) THEN
+        RAISE EXCEPTION 'One or more serials are not available/at location for sale line %', v_line.id;
+      END IF;
+
+      -- mark SOLD + attach sale_line_id
+      UPDATE product_serials ps
+      SET status = 'SOLD', sale_line_id = v_line.id, updated_at = now()
+      FROM sale_line_serials sls
+      WHERE ps.serial_no = sls.serial_no AND sls.line_id = v_line.id;
+    END IF;
+
+    INSERT INTO stock_ledger(product_id, location_id, ref_type, ref_id, in_qty, out_qty, cost_wac_after, note)
+    VALUES (v_line.product_id, v_head.location_id, 'SALE', v_head.id, 0, v_qty, v_wac,
+            COALESCE('SALE '||v_head.doc_no,'SALE'));
+  END LOOP;
+
+  UPDATE sale_head
+  SET gross=v_head.gross, discount=v_head.discount, tax=v_head.tax, net=v_head.net, status='POSTED'
+  WHERE id = p_head_id;
+
+  -- Loyalty earn (keep as before)
+  SELECT customer_id INTO v_cust_id FROM sale_head WHERE id = p_head_id;
+  IF v_cust_id IS NOT NULL THEN
+    SELECT earn_rate INTO v_loyalty_points FROM loyalty_rules ORDER BY id LIMIT 1;
+    v_loyalty_points := COALESCE(v_loyalty_points,0) * v_head.net;

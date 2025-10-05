@@ -1,0 +1,116 @@
+    RETURN;
+  END IF;
+
+  IF coalesce(v_tracked, false) IS FALSE THEN
+    RETURN;
+  END IF;
+
+  IF NOT fn_is_integer_qty(v_qty) THEN
+    RAISE EXCEPTION 'Serial-tracked product % must have integer quantity (got %).', v_prod_id, v_qty;
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM purchase_line_serials
+  WHERE line_id = p_line_id;
+
+  IF v_count <> v_qty::int THEN
+    RAISE EXCEPTION 'Purchase line % requires % serial(s) but has %.', p_line_id, v_qty::int, v_count;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =========================
+-- SALE: enforce serials == qty
+-- =========================
+DROP TRIGGER IF EXISTS ctrg_sale_line_serials_line ON sale_line;
+DROP TRIGGER IF EXISTS ctrg_sale_line_serials_serials ON sale_line_serials;
+
+-- Fire after any change to the sale line itself
+CREATE CONSTRAINT TRIGGER ctrg_sale_line_serials_line
+AFTER INSERT OR UPDATE OR DELETE ON sale_line
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION trg_check_sale_line_serials_fn( COALESCE(NEW.id, OLD.id) );
+
+-- Fire after any change to the serial list
+CREATE CONSTRAINT TRIGGER ctrg_sale_line_serials_serials
+AFTER INSERT OR UPDATE OR DELETE ON sale_line_serials
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION trg_check_sale_line_serials_fn( COALESCE(NEW.line_id, OLD.line_id) );
+
+-- =========================
+-- PURCHASE: enforce serials == qty
+-- =========================
+DROP TRIGGER IF EXISTS ctrg_purchase_line_serials_line ON purchase_line;
+DROP TRIGGER IF EXISTS ctrg_purchase_line_serials_serials ON purchase_line_serials;
+
+CREATE CONSTRAINT TRIGGER ctrg_purchase_line_serials_line
+AFTER INSERT OR UPDATE OR DELETE ON purchase_line
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION trg_check_purchase_line_serials_fn( COALESCE(NEW.id, OLD.id) );
+
+CREATE CONSTRAINT TRIGGER ctrg_purchase_line_serials_serials
+AFTER INSERT OR UPDATE OR DELETE ON purchase_line_serials
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION trg_check_purchase_line_serials_fn( COALESCE(NEW.line_id, OLD.line_id) );
+
+
+-- Prevent the same serial from being entered twice on the same GRN
+CREATE UNIQUE INDEX IF NOT EXISTS uq_purchase_line_serials_by_head
+ON purchase_line_serials(serial_no, (SELECT head_id FROM purchase_line WHERE id = line_id));
+
+-- Prevent entering a serial that already exists in product_serials (system-wide)
+-- (Alternative to checking at post time; use a trigger for portability.)
+CREATE OR REPLACE FUNCTION trg_reject_existing_serial_on_capture()
+RETURNS trigger AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM product_serials ps WHERE ps.serial_no = NEW.serial_no) THEN
+    RAISE EXCEPTION 'Serial % already exists in system.', NEW.serial_no;
+  END IF;
+  RETURN NEW;
+END; $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_block_dup_serial_capture ON purchase_line_serials;
+CREATE TRIGGER trg_block_dup_serial_capture
+BEFORE INSERT ON purchase_line_serials
+FOR EACH ROW
+EXECUTE FUNCTION trg_reject_existing_serial_on_capture();
+
+
+-- =========================================================
+-- 6) Seed minimal data (optional)
+-- =========================================================
+INSERT INTO roles(name) VALUES ('admin') ON CONFLICT DO NOTHING;
+INSERT INTO users(username, pw_hash, role_id)
+SELECT 'admin', '$2a$10$replace_with_bcrypt', r.id
+FROM roles r WHERE r.name='admin'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO locations(name) VALUES ('Main') ON CONFLICT DO NOTHING;
+
+INSERT INTO number_series(code, prefix, next_no, width) VALUES
+  ('INV','INV-',1,6),
+  ('GRN','GRN-',1,6),
+  ('RET','RET-',1,6)
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO tax_groups(name, is_inclusive) VALUES
+  ('VAT5', true), ('Exempt', true)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO tax_rates(tax_group_id, rate_percent)
+SELECT tg.id, 5 FROM tax_groups tg WHERE tg.name='VAT5'
+ON CONFLICT DO NOTHING;
+
+-- =========================================================
+-- 7) Helpful secure app role (least privilege) - optional
+-- =========================================================
+-- CREATE ROLE ebs_app LOGIN PASSWORD 'change_me';
+-- GRANT USAGE ON SCHEMA public TO ebs_app;
+-- GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ebs_app;
+-- ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ebs_app;
+-- GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO ebs_app;
+-- ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO ebs_app;
