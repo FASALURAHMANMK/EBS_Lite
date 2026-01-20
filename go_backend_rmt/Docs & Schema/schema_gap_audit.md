@@ -1,0 +1,76 @@
+# Schema Gap Audit (Go -> PostgrSQL.sql)
+
+## Tables/Columns Referenced by Go
+- attendance: attendance_id, check_in, check_out, created_at, created_by, date, employee_id, is_deleted, notes, status, sync_status, updated_at
+- audit_log: action, field_changes, ip_address, new_value, old_value, record_id, table_name, user_agent, user_id
+- brands: brand_id, company_id, created_by, description, is_active, name, updated_at, updated_by
+- cash_register: cash_in, cash_out, closed_by, closing_balance, created_at, date, expected_balance, location_id, opened_by, opening_balance, register_id, status, sync_status, updated_at, variance
+- cash_register_tally: count, location_id, notes, recorded_by
+- categories: category_id, company_id, created_by, description, is_active, name, parent_id, updated_at, updated_by
+- collection_invoices: amount, collection_id, sale_id
+- collections: amount, collection_date, collection_id, collection_number, created_at, created_by, customer_id, location_id, notes, payment_method_id, reference_number, sync_status, updated_at, updated_by
+- companies: address, currency_id, email, is_active, logo, name, phone, tax_number, updated_at
+- currencies: code, currency_id, exchange_rate, is_base_currency, is_deleted, name, symbol, updated_at
+- customer_credit_transactions: amount, company_id, created_by, customer_id, description, type
+- customers: address, company_id, created_at, created_by, credit_limit, customer_id, email, is_active, is_deleted, is_loyalty, loyalty_tier_id, name, payment_terms, phone, sync_status, tax_number, updated_at, updated_by
+- device_sessions: created_at, device_id, device_name, ip_address, is_active, is_stale, last_seen, last_sync_time, session_id, user_agent, user_id
+- employees: address, company_id, created_by, department, email, employee_code, employee_id, hire_date, is_active, is_deleted, leave_balance, location_id, name, phone, position, salary, updated_at, updated_by
+- expense_categories: category_id, company_id, created_by, is_deleted, name, updated_at, updated_by
+- expenses: amount, category_id, created_at, created_by, expense_date, expense_id, is_deleted, location_id, notes, sync_status, updated_at, updated_by
+- goods_receipt_items: goods_receipt_id, goods_receipt_item_id, line_total, product_id, received_quantity, unit_price
+- goods_receipts: goods_receipt_id, is_deleted, location_id, purchase_id, receipt_number, received_by, received_date, supplier_id
+- information_schema: columns
+- invoice_templates: company_id, is_active, is_default, layout, name, primary_language, secondary_language, template_type
+- languages: is_active
+- leaves: employee_id, end_date, reason, start_date, status
+- ledger_entries: account_id, balance, company_id, created_at, created_by, credit, date, debit, description, entry_id, reference, sync_status, transaction_id, transaction_type, updated_at, updated_by, voucher_id
+- locations: address, company_id, is_active, location_id, name, phone, updated_at
+- loyalty_programs: customer_id, last_updated, loyalty_id, points, total_earned, total_redeemed
+- loyalty_redemptions: customer_id, points_used, redeemed_at, redemption_id, sale_id, value_redeemed
+- loyalty_settings: company_id
+- loyalty_tiers: company_id, min_points, name, points_per_currency, tier_id
+- loyalty_transactions: balance_after, customer_id, description, points, reference_id, reference_type, transaction_type
+- numbering_sequences: company_id, current_number, location_id, name, prefix, sequence_length, updated_at
+- password_reset_tokens: expires_at, token, user_id
+- payment_method_currencies: currency_id, exchange_rate, method_id
+- payment_methods: company_id, external_integration, is_active, method_id, name, type
+- payments: amount, created_at, created_by, is_deleted, location_id, notes, payment_date, payment_id, payment_method_id, payment_number, purchase_id, reference_number, supplier_id, sync_status, updated_at, updated_by
+- payroll: basic_salary, created_at, employee_id, gross_salary, net_salary, pay_period_end, pay_period_start, payroll_id, processed_by, status, sync_status, total_deductions, updated_at
+- payroll_advances: amount, date, payroll_id
+- payroll_deductions: amount, date, payroll_id, type
+- permissions: action, description, module, name, permission_id
+- printer_settings: company_id, connectivity, is_active, is_default, location_id, name, paper_size, printer_type
+- product_attribute_values: attribute_id, product_id, value
+- product_attributes: attribute_id, company_id, is_deleted, is_required, name, options, type
+- product_barcodes: barcode, cost_price, is_primary, pack_size, product_id, selling_price
+- products: brand_id, category_id, company_id, cost_price, created_by, default_supplier_id, description, dimensions, is_active, is_deleted, is_serialized, name, product_id, reorder_level, selling_price, sku, tax_id, unit_id, updated_at, updated_by, weight
+- promotions: applicable_to, company_id, conditions, description, discount_type, end_date, is_active, min_amount, name, start_date, updated_at, value
+- purchase_details: batch_number, discount_amount, discount_percentage, expiry_date, line_total, product_id, purchase_detail_id, purchase_id, quantity, received_quantity, serial_numbers, tax_amount, tax_id, unit_price
+- purchase_return_details: line_total, product_id, purchase_detail_id, quantity, return_detail_id, return_id, unit_price
+- purchase_returns: approved_at, approved_by, created_at, created_by, is_deleted, location_id, purchase_id, reason, receipt_file, reference_number, return_date, return_id, return_number, status, supplier_id, sync_status, total_amount, updated_at, updated_by
+- purchases: created_at, created_by, discount_amount, due_date, invoice_file, is_deleted, location_id, notes, paid_amount, payment_terms, purchase_date, purchase_id, purchase_number, reference_number, status, subtotal, supplier_id, sync_status, tax_amount, total_amount, updated_at, updated_by
+- role_permissions: permission_id, role_id
+- roles: description, name
+- salary_components: amount, payroll_id, type
+- sale_details: // discount_percentage, // line_total, discount_amount, discount_percentage, line_total, notes, product_id, product_name, quantity, sale_detail_id, sale_id, serial_numbers, tax_amount, tax_id, unit_price
+- sale_payments: amount, base_amount, currency_id, exchange_rate, method_id, sale_id
+- sale_promotions: discount_amount, promotion_id, sale_id
+- sale_return_details: line_total, product_id, quantity, return_detail_id, return_id, sale_detail_id, unit_price
+- sale_returns: created_at, created_by, customer_id, is_deleted, location_id, reason, return_date, return_id, return_number, sale_id, status, sync_status, total_amount, updated_at, updated_by
+- sales: // payment_method_id, // subtotal, created_at, created_by, customer_id, discount_amount, is_deleted, is_quick_sale, location_id, notes, paid_amount, payment_method_id, pos_status, sale_date, sale_id, sale_number, sale_time, status, subtotal, sync_status, tax_amount, total_amount, updated_at, updated_by
+- settings: company_id, key, value
+- stock: last_updated, location_id, product_id, quantity, reserved_quantity, stock_id
+- stock_adjustment_document_items: adjustment, document_id, product_id
+- stock_adjustment_documents: created_at, created_by, document_id, document_number, location_id, reason
+- stock_adjustments: adjustment, adjustment_id, created_at, created_by, location_id, product_id, reason
+- stock_lots: batch_number, cost_price, expiry_date, goods_receipt_id, location_id, product_id, purchase_id, quantity, received_date, remaining_quantity, serial_numbers, supplier_id
+- stock_transfer_details: product_id, quantity, received_quantity, transfer_detail_id, transfer_id
+- stock_transfers: approved_at, approved_by, created_at, created_by, from_location_id, notes, status, sync_status, to_location_id, transfer_date, transfer_id, transfer_number, updated_at, updated_by
+- suppliers: address, company_id, contact_person, created_at, created_by, credit_limit, email, is_active, name, payment_terms, phone, supplier_id, sync_status, tax_number, updated_at, updated_by
+- taxes: company_id, is_active, is_compound, name, percentage, tax_id
+- translations: key, language_code, value
+- units: base_unit_id, conversion_factor, name, symbol, unit_id
+- user_preferences: key, user_id, value
+- users: company_id, email, first_name, is_active, is_deleted, is_locked, last_login, last_name, location_id, password_hash, phone, preferred_language, role_id, secondary_language, updated_at, user_id, username
+- vouchers: account_id, amount, company_id, created_by, date, description, is_deleted, reference, type, updated_by, voucher_id
+- workflow_approvals: approved_at, approver_role_id, created_by, remarks, state_id, status, updated_by

@@ -27,6 +27,9 @@ func main() {
 		log.Fatal("Failed to connect to database:", err)
 	}
 	defer database.Close()
+	if err := database.ValidateSchema(database.GetDB()); err != nil {
+		log.Fatal("Schema validation failed:", err)
+	}
 
 	// Set Gin mode
 	if cfg.Environment == "production" {

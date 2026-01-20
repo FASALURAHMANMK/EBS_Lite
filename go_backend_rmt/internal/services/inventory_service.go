@@ -21,49 +21,6 @@ func NewInventoryService() *InventoryService {
     }
 }
 
-// small interface to allow using either *sql.DB or *sql.Tx for Exec
-type sqlExecer interface {
-    Exec(query string, args ...any) (sql.Result, error)
-}
-
-// ensureAdjustmentDocTables creates the stock adjustment document tables if they do not exist.
-// This is a safety net for environments where migrations weren't run yet.
-func (s *InventoryService) ensureAdjustmentDocTables(ex sqlExecer) error {
-    if _, err := ex.Exec(`
-        CREATE TABLE IF NOT EXISTS stock_adjustment_documents (
-            document_id      SERIAL PRIMARY KEY,
-            document_number  VARCHAR(64) NOT NULL UNIQUE,
-            location_id      INTEGER NOT NULL,
-            reason           VARCHAR(255) NOT NULL,
-            created_by       INTEGER NOT NULL,
-            created_at       TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-    `); err != nil {
-        return fmt.Errorf("failed to ensure stock_adjustment_documents: %w", err)
-    }
-    if _, err := ex.Exec(`
-        CREATE TABLE IF NOT EXISTS stock_adjustment_document_items (
-            item_id     SERIAL PRIMARY KEY,
-            document_id INTEGER NOT NULL,
-            product_id  INTEGER NOT NULL,
-            adjustment  DOUBLE PRECISION NOT NULL
-        )
-    `); err != nil {
-        return fmt.Errorf("failed to ensure stock_adjustment_document_items: %w", err)
-    }
-    // Helpful indexes (IF NOT EXISTS supported in PG >=9.5)
-    if _, err := ex.Exec(`CREATE INDEX IF NOT EXISTS idx_sad_location_id ON stock_adjustment_documents(location_id)`); err != nil {
-        return fmt.Errorf("failed to create idx_sad_location_id: %w", err)
-    }
-    if _, err := ex.Exec(`CREATE INDEX IF NOT EXISTS idx_sadi_document_id ON stock_adjustment_document_items(document_id)`); err != nil {
-        return fmt.Errorf("failed to create idx_sadi_document_id: %w", err)
-    }
-    if _, err := ex.Exec(`CREATE INDEX IF NOT EXISTS idx_sadi_product_id ON stock_adjustment_document_items(product_id)`); err != nil {
-        return fmt.Errorf("failed to create idx_sadi_product_id: %w", err)
-    }
-    return nil
-}
-
 func (s *InventoryService) GetStock(companyID, locationID int, productID *int) ([]models.StockWithProduct, error) {
     // Select products in the company and left-join stock for the requested location.
     // COALESCE stock fields to avoid NULL scans and to return zero-quantity rows.
@@ -214,10 +171,6 @@ func (s *InventoryService) GetStockAdjustments(companyID, locationID int) ([]mod
 
 // CreateStockAdjustmentDocument creates a header + items and applies stock changes atomically
 func (s *InventoryService) CreateStockAdjustmentDocument(companyID, locationID, userID int, req *models.CreateStockAdjustmentDocumentRequest) (*models.StockAdjustmentDocument, error) {
-    // Ensure tables exist (in case migrations haven't run)
-    if err := s.ensureAdjustmentDocTables(s.db); err != nil {
-        return nil, err
-    }
     if len(req.Items) == 0 {
         return nil, fmt.Errorf("no items to adjust")
     }
@@ -303,10 +256,6 @@ func (s *InventoryService) CreateStockAdjustmentDocument(companyID, locationID, 
 
 // GetStockAdjustmentDocuments returns document headers for a company/location
 func (s *InventoryService) GetStockAdjustmentDocuments(companyID, locationID int) ([]models.StockAdjustmentDocument, error) {
-    // Ensure tables exist (in case migrations haven't run)
-    if err := s.ensureAdjustmentDocTables(s.db); err != nil {
-        return nil, err
-    }
     rows, err := s.db.Query(`
         SELECT d.document_id, d.document_number, d.location_id, d.reason, d.created_by, d.created_at
         FROM stock_adjustment_documents d
@@ -349,10 +298,6 @@ func (s *InventoryService) GetStockAdjustmentDocuments(companyID, locationID int
 
 // GetStockAdjustmentDocument returns header + items
 func (s *InventoryService) GetStockAdjustmentDocument(documentID, companyID, locationID int) (*models.StockAdjustmentDocument, error) {
-    // Ensure tables exist (in case migrations haven't run)
-    if err := s.ensureAdjustmentDocTables(s.db); err != nil {
-        return nil, err
-    }
     var d models.StockAdjustmentDocument
     err := s.db.QueryRow(`
         SELECT d.document_id, d.document_number, d.location_id, d.reason, d.created_by, d.created_at

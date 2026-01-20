@@ -137,6 +137,15 @@ CREATE TABLE device_sessions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Password Reset Tokens Table
+CREATE TABLE password_reset_tokens (
+    token_id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    token VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Categories Table
 CREATE TABLE categories (
     category_id SERIAL PRIMARY KEY,
@@ -195,7 +204,6 @@ CREATE TABLE products (
     category_id INTEGER REFERENCES categories(category_id),
     brand_id INTEGER REFERENCES brands(brand_id),
     unit_id INTEGER REFERENCES units(unit_id),
-    tax_id INTEGER NOT NULL REFERENCES taxes(tax_id),
     name VARCHAR(255) NOT NULL,
     sku VARCHAR(100),
     description TEXT,
@@ -273,6 +281,18 @@ CREATE TABLE customers (
     is_deleted BOOLEAN DEFAULT FALSE
 );
 
+-- Customer Credit Transactions Table
+CREATE TABLE customer_credit_transactions (
+    transaction_id SERIAL PRIMARY KEY,
+    customer_id INTEGER NOT NULL REFERENCES customers(customer_id) ON DELETE CASCADE,
+    company_id INTEGER NOT NULL REFERENCES companies(company_id) ON DELETE CASCADE,
+    amount NUMERIC(12,2) NOT NULL,
+    type VARCHAR(20) NOT NULL CHECK (LOWER(type) IN ('credit', 'debit')),
+    description TEXT,
+    created_by INTEGER NOT NULL REFERENCES users(user_id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Taxes Table
 CREATE TABLE taxes (
     tax_id SERIAL PRIMARY KEY,
@@ -325,6 +345,9 @@ CREATE TABLE employees (
     is_active BOOLEAN DEFAULT TRUE,
     created_by INTEGER NOT NULL REFERENCES users(user_id),
     updated_by INTEGER REFERENCES users(user_id),
+    last_check_in TIMESTAMP,
+    last_check_out TIMESTAMP,
+    leave_balance NUMERIC(12,2) DEFAULT 0,
     sync_status VARCHAR(20) DEFAULT 'synced',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -829,6 +852,7 @@ CREATE TABLE expenses (
     category_id INTEGER NOT NULL REFERENCES expense_categories(category_id),
     amount NUMERIC(12,2) NOT NULL,
     expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    notes TEXT,
     description TEXT,
     receipt_number VARCHAR(100),
     vendor_name VARCHAR(255),
@@ -861,13 +885,25 @@ CREATE TABLE cash_register (
     UNIQUE(location_id, date)
 );
 
+-- Cash Register Tally Table
+CREATE TABLE cash_register_tally (
+    tally_id SERIAL PRIMARY KEY,
+    location_id INTEGER NOT NULL REFERENCES locations(location_id),
+    count NUMERIC(12,2) NOT NULL,
+    notes TEXT,
+    recorded_by INTEGER NOT NULL REFERENCES users(user_id),
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Vouchers Table
 CREATE TABLE vouchers (
     voucher_id SERIAL PRIMARY KEY,
-    voucher_number VARCHAR(100) NOT NULL,
-    type VARCHAR(50) NOT NULL CHECK (type IN ('PAYMENT', 'RECEIPT', 'JOURNAL')),
+    company_id INTEGER NOT NULL REFERENCES companies(company_id) ON DELETE CASCADE,
+    voucher_number VARCHAR(100),
+    type VARCHAR(50) NOT NULL CHECK (LOWER(type) IN ('payment', 'receipt', 'journal')),
     date DATE NOT NULL DEFAULT CURRENT_DATE,
     amount NUMERIC(12,2) NOT NULL,
+    account_id INTEGER NOT NULL REFERENCES chart_of_accounts(account_id),
     description TEXT,
     reference VARCHAR(100),
     created_by INTEGER NOT NULL REFERENCES users(user_id),
@@ -881,15 +917,17 @@ CREATE TABLE vouchers (
 -- Ledger Entries Table
 CREATE TABLE ledger_entries (
     entry_id SERIAL PRIMARY KEY,
-    account_id INTEGER NOT NULL REFERENCES chart_of_accounts(account_id),
+    company_id INTEGER NOT NULL REFERENCES companies(company_id) ON DELETE CASCADE,
+    account_id INTEGER REFERENCES chart_of_accounts(account_id),
     voucher_id INTEGER REFERENCES vouchers(voucher_id),
-    date DATE NOT NULL,
+    date DATE NOT NULL DEFAULT CURRENT_DATE,
     debit NUMERIC(12,2) DEFAULT 0,
     credit NUMERIC(12,2) DEFAULT 0,
     balance NUMERIC(12,2) DEFAULT 0,
     transaction_type VARCHAR(50),
     transaction_id INTEGER,
     description TEXT,
+    reference VARCHAR(100),
     created_by INT NOT NULL REFERENCES users(user_id),
     updated_by INT REFERENCES users(user_id),
     sync_status VARCHAR(20) DEFAULT 'synced',
@@ -913,19 +951,17 @@ CREATE TABLE leave_types (
 );
 
 -- Employee Leaves Table
-CREATE TABLE employee_leaves (
+CREATE TABLE leaves (
     leave_id SERIAL PRIMARY KEY,
     employee_id INTEGER NOT NULL REFERENCES employees(employee_id) ON DELETE CASCADE,
-    leave_type_id INTEGER NOT NULL REFERENCES leave_types(leave_type_id),
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
-    days_count INTEGER NOT NULL,
     reason TEXT,
     status VARCHAR(50) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
-    approved_by INTEGER REFERENCES users(user_id),
-    applied_date DATE DEFAULT CURRENT_DATE,
     sync_status VARCHAR(20) DEFAULT 'synced',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE
 );
 
 -- Holidays Table
@@ -933,6 +969,7 @@ CREATE TABLE holidays (
     holiday_id SERIAL PRIMARY KEY,
     company_id INTEGER NOT NULL REFERENCES companies(company_id) ON DELETE CASCADE,
     date DATE NOT NULL,
+    name VARCHAR(255) NOT NULL DEFAULT '',
     description TEXT,
     is_recurring BOOLEAN DEFAULT FALSE,
     sync_status VARCHAR(20) DEFAULT 'synced',
@@ -946,9 +983,9 @@ CREATE TABLE holidays (
 CREATE TABLE attendance (
     attendance_id SERIAL PRIMARY KEY,
     employee_id INTEGER NOT NULL REFERENCES employees(employee_id) ON DELETE CASCADE,
-    date DATE NOT NULL,
-    in_time TIME,
-    out_time TIME,
+    date DATE NOT NULL DEFAULT CURRENT_DATE,
+    check_in TIMESTAMP,
+    check_out TIMESTAMP,
     total_hours NUMERIC(4,2),
     status VARCHAR(50) DEFAULT 'PRESENT' CHECK (status IN ('PRESENT', 'ABSENT', 'LATE', 'HALF_DAY')),
     leave_type_id INTEGER REFERENCES leave_types(leave_type_id),
@@ -957,18 +994,20 @@ CREATE TABLE attendance (
     sync_status VARCHAR(20) DEFAULT 'synced',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE,
     UNIQUE(employee_id, date)
 );
 
 -- Salary Components Table
 CREATE TABLE salary_components (
     component_id SERIAL PRIMARY KEY,
-    company_id INTEGER NOT NULL REFERENCES companies(company_id) ON DELETE CASCADE,
-    name VARCHAR(100) NOT NULL,
-    type VARCHAR(50) NOT NULL CHECK (type IN ('EARNING', 'DEDUCTION')),
-    is_percentage BOOLEAN DEFAULT FALSE,
-    default_value NUMERIC(12,2),
-    is_active BOOLEAN DEFAULT TRUE
+    payroll_id INTEGER NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    amount NUMERIC(12,2) NOT NULL,
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE
 );
 
 -- Employee Salaries Table
@@ -997,6 +1036,35 @@ CREATE TABLE payroll (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Payroll Advances Table
+CREATE TABLE payroll_advances (
+    advance_id SERIAL PRIMARY KEY,
+    payroll_id INTEGER NOT NULL REFERENCES payroll(payroll_id) ON DELETE CASCADE,
+    amount NUMERIC(12,2) NOT NULL,
+    date DATE NOT NULL,
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE
+);
+
+-- Payroll Deductions Table
+CREATE TABLE payroll_deductions (
+    deduction_id SERIAL PRIMARY KEY,
+    payroll_id INTEGER NOT NULL REFERENCES payroll(payroll_id) ON DELETE CASCADE,
+    type VARCHAR(100) NOT NULL,
+    amount NUMERIC(12,2) NOT NULL,
+    date DATE NOT NULL,
+    sync_status VARCHAR(20) DEFAULT 'synced',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN DEFAULT FALSE
+);
+
+ALTER TABLE salary_components
+ADD CONSTRAINT fk_salary_components_payroll
+FOREIGN KEY (payroll_id) REFERENCES payroll(payroll_id) ON DELETE CASCADE;
 
 -- ===============================================
 -- ADDITIONAL TABLES
@@ -1036,7 +1104,8 @@ CREATE TABLE promotions (
     applicable_to VARCHAR(50) CHECK (applicable_to IN ('ALL', 'PRODUCTS', 'CATEGORIES', 'CUSTOMERS')),
     conditions JSONB,
     is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Settings Table
@@ -1045,7 +1114,7 @@ CREATE TABLE settings (
     company_id INTEGER REFERENCES companies(company_id),
     location_id INTEGER REFERENCES locations(location_id),
     key VARCHAR(255) NOT NULL,
-    value TEXT,
+    value JSONB,
     description TEXT,
     data_type VARCHAR(50) DEFAULT 'TEXT',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1161,6 +1230,8 @@ CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_device_sessions_user_id ON device_sessions(user_id);
 CREATE INDEX idx_device_sessions_active ON device_sessions(user_id, is_active);
+CREATE UNIQUE INDEX ux_password_reset_tokens_token ON password_reset_tokens(token);
+CREATE INDEX idx_password_reset_tokens_user ON password_reset_tokens(user_id);
 
 -- Products and Inventory
 CREATE INDEX idx_products_company_id ON products(company_id);
@@ -1185,6 +1256,9 @@ CREATE INDEX idx_stock_location_product ON stock(location_id, product_id);
 CREATE INDEX idx_stock_low_stock ON stock(product_id) WHERE quantity <= 0;
 CREATE INDEX idx_stock_lots_product_location ON stock_lots(product_id, location_id);
 CREATE INDEX idx_stock_lots_expiry ON stock_lots(expiry_date) WHERE expiry_date IS NOT NULL;
+CREATE INDEX idx_stock_adjustments_location_created_at ON stock_adjustments(location_id, created_at);
+CREATE INDEX idx_stock_transfers_from_location_created_at ON stock_transfers(from_location_id, created_at);
+CREATE INDEX idx_stock_transfers_to_location_created_at ON stock_transfers(to_location_id, created_at);
 
 -- Sales
 CREATE INDEX idx_sales_location ON sales(location_id);
@@ -1193,6 +1267,8 @@ CREATE INDEX idx_sales_date ON sales(sale_date);
 CREATE INDEX idx_sales_status ON sales(status);
 CREATE INDEX idx_sales_number ON sales(sale_number);
 CREATE INDEX idx_sales_created_by ON sales(created_by);
+CREATE INDEX idx_sales_location_created_at ON sales(location_id, created_at);
+CREATE INDEX idx_sales_customer_created_at ON sales(customer_id, created_at);
 CREATE INDEX idx_sale_details_sale ON sale_details(sale_id);
 CREATE INDEX idx_sale_details_product ON sale_details(product_id);
 
@@ -1206,15 +1282,19 @@ CREATE INDEX idx_purchases_location ON purchases(location_id);
 CREATE INDEX idx_purchases_supplier ON purchases(supplier_id);
 CREATE INDEX idx_purchases_date ON purchases(purchase_date);
 CREATE INDEX idx_purchases_status ON purchases(status);
+CREATE INDEX idx_purchases_location_created_at ON purchases(location_id, created_at);
 CREATE INDEX idx_purchase_details_purchase ON purchase_details(purchase_id);
 CREATE INDEX idx_purchase_details_product ON purchase_details(product_id);
+CREATE INDEX idx_goods_receipts_location_received_date ON goods_receipts(location_id, received_date);
 
 -- Returns
 CREATE INDEX idx_sale_returns_sale ON sale_returns(sale_id);
 CREATE INDEX idx_sale_returns_date ON sale_returns(return_date);
+CREATE INDEX idx_sale_returns_location_created_at ON sale_returns(location_id, created_at);
 CREATE INDEX idx_purchase_returns_purchase ON purchase_returns(purchase_id);
 CREATE INDEX idx_purchase_returns_date ON purchase_returns(return_date);
 CREATE INDEX idx_purchase_returns_supplier ON purchase_returns(supplier_id);
+CREATE INDEX idx_purchase_returns_location_created_at ON purchase_returns(location_id, created_at);
 
 -- Customers and Suppliers
 CREATE INDEX idx_customers_company ON customers(company_id);
@@ -1223,24 +1303,36 @@ CREATE INDEX idx_customers_email ON customers(email);
 CREATE INDEX idx_suppliers_company ON suppliers(company_id);
 CREATE INDEX idx_suppliers_phone ON suppliers(phone);
 CREATE INDEX idx_suppliers_email ON suppliers(email);
+CREATE INDEX idx_customer_credit_transactions_company_customer_created_at ON customer_credit_transactions(company_id, customer_id, created_at);
 
 -- Financial
+CREATE UNIQUE INDEX ux_taxes_company_name ON taxes(company_id, name);
+CREATE UNIQUE INDEX ux_payment_methods_company_name ON payment_methods(company_id, name);
 CREATE INDEX idx_payments_supplier ON payments(supplier_id);
+CREATE INDEX idx_payments_location_created_at ON payments(location_id, created_at);
 CREATE INDEX idx_collections_customer ON collections(customer_id);
 CREATE INDEX idx_collections_date ON collections(collection_date);
+CREATE INDEX idx_collections_location_created_at ON collections(location_id, created_at);
 CREATE INDEX idx_expenses_location ON expenses(location_id);
 CREATE INDEX idx_expenses_category ON expenses(category_id);
 CREATE INDEX idx_expenses_date ON expenses(expense_date);
 CREATE INDEX idx_cash_register_location_date ON cash_register(location_id, date);
+CREATE INDEX idx_cash_register_tally_location_recorded_at ON cash_register_tally(location_id, recorded_at);
+CREATE INDEX idx_vouchers_company_date ON vouchers(company_id, date);
 CREATE INDEX idx_ledger_entries_account ON ledger_entries(account_id);
+CREATE INDEX idx_ledger_entries_company_account ON ledger_entries(company_id, account_id);
 CREATE INDEX idx_ledger_entries_date ON ledger_entries(date);
 
 -- HR
 CREATE INDEX idx_employees_company ON employees(company_id);
 CREATE INDEX idx_employees_location ON employees(location_id);
 CREATE INDEX idx_attendance_employee_date ON attendance(employee_id, date);
+CREATE INDEX idx_attendance_employee_check_in ON attendance(employee_id, check_in);
 CREATE INDEX idx_payroll_employee ON payroll(employee_id);
 CREATE INDEX idx_payroll_period ON payroll(pay_period_start, pay_period_end);
+CREATE INDEX idx_salary_components_payroll ON salary_components(payroll_id);
+CREATE INDEX idx_payroll_advances_payroll ON payroll_advances(payroll_id);
+CREATE INDEX idx_payroll_deductions_payroll ON payroll_deductions(payroll_id);
 
 -- Sync and Audit
 CREATE INDEX idx_sync_log_table_record ON sync_log(table_name, record_id);
@@ -1330,6 +1422,45 @@ INSERT INTO payment_methods (name, type) VALUES
 ('Debit Card', 'CARD'),
 ('Bank Transfer', 'BANK'),
 ('Check', 'BANK');
+
+-- Default Tax and Payment Method per Company (idempotent)
+INSERT INTO taxes (company_id, name, percentage, is_compound, is_active)
+SELECT c.company_id, 'None', 0, FALSE, TRUE
+FROM companies c
+WHERE NOT EXISTS (
+    SELECT 1 FROM taxes t
+    WHERE t.company_id = c.company_id AND LOWER(t.name) = 'none'
+);
+
+INSERT INTO payment_methods (company_id, name, type)
+SELECT c.company_id, 'Cash', 'CASH'
+FROM companies c
+WHERE NOT EXISTS (
+    SELECT 1 FROM payment_methods pm
+    WHERE pm.company_id = c.company_id AND LOWER(pm.name) = 'cash'
+);
+
+-- Default numbering sequences per company (idempotent)
+INSERT INTO numbering_sequences (company_id, location_id, name, prefix, sequence_length, current_number)
+SELECT c.company_id, NULL, seq.name, seq.prefix, 6, 0
+FROM companies c
+CROSS JOIN (
+    VALUES
+        ('sale', 'INV-'),
+        ('quote', 'QOT-'),
+        ('purchase', 'PO-'),
+        ('sale_return', 'SR-'),
+        ('purchase_return', 'PR-'),
+        ('stock_adjustment', 'ADJ-'),
+        ('stock_transfer', 'ST-'),
+        ('payment', 'PAY-'),
+        ('grn', 'GRN-'),
+        ('collection', 'COL-')
+) AS seq(name, prefix)
+WHERE NOT EXISTS (
+    SELECT 1 FROM numbering_sequences ns
+    WHERE ns.company_id = c.company_id AND ns.location_id IS NULL AND ns.name = seq.name
+);
 
 -- ===============================================
 -- ROW LEVEL SECURITY (Optional)

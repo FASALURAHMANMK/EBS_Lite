@@ -1,0 +1,110 @@
+EBS Lite - Production Release Plan (v1)
+Scope: online-only, Flutter client only (Android + iOS + Windows), Go backend runs directly on a VPS.
+Goal: make the deployment schema file `go_backend_rmt/Docs & Schema/PostgrSQL.sql` match what the Go backend actually expects.
+
+--------------------------------------------
+0) Define what ships in v1 (scope lock)
+--------------------------------------------
+- Ship (end-to-end): Auth + RBAC, Company + Locations, Products (barcodes + attributes), Inventory (stock + adjustments + transfers),
+  Purchases (PO + GRN + returns), POS/Sales (hold/resume/void/print-data), Customers, Suppliers, Settings (taxes/currency/payment/printer as used).
+  Notifications, Quotes (implement fully).
+- Do NOT ship in v1 (hide/disable in Flutter): Reports, Accounts, HR
+- Acceptance: every visible screen performs real API operations (no placeholder “feature grid” pages in production navigation).
+
+--------------------------------------------
+1) Make `PostgrSQL.sql` the true deployment schema
+--------------------------------------------
+Deliverable: you can deploy by running `PostgrSQL.sql` on a clean Postgres DB and the Go server runs without runtime “CREATE TABLE IF NOT EXISTS” hacks.
+
+1.1 Schema-gap audit (Go -> SQL)
+- Enumerate all tables/columns/indexes the Go code reads/writes.
+- Compare with `PostgrSQL.sql` and list diffs (missing columns, wrong NULL/NOT NULL, wrong FK, missing indexes).
+- Known mismatches already observed:
+  - `products.default_supplier_id` expected by Go but missing in SQL.
+  - `ledger_entries` columns used by Go do not match SQL definition.
+
+1.2 Update `PostgrSQL.sql` to match Go
+- Add missing columns and constraints the code expects.
+- Fix/align accounting tables to match current backend behavior OR adjust backend to match your intended accounting schema (pick one path for v1).
+- Add indexes for the queries used in POS/Sales/Inventory/Purchases (company_id + location_id + created_at patterns).
+
+1.3 Remove runtime schema creation from services
+- Replace “ensure tables exist” logic with startup-time validation (fail fast with a clear error if schema is wrong).
+
+1.4 Seed minimal required data
+- Ensure fresh DB has:
+  - default roles/permissions
+  - at least one tax (“None”, 0%)
+  - at least one payment method (“Cash”) if POS requires it
+  - any required numbering sequence seeds
+
+--------------------------------------------
+2) Backend production hardening (online-only)
+--------------------------------------------
+2.1 Configuration correctness
+- Fix server to use `PORT`/`cfg.Port` consistently (avoid `S_PORT`).
+- In production, refuse to start if `JWT_SECRET` is default/weak.
+- Add graceful shutdown (SIGTERM) to avoid dropping requests during deploy.
+
+2.2 Multi-tenant integrity
+- For each endpoint, ensure company/location ownership is enforced in SQL (don’t rely only on request params).
+- Prevent cross-company reads/writes via IDs.
+
+2.3 Transactional integrity
+- Ensure sales/purchases/returns that affect stock do it in a single DB transaction.
+- Decide idempotency rules for POS actions (hold/resume/void/checkout) to avoid duplicates on retry.
+
+2.4 Disable or complete partial APIs
+- Quotes: either implement quotes tables + CRUD fully or remove/hide routes for v1.
+- Reports: remove “not implemented” endpoints from v1 surface OR implement the subset used by Flutter.
+
+2.5 Error handling for production
+- Don’t return raw DB errors to clients in production; map to safe messages + log details server-side.
+
+2.6 Tests and smoke checks
+- Fix existing failing Go tests.
+- Add a minimal smoke test script flow: register/login -> create company -> create product -> receive stock -> checkout sale -> print data.
+
+--------------------------------------------
+3) Flutter production readiness (Android + iOS + Windows)
+--------------------------------------------
+3.1 Configurable base URL
+- Replace hardcoded base URL with `--dart-define=API_BASE_URL=https://api.yourdomain.com/api/v1`.
+- Provide dev defaults for localhost/emulator, but production must be HTTPS.
+
+3.2 Feature gating
+- Hide or lock navigation to non-v1 modules (Reports/Accounts/HR/Notifications) so the app appears “complete”.
+
+3.3 Auth/session stability
+- Keep refresh-token single-flight behavior.
+- Ensure logout + token purge is consistent across platforms.
+
+3.4 Release builds
+- Android: signing config + versioning + network security (avoid cleartext HTTP in prod).
+- iOS: bundle ID + signing + ATS compliance (HTTPS required).
+- Windows: build + installer strategy (MSIX or exe) and environment config for API URL.
+
+--------------------------------------------
+4) VPS deployment (no Docker)
+--------------------------------------------
+4.1 Database setup (Postgres)
+- Create DB + user, apply `PostgrSQL.sql`, run seeds.
+- Configure backups (daily dump + retention) before first real usage.
+
+4.2 Backend service
+- Build Go binary and run via `systemd` with an env file.
+- Put behind Nginx/Caddy for TLS + reverse proxy + request size limits.
+- Set logging and log rotation; monitor health endpoint.
+
+4.3 Rollout checklist
+- Run smoke flow against production DB.
+- Verify POS checkout, stock decrement, purchase receiving, and “print data” payloads.
+
+--------------------------------------------
+Immediate next actions (recommended order)
+--------------------------------------------
+1) Finish schema-gap audit and update `PostgrSQL.sql` to match Go.
+2) Fix ledger schema/service mismatch (choose v1 accounting behavior).
+3) Fix backend PORT handling + production secrets validation.
+4) Implement Flutter base URL via `--dart-define` + hide non-v1 pages.
+5) Add VPS deployment unit + reverse proxy config and smoke checks.
