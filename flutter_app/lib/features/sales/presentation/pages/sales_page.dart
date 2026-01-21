@@ -4,6 +4,7 @@ import 'package:ebs_lite/shared/pages/feature_detail_page.dart';
 import 'package:ebs_lite/features/pos/presentation/pages/pos_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/sales_history_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/sales_returns_page.dart';
+import 'quotes_page.dart';
 
 class SalesPage extends StatelessWidget {
   const SalesPage({super.key});
@@ -31,7 +32,7 @@ class SalesPage extends StatelessWidget {
         label: 'Quotes',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
-              builder: (_) => const FeatureDetailPage(title: 'Quotes')),
+              builder: (_) => const QuotesPage()),
         ),
       ),
       FeatureItem(

@@ -96,10 +96,7 @@ class ApiClient {
   }
 
   Future<void> _purgeTokens() async {
-    await _secureStorage.delete(key: AuthRepository.accessTokenKey);
-    await _secureStorage.delete(key: AuthRepository.refreshTokenKey);
-    await _secureStorage.delete(key: AuthRepository.sessionIdKey);
-    await _prefs.remove(AuthRepository.companyKey);
+    await AuthRepository.purgeLocalSession(_prefs, _secureStorage);
   }
 }
 

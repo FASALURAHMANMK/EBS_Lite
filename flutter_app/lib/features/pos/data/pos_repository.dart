@@ -104,6 +104,7 @@ class PosRepository {
     int? saleId,
     List<PosPaymentLineDto>? payments,
     double? redeemPoints,
+    String? idempotencyKey,
   }) async {
     final loc = _ref.read(locationNotifierProvider).selected;
     if (loc == null) {
@@ -127,10 +128,15 @@ class PosRepository {
         'payments': payments.map((p) => p.toJson()).toList(),
       if (redeemPoints != null && redeemPoints > 0) 'redeem_points': redeemPoints,
     };
+    final headers = <String, dynamic>{
+      if ((idempotencyKey ?? '').isNotEmpty) 'Idempotency-Key': idempotencyKey,
+      if ((idempotencyKey ?? '').isNotEmpty) 'X-Idempotency-Key': idempotencyKey,
+    };
     final res = await _dio.post(
       '/pos/checkout',
       queryParameters: {'location_id': loc.locationId},
       data: payload,
+      options: headers.isEmpty ? null : Options(headers: headers),
     );
     final data = (res.data is Map<String, dynamic>)
         ? (res.data['data'] as Map<String, dynamic>?)
@@ -166,6 +172,7 @@ class PosRepository {
     int? customerId,
     required List<PosCartItem> items,
     double discountAmount = 0.0,
+    String? idempotencyKey,
   }) async {
     final loc = _ref.read(locationNotifierProvider).selected;
     if (loc == null) {
@@ -184,7 +191,16 @@ class PosRepository {
       'paid_amount': 0,
       'discount_amount': discountAmount,
     };
-    final res = await _dio.post('/pos/hold', queryParameters: {'location_id': loc.locationId}, data: payload);
+    final headers = <String, dynamic>{
+      if ((idempotencyKey ?? '').isNotEmpty) 'Idempotency-Key': idempotencyKey,
+      if ((idempotencyKey ?? '').isNotEmpty) 'X-Idempotency-Key': idempotencyKey,
+    };
+    final res = await _dio.post(
+      '/pos/hold',
+      queryParameters: {'location_id': loc.locationId},
+      data: payload,
+      options: headers.isEmpty ? null : Options(headers: headers),
+    );
     final sale = (res.data is Map<String, dynamic>) ? ((res.data['data'] as Map<String, dynamic>?) ?? <String, dynamic>{}) : <String, dynamic>{};
     return PosCheckoutResult.fromSale(sale);
   }
@@ -201,11 +217,20 @@ class PosRepository {
     await _dio.post('/sales/$saleId/resume');
   }
 
-  Future<void> voidSale(int saleId) async {
+  Future<void> voidSale(int saleId, {String? idempotencyKey}) async {
     final loc = _ref.read(locationNotifierProvider).selected;
-    await _dio.post('/pos/void/$saleId', queryParameters: {
-      if (loc != null) 'location_id': loc.locationId,
-    });
+    final key = (idempotencyKey ?? '').isEmpty ? 'void-$saleId' : idempotencyKey!;
+    final headers = <String, dynamic>{
+      'Idempotency-Key': key,
+      'X-Idempotency-Key': key,
+    };
+    await _dio.post(
+      '/pos/void/$saleId',
+      queryParameters: {
+        if (loc != null) 'location_id': loc.locationId,
+      },
+      options: Options(headers: headers),
+    );
   }
 
   Future<SaleDto> getSaleById(int saleId) async {

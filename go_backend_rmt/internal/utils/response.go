@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"log"
 	"net/http"
 
 	"erp-backend/internal/models"
@@ -42,7 +43,10 @@ func ErrorResponse(c *gin.Context, statusCode int, message string, err error) {
 	}
 
 	if err != nil {
-		response.Error = err.Error()
+		logRequestError(c, err)
+		if shouldExposeError() {
+			response.Error = err.Error()
+		}
 	}
 
 	c.JSON(statusCode, response)
@@ -113,8 +117,32 @@ func InternalServerErrorResponse(c *gin.Context, message string, err error) {
 	}
 
 	if err != nil {
-		response.Error = err.Error()
+		logRequestError(c, err)
+		if shouldExposeError() {
+			response.Error = err.Error()
+		}
 	}
 
 	c.JSON(http.StatusInternalServerError, response)
+}
+
+func shouldExposeError() bool {
+	return gin.Mode() != gin.ReleaseMode
+}
+
+func logRequestError(c *gin.Context, err error) {
+	if err == nil {
+		return
+	}
+	requestID := ""
+	if c != nil {
+		requestID = c.GetString("request_id")
+	}
+	path := ""
+	method := ""
+	if c != nil && c.Request != nil {
+		path = c.Request.URL.Path
+		method = c.Request.Method
+	}
+	log.Printf("request_id=%s method=%s path=%s error=%v", requestID, method, path, err)
 }

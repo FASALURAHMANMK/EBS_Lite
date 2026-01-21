@@ -15,44 +15,60 @@ type PurchaseReturnService struct {
 }
 
 func NewPurchaseReturnService() *PurchaseReturnService {
-    return &PurchaseReturnService{
-        db: database.GetDB(),
-    }
+	return &PurchaseReturnService{
+		db: database.GetDB(),
+	}
 }
 
 // VerifyReturnInCompany is an exported wrapper to reuse in handlers without duplicating logic
 func (s *PurchaseReturnService) VerifyReturnInCompany(returnID, companyID int) error {
-    return s.verifyReturnInCompany(returnID, companyID)
+	return s.verifyReturnInCompany(returnID, companyID)
 }
 
 // SetPurchaseReturnReceiptFile stores a file path for the return; if optional columns are missing, it degrades gracefully.
 func (s *PurchaseReturnService) SetPurchaseReturnReceiptFile(returnID, companyID int, path string, number *string) error {
-    if err := s.verifyReturnInCompany(returnID, companyID); err != nil {
-        return err
-    }
-    // Conditionally update receipt_file column
-    var colCount int
-    if err := s.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'purchase_returns' AND column_name = 'receipt_file'`).Scan(&colCount); err == nil && colCount > 0 {
-        if _, err := s.db.Exec(`UPDATE purchase_returns SET receipt_file = $1, updated_at = CURRENT_TIMESTAMP WHERE return_id = $2`, path, returnID); err != nil {
-            return fmt.Errorf("failed to set receipt file: %w", err)
-        }
-    }
-    // Try to store number if provided
-    if number != nil && *number != "" {
-        // Prefer dedicated column reference_number if exists; otherwise append to reason
-        colCount = 0
-        if err := s.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'purchase_returns' AND column_name = 'reference_number'`).Scan(&colCount); err == nil && colCount > 0 {
-            if _, err := s.db.Exec(`UPDATE purchase_returns SET reference_number = $1, updated_at = CURRENT_TIMESTAMP WHERE return_id = $2`, *number, returnID); err != nil {
-                return fmt.Errorf("failed to set reference number: %w", err)
-            }
-        } else {
-            // Fallback: append to reason
-            if _, err := s.db.Exec(`UPDATE purchase_returns SET reason = CONCAT(COALESCE(reason,''), CASE WHEN reason IS NULL OR reason = '' THEN '' ELSE ' | ' END, 'Receipt: ', $1), updated_at = CURRENT_TIMESTAMP WHERE return_id = $2`, *number, returnID); err != nil {
-                return fmt.Errorf("failed to append receipt number to reason: %w", err)
-            }
-        }
-    }
-    return nil
+	if err := s.verifyReturnInCompany(returnID, companyID); err != nil {
+		return err
+	}
+	// Conditionally update receipt_file column
+	var colCount int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'purchase_returns' AND column_name = 'receipt_file'`).Scan(&colCount); err == nil && colCount > 0 {
+		if _, err := s.db.Exec(`
+            UPDATE purchase_returns pr SET receipt_file = $1, updated_at = CURRENT_TIMESTAMP
+            FROM purchases p
+            JOIN suppliers s ON p.supplier_id = s.supplier_id
+            WHERE pr.return_id = $2 AND pr.purchase_id = p.purchase_id AND s.company_id = $3
+        `, path, returnID, companyID); err != nil {
+			return fmt.Errorf("failed to set receipt file: %w", err)
+		}
+	}
+	// Try to store number if provided
+	if number != nil && *number != "" {
+		// Prefer dedicated column reference_number if exists; otherwise append to reason
+		colCount = 0
+		if err := s.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'purchase_returns' AND column_name = 'reference_number'`).Scan(&colCount); err == nil && colCount > 0 {
+			if _, err := s.db.Exec(`
+                UPDATE purchase_returns pr SET reference_number = $1, updated_at = CURRENT_TIMESTAMP
+                FROM purchases p
+                JOIN suppliers s ON p.supplier_id = s.supplier_id
+                WHERE pr.return_id = $2 AND pr.purchase_id = p.purchase_id AND s.company_id = $3
+            `, *number, returnID, companyID); err != nil {
+				return fmt.Errorf("failed to set reference number: %w", err)
+			}
+		} else {
+			// Fallback: append to reason
+			if _, err := s.db.Exec(`
+                UPDATE purchase_returns pr SET reason = CONCAT(COALESCE(reason,''), CASE WHEN reason IS NULL OR reason = '' THEN '' ELSE ' | ' END, 'Receipt: ', $1),
+                    updated_at = CURRENT_TIMESTAMP
+                FROM purchases p
+                JOIN suppliers s ON p.supplier_id = s.supplier_id
+                WHERE pr.return_id = $2 AND pr.purchase_id = p.purchase_id AND s.company_id = $3
+            `, *number, returnID, companyID); err != nil {
+				return fmt.Errorf("failed to append receipt number to reason: %w", err)
+			}
+		}
+	}
+	return nil
 }
 
 func (s *PurchaseReturnService) GetPurchaseReturns(companyID, locationID int, filters map[string]string) ([]models.PurchaseReturn, error) {
@@ -167,13 +183,16 @@ func (s *PurchaseReturnService) GetPurchaseReturnByID(returnID, companyID int) (
                            prd.quantity, prd.unit_price, prd.line_total,
                            p.name as product_name, p.sku, pb.barcode
                 FROM purchase_return_details prd
+                JOIN purchase_returns pr ON prd.return_id = pr.return_id
+                JOIN purchases pu ON pr.purchase_id = pu.purchase_id
+                JOIN suppliers s ON pu.supplier_id = s.supplier_id
                 JOIN products p ON prd.product_id = p.product_id
                 LEFT JOIN product_barcodes pb ON p.product_id = pb.product_id AND pb.is_primary = TRUE
-                WHERE prd.return_id = $1
+                WHERE prd.return_id = $1 AND s.company_id = $2 AND p.company_id = $2
                 ORDER BY prd.return_detail_id
         `
 
-	rows, err := s.db.Query(detailsQuery, returnID)
+	rows, err := s.db.Query(detailsQuery, returnID, companyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get purchase return details: %w", err)
 	}
@@ -232,6 +251,12 @@ func (s *PurchaseReturnService) CreatePurchaseReturn(companyID, locationID, user
 			return nil, fmt.Errorf("purchase not found")
 		}
 		return nil, fmt.Errorf("failed to verify purchase: %w", err)
+	}
+
+	if locationID == 0 {
+		locationID = purchaseLocationID
+	} else if locationID != purchaseLocationID {
+		return nil, fmt.Errorf("invalid location for purchase")
 	}
 
 	// Generate return number using numbering sequence service
@@ -337,7 +362,12 @@ func (s *PurchaseReturnService) UpdatePurchaseReturn(returnID, companyID, userID
 	}
 
 	var status string
-	err := s.db.QueryRow("SELECT status FROM purchase_returns WHERE return_id = $1", returnID).Scan(&status)
+	err := s.db.QueryRow(`
+		SELECT pr.status FROM purchase_returns pr
+		JOIN purchases p ON pr.purchase_id = p.purchase_id
+		JOIN suppliers s ON p.supplier_id = s.supplier_id
+		WHERE pr.return_id = $1 AND s.company_id = $2 AND pr.is_deleted = FALSE
+	`, returnID, companyID).Scan(&status)
 	if err != nil {
 		return fmt.Errorf("failed to get return status: %w", err)
 	}
@@ -374,8 +404,9 @@ func (s *PurchaseReturnService) UpdatePurchaseReturn(returnID, companyID, userID
 	argCount++
 	setParts = append(setParts, "updated_at = CURRENT_TIMESTAMP")
 
-	query := fmt.Sprintf("UPDATE purchase_returns SET %s WHERE return_id = $%d", strings.Join(setParts, ", "), argCount)
-	args = append(args, returnID)
+	query := fmt.Sprintf("UPDATE purchase_returns pr SET %s FROM purchases p JOIN suppliers s ON p.supplier_id = s.supplier_id WHERE pr.return_id = $%d AND pr.purchase_id = p.purchase_id AND s.company_id = $%d",
+		strings.Join(setParts, ", "), argCount, argCount+1)
+	args = append(args, returnID, companyID)
 
 	result, err := s.db.Exec(query, args...)
 	if err != nil {
@@ -400,7 +431,12 @@ func (s *PurchaseReturnService) DeletePurchaseReturn(returnID, companyID, userID
 	}
 
 	var status string
-	err := s.db.QueryRow("SELECT status FROM purchase_returns WHERE return_id = $1", returnID).Scan(&status)
+	err := s.db.QueryRow(`
+		SELECT pr.status FROM purchase_returns pr
+		JOIN purchases p ON pr.purchase_id = p.purchase_id
+		JOIN suppliers s ON p.supplier_id = s.supplier_id
+		WHERE pr.return_id = $1 AND s.company_id = $2 AND pr.is_deleted = FALSE
+	`, returnID, companyID).Scan(&status)
 	if err != nil {
 		return fmt.Errorf("failed to get return status: %w", err)
 	}
@@ -409,9 +445,12 @@ func (s *PurchaseReturnService) DeletePurchaseReturn(returnID, companyID, userID
 		return fmt.Errorf("completed returns cannot be deleted")
 	}
 
-	query := `UPDATE purchase_returns SET is_deleted = TRUE, updated_by = $2, updated_at = CURRENT_TIMESTAMP WHERE return_id = $1`
+	query := `UPDATE purchase_returns pr SET is_deleted = TRUE, updated_by = $2, updated_at = CURRENT_TIMESTAMP
+		FROM purchases p
+		JOIN suppliers s ON p.supplier_id = s.supplier_id
+		WHERE pr.return_id = $1 AND pr.purchase_id = p.purchase_id AND s.company_id = $3`
 
-	result, err := s.db.Exec(query, returnID, userID)
+	result, err := s.db.Exec(query, returnID, userID, companyID)
 	if err != nil {
 		return fmt.Errorf("failed to delete purchase return: %w", err)
 	}

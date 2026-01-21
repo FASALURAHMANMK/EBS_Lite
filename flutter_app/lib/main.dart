@@ -21,9 +21,6 @@ import 'features/auth/presentation/create_company_screen.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/dashboard/controllers/location_notifier.dart';
 
-/// Keys used across the app
-const String _userKey = 'user';
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -118,7 +115,7 @@ class _MyAppState extends ConsumerState<MyApp> {
 
       // Persist *fresh* minimal user payload only after validation succeeds
       await prefs.setString(
-        _userKey,
+        AuthRepository.userKey,
         jsonEncode({
           'user_id': user.userId,
           'username': user.username,
@@ -193,9 +190,5 @@ class _MyAppState extends ConsumerState<MyApp> {
 
 Future<void> _purgeAllAuthPrefs(
     SharedPreferences prefs, FlutterSecureStorage secureStorage) async {
-  await secureStorage.delete(key: AuthRepository.accessTokenKey);
-  await secureStorage.delete(key: AuthRepository.refreshTokenKey);
-  await secureStorage.delete(key: AuthRepository.sessionIdKey);
-  await prefs.remove(_userKey);
-  await prefs.remove(AuthRepository.companyKey);
+  await AuthRepository.purgeLocalSession(prefs, secureStorage);
 }

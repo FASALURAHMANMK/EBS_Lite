@@ -1,3 +1,4 @@
+import 'package:ebs_lite/features/auth/data/auth_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -40,7 +41,7 @@ class LocationNotifier extends StateNotifier<LocationState> {
   LocationNotifier(this._repository, this._prefs, this._ref)
       : super(const LocationState());
 
-  static const selectedLocationKey = 'selected_location_id';
+  static const selectedLocationKey = AuthRepository.selectedLocationKey;
 
   final LocationRepository _repository;
   final SharedPreferences _prefs;
@@ -54,8 +55,7 @@ class LocationNotifier extends StateNotifier<LocationState> {
       final stored = _prefs.getInt(selectedLocationKey);
       if (stored != null) {
         try {
-          selected =
-              list.firstWhere((l) => l.locationId == stored);
+          selected = list.firstWhere((l) => l.locationId == stored);
         } catch (_) {
           selected = null;
         }

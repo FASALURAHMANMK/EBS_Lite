@@ -56,7 +56,7 @@ type CreateQuoteRequest struct {
 	CustomerID     *int                     `json:"customer_id,omitempty"`
 	Items          []CreateQuoteItemRequest `json:"items" validate:"required,min=1"`
 	DiscountAmount float64                  `json:"discount_amount"`
-	ValidUntil     time.Time                `json:"valid_until"`
+	ValidUntil     FlexibleTime             `json:"valid_until"`
 	Notes          *string                  `json:"notes,omitempty"`
 }
 
@@ -72,9 +72,11 @@ type CreateQuoteItemRequest struct {
 }
 
 type UpdateQuoteRequest struct {
-	Status     *string    `json:"status,omitempty"`
-	Notes      *string    `json:"notes,omitempty"`
-	ValidUntil *time.Time `json:"valid_until,omitempty"`
+	Status         *string                  `json:"status,omitempty"`
+	Notes          *string                  `json:"notes,omitempty"`
+	ValidUntil     *FlexibleTime            `json:"valid_until,omitempty"`
+	DiscountAmount *float64                 `json:"discount_amount,omitempty"`
+	Items          []CreateQuoteItemRequest `json:"items,omitempty" validate:"omitempty,min=1"`
 }
 
 type ShareQuoteRequest struct {

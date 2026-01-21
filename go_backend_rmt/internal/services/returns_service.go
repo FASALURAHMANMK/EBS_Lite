@@ -10,13 +10,13 @@ import (
 )
 
 type ReturnsService struct {
-    db *sql.DB
+	db *sql.DB
 }
 
 func NewReturnsService() *ReturnsService {
-    return &ReturnsService{
-        db: database.GetDB(),
-    }
+	return &ReturnsService{
+		db: database.GetDB(),
+	}
 }
 
 // FindReturnableSaleForCustomer attempts to find a single completed sale for
@@ -25,51 +25,51 @@ func NewReturnsService() *ReturnsService {
 // the return to. If none is found, an error is returned instructing the caller
 // to specify an invoice.
 func (s *ReturnsService) FindReturnableSaleForCustomer(companyID, customerID int, items []models.CreateSaleReturnItemRequest) (int, error) {
-    // Verify customer belongs to company
-    var cnt int
-    if err := s.db.QueryRow(`SELECT COUNT(*) FROM customers WHERE customer_id=$1 AND company_id=$2 AND is_deleted=FALSE`, customerID, companyID).Scan(&cnt); err != nil {
-        return 0, fmt.Errorf("failed to verify customer: %w", err)
-    }
-    if cnt == 0 {
-        return 0, fmt.Errorf("customer not found")
-    }
+	// Verify customer belongs to company
+	var cnt int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM customers WHERE customer_id=$1 AND company_id=$2 AND is_deleted=FALSE`, customerID, companyID).Scan(&cnt); err != nil {
+		return 0, fmt.Errorf("failed to verify customer: %w", err)
+	}
+	if cnt == 0 {
+		return 0, fmt.Errorf("customer not found")
+	}
 
-    // Candidate sales: most recent first
-    rows, err := s.db.Query(`
+	// Candidate sales: most recent first
+	rows, err := s.db.Query(`
         SELECT s.sale_id
         FROM sales s
         JOIN locations l ON s.location_id=l.location_id
         WHERE l.company_id=$1 AND s.customer_id=$2 AND s.status='COMPLETED' AND s.is_deleted=FALSE
         ORDER BY s.sale_date DESC, s.created_at DESC, s.sale_id DESC
     `, companyID, customerID)
-    if err != nil {
-        return 0, fmt.Errorf("failed to query candidate sales: %w", err)
-    }
-    defer rows.Close()
+	if err != nil {
+		return 0, fmt.Errorf("failed to query candidate sales: %w", err)
+	}
+	defer rows.Close()
 
-    for rows.Next() {
-        var saleID int
-        if err := rows.Scan(&saleID); err != nil {
-            return 0, fmt.Errorf("failed to scan sale id: %w", err)
-        }
-        // Check if this sale can cover all items
-        ok := true
-        for _, it := range items {
-            valid, err := s.validateReturnItem(saleID, it.ProductID, it.Quantity)
-            if err != nil || !valid {
-                ok = false
-                break
-            }
-        }
-        if ok {
-            return saleID, nil
-        }
-    }
-    if err := rows.Err(); err != nil {
-        return 0, fmt.Errorf("failed to iterate candidate sales: %w", err)
-    }
+	for rows.Next() {
+		var saleID int
+		if err := rows.Scan(&saleID); err != nil {
+			return 0, fmt.Errorf("failed to scan sale id: %w", err)
+		}
+		// Check if this sale can cover all items
+		ok := true
+		for _, it := range items {
+			valid, err := s.validateReturnItem(companyID, saleID, it.ProductID, it.Quantity)
+			if err != nil || !valid {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			return saleID, nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, fmt.Errorf("failed to iterate candidate sales: %w", err)
+	}
 
-    return 0, fmt.Errorf("no single invoice can cover requested quantities; please specify an invoice")
+	return 0, fmt.Errorf("no single invoice can cover requested quantities; please specify an invoice")
 }
 
 func (s *ReturnsService) GetSaleReturns(companyID int, filters map[string]string) ([]models.SaleReturn, error) {
@@ -144,7 +144,7 @@ func (s *ReturnsService) GetSaleReturns(companyID int, filters map[string]string
 		}
 
 		// Get return items
-		items, err := s.getSaleReturnItems(saleReturn.ReturnID)
+		items, err := s.getSaleReturnItems(saleReturn.ReturnID, companyID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get return items: %w", err)
 		}
@@ -188,7 +188,7 @@ func (s *ReturnsService) GetSaleReturnByID(returnID, companyID int) (*models.Sal
 	}
 
 	// Get return items
-	items, err := s.getSaleReturnItems(saleReturn.ReturnID)
+	items, err := s.getSaleReturnItems(saleReturn.ReturnID, companyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get return items: %w", err)
 	}
@@ -220,7 +220,7 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 
 	// Validate return items against original sale
 	for _, item := range req.Items {
-		available, err := s.validateReturnItem(req.SaleID, item.ProductID, item.Quantity)
+		available, err := s.validateReturnItem(companyID, req.SaleID, item.ProductID, item.Quantity)
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate return item %d: %w", item.ProductID, err)
 		}
@@ -285,10 +285,11 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 	// Update original sale's paid amount if needed
 	// This is optional business logic - you might want to create a credit note instead
 	_, err = tx.Exec(`
-		UPDATE sales 
+		UPDATE sales s
 		SET paid_amount = paid_amount - $1, updated_at = CURRENT_TIMESTAMP
-		WHERE sale_id = $2
-	`, totalAmount, req.SaleID)
+		FROM locations l
+		WHERE s.sale_id = $2 AND s.location_id = l.location_id AND l.company_id = $3
+	`, totalAmount, req.SaleID, companyID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to update original sale: %w", err)
@@ -312,7 +313,11 @@ func (s *ReturnsService) UpdateSaleReturn(returnID, companyID, userID int, updat
 
 	// Check if return can be updated
 	var status string
-	err = s.db.QueryRow("SELECT status FROM sale_returns WHERE return_id = $1", returnID).Scan(&status)
+	err = s.db.QueryRow(`
+		SELECT sr.status FROM sale_returns sr
+		JOIN locations l ON sr.location_id = l.location_id
+		WHERE sr.return_id = $1 AND l.company_id = $2 AND sr.is_deleted = FALSE
+	`, returnID, companyID).Scan(&status)
 	if err != nil {
 		return fmt.Errorf("failed to get return status: %w", err)
 	}
@@ -349,9 +354,9 @@ func (s *ReturnsService) UpdateSaleReturn(returnID, companyID, userID int, updat
 	argCount++
 	setParts = append(setParts, "updated_at = CURRENT_TIMESTAMP")
 
-	query := fmt.Sprintf("UPDATE sale_returns SET %s WHERE return_id = $%d",
-		strings.Join(setParts, ", "), argCount)
-	args = append(args, returnID)
+	query := fmt.Sprintf("UPDATE sale_returns sr SET %s FROM locations l WHERE sr.return_id = $%d AND sr.location_id = l.location_id AND l.company_id = $%d",
+		strings.Join(setParts, ", "), argCount, argCount+1)
+	args = append(args, returnID, companyID)
 
 	result, err := s.db.Exec(query, args...)
 	if err != nil {
@@ -379,7 +384,11 @@ func (s *ReturnsService) DeleteSaleReturn(returnID, companyID, userID int) error
 
 	// Check if return can be deleted
 	var status string
-	err = s.db.QueryRow("SELECT status FROM sale_returns WHERE return_id = $1", returnID).Scan(&status)
+	err = s.db.QueryRow(`
+		SELECT sr.status FROM sale_returns sr
+		JOIN locations l ON sr.location_id = l.location_id
+		WHERE sr.return_id = $1 AND l.company_id = $2 AND sr.is_deleted = FALSE
+	`, returnID, companyID).Scan(&status)
 	if err != nil {
 		return fmt.Errorf("failed to get return status: %w", err)
 	}
@@ -388,9 +397,10 @@ func (s *ReturnsService) DeleteSaleReturn(returnID, companyID, userID int) error
 		return fmt.Errorf("completed returns cannot be deleted")
 	}
 
-	query := `UPDATE sale_returns SET is_deleted = TRUE, updated_by = $2, updated_at = CURRENT_TIMESTAMP WHERE return_id = $1`
+	query := `UPDATE sale_returns sr SET is_deleted = TRUE, updated_by = $2, updated_at = CURRENT_TIMESTAMP
+		FROM locations l WHERE sr.return_id = $1 AND sr.location_id = l.location_id AND l.company_id = $3`
 
-	result, err := s.db.Exec(query, returnID, userID)
+	result, err := s.db.Exec(query, returnID, userID, companyID)
 	if err != nil {
 		return fmt.Errorf("failed to delete return: %w", err)
 	}
@@ -503,18 +513,20 @@ func (s *ReturnsService) GetReturnsSummary(companyID int, dateFrom, dateTo strin
 }
 
 // Helper methods
-func (s *ReturnsService) getSaleReturnItems(returnID int) ([]models.SaleReturnDetail, error) {
+func (s *ReturnsService) getSaleReturnItems(returnID, companyID int) ([]models.SaleReturnDetail, error) {
 	query := `
 		SELECT srd.return_detail_id, srd.return_id, srd.sale_detail_id, srd.product_id,
 			   srd.quantity, srd.unit_price, srd.line_total,
 			   p.name as product_name
 		FROM sale_return_details srd
+		JOIN sale_returns sr ON srd.return_id = sr.return_id
+		JOIN locations l ON sr.location_id = l.location_id
 		LEFT JOIN products p ON srd.product_id = p.product_id
-		WHERE srd.return_id = $1
+		WHERE srd.return_id = $1 AND l.company_id = $2 AND sr.is_deleted = FALSE
 		ORDER BY srd.return_detail_id
 	`
 
-	rows, err := s.db.Query(query, returnID)
+	rows, err := s.db.Query(query, returnID, companyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get return items: %w", err)
 	}
@@ -539,16 +551,17 @@ func (s *ReturnsService) getSaleReturnItems(returnID int) ([]models.SaleReturnDe
 	return items, nil
 }
 
-func (s *ReturnsService) GetReturnedQuantitiesBySaleDetail(saleID int) (map[int]float64, error) {
+func (s *ReturnsService) GetReturnedQuantitiesBySaleDetail(companyID, saleID int) (map[int]float64, error) {
 	query := `
                 SELECT srd.sale_detail_id, COALESCE(SUM(srd.quantity), 0) as returned_quantity
                 FROM sale_return_details srd
                 JOIN sale_returns sr ON srd.return_id = sr.return_id
-                WHERE sr.sale_id = $1 AND sr.status = 'COMPLETED' AND srd.sale_detail_id IS NOT NULL
+				JOIN locations l ON sr.location_id = l.location_id
+                WHERE sr.sale_id = $1 AND l.company_id = $2 AND sr.status = 'COMPLETED' AND srd.sale_detail_id IS NOT NULL
                 GROUP BY srd.sale_detail_id
         `
 
-	rows, err := s.db.Query(query, saleID)
+	rows, err := s.db.Query(query, saleID, companyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get returned quantities: %w", err)
 	}
@@ -571,13 +584,18 @@ func (s *ReturnsService) GetReturnedQuantitiesBySaleDetail(saleID int) (map[int]
 	return results, nil
 }
 
-func (s *ReturnsService) validateReturnItem(saleID, productID int, returnQuantity float64) (bool, error) {
+func (s *ReturnsService) validateReturnItem(companyID, saleID, productID int, returnQuantity float64) (bool, error) {
 	// Get original sale quantity
 	var originalQuantity float64
 	err := s.db.QueryRow(`
 		SELECT quantity FROM sale_details 
 		WHERE sale_id = $1 AND product_id = $2
-	`, saleID, productID).Scan(&originalQuantity)
+		  AND EXISTS (
+			  SELECT 1 FROM sales s
+			  JOIN locations l ON s.location_id = l.location_id
+			  WHERE s.sale_id = $1 AND l.company_id = $3 AND s.is_deleted = FALSE
+		  )
+	`, saleID, productID, companyID).Scan(&originalQuantity)
 
 	if err == sql.ErrNoRows {
 		return false, fmt.Errorf("product not found in original sale")
@@ -592,8 +610,9 @@ func (s *ReturnsService) validateReturnItem(saleID, productID int, returnQuantit
 		SELECT COALESCE(SUM(srd.quantity), 0)
 		FROM sale_return_details srd
 		JOIN sale_returns sr ON srd.return_id = sr.return_id
-		WHERE sr.sale_id = $1 AND srd.product_id = $2 AND sr.status = 'COMPLETED'
-	`, saleID, productID).Scan(&totalReturned)
+		JOIN locations l ON sr.location_id = l.location_id
+		WHERE sr.sale_id = $1 AND srd.product_id = $2 AND l.company_id = $3 AND sr.status = 'COMPLETED'
+	`, saleID, productID, companyID).Scan(&totalReturned)
 
 	if err != nil {
 		return false, err

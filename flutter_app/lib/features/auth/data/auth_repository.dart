@@ -18,6 +18,20 @@ class AuthRepository {
   static const refreshTokenKey = 'refresh_token';
   static const sessionIdKey = 'session_id';
   static const companyKey = 'company';
+  static const userKey = 'user';
+  static const selectedLocationKey = 'selected_location_id';
+
+  static Future<void> purgeLocalSession(
+    SharedPreferences prefs,
+    FlutterSecureStorage secureStorage,
+  ) async {
+    await secureStorage.delete(key: accessTokenKey);
+    await secureStorage.delete(key: refreshTokenKey);
+    await secureStorage.delete(key: sessionIdKey);
+    await prefs.remove(companyKey);
+    await prefs.remove(userKey);
+    await prefs.remove(selectedLocationKey);
+  }
 
   Future<String> _getDeviceId() async {
     var id = _prefs.getString(_deviceKey);
@@ -129,10 +143,7 @@ class AuthRepository {
     try {
       await _dio.post('/auth/logout');
     } finally {
-      await _secureStorage.delete(key: accessTokenKey);
-      await _secureStorage.delete(key: refreshTokenKey);
-      await _secureStorage.delete(key: sessionIdKey);
-      await _prefs.remove(companyKey);
+      await AuthRepository.purgeLocalSession(_prefs, _secureStorage);
     }
   }
 

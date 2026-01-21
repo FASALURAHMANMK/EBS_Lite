@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../data/models.dart';
 import '../data/pos_repository.dart';
@@ -80,6 +81,8 @@ class PosNotifier extends StateNotifier<PosState> {
   PosNotifier(this._repo) : super(const PosState());
   final PosRepository _repo;
   Timer? _debounce;
+  String? _checkoutIdemKey;
+  String? _holdIdemKey;
 
   Future<void> init() async {
     state = state.copyWith(isLoading: true, error: null);
@@ -183,47 +186,61 @@ class PosNotifier extends StateNotifier<PosState> {
     List<PosPaymentLineDto>? payments,
     double? redeemPoints,
   }) async {
-    final result = await _repo.checkout(
-      customerId: state.customer?.customerId,
-      items: state.cart,
-      paymentMethodId: paymentMethodId,
-      paidAmount: paidAmount,
-      discountAmount: state.discount,
-      saleId: state.activeSaleId,
-      payments: payments,
-      redeemPoints: redeemPoints,
-    );
-    final nextPreview = await _repo.getNextReceiptPreview();
-    state = state.copyWith(
-      clearCommittedReceipt: true,
-      clearActiveSaleId: true,
-      clearCustomer: true,
-      receiptPreview: nextPreview,
-      cart: const [],
-      suggestions: const [],
-      discount: 0.0,
-      tax: 0.0,
-    );
-    return result;
+    _checkoutIdemKey ??= const Uuid().v4();
+    try {
+      final result = await _repo.checkout(
+        customerId: state.customer?.customerId,
+        items: state.cart,
+        paymentMethodId: paymentMethodId,
+        paidAmount: paidAmount,
+        discountAmount: state.discount,
+        saleId: state.activeSaleId,
+        payments: payments,
+        redeemPoints: redeemPoints,
+        idempotencyKey: _checkoutIdemKey,
+      );
+      _checkoutIdemKey = null;
+      final nextPreview = await _repo.getNextReceiptPreview();
+      state = state.copyWith(
+        clearCommittedReceipt: true,
+        clearActiveSaleId: true,
+        clearCustomer: true,
+        receiptPreview: nextPreview,
+        cart: const [],
+        suggestions: const [],
+        discount: 0.0,
+        tax: 0.0,
+      );
+      return result;
+    } catch (_) {
+      rethrow;
+    }
   }
 
   Future<void> holdCurrent() async {
-    await _repo.holdSale(
-      customerId: state.customer?.customerId,
-      items: state.cart,
-      discountAmount: state.discount,
-    );
-    // Reset cart and refresh preview. Do not show held sale number in header.
-    final preview = await _repo.getNextReceiptPreview();
-    state = state.copyWith(
-      clearCommittedReceipt: true,
-      clearActiveSaleId: true,
-      cart: const [],
-      suggestions: const [],
-      discount: 0.0,
-      tax: 0.0,
-      receiptPreview: preview,
-    );
+    _holdIdemKey ??= const Uuid().v4();
+    try {
+      await _repo.holdSale(
+        customerId: state.customer?.customerId,
+        items: state.cart,
+        discountAmount: state.discount,
+        idempotencyKey: _holdIdemKey,
+      );
+      _holdIdemKey = null;
+      // Reset cart and refresh preview. Do not show held sale number in header.
+      final preview = await _repo.getNextReceiptPreview();
+      state = state.copyWith(
+        clearCommittedReceipt: true,
+        clearActiveSaleId: true,
+        cart: const [],
+        suggestions: const [],
+        discount: 0.0,
+        tax: 0.0,
+        receiptPreview: preview,
+      );
+    } catch (_) {
+      rethrow;
+    }
   }
 
   void voidCurrent() {

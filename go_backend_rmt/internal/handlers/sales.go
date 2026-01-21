@@ -131,7 +131,7 @@ func (h *SalesHandler) CreateSale(c *gin.Context) {
 	}
 
 	// Calculate totals to validate paid amount
-	_, _, totalAmount, err := h.salesService.CalculateTotals(&req)
+	_, _, totalAmount, err := h.salesService.CalculateTotals(companyID, &req)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to calculate totals", err)
 		return
@@ -146,7 +146,7 @@ func (h *SalesHandler) CreateSale(c *gin.Context) {
 		return
 	}
 
-	sale, err := h.salesService.CreateSale(companyID, locationID, userID, &req)
+	sale, err := h.salesService.CreateSale(companyID, locationID, userID, &req, nil)
 	if err != nil {
 		if err.Error() == "customer not found" {
 			utils.NotFoundResponse(c, "Customer not found")
@@ -362,12 +362,12 @@ func (h *SalesHandler) GetSalesHistory(c *gin.Context) {
 	if productID := c.Query("product_id"); productID != "" {
 		filters["product_id"] = productID
 	}
-    if paymentMethodID := c.Query("payment_method_id"); paymentMethodID != "" {
-        filters["payment_method_id"] = paymentMethodID
-    }
-    if saleNumber := c.Query("sale_number"); saleNumber != "" {
-        filters["sale_number"] = saleNumber
-    }
+	if paymentMethodID := c.Query("payment_method_id"); paymentMethodID != "" {
+		filters["payment_method_id"] = paymentMethodID
+	}
+	if saleNumber := c.Query("sale_number"); saleNumber != "" {
+		filters["sale_number"] = saleNumber
+	}
 
 	sales, err := h.salesService.GetSalesHistory(companyID, filters)
 	if err != nil {
@@ -445,6 +445,10 @@ func (h *SalesHandler) GetQuote(c *gin.Context) {
 
 	quote, err := h.salesService.GetQuoteByID(quoteID, companyID)
 	if err != nil {
+		if err.Error() == "quote not found" {
+			utils.NotFoundResponse(c, "Quote not found")
+			return
+		}
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get quote", err)
 		return
 	}
@@ -487,6 +491,7 @@ func (h *SalesHandler) CreateQuote(c *gin.Context) {
 // PUT /sales/quotes/:id
 func (h *SalesHandler) UpdateQuote(c *gin.Context) {
 	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
 	if companyID == 0 {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
@@ -510,7 +515,11 @@ func (h *SalesHandler) UpdateQuote(c *gin.Context) {
 		return
 	}
 
-	if err := h.salesService.UpdateQuote(quoteID, companyID, &req); err != nil {
+	if err := h.salesService.UpdateQuote(quoteID, companyID, userID, &req); err != nil {
+		if err.Error() == "quote not found" {
+			utils.NotFoundResponse(c, "Quote not found")
+			return
+		}
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update quote", err)
 		return
 	}
@@ -533,6 +542,10 @@ func (h *SalesHandler) DeleteQuote(c *gin.Context) {
 	}
 
 	if err := h.salesService.DeleteQuote(quoteID, companyID); err != nil {
+		if err.Error() == "quote not found" {
+			utils.NotFoundResponse(c, "Quote not found")
+			return
+		}
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to delete quote", err)
 		return
 	}
@@ -555,6 +568,10 @@ func (h *SalesHandler) PrintQuote(c *gin.Context) {
 	}
 
 	if err := h.salesService.PrintQuote(quoteID, companyID); err != nil {
+		if err.Error() == "quote not found" {
+			utils.NotFoundResponse(c, "Quote not found")
+			return
+		}
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to print quote", err)
 		return
 	}
@@ -589,6 +606,10 @@ func (h *SalesHandler) ShareQuote(c *gin.Context) {
 	}
 
 	if err := h.salesService.ShareQuote(quoteID, companyID, &req); err != nil {
+		if err.Error() == "quote not found" {
+			utils.NotFoundResponse(c, "Quote not found")
+			return
+		}
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to share quote", err)
 		return
 	}

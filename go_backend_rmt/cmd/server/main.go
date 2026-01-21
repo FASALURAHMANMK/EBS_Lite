@@ -1,8 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
 
 	"erp-backend/internal/config"
 	"erp-backend/internal/database"
@@ -36,6 +42,10 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
+	if cfg.Environment == "production" && isWeakJWTSecret(cfg.JWTSecret) {
+		log.Fatal("Refusing to start: JWT_SECRET is weak or default in production")
+	}
+
 	// Initialize Gin router
 	router := gin.New()
 
@@ -47,14 +57,38 @@ func main() {
 	// Initialize routes
 	routes.Initialize(router, cfg)
 
-	// Start server
-	port := os.Getenv("S_PORT")
-	if port == "" {
-		port = "8080"
+	// Start server with graceful shutdown
+	server := &http.Server{
+		Addr:    ":" + cfg.Port,
+		Handler: router,
 	}
 
-	log.Printf("Server starting on port %s", port)
-	if err := router.Run(":" + port); err != nil {
-		log.Fatal("Failed to start server:", err)
+	go func() {
+		log.Printf("Server starting on port %s", cfg.Port)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal("Failed to start server:", err)
+		}
+	}()
+
+	shutdownCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	<-shutdownCtx.Done()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		log.Printf("Graceful shutdown failed: %v", err)
 	}
+	log.Println("Server stopped")
+}
+
+func isWeakJWTSecret(secret string) bool {
+	trimmed := strings.TrimSpace(secret)
+	if trimmed == "" {
+		return true
+	}
+	if trimmed == "your-super-secret-jwt-key-change-this-in-production" {
+		return true
+	}
+	return len(trimmed) < 32
 }

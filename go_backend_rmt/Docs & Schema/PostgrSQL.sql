@@ -515,6 +515,7 @@ CREATE TABLE sales (
     pos_status VARCHAR(20) DEFAULT 'COMPLETED' CHECK (pos_status IN ('HOLD', 'ACTIVE', 'COMPLETED')),
     is_quick_sale BOOLEAN DEFAULT FALSE,
     notes TEXT,
+    idempotency_key VARCHAR(100),
     created_by INTEGER NOT NULL REFERENCES users(user_id),
     updated_by INTEGER NOT NULL REFERENCES users(user_id),
     sync_status VARCHAR(20) DEFAULT 'synced',
@@ -632,6 +633,24 @@ CREATE TABLE quotes (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_deleted BOOLEAN DEFAULT FALSE
 );
+
+-- Quote Items Table
+CREATE TABLE quote_items (
+    quote_item_id SERIAL PRIMARY KEY,
+    quote_id INTEGER NOT NULL REFERENCES quotes(quote_id) ON DELETE CASCADE,
+    product_id INTEGER REFERENCES products(product_id),
+    product_name VARCHAR(255),
+    quantity NUMERIC(10,3) NOT NULL,
+    unit_price NUMERIC(12,2) NOT NULL,
+    discount_percentage NUMERIC(5,2) DEFAULT 0,
+    discount_amount NUMERIC(12,2) DEFAULT 0,
+    tax_id INTEGER REFERENCES taxes(tax_id),
+    tax_amount NUMERIC(12,2) DEFAULT 0,
+    line_total NUMERIC(12,2) NOT NULL,
+    serial_numbers TEXT[],
+    notes TEXT
+);
+CREATE INDEX idx_quote_items_quote ON quote_items(quote_id);
 
 -- Purchases Table
 CREATE TABLE purchases (
@@ -1266,6 +1285,7 @@ CREATE INDEX idx_sales_customer ON sales(customer_id);
 CREATE INDEX idx_sales_date ON sales(sale_date);
 CREATE INDEX idx_sales_status ON sales(status);
 CREATE INDEX idx_sales_number ON sales(sale_number);
+CREATE UNIQUE INDEX idx_sales_location_idempotency ON sales(location_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE INDEX idx_sales_created_by ON sales(created_by);
 CREATE INDEX idx_sales_location_created_at ON sales(location_id, created_at);
 CREATE INDEX idx_sales_customer_created_at ON sales(customer_id, created_at);

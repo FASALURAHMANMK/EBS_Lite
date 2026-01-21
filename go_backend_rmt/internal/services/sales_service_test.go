@@ -18,7 +18,7 @@ func TestCreateSale_PaidAmountExceedsTotal(t *testing.T) {
 		PaidAmount: 20, // Greater than calculated total of 10
 	}
 
-	_, err := svc.CreateSale(1, 1, 1, req)
+	_, err := svc.CreateSale(1, 1, 1, req, nil)
 	if err == nil {
 		t.Fatal("expected error but got nil")
 	}

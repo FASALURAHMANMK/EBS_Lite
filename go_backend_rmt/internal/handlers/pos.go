@@ -12,7 +12,7 @@ import (
 )
 
 type POSHandler struct {
-    posService *services.POSService
+	posService *services.POSService
 }
 
 func NewPOSHandler() *POSHandler {
@@ -127,7 +127,12 @@ func (h *POSHandler) ProcessCheckout(c *gin.Context) {
 		return
 	}
 
-	sale, err := h.posService.ProcessCheckout(companyID, locationID, userID, &req)
+	idemKey := c.GetHeader("Idempotency-Key")
+	if idemKey == "" {
+		idemKey = c.GetHeader("X-Idempotency-Key")
+	}
+
+	sale, err := h.posService.ProcessCheckout(companyID, locationID, userID, &req, idemKey)
 	if err != nil {
 		if err.Error() == "customer not found" {
 			utils.NotFoundResponse(c, "Customer not found")
@@ -145,51 +150,51 @@ func (h *POSHandler) ProcessCheckout(c *gin.Context) {
 
 // POST /pos/print
 func (h *POSHandler) PrintInvoice(c *gin.Context) {
-    companyID := c.GetInt("company_id")
-    if companyID == 0 {
-        utils.ForbiddenResponse(c, "Company access required")
-        return
-    }
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
 
-    var req models.POSPrintRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
-        return
-    }
+	var req models.POSPrintRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
 
-    // Require either invoice_id or sale_number
-    if (req.InvoiceID == nil || *req.InvoiceID == 0) && (req.SaleNumber == nil || *req.SaleNumber == "") {
-        utils.ErrorResponse(c, http.StatusBadRequest, "invoice_id or sale_number is required", nil)
-        return
-    }
+	// Require either invoice_id or sale_number
+	if (req.InvoiceID == nil || *req.InvoiceID == 0) && (req.SaleNumber == nil || *req.SaleNumber == "") {
+		utils.ErrorResponse(c, http.StatusBadRequest, "invoice_id or sale_number is required", nil)
+		return
+	}
 
-    // Resolve sale
-    salesSvc := services.NewSalesService()
-    var sale *models.Sale
-    var err error
-    if req.InvoiceID != nil && *req.InvoiceID > 0 {
-        sale, err = salesSvc.GetSaleByID(*req.InvoiceID, companyID)
-    } else if req.SaleNumber != nil {
-        sale, err = salesSvc.GetSaleByNumber(*req.SaleNumber, companyID)
-    }
-    if err != nil {
-        if err.Error() == "sale not found" {
-            utils.NotFoundResponse(c, "Invoice not found")
-            return
-        }
-        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to get invoice", err)
-        return
-    }
+	// Resolve sale
+	salesSvc := services.NewSalesService()
+	var sale *models.Sale
+	var err error
+	if req.InvoiceID != nil && *req.InvoiceID > 0 {
+		sale, err = salesSvc.GetSaleByID(*req.InvoiceID, companyID)
+	} else if req.SaleNumber != nil {
+		sale, err = salesSvc.GetSaleByNumber(*req.SaleNumber, companyID)
+	}
+	if err != nil {
+		if err.Error() == "sale not found" {
+			utils.NotFoundResponse(c, "Invoice not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to get invoice", err)
+		return
+	}
 
-    // Company details for header/branding
-    companySvc := services.NewCompanyService()
-    company, err := companySvc.GetCompanyByID(companyID)
-    if err != nil {
-        utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to load company", err)
-        return
-    }
+	// Company details for header/branding
+	companySvc := services.NewCompanyService()
+	company, err := companySvc.GetCompanyByID(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to load company", err)
+		return
+	}
 
-    utils.SuccessResponse(c, "Print data", models.POSPrintDataResponse{Sale: *sale, Company: *company})
+	utils.SuccessResponse(c, "Print data", models.POSPrintDataResponse{Sale: *sale, Company: *company})
 }
 
 // GET /pos/held-sales
@@ -324,115 +329,125 @@ func (h *POSHandler) GetReceiptData(c *gin.Context) {
 // reverse stock and amounts. If the original is DRAFT/HELD, a zero-total VOID
 // document is created just to record the void event and advance numbering.
 func (h *POSHandler) VoidSale(c *gin.Context) {
-    companyID := c.GetInt("company_id")
-    locationID := c.GetInt("location_id")
-    userID := c.GetInt("user_id")
-    if companyID == 0 {
-        utils.ForbiddenResponse(c, "Company access required")
-        return
-    }
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+	userID := c.GetInt("user_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
 
-    if loc := c.Query("location_id"); loc != "" {
-        if id, err := strconv.Atoi(loc); err == nil {
-            locationID = id
-        }
-    }
-    if locationID == 0 {
-        utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
-        return
-    }
+	if loc := c.Query("location_id"); loc != "" {
+		if id, err := strconv.Atoi(loc); err == nil {
+			locationID = id
+		}
+	}
+	if locationID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+		return
+	}
 
-    saleID, err := strconv.Atoi(c.Param("id"))
-    if err != nil {
-        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid sale ID", err)
-        return
-    }
+	saleID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid sale ID", err)
+		return
+	}
 
-    voidSale, err := h.posService.VoidSale(companyID, locationID, userID, saleID)
-    if err != nil {
-        if err.Error() == "sale not found" {
-            utils.NotFoundResponse(c, "Sale not found")
-            return
-        }
-        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to void sale", err)
-        return
-    }
+	idemKey := c.GetHeader("Idempotency-Key")
+	if idemKey == "" {
+		idemKey = c.GetHeader("X-Idempotency-Key")
+	}
 
-    utils.CreatedResponse(c, "Void invoice created", voidSale)
+	voidSale, err := h.posService.VoidSale(companyID, locationID, userID, saleID, idemKey)
+	if err != nil {
+		if err.Error() == "sale not found" {
+			utils.NotFoundResponse(c, "Sale not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to void sale", err)
+		return
+	}
+
+	utils.CreatedResponse(c, "Void invoice created", voidSale)
 }
 
 // POST /pos/calculate
 // Calculates subtotal, tax and total for the provided POS items and discount
 // without creating a sale. Useful for client-side previews.
 func (h *POSHandler) CalculateTotals(c *gin.Context) {
-    companyID := c.GetInt("company_id")
-    if companyID == 0 {
-        utils.ForbiddenResponse(c, "Company access required")
-        return
-    }
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
 
-    var req models.POSCheckoutRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
-        return
-    }
+	var req models.POSCheckoutRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
 
-    // Reuse sales service calculation logic
-    salesService := services.NewSalesService()
-    subtotal, tax, total, err := salesService.CalculateTotals(&models.CreateSaleRequest{
-        CustomerID:     req.CustomerID,
-        Items:          req.Items,
-        DiscountAmount: req.DiscountAmount,
-    })
-    if err != nil {
-        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to calculate totals", err)
-        return
-    }
+	// Reuse sales service calculation logic
+	salesService := services.NewSalesService()
+	subtotal, tax, total, err := salesService.CalculateTotals(companyID, &models.CreateSaleRequest{
+		CustomerID:     req.CustomerID,
+		Items:          req.Items,
+		DiscountAmount: req.DiscountAmount,
+	})
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to calculate totals", err)
+		return
+	}
 
-    utils.SuccessResponse(c, "Totals calculated successfully", gin.H{
-        "subtotal":    subtotal,
-        "tax_amount":  tax,
-        "total_amount": total,
-    })
+	utils.SuccessResponse(c, "Totals calculated successfully", gin.H{
+		"subtotal":     subtotal,
+		"tax_amount":   tax,
+		"total_amount": total,
+	})
 }
 
 // POST /pos/hold
 // Creates a held sale (status=DRAFT, pos_status=HOLD) without affecting stock.
 func (h *POSHandler) HoldSale(c *gin.Context) {
-    companyID := c.GetInt("company_id")
-    locationID := c.GetInt("location_id")
-    userID := c.GetInt("user_id")
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+	userID := c.GetInt("user_id")
 
-    if companyID == 0 {
-        utils.ForbiddenResponse(c, "Company access required")
-        return
-    }
-    if loc := c.Query("location_id"); loc != "" {
-        if id, err := strconv.Atoi(loc); err == nil {
-            locationID = id
-        }
-    }
-    if locationID == 0 {
-        utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
-        return
-    }
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	if loc := c.Query("location_id"); loc != "" {
+		if id, err := strconv.Atoi(loc); err == nil {
+			locationID = id
+		}
+	}
+	if locationID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+		return
+	}
 
-    var req models.POSCheckoutRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
-        return
-    }
-    if err := utils.ValidateStruct(&req); err != nil {
-        validationErrors := utils.GetValidationErrors(err)
-        utils.ValidationErrorResponse(c, validationErrors)
-        return
-    }
+	var req models.POSCheckoutRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		validationErrors := utils.GetValidationErrors(err)
+		utils.ValidationErrorResponse(c, validationErrors)
+		return
+	}
 
-    sale, err := h.posService.CreateHeldSale(companyID, locationID, userID, &req)
-    if err != nil {
-        utils.ErrorResponse(c, http.StatusBadRequest, "Failed to hold sale", err)
-        return
-    }
+	idemKey := c.GetHeader("Idempotency-Key")
+	if idemKey == "" {
+		idemKey = c.GetHeader("X-Idempotency-Key")
+	}
 
-    utils.CreatedResponse(c, "Sale held successfully", sale)
+	sale, err := h.posService.CreateHeldSale(companyID, locationID, userID, &req, idemKey)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to hold sale", err)
+		return
+	}
+
+	utils.CreatedResponse(c, "Sale held successfully", sale)
 }
