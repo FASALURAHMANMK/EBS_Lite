@@ -19,4 +19,3 @@ class AuthEvents {
     _logoutController.close();
   }
 }
-

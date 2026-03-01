@@ -59,7 +59,9 @@ class PosCartItem {
     this.discountPercent = 0.0,
   });
 
-  PosCartItem copyWith({double? quantity, double? unitPrice, double? discountPercent}) => PosCartItem(
+  PosCartItem copyWith(
+          {double? quantity, double? unitPrice, double? discountPercent}) =>
+      PosCartItem(
         product: product,
         quantity: quantity ?? this.quantity,
         unitPrice: unitPrice ?? this.unitPrice,
@@ -84,7 +86,8 @@ class PosCheckoutResult {
     required this.totalAmount,
   });
 
-  factory PosCheckoutResult.fromSale(Map<String, dynamic> sale) => PosCheckoutResult(
+  factory PosCheckoutResult.fromSale(Map<String, dynamic> sale) =>
+      PosCheckoutResult(
         saleId: sale['sale_id'] as int,
         saleNumber: sale['sale_number'] as String? ?? '',
         totalAmount: (sale['total_amount'] as num?)?.toDouble() ?? 0.0,
@@ -145,14 +148,20 @@ class SaleItemDto {
   final double unitPrice;
   final double discountPercent;
 
-  SaleItemDto({this.productId, this.productName, required this.quantity, required this.unitPrice, this.discountPercent = 0.0});
+  SaleItemDto(
+      {this.productId,
+      this.productName,
+      required this.quantity,
+      required this.unitPrice,
+      this.discountPercent = 0.0});
 
   factory SaleItemDto.fromJson(Map<String, dynamic> json) => SaleItemDto(
         productId: json['product_id'] as int?,
         productName: json['product_name'] as String?,
         quantity: (json['quantity'] as num?)?.toDouble() ?? 0.0,
         unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0.0,
-        discountPercent: (json['discount_percentage'] as num?)?.toDouble() ?? 0.0,
+        discountPercent:
+            (json['discount_percentage'] as num?)?.toDouble() ?? 0.0,
       );
 }
 
@@ -202,7 +211,8 @@ class CustomerDetailDto {
     required this.creditBalance,
   });
 
-  factory CustomerDetailDto.fromJson(Map<String, dynamic> json) => CustomerDetailDto(
+  factory CustomerDetailDto.fromJson(Map<String, dynamic> json) =>
+      CustomerDetailDto(
         customerId: json['customer_id'] as int,
         name: json['name'] as String? ?? '',
         creditLimit: (json['credit_limit'] as num?)?.toDouble() ?? 0.0,
@@ -214,7 +224,8 @@ class PosPaymentLineDto {
   final int methodId;
   final int? currencyId;
   final double amount;
-  PosPaymentLineDto({required this.methodId, this.currencyId, required this.amount});
+  PosPaymentLineDto(
+      {required this.methodId, this.currencyId, required this.amount});
 
   Map<String, dynamic> toJson() => {
         'method_id': methodId,

@@ -65,11 +65,15 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         ref.read(loyaltyRepositoryProvider).getSettings(),
         // Customer info for points if selected
         if (posState.customer != null)
-          ref.read(customerRepositoryProvider).getCustomerSummary(posState.customer!.customerId)
+          ref
+              .read(customerRepositoryProvider)
+              .getCustomerSummary(posState.customer!.customerId)
         else
           Future.value(null),
         if (posState.customer != null)
-          ref.read(customerRepositoryProvider).getCustomer(posState.customer!.customerId)
+          ref
+              .read(customerRepositoryProvider)
+              .getCustomer(posState.customer!.customerId)
         else
           Future.value(null),
       ]);
@@ -106,7 +110,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
               ),
       );
       final total = ref.read(posNotifierProvider).total;
-      final defaultMethod = _methods.isNotEmpty ? _methods.first.methodId : null;
+      final defaultMethod =
+          _methods.isNotEmpty ? _methods.first.methodId : null;
       final defaultCurrency = _baseCurrency?.currencyId;
       _lines.clear();
       final first = _PaymentLine(
@@ -127,7 +132,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(posNotifierProvider);
     final total = state.total;
-    final redeemPts = _useLoyalty ? (double.tryParse(_redeemCtrl.text.trim()) ?? 0.0) : 0.0;
+    final redeemPts =
+        _useLoyalty ? (double.tryParse(_redeemCtrl.text.trim()) ?? 0.0) : 0.0;
     final redeemClamped = redeemPts.clamp(0.0, _availablePoints);
     final redeemValue = redeemClamped * _pointValue;
     final effectiveTotal = (total - redeemValue).clamp(0.0, double.infinity);
@@ -153,16 +159,31 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                             onChanged: (v) => setState(() {
                                   _useLoyalty = (v ?? false);
                                   if (_lines.isNotEmpty) {
-                                    final newTotal = (state.total - ((_useLoyalty ? (double.tryParse(_redeemCtrl.text.trim()) ?? 0.0) : 0.0).clamp(0.0, _availablePoints) * _pointValue)).clamp(0.0, double.infinity);
-                                    _lines.first.controller.text = newTotal.toStringAsFixed(2);
+                                    final newTotal = (state.total -
+                                            ((_useLoyalty
+                                                        ? (double.tryParse(
+                                                                _redeemCtrl.text
+                                                                    .trim()) ??
+                                                            0.0)
+                                                        : 0.0)
+                                                    .clamp(
+                                                        0.0, _availablePoints) *
+                                                _pointValue))
+                                        .clamp(0.0, double.infinity);
+                                    _lines.first.controller.text =
+                                        newTotal.toStringAsFixed(2);
                                   }
                                 })),
                         const Text('Redeem loyalty points'),
                       ]),
                       Row(children: [
-                        Chip(label: Text('Avail: ${_availablePoints.toStringAsFixed(0)} pts')),
+                        Chip(
+                            label: Text(
+                                'Avail: ${_availablePoints.toStringAsFixed(0)} pts')),
                         const SizedBox(width: 8),
-                        Chip(label: Text('Value/pt: ${_pointValue.toStringAsFixed(2)}')),
+                        Chip(
+                            label: Text(
+                                'Value/pt: ${_pointValue.toStringAsFixed(2)}')),
                       ]),
                       Row(children: [
                         SizedBox(
@@ -171,11 +192,19 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                             controller: _redeemCtrl,
                             enabled: _useLoyalty,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(labelText: 'Points to redeem'),
+                            decoration: const InputDecoration(
+                                labelText: 'Points to redeem'),
                             onChanged: (_) => setState(() {
                               if (_lines.isNotEmpty) {
-                                final newTotal = (state.total - ((double.tryParse(_redeemCtrl.text.trim()) ?? 0.0).clamp(0.0, _availablePoints) * _pointValue)).clamp(0.0, double.infinity);
-                                _lines.first.controller.text = newTotal.toStringAsFixed(2);
+                                final newTotal = (state.total -
+                                        ((double.tryParse(_redeemCtrl.text
+                                                        .trim()) ??
+                                                    0.0)
+                                                .clamp(0.0, _availablePoints) *
+                                            _pointValue))
+                                    .clamp(0.0, double.infinity);
+                                _lines.first.controller.text =
+                                    newTotal.toStringAsFixed(2);
                               }
                             }),
                           ),
@@ -188,9 +217,13 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                           onPressed: !_useLoyalty
                               ? null
                               : () {
-                                  final needed = (_pointValue > 0) ? (state.total / _pointValue) : 0.0;
-                                  final clamped = needed.clamp(0.0, _availablePoints);
-                                  setState(() => _redeemCtrl.text = clamped.toStringAsFixed(0));
+                                  final needed = (_pointValue > 0)
+                                      ? (state.total / _pointValue)
+                                      : 0.0;
+                                  final clamped =
+                                      needed.clamp(0.0, _availablePoints);
+                                  setState(() => _redeemCtrl.text =
+                                      clamped.toStringAsFixed(0));
                                 },
                           child: const Text('Full bill'),
                         ),
@@ -199,23 +232,32 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                           onPressed: !_useLoyalty
                               ? null
                               : () {
-                                  setState(() => _redeemCtrl.text = _availablePoints.toStringAsFixed(0));
+                                  setState(() => _redeemCtrl.text =
+                                      _availablePoints.toStringAsFixed(0));
                                 },
                           child: const Text('Full available'),
                         ),
                       ]),
                       if (_useLoyalty) ...[
                         Slider(
-                          value: (double.tryParse(_redeemCtrl.text.trim()) ?? 0.0).clamp(0.0, _availablePoints),
+                          value:
+                              (double.tryParse(_redeemCtrl.text.trim()) ?? 0.0)
+                                  .clamp(0.0, _availablePoints),
                           min: 0.0,
                           max: _availablePoints > 0 ? _availablePoints : 0.0,
-                          divisions: _availablePoints > 0 ? _availablePoints.toInt().clamp(1, 1000) : 1,
+                          divisions: _availablePoints > 0
+                              ? _availablePoints.toInt().clamp(1, 1000)
+                              : 1,
                           label: _redeemCtrl.text,
                           onChanged: (v) => setState(() {
                             _redeemCtrl.text = v.toStringAsFixed(0);
                             if (_lines.isNotEmpty) {
-                              final newTotal = (state.total - (v.clamp(0.0, _availablePoints) * _pointValue)).clamp(0.0, double.infinity);
-                              _lines.first.controller.text = newTotal.toStringAsFixed(2);
+                              final newTotal = (state.total -
+                                      (v.clamp(0.0, _availablePoints) *
+                                          _pointValue))
+                                  .clamp(0.0, double.infinity);
+                              _lines.first.controller.text =
+                                  newTotal.toStringAsFixed(2);
                             }
                           }),
                         ),
@@ -227,11 +269,14 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Payments', style: Theme.of(context).textTheme.titleSmall),
+                        Text('Payments',
+                            style: Theme.of(context).textTheme.titleSmall),
                         TextButton.icon(
                           onPressed: () => setState(() {
                             final l = _PaymentLine(
-                              methodId: _methods.isNotEmpty ? _methods.first.methodId : null,
+                              methodId: _methods.isNotEmpty
+                                  ? _methods.first.methodId
+                                  : null,
                               currencyId: _baseCurrency?.currencyId,
                               controller: TextEditingController(text: '0.00'),
                             );
@@ -258,19 +303,23 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                               child: Row(
                                 children: _methods
                                     .map((m) => Padding(
-                                          padding: const EdgeInsets.only(right: 16.0),
+                                          padding: const EdgeInsets.only(
+                                              right: 16.0),
                                           child: InkWell(
                                             onTap: () => setState(() {
                                               line.methodId = m.methodId;
-                                              _ensureAllowedCurrencyForLine(line);
+                                              _ensureAllowedCurrencyForLine(
+                                                  line);
                                             }),
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 Icon(
                                                   line.methodId == m.methodId
-                                                      ? Icons.radio_button_checked
-                                                      : Icons.radio_button_unchecked,
+                                                      ? Icons
+                                                          .radio_button_checked
+                                                      : Icons
+                                                          .radio_button_unchecked,
                                                   size: 20,
                                                 ),
                                                 Text(m.name),
@@ -287,27 +336,36 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                 Expanded(
                                   child: TextField(
                                     controller: line.controller,
-                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                            decimal: true),
                                     decoration: InputDecoration(
                                       labelText: 'Amount',
                                       prefixIcon: InkWell(
                                         onTap: () async {
-                                          final picked = await _pickCurrencyFor(context, line.methodId);
-                                          if (picked != null) setState(() => line.currencyId = picked);
+                                          final picked = await _pickCurrencyFor(
+                                              context, line.methodId);
+                                          if (picked != null) {
+                                            setState(
+                                                () => line.currencyId = picked);
+                                          }
                                         },
                                         child: Container(
                                           alignment: Alignment.center,
                                           width: 80,
                                           child: Text(
                                             _codeFor(line.currencyId),
-                                            style: Theme.of(context).textTheme.titleMedium,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleMedium,
                                           ),
                                         ),
                                       ),
                                       suffixIcon: IconButton(
                                         tooltip: 'Clear',
                                         icon: const Icon(Icons.clear_rounded),
-                                        onPressed: () => setState(() => line.controller.text = '0.00'),
+                                        onPressed: () => setState(() =>
+                                            line.controller.text = '0.00'),
                                       ),
                                     ),
                                     onChanged: (_) => setState(() {}),
@@ -318,8 +376,10 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                   tooltip: 'Remove',
                                   onPressed: _lines.length == 1
                                       ? null
-                                      : () => setState(() => _lines.removeAt(idx)),
-                                  icon: const Icon(Icons.remove_circle_outline_rounded),
+                                      : () =>
+                                          setState(() => _lines.removeAt(idx)),
+                                  icon: const Icon(
+                                      Icons.remove_circle_outline_rounded),
                                 )
                               ],
                             ),
@@ -331,16 +391,20 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Total Paid', style: Theme.of(context).textTheme.titleMedium),
-                        Text(_sumPaidInBase().toStringAsFixed(2), style: Theme.of(context).textTheme.titleMedium),
+                        Text('Total Paid',
+                            style: Theme.of(context).textTheme.titleMedium),
+                        Text(_sumPaidInBase().toStringAsFixed(2),
+                            style: Theme.of(context).textTheme.titleMedium),
                       ],
                     ),
                     const SizedBox(height: 6),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(isChange ? 'Change' : 'Due', style: Theme.of(context).textTheme.titleSmall),
-                        Text(displayBalance.toStringAsFixed(2), style: Theme.of(context).textTheme.titleSmall),
+                        Text(isChange ? 'Change' : 'Due',
+                            style: Theme.of(context).textTheme.titleSmall),
+                        Text(displayBalance.toStringAsFixed(2),
+                            style: Theme.of(context).textTheme.titleSmall),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -348,7 +412,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                       alignment: Alignment.centerRight,
                       child: Wrap(spacing: 12, children: [
                         TextButton(
-                          onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+                          onPressed: _submitting
+                              ? null
+                              : () => Navigator.of(context).pop(),
                           child: const Text('Cancel'),
                         ),
                         FilledButton.icon(
@@ -357,21 +423,29 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                               : () async {
                                   setState(() => _submitting = true);
                                   try {
-                                    final primaryMethod = _primaryMethodIdFromLines();
+                                    final primaryMethod =
+                                        _primaryMethodIdFromLines();
                                     final paid = _sumPaidInBase();
                                     // Clamp redeem points
                                     double? redeemPoints;
                                     if (_useLoyalty && _availablePoints > 0) {
-                                      final want = double.tryParse(_redeemCtrl.text.trim()) ?? 0.0;
-                                      final clamped = want.clamp(0.0, _availablePoints);
-                                      redeemPoints = clamped > 0 ? clamped : null;
+                                      final want = double.tryParse(
+                                              _redeemCtrl.text.trim()) ??
+                                          0.0;
+                                      final clamped =
+                                          want.clamp(0.0, _availablePoints);
+                                      redeemPoints =
+                                          clamped > 0 ? clamped : null;
                                     }
                                     final payments = _lines
                                         .where((l) => l.methodId != null)
                                         .map((l) => PosPaymentLineDto(
                                               methodId: l.methodId!,
                                               currencyId: l.currencyId,
-                                              amount: double.tryParse(l.controller.text.trim()) ?? 0.0,
+                                              amount: double.tryParse(l
+                                                      .controller.text
+                                                      .trim()) ??
+                                                  0.0,
                                             ))
                                         .toList();
 
@@ -388,18 +462,25 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
                                     await _showSuccessDialog(result);
 
-                                    if (!mounted) return;
-                                    Navigator.of(context).pop(); // back to POS for next sale
+                                    if (!context.mounted) return;
+                                    Navigator.of(context)
+                                        .pop(); // back to POS for next sale
                                   } catch (e) {
-                                    if (!mounted) return;
+                                    if (!context.mounted) return;
                                     setState(() => _submitting = false);
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Failed to process: $e')),
+                                      SnackBar(
+                                          content:
+                                              Text('Failed to process: $e')),
                                     );
                                   }
                                 },
                           icon: _submitting
-                              ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              ? const SizedBox(
+                                  height: 16,
+                                  width: 16,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
                               : const Icon(Icons.check_circle_rounded),
                           label: const Text('Finalize'),
                         ),
@@ -430,19 +511,26 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
             TextButton(
               onPressed: () async {
                 try {
-                  final data = await ref.read(posRepositoryProvider).getPrintData(invoiceId: result.saleId);
+                  final data = await ref
+                      .read(posRepositoryProvider)
+                      .getPrintData(invoiceId: result.saleId);
                   final sale = (data['sale'] as Map<String, dynamic>? ?? {});
-                  final company = (data['company'] as Map<String, dynamic>? ?? {});
+                  final company =
+                      (data['company'] as Map<String, dynamic>? ?? {});
                   final logoUrl = _resolveLogoUrl(company);
-                  final bytes = await InvoicePdfBuilder.buildPdfFromHtml(sale, company, format: PdfPageFormat.a4, logoUrl: logoUrl);
+                  final bytes = await InvoicePdfBuilder.buildPdfFromHtml(
+                      sale, company,
+                      format: PdfPageFormat.a4, logoUrl: logoUrl);
                   final dir = await getTemporaryDirectory();
-                  final fileName = 'Invoice-${sale['sale_number'] ?? result.saleNumber}.pdf';
+                  final fileName =
+                      'Invoice-${sale['sale_number'] ?? result.saleNumber}.pdf';
                   final path = '${dir.path}/$fileName';
                   final file = File(path);
                   await file.writeAsBytes(bytes, flush: true);
                   await Share.shareXFiles(
                     [XFile(path, name: fileName, mimeType: 'application/pdf')],
-                    subject: 'Invoice ${sale['sale_number'] ?? result.saleNumber}',
+                    subject:
+                        'Invoice ${sale['sale_number'] ?? result.saleNumber}',
                     text: 'Please find the attached invoice.',
                   );
                 } catch (e) {
@@ -466,10 +554,13 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   }
 
   Future<void> _showPrintOptions(PosCheckoutResult result) async {
-    final data = await ref.read(posRepositoryProvider).getPrintData(invoiceId: result.saleId);
+    final data = await ref
+        .read(posRepositoryProvider)
+        .getPrintData(invoiceId: result.saleId);
     final sale = (data['sale'] as Map<String, dynamic>? ?? {});
     final company = (data['company'] as Map<String, dynamic>? ?? {});
-    final printers = await ref.read(printerSettingsRepositoryProvider).loadAll();
+    final printers =
+        await ref.read(printerSettingsRepositoryProvider).loadAll();
 
     if (!mounted) return;
     await showModalBottomSheet(
@@ -481,9 +572,12 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
             children: [
               ListTile(title: const Text('Select Printer'), dense: true),
               ...printers.map((p) => ListTile(
-                    leading: Icon(p.kind.startsWith('thermal') ? Icons.print_rounded : Icons.picture_as_pdf_rounded),
+                    leading: Icon(p.kind.startsWith('thermal')
+                        ? Icons.print_rounded
+                        : Icons.picture_as_pdf_rounded),
                     title: Text(p.name),
-                    subtitle: Text('${p.kind.toUpperCase()} • ${p.connectionType}'),
+                    subtitle:
+                        Text('${p.kind.toUpperCase()} • ${p.connectionType}'),
                     onTap: () async {
                       Navigator.of(ctx).pop();
                       await _printToPrinter(p, sale, company);
@@ -500,7 +594,10 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         Navigator.of(ctx).pop();
                         final logoUrl = _resolveLogoUrl(company);
                         await Printing.layoutPdf(
-                          onLayout: (format) => InvoicePdfBuilder.buildPdfFromWidgets(sale, company, format: PdfPageFormat.a4, logoUrl: logoUrl),
+                          onLayout: (format) =>
+                              InvoicePdfBuilder.buildPdfFromWidgets(
+                                  sale, company,
+                                  format: PdfPageFormat.a4, logoUrl: logoUrl),
                         );
                       },
                       child: const Text('Print A4 Now'),
@@ -515,15 +612,20 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   }
 
   Future<void> _printSmart(PosCheckoutResult result) async {
-    final data = await ref.read(posRepositoryProvider).getPrintData(invoiceId: result.saleId);
+    final data = await ref
+        .read(posRepositoryProvider)
+        .getPrintData(invoiceId: result.saleId);
     final sale = (data['sale'] as Map<String, dynamic>? ?? {});
     final company = (data['company'] as Map<String, dynamic>? ?? {});
-    final printers = await ref.read(printerSettingsRepositoryProvider).loadAll();
+    final printers =
+        await ref.read(printerSettingsRepositoryProvider).loadAll();
     PrinterDevice? target;
     if (printers.length == 1) {
       target = printers.first;
     } else {
-      target = printers.firstWhere((p) => p.isDefault, orElse: () => PrinterDevice(id: '', name: '', kind: 'a4', connectionType: 'system'));
+      target = printers.firstWhere((p) => p.isDefault,
+          orElse: () => PrinterDevice(
+              id: '', name: '', kind: 'a4', connectionType: 'system'));
       if (target.id.isEmpty) target = null;
     }
     if (target != null) {
@@ -533,7 +635,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     }
   }
 
-  Future<void> _printToPrinter(PrinterDevice p, Map<String, dynamic> sale, Map<String, dynamic> company) async {
+  Future<void> _printToPrinter(PrinterDevice p, Map<String, dynamic> sale,
+      Map<String, dynamic> company) async {
     try {
       switch (p.kind) {
         case 'thermal_80':
@@ -567,22 +670,28 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         case 'a5':
           final logoUrl = _resolveLogoUrl(company);
           await Printing.layoutPdf(
-            onLayout: (format) => InvoicePdfBuilder.buildPdfFromWidgets(sale, company, format: PdfPageFormat.a5, logoUrl: logoUrl),
+            onLayout: (format) => InvoicePdfBuilder.buildPdfFromWidgets(
+                sale, company,
+                format: PdfPageFormat.a5, logoUrl: logoUrl),
           );
           break;
         case 'a4':
         default:
           final logoUrl = _resolveLogoUrl(company);
           await Printing.layoutPdf(
-            onLayout: (format) => InvoicePdfBuilder.buildPdfFromWidgets(sale, company, format: PdfPageFormat.a4, logoUrl: logoUrl),
+            onLayout: (format) => InvoicePdfBuilder.buildPdfFromWidgets(
+                sale, company,
+                format: PdfPageFormat.a4, logoUrl: logoUrl),
           );
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Printed via ${p.name}')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Printed via ${p.name}')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Print failed: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Print failed: $e')));
       }
     }
   }
@@ -605,7 +714,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   }
 
   List<int> _allowedCurrenciesForMethod(int? methodId) {
-    if (methodId == null) return _baseCurrency != null ? [_baseCurrency!.currencyId] : <int>[];
+    if (methodId == null) {
+      return _baseCurrency != null ? [_baseCurrency!.currencyId] : <int>[];
+    }
     final list = _methodCurrencies[methodId] ?? const [];
     if (list.isEmpty) {
       return _baseCurrency != null ? [_baseCurrency!.currencyId] : <int>[];
@@ -616,7 +727,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   String _codeFor(int? currencyId) {
     final cur = _currencies.firstWhere(
       (c) => c.currencyId == currencyId,
-      orElse: () => _baseCurrency ??
+      orElse: () =>
+          _baseCurrency ??
           CurrencyDto(
               currencyId: 0,
               code: 'BASE',
@@ -634,9 +746,18 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       (e) => e['currency_id'] == currencyId,
       orElse: () => const {'exchange_rate': null, 'rate': null},
     );
-    final rate = (found['exchange_rate'] as num?)?.toDouble() ?? (found['rate'] as num?)?.toDouble();
+    final rate = (found['exchange_rate'] as num?)?.toDouble() ??
+        (found['rate'] as num?)?.toDouble();
     if (rate != null) return rate;
-    final cur = _currencies.firstWhere((c) => c.currencyId == currencyId, orElse: () => _baseCurrency ?? CurrencyDto(currencyId: currencyId, code: 'CUR', symbol: null, isBase: false, exchangeRate: 1.0));
+    final cur = _currencies.firstWhere((c) => c.currencyId == currencyId,
+        orElse: () =>
+            _baseCurrency ??
+            CurrencyDto(
+                currencyId: currencyId,
+                code: 'CUR',
+                symbol: null,
+                isBase: false,
+                exchangeRate: 1.0));
     return cur.exchangeRate;
   }
 
@@ -677,7 +798,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
   Future<int?> _pickCurrencyFor(BuildContext context, int? methodId) async {
     final allowed = _allowedCurrenciesForMethod(methodId);
-    final subset = _currencies.where((c) => allowed.isEmpty || allowed.contains(c.currencyId)).toList();
+    final subset = _currencies
+        .where((c) => allowed.isEmpty || allowed.contains(c.currencyId))
+        .toList();
     return showDialog<int>(
       context: context,
       builder: (ctx) {
@@ -692,7 +815,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 final c = subset[i];
                 return ListTile(
                   title: Text(c.code),
-                  subtitle: c.isBase ? const Text('Base currency') : Text('Rate: ${c.exchangeRate}'),
+                  subtitle: c.isBase
+                      ? const Text('Base currency')
+                      : Text('Rate: ${c.exchangeRate}'),
                   onTap: () => Navigator.of(ctx).pop(c.currencyId),
                 );
               },
@@ -716,4 +841,3 @@ class _PaymentLine {
   int? currencyId;
   final TextEditingController controller;
 }
-

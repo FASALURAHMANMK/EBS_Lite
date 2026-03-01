@@ -31,24 +31,21 @@ class SalesPage extends StatelessWidget {
         icon: Icons.request_quote_rounded,
         label: 'Quotes',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-              builder: (_) => const QuotesPage()),
+          MaterialPageRoute(builder: (_) => const QuotesPage()),
         ),
       ),
       FeatureItem(
         icon: Icons.assignment_return_rounded,
         label: 'Returns',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-              builder: (_) => const SaleReturnFormPage()),
+          MaterialPageRoute(builder: (_) => const SaleReturnFormPage()),
         ),
       ),
       FeatureItem(
         icon: Icons.history_rounded,
         label: 'Sale History',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-              builder: (_) => const SalesHistoryPage()),
+          MaterialPageRoute(builder: (_) => const SalesHistoryPage()),
         ),
       ),
       FeatureItem(

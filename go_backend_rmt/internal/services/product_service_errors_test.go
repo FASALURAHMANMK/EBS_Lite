@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -40,7 +41,21 @@ func (c *stubConn) Close() error              { return nil }
 func (c *stubConn) Begin() (driver.Tx, error) { return nil, errors.New("not implemented") }
 
 func (c *stubConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	for pattern, resp := range c.responses {
+	patterns := make([]string, 0, len(c.responses))
+	for pattern := range c.responses {
+		patterns = append(patterns, pattern)
+	}
+	// Prefer the most-specific match to avoid ambiguous patterns like "FROM products".
+	// This keeps tests stable regardless of map iteration order.
+	sort.Slice(patterns, func(i, j int) bool {
+		if len(patterns[i]) != len(patterns[j]) {
+			return len(patterns[i]) > len(patterns[j])
+		}
+		return patterns[i] < patterns[j]
+	})
+
+	for _, pattern := range patterns {
+		resp := c.responses[pattern]
 		if strings.Contains(query, pattern) {
 			if resp.err != nil {
 				return nil, resp.err
@@ -88,6 +103,10 @@ func productRow() []driver.Value {
 	return []driver.Value{1, 1, nil, nil, nil, "Test", nil, nil, nil, nil, 0, nil, nil, false, true, 1, nil, 1, time.Now(), time.Now(), false}
 }
 
+func productRowWithSupplierAndTax() []driver.Value {
+	return append(productRow(), nil, 1)
+}
+
 func TestGetProducts_BarcodesError(t *testing.T) {
 	db := mockDB(map[string]stubResp{
 		"FROM products": {
@@ -122,9 +141,9 @@ func TestGetProducts_AttributesError(t *testing.T) {
 
 func TestGetProductByID_BarcodesError(t *testing.T) {
 	db := mockDB(map[string]stubResp{
-		"FROM products": {
-			columns: []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted"},
-			rows:    [][]driver.Value{productRow()},
+		"default_supplier_id, tax_id": {
+			columns: []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted", "default_supplier_id", "tax_id"},
+			rows:    [][]driver.Value{productRowWithSupplierAndTax()},
 		},
 		"FROM product_barcodes": {err: errors.New("barcode failure")},
 	})
@@ -136,9 +155,9 @@ func TestGetProductByID_BarcodesError(t *testing.T) {
 
 func TestGetProductByID_AttributesError(t *testing.T) {
 	db := mockDB(map[string]stubResp{
-		"FROM products": {
-			columns: []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted"},
-			rows:    [][]driver.Value{productRow()},
+		"default_supplier_id, tax_id": {
+			columns: []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted", "default_supplier_id", "tax_id"},
+			rows:    [][]driver.Value{productRowWithSupplierAndTax()},
 		},
 		"FROM product_barcodes": {
 			columns: []string{"barcode_id", "product_id", "barcode", "pack_size", "cost_price", "selling_price", "is_primary"},

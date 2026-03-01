@@ -33,14 +33,17 @@ class PosRepository {
     Map<String, dynamic>? chosen;
     // Prefer location-specific sequence over global fallback
     for (final m in list) {
-      if ((m['name'] as String?)?.toLowerCase() == 'sale' && (m['location_id'] as int?) == loc.locationId) {
+      if ((m['name'] as String?)?.toLowerCase() == 'sale' &&
+          (m['location_id'] as int?) == loc.locationId) {
         chosen = m;
         break;
       }
     }
     // Fallback to global company-level sequence (location_id == null)
     chosen ??= list.firstWhere(
-      (m) => (m['name'] as String?)?.toLowerCase() == 'sale' && m['location_id'] == null,
+      (m) =>
+          (m['name'] as String?)?.toLowerCase() == 'sale' &&
+          m['location_id'] == null,
       orElse: () => <String, dynamic>{},
     );
     if (chosen.isEmpty) return null;
@@ -126,11 +129,13 @@ class PosRepository {
       'discount_amount': discountAmount,
       if (payments != null && payments.isNotEmpty)
         'payments': payments.map((p) => p.toJson()).toList(),
-      if (redeemPoints != null && redeemPoints > 0) 'redeem_points': redeemPoints,
+      if (redeemPoints != null && redeemPoints > 0)
+        'redeem_points': redeemPoints,
     };
     final headers = <String, dynamic>{
       if ((idempotencyKey ?? '').isNotEmpty) 'Idempotency-Key': idempotencyKey,
-      if ((idempotencyKey ?? '').isNotEmpty) 'X-Idempotency-Key': idempotencyKey,
+      if ((idempotencyKey ?? '').isNotEmpty)
+        'X-Idempotency-Key': idempotencyKey,
     };
     final res = await _dio.post(
       '/pos/checkout',
@@ -141,7 +146,8 @@ class PosRepository {
     final data = (res.data is Map<String, dynamic>)
         ? (res.data['data'] as Map<String, dynamic>?)
         : null;
-    final sale = (data?['sale'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+    final sale =
+        (data?['sale'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     return PosCheckoutResult.fromSale(sale);
   }
 
@@ -160,7 +166,9 @@ class PosRepository {
           .toList(),
       'discount_amount': discountAmount,
     });
-    final map = (res.data is Map<String, dynamic>) ? (res.data['data'] as Map<String, dynamic>) : <String, dynamic>{};
+    final map = (res.data is Map<String, dynamic>)
+        ? (res.data['data'] as Map<String, dynamic>)
+        : <String, dynamic>{};
     return {
       'subtotal': (map['subtotal'] as num?)?.toDouble() ?? 0.0,
       'tax_amount': (map['tax_amount'] as num?)?.toDouble() ?? 0.0,
@@ -193,7 +201,8 @@ class PosRepository {
     };
     final headers = <String, dynamic>{
       if ((idempotencyKey ?? '').isNotEmpty) 'Idempotency-Key': idempotencyKey,
-      if ((idempotencyKey ?? '').isNotEmpty) 'X-Idempotency-Key': idempotencyKey,
+      if ((idempotencyKey ?? '').isNotEmpty)
+        'X-Idempotency-Key': idempotencyKey,
     };
     final res = await _dio.post(
       '/pos/hold',
@@ -201,16 +210,21 @@ class PosRepository {
       data: payload,
       options: headers.isEmpty ? null : Options(headers: headers),
     );
-    final sale = (res.data is Map<String, dynamic>) ? ((res.data['data'] as Map<String, dynamic>?) ?? <String, dynamic>{}) : <String, dynamic>{};
+    final sale = (res.data is Map<String, dynamic>)
+        ? ((res.data['data'] as Map<String, dynamic>?) ?? <String, dynamic>{})
+        : <String, dynamic>{};
     return PosCheckoutResult.fromSale(sale);
   }
 
   Future<List<HeldSaleDto>> getHeldSales() async {
     final loc = _ref.read(locationNotifierProvider).selected;
     if (loc == null) return const [];
-    final res = await _dio.get('/pos/held-sales', queryParameters: {'location_id': loc.locationId});
+    final res = await _dio.get('/pos/held-sales',
+        queryParameters: {'location_id': loc.locationId});
     final list = _asList(res);
-    return list.map((e) => HeldSaleDto.fromJson(e as Map<String, dynamic>)).toList();
+    return list
+        .map((e) => HeldSaleDto.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> resumeSale(int saleId) async {
@@ -219,7 +233,8 @@ class PosRepository {
 
   Future<void> voidSale(int saleId, {String? idempotencyKey}) async {
     final loc = _ref.read(locationNotifierProvider).selected;
-    final key = (idempotencyKey ?? '').isEmpty ? 'void-$saleId' : idempotencyKey!;
+    final key =
+        (idempotencyKey ?? '').isEmpty ? 'void-$saleId' : idempotencyKey!;
     final headers = <String, dynamic>{
       'Idempotency-Key': key,
       'X-Idempotency-Key': key,
@@ -242,16 +257,22 @@ class PosRepository {
   Future<List<CurrencyDto>> getCurrencies() async {
     final res = await _dio.get('/currencies');
     final list = _asList(res);
-    return list.map((e) => CurrencyDto.fromJson(e as Map<String, dynamic>)).toList();
+    return list
+        .map((e) => CurrencyDto.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
-  Future<Map<String, dynamic>> getPrintData({int? invoiceId, String? saleNumber}) async {
+  Future<Map<String, dynamic>> getPrintData(
+      {int? invoiceId, String? saleNumber}) async {
     final payload = <String, dynamic>{
       if (invoiceId != null) 'invoice_id': invoiceId,
-      if (saleNumber != null && saleNumber.isNotEmpty) 'sale_number': saleNumber,
+      if (saleNumber != null && saleNumber.isNotEmpty)
+        'sale_number': saleNumber,
     };
     final res = await _dio.post('/pos/print', data: payload);
-    final body = (res.data is Map<String, dynamic>) ? (res.data['data'] as Map<String, dynamic>?) : null;
+    final body = (res.data is Map<String, dynamic>)
+        ? (res.data['data'] as Map<String, dynamic>?)
+        : null;
     return body ?? <String, dynamic>{};
   }
 

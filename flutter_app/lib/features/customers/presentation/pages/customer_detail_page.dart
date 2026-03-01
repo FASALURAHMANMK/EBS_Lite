@@ -95,13 +95,19 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(cu.name,
-                                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(
+                                              fontWeight: FontWeight.w700)),
                                   const SizedBox(height: 4),
                                   Text([
-                                    if ((cu.phone ?? '').isNotEmpty) 'Phone: ${cu.phone}',
-                                    if ((cu.email ?? '').isNotEmpty) 'Email: ${cu.email}',
-                                    if ((cu.address ?? '').isNotEmpty) 'Address: ${cu.address}',
-                                    if ((cu.taxNumber ?? '').isNotEmpty) 'Tax#: ${cu.taxNumber}',
+                                    if ((cu.phone ?? '').isNotEmpty)
+                                      'Phone: ${cu.phone}',
+                                    if ((cu.email ?? '').isNotEmpty)
+                                      'Email: ${cu.email}',
+                                    if ((cu.address ?? '').isNotEmpty)
+                                      'Address: ${cu.address}',
+                                    if ((cu.taxNumber ?? '').isNotEmpty)
+                                      'Tax#: ${cu.taxNumber}',
                                     'Credit Limit: ${cu.creditLimit.toStringAsFixed(2)} | Terms: ${cu.paymentTerms} days',
                                   ].join('\n')),
                                 ],
@@ -111,8 +117,11 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
                               tooltip: 'Edit',
                               icon: const Icon(Icons.edit_outlined),
                               onPressed: () async {
-                                final updated = await Navigator.of(context).push(
-                                  MaterialPageRoute(builder: (_) => CustomerEditPage(customerId: cu.customerId)),
+                                final updated =
+                                    await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                      builder: (_) => CustomerEditPage(
+                                          customerId: cu.customerId)),
                                 );
                                 if (updated == true && mounted) _reload();
                               },
@@ -125,29 +134,48 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
                           builder: (context, ts) {
                             if (!ts.hasData) return const SizedBox.shrink();
                             final tiers = ts.data!;
-                            final tierName = tiers.firstWhere(
-                              (t) => t.tierId == (cu.loyaltyTierId ?? -1),
-                              orElse: () => LoyaltyTierDto(tierId: -1, name: 'Member', minPoints: 0, isActive: true),
-                            ).name;
+                            final tierName = tiers
+                                .firstWhere(
+                                  (t) => t.tierId == (cu.loyaltyTierId ?? -1),
+                                  orElse: () => LoyaltyTierDto(
+                                      tierId: -1,
+                                      name: 'Member',
+                                      minPoints: 0,
+                                      isActive: true),
+                                )
+                                .name;
                             return Wrap(spacing: 8, runSpacing: 4, children: [
-                              if (cu.isLoyalty) Chip(label: Text('Tier: $tierName')),
+                              if (cu.isLoyalty)
+                                Chip(label: Text('Tier: $tierName')),
                               FutureBuilder<CustomerSummaryDto>(
                                 future: _summaryFuture,
                                 builder: (context, ss) {
-                                  if (!ss.hasData) return const SizedBox.shrink();
+                                  if (!ss.hasData) {
+                                    return const SizedBox.shrink();
+                                  }
                                   final pts = ss.data!.loyaltyPoints;
-                                  return Row(mainAxisSize: MainAxisSize.min, children: [
-                                    Chip(label: Text('Points: ${pts.toStringAsFixed(0)}')),
-                                    const SizedBox(width: 6),
-                                    FutureBuilder<LoyaltySettingsDto>(
-                                      future: _loySettingsFuture,
-                                      builder: (context, ls) {
-                                        if (!ls.hasData) return const SizedBox.shrink();
-                                        final avail = (pts - ls.data!.minPointsReserve).clamp(0, double.infinity);
-                                        return Chip(label: Text('Avail: ${avail.toStringAsFixed(0)}'));
-                                      },
-                                    ),
-                                  ]);
+                                  return Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Chip(
+                                            label: Text(
+                                                'Points: ${pts.toStringAsFixed(0)}')),
+                                        const SizedBox(width: 6),
+                                        FutureBuilder<LoyaltySettingsDto>(
+                                          future: _loySettingsFuture,
+                                          builder: (context, ls) {
+                                            if (!ls.hasData) {
+                                              return const SizedBox.shrink();
+                                            }
+                                            final avail = (pts -
+                                                    ls.data!.minPointsReserve)
+                                                .clamp(0, double.infinity);
+                                            return Chip(
+                                                label: Text(
+                                                    'Avail: ${avail.toStringAsFixed(0)}'));
+                                          },
+                                        ),
+                                      ]);
                                 },
                               ),
                             ]);
@@ -370,6 +398,7 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
     try {
       final repo = ref.read(customerRepositoryProvider);
       final methods = await repo.getPaymentMethods();
+      if (!mounted) return;
       setState(() {
         _methods = methods;
         _methodId = methods.isNotEmpty
@@ -381,6 +410,7 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
             : null;
       });
     } catch (e) {
+      if (!mounted) return;
       _showError(context, e);
     }
   }
@@ -390,6 +420,7 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
       final repo = ref.read(customerRepositoryProvider);
       final list =
           await repo.getOutstandingInvoices(customerId: widget.customerId);
+      if (!mounted) return;
       final invoices = list
           .where((e) =>
               ((e['total_amount'] ?? 0) as num).toDouble() -
@@ -407,6 +438,7 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
       });
       if (_invoiceMode) _autoAllocate();
     } catch (e) {
+      if (!mounted) return;
       _showError(context, e);
     }
   }
@@ -502,6 +534,7 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
       widget.onDone();
       _showInfo(context, 'Collection recorded');
     } catch (e) {
+      if (!mounted) return;
       _showError(context, e);
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -607,23 +640,40 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
                             title: const Text('Select Payment Method'),
                             content: SizedBox(
                               width: double.maxFinite,
-                              child: ListView.builder(
-                                shrinkWrap: true,
-                                itemCount: _methods.length,
-                                itemBuilder: (_, i) {
-                                  final m = _methods[i];
-                                  final id = (m['method_id'] as int?) ??
-                                      (m['id'] as int?);
-                                  final name = (m['name'] ?? m['method'] ?? '')
-                                      .toString();
-                                  return RadioListTile<int>(
-                                    value: id ?? -1,
-                                    groupValue: _methodId ?? -1,
-                                    onChanged: (v) => Navigator.of(ctx)
-                                        .pop({'id': id, 'name': name}),
-                                    title: Text(name),
+                              child: RadioGroup<int>(
+                                groupValue: _methodId ?? -1,
+                                onChanged: (value) {
+                                  if (value == null) return;
+                                  final selected = _methods.firstWhere(
+                                    (m) =>
+                                        ((m['method_id'] as int?) ??
+                                            (m['id'] as int?)) ==
+                                        value,
+                                    orElse: () => const {},
                                   );
+                                  final name = (selected['name'] ??
+                                          selected['method'] ??
+                                          '')
+                                      .toString();
+                                  Navigator.of(ctx)
+                                      .pop({'id': value, 'name': name});
                                 },
+                                child: ListView.builder(
+                                  shrinkWrap: true,
+                                  itemCount: _methods.length,
+                                  itemBuilder: (_, i) {
+                                    final m = _methods[i];
+                                    final id = (m['method_id'] as int?) ??
+                                        (m['id'] as int?);
+                                    final name =
+                                        (m['name'] ?? m['method'] ?? '')
+                                            .toString();
+                                    return RadioListTile<int>(
+                                      value: id ?? -1,
+                                      title: Text(name),
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                             actions: [

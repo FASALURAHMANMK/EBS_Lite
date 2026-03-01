@@ -37,7 +37,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
     super.dispose();
   }
 
-  String _fmtDate(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  String _fmtDate(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   Future<void> _load() async {
     setState(() => _loading = true);
@@ -48,7 +49,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
 
       // Summaries (today, all-time)
       try {
-        final sToday = await repo.getSalesSummary(dateFrom: todayStr, dateTo: todayStr);
+        final sToday =
+            await repo.getSalesSummary(dateFrom: todayStr, dateTo: todayStr);
         if (mounted) setState(() => _summaryToday = sToday);
       } catch (_) {}
       try {
@@ -66,8 +68,10 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
       }
 
       // Single or multi-customer filtering
-      final selectedIds = _selectedCustomers.map((e) => e.customerId).toList(growable: false);
-      final singleCustomerId = selectedIds.length == 1 ? selectedIds.first : null;
+      final selectedIds =
+          _selectedCustomers.map((e) => e.customerId).toList(growable: false);
+      final singleCustomerId =
+          selectedIds.length == 1 ? selectedIds.first : null;
 
       // Sales
       try {
@@ -80,7 +84,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
         if (selectedIds.isNotEmpty && singleCustomerId == null) {
           final selSet = selectedIds.toSet();
           filtered = sales.where((e) {
-            final cid = (e['customer'] is Map && (e['customer']?['customer_id'] != null))
+            final cid = (e['customer'] is Map &&
+                    (e['customer']?['customer_id'] != null))
                 ? (e['customer']['customer_id'] as int?)
                 : (e['customer_id'] as int?);
             return cid != null && selSet.contains(cid);
@@ -115,7 +120,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
     final now = DateTime.now();
     final firstDate = DateTime(now.year - 3, 1, 1);
     final lastDate = DateTime(now.year + 1, 12, 31);
-    final initial = _dateRange ?? DateTimeRange(start: now.subtract(const Duration(days: 7)), end: now);
+    final initial = _dateRange ??
+        DateTimeRange(start: now.subtract(const Duration(days: 7)), end: now);
     final picked = await showDateRangePicker(
       context: context,
       firstDate: firstDate,
@@ -225,7 +231,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                           onPressed: () {
                             final mapById = {
                               for (final r in results) r.customerId: r,
-                              for (final r in _selectedCustomers) r.customerId: r,
+                              for (final r in _selectedCustomers)
+                                r.customerId: r,
                             };
                             final list = selected
                                 .map((id) => mapById[id])
@@ -277,8 +284,12 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
         if (v is DateTime) return v;
         return DateTime.tryParse(v.toString());
       }
-      return tryParse(e['created_at']) ?? tryParse(e['sale_date']) ?? tryParse(e['return_date']);
+
+      return tryParse(e['created_at']) ??
+          tryParse(e['sale_date']) ??
+          tryParse(e['return_date']);
     }
+
     merged.sort((a, b) {
       final da = parseDate(a) ?? DateTime.fromMillisecondsSinceEpoch(0);
       final db = parseDate(b) ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -289,7 +300,9 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
         ? merged
         : merged.where((e) {
             final t = (e['_type'] as String?) ?? '';
-            final code = t == 'sale' ? (e['sale_number'] ?? '') : (e['return_number'] ?? '');
+            final code = t == 'sale'
+                ? (e['sale_number'] ?? '')
+                : (e['return_number'] ?? '');
             return code.toString().toLowerCase().contains(q);
           }).toList();
 
@@ -300,7 +313,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
           IconButton(
             tooltip: 'New Sale',
             icon: const Icon(Icons.point_of_sale_rounded),
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PosPage())),
+            onPressed: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const PosPage())),
           ),
           IconButton(
             tooltip: 'Refresh',
@@ -319,9 +333,12 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Row(
                 children: [
-                  Expanded(child: _SummaryCard(title: 'Today', data: _summaryToday)),
+                  Expanded(
+                      child: _SummaryCard(title: 'Today', data: _summaryToday)),
                   const SizedBox(width: 8),
-                  Expanded(child: _SummaryCard(title: 'All-time', data: _summaryAll)),
+                  Expanded(
+                      child:
+                          _SummaryCard(title: 'All-time', data: _summaryAll)),
                 ],
               ),
             ),
@@ -346,7 +363,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                         : 'Date: ${_fmtDate(_dateRange!.start)} → ${_fmtDate(_dateRange!.end)}',
                     icon: Icon(
                       Icons.calendar_month_rounded,
-                      color: _dateRange != null ? theme.colorScheme.primary : null,
+                      color:
+                          _dateRange != null ? theme.colorScheme.primary : null,
                     ),
                     onPressed: _pickDateRange,
                     onLongPress: () async {
@@ -366,7 +384,9 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                       children: [
                         Icon(
                           Icons.group_rounded,
-                          color: _selectedCustomers.isNotEmpty ? theme.colorScheme.primary : null,
+                          color: _selectedCustomers.isNotEmpty
+                              ? theme.colorScheme.primary
+                              : null,
                         ),
                         if (_selectedCustomers.isNotEmpty)
                           Positioned(
@@ -405,49 +425,68 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                         final row = filtered[i];
                         final type = (row['_type'] as String?) ?? '';
                         if (type == 'sale') {
-                          final amount = ((row['total_amount'] as num?)?.toDouble() ?? 0).toStringAsFixed(2);
+                          final amount =
+                              ((row['total_amount'] as num?)?.toDouble() ?? 0)
+                                  .toStringAsFixed(2);
                           final subtitleParts = <String>[
-                            if ((row['customer']?['name'] ?? '') != '') (row['customer']?['name']).toString(),
-                            if (row['sale_date'] != null) row['sale_date'].toString(),
+                            if ((row['customer']?['name'] ?? '') != '')
+                              (row['customer']?['name']).toString(),
+                            if (row['sale_date'] != null)
+                              row['sale_date'].toString(),
                           ];
                           return Card(
                             elevation: 0,
                             child: ListTile(
                               leading: const Icon(Icons.receipt_long_rounded),
                               title: Text(row['sale_number']?.toString() ?? ''),
-                              subtitle: Text(subtitleParts.where((e) => e.isNotEmpty).join(' · ')),
-                              trailing: Text(amount, style: theme.textTheme.titleMedium),
+                              subtitle: Text(subtitleParts
+                                  .where((e) => e.isNotEmpty)
+                                  .join(' · ')),
+                              trailing: Text(amount,
+                                  style: theme.textTheme.titleMedium),
                               onTap: () {
                                 final id = row['sale_id'] as int?;
                                 if (id != null) {
                                   Navigator.of(context).push(
-                                    MaterialPageRoute(builder: (_) => SaleDetailPage(saleId: id)),
+                                    MaterialPageRoute(
+                                        builder: (_) =>
+                                            SaleDetailPage(saleId: id)),
                                   );
                                 }
                               },
                             ),
                           );
                         } else {
-                          final amount = ((row['total_amount'] as num?)?.toDouble() ?? 0).toStringAsFixed(2);
+                          final amount =
+                              ((row['total_amount'] as num?)?.toDouble() ?? 0)
+                                  .toStringAsFixed(2);
                           final subtitleParts = <String>[
                             if ((row['customer']?['name'] ?? '') != '')
                               (row['customer']?['name']).toString()
                             else if (row['customer_id'] != null)
                               'Customer #${row['customer_id']}',
-                            if (row['return_date'] != null) row['return_date'].toString(),
+                            if (row['return_date'] != null)
+                              row['return_date'].toString(),
                           ];
                           return Card(
                             elevation: 0,
                             child: ListTile(
-                              leading: const Icon(Icons.assignment_return_rounded),
-                              title: Text(row['return_number']?.toString() ?? ''),
-                              subtitle: Text(subtitleParts.where((e) => e.isNotEmpty).join(' · ')),
-                              trailing: Text(amount, style: theme.textTheme.titleMedium),
+                              leading:
+                                  const Icon(Icons.assignment_return_rounded),
+                              title:
+                                  Text(row['return_number']?.toString() ?? ''),
+                              subtitle: Text(subtitleParts
+                                  .where((e) => e.isNotEmpty)
+                                  .join(' · ')),
+                              trailing: Text(amount,
+                                  style: theme.textTheme.titleMedium),
                               onTap: () {
                                 final id = row['return_id'] as int?;
                                 if (id != null) {
                                   Navigator.of(context).push(
-                                    MaterialPageRoute(builder: (_) => SaleReturnDetailPage(returnId: id)),
+                                    MaterialPageRoute(
+                                        builder: (_) =>
+                                            SaleReturnDetailPage(returnId: id)),
                                   );
                                 }
                               },
@@ -472,9 +511,11 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final totalSales = ((data?['total_sales'] as num?)?.toDouble() ?? 0).toStringAsFixed(2);
+    final totalSales =
+        ((data?['total_sales'] as num?)?.toDouble() ?? 0).toStringAsFixed(2);
     final txns = (data?['total_transactions'] as num?)?.toInt() ?? 0;
-    final avg = ((data?['average_ticket'] as num?)?.toDouble() ?? 0).toStringAsFixed(2);
+    final avg =
+        ((data?['average_ticket'] as num?)?.toDouble() ?? 0).toStringAsFixed(2);
     return Card(
       elevation: 0,
       child: Padding(
@@ -493,4 +534,3 @@ class _SummaryCard extends StatelessWidget {
     );
   }
 }
-

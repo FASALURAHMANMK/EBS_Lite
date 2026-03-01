@@ -45,7 +45,8 @@ class PrinterDevice {
     int? usbVendorId,
     int? usbProductId,
     bool? isDefault,
-  }) => PrinterDevice(
+  }) =>
+      PrinterDevice(
         id: id ?? this.id,
         name: name ?? this.name,
         kind: kind ?? this.kind,
@@ -98,7 +99,8 @@ class PrinterSettingsRepository {
     final str = prefs.getString(_printersKey);
     if (str == null || str.isEmpty) return [];
     try {
-      final list = (jsonDecode(str) as List<dynamic>).cast<Map<String, dynamic>>();
+      final list =
+          (jsonDecode(str) as List<dynamic>).cast<Map<String, dynamic>>();
       return list.map(PrinterDevice.fromJson).toList();
     } catch (_) {
       return [];
@@ -107,7 +109,8 @@ class PrinterSettingsRepository {
 
   Future<void> saveAll(List<PrinterDevice> printers) async {
     final prefs = _ref.read(sharedPreferencesProvider);
-    await prefs.setString(_printersKey, jsonEncode(printers.map((e) => e.toJson()).toList()));
+    await prefs.setString(
+        _printersKey, jsonEncode(printers.map((e) => e.toJson()).toList()));
   }
 
   Future<PrinterDevice> add(PrinterDevice device) async {
@@ -116,7 +119,8 @@ class PrinterSettingsRepository {
     // ensure only one default
     List<PrinterDevice> next;
     if (withId.isDefault) {
-      next = list.map((p) => p.copyWith(isDefault: false)).toList()..add(withId);
+      next = list.map((p) => p.copyWith(isDefault: false)).toList()
+        ..add(withId);
     } else {
       next = [...list, withId];
     }
@@ -155,6 +159,7 @@ class PrinterSettingsRepository {
   }
 }
 
-final printerSettingsRepositoryProvider = Provider<PrinterSettingsRepository>((ref) {
+final printerSettingsRepositoryProvider =
+    Provider<PrinterSettingsRepository>((ref) {
   return PrinterSettingsRepository(ref);
 });

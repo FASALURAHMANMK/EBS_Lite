@@ -33,7 +33,8 @@ class _CustomerCreatePageState extends ConsumerState<CustomerCreatePage> {
     super.dispose();
   }
 
-  String? _req(String? v) => (v == null || v.trim().isEmpty) ? 'Required' : null;
+  String? _req(String? v) =>
+      (v == null || v.trim().isEmpty) ? 'Required' : null;
 
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -72,29 +73,55 @@ class _CustomerCreatePageState extends ConsumerState<CustomerCreatePage> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              TextFormField(controller: _name, decoration: const InputDecoration(labelText: 'Name'), validator: _req),
+              TextFormField(
+                  controller: _name,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                  validator: _req),
               const SizedBox(height: 8),
-              TextFormField(controller: _phone, decoration: const InputDecoration(labelText: 'Phone')),
+              TextFormField(
+                  controller: _phone,
+                  decoration: const InputDecoration(labelText: 'Phone')),
               const SizedBox(height: 8),
-              TextFormField(controller: _email, decoration: const InputDecoration(labelText: 'Email')),
+              TextFormField(
+                  controller: _email,
+                  decoration: const InputDecoration(labelText: 'Email')),
               const SizedBox(height: 8),
-              TextFormField(controller: _address, decoration: const InputDecoration(labelText: 'Address')),
+              TextFormField(
+                  controller: _address,
+                  decoration: const InputDecoration(labelText: 'Address')),
               const SizedBox(height: 8),
-              TextFormField(controller: _tax, decoration: const InputDecoration(labelText: 'Tax Number')),
+              TextFormField(
+                  controller: _tax,
+                  decoration: const InputDecoration(labelText: 'Tax Number')),
               const SizedBox(height: 8),
-          Row(children: [
-            Expanded(child: TextFormField(controller: _terms, decoration: const InputDecoration(labelText: 'Payment Terms (days)'), keyboardType: TextInputType.number)),
-            const SizedBox(width: 12),
-            Expanded(child: TextFormField(controller: _credit, decoration: const InputDecoration(labelText: 'Credit Limit'), keyboardType: TextInputType.number)),
-          ]),
-          const SizedBox(height: 8),
-          Row(children: [
-            Switch(value: _isLoyalty, onChanged: (v) => setState(() => _isLoyalty = v)),
-            const SizedBox(width: 8),
-            const Text('Enroll in loyalty')
-          ]),
+              Row(children: [
+                Expanded(
+                    child: TextFormField(
+                        controller: _terms,
+                        decoration: const InputDecoration(
+                            labelText: 'Payment Terms (days)'),
+                        keyboardType: TextInputType.number)),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: TextFormField(
+                        controller: _credit,
+                        decoration:
+                            const InputDecoration(labelText: 'Credit Limit'),
+                        keyboardType: TextInputType.number)),
+              ]),
+              const SizedBox(height: 8),
+              Row(children: [
+                Switch(
+                    value: _isLoyalty,
+                    onChanged: (v) => setState(() => _isLoyalty = v)),
+                const SizedBox(width: 8),
+                const Text('Enroll in loyalty')
+              ]),
               const SizedBox(height: 12),
-              FilledButton.icon(onPressed: _saving ? null : _save, icon: const Icon(Icons.save_rounded), label: const Text('Create Customer')),
+              FilledButton.icon(
+                  onPressed: _saving ? null : _save,
+                  icon: const Icon(Icons.save_rounded),
+                  label: const Text('Create Customer')),
             ],
           ),
         ),
@@ -102,4 +129,3 @@ class _CustomerCreatePageState extends ConsumerState<CustomerCreatePage> {
     );
   }
 }
-

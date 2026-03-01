@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
-import 'package:ebs_lite/shared/pages/feature_detail_page.dart';
+import 'attendance_page.dart';
+import 'payroll_page.dart';
 
 class HRPage extends StatelessWidget {
   const HRPage({super.key});
@@ -12,14 +13,14 @@ class HRPage extends StatelessWidget {
         icon: Icons.how_to_reg_rounded,
         label: 'Attendance Register',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FeatureDetailPage(title: 'Attendance Register')),
+          MaterialPageRoute(builder: (_) => const AttendancePage()),
         ),
       ),
       FeatureItem(
         icon: Icons.payments_rounded,
         label: 'Payroll Management',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FeatureDetailPage(title: 'Payroll Management')),
+          MaterialPageRoute(builder: (_) => const PayrollPage()),
         ),
       ),
     ];
@@ -30,4 +31,3 @@ class HRPage extends StatelessWidget {
     );
   }
 }
-

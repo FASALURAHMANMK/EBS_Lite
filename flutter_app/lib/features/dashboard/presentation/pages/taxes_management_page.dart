@@ -7,7 +7,8 @@ class TaxesManagementPage extends ConsumerStatefulWidget {
   const TaxesManagementPage({super.key});
 
   @override
-  ConsumerState<TaxesManagementPage> createState() => _TaxesManagementPageState();
+  ConsumerState<TaxesManagementPage> createState() =>
+      _TaxesManagementPageState();
 }
 
 class _TaxesManagementPageState extends ConsumerState<TaxesManagementPage> {
@@ -76,10 +77,12 @@ class _TaxesManagementPageState extends ConsumerState<TaxesManagementPage> {
                                       content: Text('Delete tax "${t.name}"?'),
                                       actions: [
                                         TextButton(
-                                            onPressed: () => Navigator.pop(context, false),
+                                            onPressed: () =>
+                                                Navigator.pop(context, false),
                                             child: const Text('Cancel')),
                                         FilledButton(
-                                            onPressed: () => Navigator.pop(context, true),
+                                            onPressed: () =>
+                                                Navigator.pop(context, true),
                                             child: const Text('Delete')),
                                       ],
                                     ),
@@ -87,13 +90,16 @@ class _TaxesManagementPageState extends ConsumerState<TaxesManagementPage> {
                                   false;
                               if (!ok) return;
                               try {
-                                await ref.read(taxesRepositoryProvider).deleteTax(t.taxId);
+                                await ref
+                                    .read(taxesRepositoryProvider)
+                                    .deleteTax(t.taxId);
                                 _load();
                               } catch (e) {
-                                if (!mounted) return;
+                                if (!context.mounted) return;
                                 ScaffoldMessenger.of(context)
                                   ..hideCurrentSnackBar()
-                                  ..showSnackBar(SnackBar(content: Text('Failed: $e')));
+                                  ..showSnackBar(
+                                      SnackBar(content: Text('Failed: $e')));
                               }
                             },
                           ),
@@ -109,7 +115,8 @@ class _TaxesManagementPageState extends ConsumerState<TaxesManagementPage> {
 
   Future<void> _openEditor(BuildContext context, {TaxDto? initial}) async {
     final name = TextEditingController(text: initial?.name ?? '');
-    final percent = TextEditingController(text: initial?.percentage.toString() ?? '0');
+    final percent =
+        TextEditingController(text: initial?.percentage.toString() ?? '0');
     bool isCompound = initial?.isCompound ?? false;
     bool isActive = initial?.isActive ?? true;
 
@@ -131,7 +138,8 @@ class _TaxesManagementPageState extends ConsumerState<TaxesManagementPage> {
                 TextField(
                   controller: percent,
                   decoration: const InputDecoration(labelText: 'Percentage'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                 ),
                 const SizedBox(height: 8),
                 SwitchListTile(
@@ -148,8 +156,12 @@ class _TaxesManagementPageState extends ConsumerState<TaxesManagementPage> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Save')),
           ],
         ),
       ),
@@ -159,17 +171,25 @@ class _TaxesManagementPageState extends ConsumerState<TaxesManagementPage> {
       final repo = ref.read(taxesRepositoryProvider);
       final p = double.tryParse(percent.text.trim()) ?? 0;
       if (initial == null) {
-        await repo.createTax(name: name.text.trim(), percentage: p, isCompound: isCompound, isActive: isActive);
+        await repo.createTax(
+            name: name.text.trim(),
+            percentage: p,
+            isCompound: isCompound,
+            isActive: isActive);
       } else {
-        await repo.updateTax(taxId: initial.taxId, name: name.text.trim(), percentage: p, isCompound: isCompound, isActive: isActive);
+        await repo.updateTax(
+            taxId: initial.taxId,
+            name: name.text.trim(),
+            percentage: p,
+            isCompound: isCompound,
+            isActive: isActive);
       }
       _load();
     } catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text('Failed: $e')));
     }
   }
 }
-

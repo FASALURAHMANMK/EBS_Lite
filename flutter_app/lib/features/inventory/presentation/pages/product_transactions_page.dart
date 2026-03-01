@@ -10,22 +10,27 @@ import 'stock_adjustments_page.dart';
 import 'stock_adjustment_document_detail_page.dart';
 
 class ProductTransactionsPage extends ConsumerStatefulWidget {
-  const ProductTransactionsPage({super.key, required this.productId, required this.productName});
+  const ProductTransactionsPage(
+      {super.key, required this.productId, required this.productName});
   final int productId;
-  final String productName; // kept for backward compatibility (not shown in header)
+  final String
+      productName; // kept for backward compatibility (not shown in header)
 
   @override
-  ConsumerState<ProductTransactionsPage> createState() => _ProductTransactionsPageState();
+  ConsumerState<ProductTransactionsPage> createState() =>
+      _ProductTransactionsPageState();
 }
 
 class _ProductBundle {
   final ProductDto product;
   final InventoryListItem? stock;
   final List<ProductTransactionDto> transactions;
-  _ProductBundle({required this.product, required this.stock, required this.transactions});
+  _ProductBundle(
+      {required this.product, required this.stock, required this.transactions});
 }
 
-class _ProductTransactionsPageState extends ConsumerState<ProductTransactionsPage> {
+class _ProductTransactionsPageState
+    extends ConsumerState<ProductTransactionsPage> {
   late Future<_ProductBundle> _future;
 
   @override
@@ -40,25 +45,31 @@ class _ProductTransactionsPageState extends ConsumerState<ProductTransactionsPag
       case 'goods_receipt':
         if (!mounted) return;
         await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => GoodsReceiptDetailPage(goodsReceiptId: t.entityId)),
+          MaterialPageRoute(
+              builder: (_) =>
+                  GoodsReceiptDetailPage(goodsReceiptId: t.entityId)),
         );
         break;
       case 'transfer':
         if (!mounted) return;
         await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => StockTransferViewPage(transferId: t.entityId)),
+          MaterialPageRoute(
+              builder: (_) => StockTransferViewPage(transferId: t.entityId)),
         );
         break;
       case 'purchase_return':
         if (!mounted) return;
         await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => PurchaseReturnDetailPage(returnId: t.entityId)),
+          MaterialPageRoute(
+              builder: (_) => PurchaseReturnDetailPage(returnId: t.entityId)),
         );
         break;
       case 'stock_adjustment_document':
         if (!mounted) return;
         await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => StockAdjustmentDocumentDetailPage(documentId: t.entityId)),
+          MaterialPageRoute(
+              builder: (_) =>
+                  StockAdjustmentDocumentDetailPage(documentId: t.entityId)),
         );
         break;
       case 'stock_adjustment':
@@ -73,7 +84,8 @@ class _ProductTransactionsPageState extends ConsumerState<ProductTransactionsPag
         if (!mounted) return;
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(const SnackBar(content: Text('Detail view not available for this transaction')));
+          ..showSnackBar(const SnackBar(
+              content: Text('Detail view not available for this transaction')));
     }
   }
 
@@ -134,7 +146,8 @@ class _ProductTransactionsPageState extends ConsumerState<ProductTransactionsPag
                 _ProductHeader(product: data.product, stock: data.stock),
                 const SizedBox(height: 12),
                 if (items.isEmpty)
-                  const Center(child: Padding(
+                  const Center(
+                      child: Padding(
                     padding: EdgeInsets.all(24.0),
                     child: Text('No transactions found'),
                   ))
@@ -176,7 +189,8 @@ class _ProductHeader extends StatelessWidget {
                 Expanded(
                   child: Text(
                     product.name,
-                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                    style: theme.textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w700),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -199,13 +213,25 @@ class _ProductHeader extends StatelessWidget {
               runSpacing: 4,
               children: [
                 if ((product.sku ?? '').isNotEmpty)
-                  _InfoRow(icon: Icons.qr_code_2_rounded, label: 'SKU', value: product.sku!),
+                  _InfoRow(
+                      icon: Icons.qr_code_2_rounded,
+                      label: 'SKU',
+                      value: product.sku!),
                 if ((stock?.categoryName ?? '').isNotEmpty)
-                  _InfoRow(icon: Icons.category_rounded, label: 'Category', value: stock!.categoryName!),
+                  _InfoRow(
+                      icon: Icons.category_rounded,
+                      label: 'Category',
+                      value: stock!.categoryName!),
                 if ((stock?.unitSymbol ?? '').isNotEmpty)
-                  _InfoRow(icon: Icons.straighten_rounded, label: 'Unit', value: stock!.unitSymbol!),
+                  _InfoRow(
+                      icon: Icons.straighten_rounded,
+                      label: 'Unit',
+                      value: stock!.unitSymbol!),
                 if ((stock?.brandName ?? '').isNotEmpty)
-                  _InfoRow(icon: Icons.branding_watermark_rounded, label: 'Brand', value: stock!.brandName!),
+                  _InfoRow(
+                      icon: Icons.branding_watermark_rounded,
+                      label: 'Brand',
+                      value: stock!.brandName!),
               ],
             ),
             const SizedBox(height: 8),
@@ -220,7 +246,8 @@ class _ProductHeader extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   'Reorder: ${stock?.reorderLevel ?? product.reorderLevel}',
-                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
               ],
             )
@@ -232,7 +259,8 @@ class _ProductHeader extends StatelessWidget {
 }
 
 class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.icon, required this.label, required this.value});
+  const _InfoRow(
+      {required this.icon, required this.label, required this.value});
   final IconData icon;
   final String label;
   final String value;
@@ -245,7 +273,9 @@ class _InfoRow extends StatelessWidget {
       children: [
         Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
         const SizedBox(width: 6),
-        Text('$label: ', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        Text('$label: ',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
         Text(value, style: theme.textTheme.bodySmall),
       ],
     );
@@ -278,7 +308,8 @@ class _TransactionTile extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            (t.quantity >= 0 ? '+ ' : '− ') + t.quantity.abs().toStringAsFixed(3),
+            (t.quantity >= 0 ? '+ ' : '− ') +
+                t.quantity.abs().toStringAsFixed(3),
             style: TextStyle(fontWeight: FontWeight.w700, color: qtyColor),
           ),
         ],
@@ -315,7 +346,8 @@ class _TransactionTile extends StatelessWidget {
                   children: [
                     const Icon(Icons.notes_outlined, size: 14),
                     const SizedBox(width: 4),
-                    Flexible(child: Text(t.notes!, overflow: TextOverflow.ellipsis)),
+                    Flexible(
+                        child: Text(t.notes!, overflow: TextOverflow.ellipsis)),
                   ],
                 ),
             ],
@@ -336,7 +368,7 @@ class _TypeChip extends StatelessWidget {
       case 'PURCHASE':
       case 'SALE_RETURN':
       case 'TRANSFER_IN':
-        return Colors.green.withOpacity(0.15);
+        return Colors.green.withValues(alpha: 0.15);
       case 'SALE':
       case 'PURCHASE_RETURN':
       case 'TRANSFER_OUT':
@@ -374,7 +406,10 @@ class _TypeChip extends StatelessWidget {
       ),
       child: Text(
         type.replaceAll('_', ' '),
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _textColor(context)),
+        style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: _textColor(context)),
       ),
     );
   }

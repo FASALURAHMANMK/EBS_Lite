@@ -48,29 +48,30 @@ class _InventoryManagementPageState
       builder: (context) => SimpleDialog(
         title: const Text('Sort by'),
         children: [
-          RadioListTile<String>(
-            value: 'name_asc',
+          RadioGroup<String>(
             groupValue: _sort,
-            onChanged: (v) => Navigator.of(context).pop(v),
-            title: const Text('Name (A–Z)'),
-          ),
-          RadioListTile<String>(
-            value: 'name_desc',
-            groupValue: _sort,
-            onChanged: (v) => Navigator.of(context).pop(v),
-            title: const Text('Name (Z–A)'),
-          ),
-          RadioListTile<String>(
-            value: 'stock_desc',
-            groupValue: _sort,
-            onChanged: (v) => Navigator.of(context).pop(v),
-            title: const Text('Stock (High→Low)'),
-          ),
-          RadioListTile<String>(
-            value: 'stock_asc',
-            groupValue: _sort,
-            onChanged: (v) => Navigator.of(context).pop(v),
-            title: const Text('Stock (Low→High)'),
+            onChanged: (value) => Navigator.of(context).pop(value),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                RadioListTile<String>(
+                  value: 'name_asc',
+                  title: Text('Name (A–Z)'),
+                ),
+                RadioListTile<String>(
+                  value: 'name_desc',
+                  title: Text('Name (Z–A)'),
+                ),
+                RadioListTile<String>(
+                  value: 'stock_desc',
+                  title: Text('Stock (High→Low)'),
+                ),
+                RadioListTile<String>(
+                  value: 'stock_asc',
+                  title: Text('Stock (Low→High)'),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -221,7 +222,9 @@ class _InventoryManagementPageState
     });
 
     // Prompt for location selection if none selected
-    if (!_promptedLocation && locState.selected == null && locState.locations.isNotEmpty) {
+    if (!_promptedLocation &&
+        locState.selected == null &&
+        locState.locations.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _showLocationPicker(locState.locations);
@@ -294,13 +297,18 @@ class _InventoryManagementPageState
                   child: _CategoryField(
                     label: 'Category',
                     valueText: () {
-                      if (state.selectedCategoryIds.isEmpty) return 'All categories';
+                      if (state.selectedCategoryIds.isEmpty) {
+                        return 'All categories';
+                      }
                       if (state.selectedCategoryIds.length == 1) {
                         final id = state.selectedCategoryIds.first;
-                        return state.categories.firstWhere(
-                          (c) => c.categoryId == id,
-                          orElse: () => CategoryDto(categoryId: -1, name: ''),
-                        ).name;
+                        return state.categories
+                            .firstWhere(
+                              (c) => c.categoryId == id,
+                              orElse: () =>
+                                  CategoryDto(categoryId: -1, name: ''),
+                            )
+                            .name;
                       }
                       return '${state.selectedCategoryIds.length} selected';
                     }(),

@@ -66,7 +66,8 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
                   child: ListTile(
                     leading: const Icon(Icons.account_balance_wallet_rounded),
                     title: Text(m.name),
-                    subtitle: Text('${m.type}${m.isActive ? '' : ' • Inactive'}${list.isEmpty ? '' : ' • ${list.length} currencies'}'),
+                    subtitle: Text(
+                        '${m.type}${m.isActive ? '' : ' • Inactive'}${list.isEmpty ? '' : ' • ${list.length} currencies'}'),
                     onTap: () => _openCurrencies(context, m),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -86,24 +87,35 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
                                     title: const Text('Delete Payment Mode'),
                                     content: Text('Delete "${m.name}"?'),
                                     actions: [
-                                      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                                      FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+                                      TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, false),
+                                          child: const Text('Cancel')),
+                                      FilledButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, true),
+                                          child: const Text('Delete')),
                                     ],
                                   ),
                                 ) ??
                                 false;
                             if (!ok) return;
                             try {
-                              await ref.read(paymentMethodsRepositoryProvider).deleteMethod(m.methodId);
+                              await ref
+                                  .read(paymentMethodsRepositoryProvider)
+                                  .deleteMethod(m.methodId);
                               setState(() {
-                                _methods = _methods.where((x) => x.methodId != m.methodId).toList();
+                                _methods = _methods
+                                    .where((x) => x.methodId != m.methodId)
+                                    .toList();
                                 _methodCurrencies.remove(m.methodId);
                               });
                             } catch (e) {
-                              if (!mounted) return;
+                              if (!context.mounted) return;
                               ScaffoldMessenger.of(context)
                                 ..hideCurrentSnackBar()
-                                ..showSnackBar(SnackBar(content: Text('Failed: $e')));
+                                ..showSnackBar(
+                                    SnackBar(content: Text('Failed: $e')));
                             }
                           },
                         ),
@@ -116,7 +128,8 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
     );
   }
 
-  Future<void> _openEditor(BuildContext context, {PaymentMethodDto? initial}) async {
+  Future<void> _openEditor(BuildContext context,
+      {PaymentMethodDto? initial}) async {
     final name = TextEditingController(text: initial?.name ?? '');
     String type = initial?.type ?? 'CASH';
     bool isActive = initial?.isActive ?? true;
@@ -125,28 +138,40 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setInner) => AlertDialog(
-          title: Text(initial == null ? 'Add Payment Mode' : 'Edit Payment Mode'),
+          title:
+              Text(initial == null ? 'Add Payment Mode' : 'Edit Payment Mode'),
           content: SizedBox(
             width: 420,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
+                TextField(
+                    controller: name,
+                    decoration: const InputDecoration(labelText: 'Name')),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   decoration: const InputDecoration(labelText: 'Type'),
                   initialValue: type,
-                  items: types.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                  items: types
+                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                      .toList(),
                   onChanged: (v) => setInner(() => type = v ?? type),
                 ),
                 const SizedBox(height: 8),
-                SwitchListTile(value: isActive, onChanged: (v) => setInner(() => isActive = v), title: const Text('Active')),
+                SwitchListTile(
+                    value: isActive,
+                    onChanged: (v) => setInner(() => isActive = v),
+                    title: const Text('Active')),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Save')),
           ],
         ),
       ),
@@ -155,15 +180,20 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
     try {
       final repo = ref.read(paymentMethodsRepositoryProvider);
       if (initial == null) {
-        await repo.createMethod(name: name.text.trim(), type: type, isActive: isActive);
+        await repo.createMethod(
+            name: name.text.trim(), type: type, isActive: isActive);
         // Reload to refresh currencies mapping (base currency added by default)
         await _load();
       } else {
-        await repo.updateMethod(id: initial.methodId, name: name.text.trim(), type: type, isActive: isActive);
+        await repo.updateMethod(
+            id: initial.methodId,
+            name: name.text.trim(),
+            type: type,
+            isActive: isActive);
         _load();
       }
     } catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text('Failed: $e')));
@@ -173,8 +203,8 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
   Future<void> _openCurrencies(BuildContext context, PaymentMethodDto m) async {
     // Editable selection with rates (default from global currencies)
     final selected = Map<int, double>.fromEntries(
-      (_methodCurrencies[m.methodId] ?? const [])
-          .map((e) => MapEntry(e['currency_id'] as int, (e['rate'] as num?)?.toDouble() ?? 0)),
+      (_methodCurrencies[m.methodId] ?? const []).map((e) => MapEntry(
+          e['currency_id'] as int, (e['rate'] as num?)?.toDouble() ?? 0)),
     );
     final res = await showDialog<bool>(
       context: context,
@@ -194,14 +224,17 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
                       final c = _currencies[i];
                       final enabled = selected.containsKey(c.currencyId);
                       final controller = TextEditingController(
-                        text: enabled ? selected[c.currencyId]?.toString() ?? '' : '',
+                        text: enabled
+                            ? selected[c.currencyId]?.toString() ?? ''
+                            : '',
                       );
                       return CheckboxListTile(
                         value: enabled,
                         onChanged: (v) {
                           setInner(() {
                             if (v == true) {
-                              selected[c.currencyId] = selected[c.currencyId] ?? 1.0;
+                              selected[c.currencyId] =
+                                  selected[c.currencyId] ?? 1.0;
                             } else {
                               selected.remove(c.currencyId);
                             }
@@ -217,9 +250,13 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
                                     width: 120,
                                     child: TextField(
                                       controller: controller,
-                                      onChanged: (v) => selected[c.currencyId] = double.tryParse(v.trim()) ?? 0,
-                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                      decoration: const InputDecoration(isDense: true, labelText: 'Rate'),
+                                      onChanged: (v) => selected[c.currencyId] =
+                                          double.tryParse(v.trim()) ?? 0,
+                                      keyboardType:
+                                          const TextInputType.numberWithOptions(
+                                              decimal: true),
+                                      decoration: const InputDecoration(
+                                          isDense: true, labelText: 'Rate'),
                                     ),
                                   ),
                                 ],
@@ -233,8 +270,12 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save')),
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Save')),
           ],
         ),
       ),
@@ -247,13 +288,16 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
                 'rate': e.value,
               })
           .toList();
-      await ref.read(paymentMethodsRepositoryProvider).setMethodCurrenciesForMethod(m.methodId, list);
+      await ref
+          .read(paymentMethodsRepositoryProvider)
+          .setMethodCurrenciesForMethod(m.methodId, list);
       setState(() {
-        _methodCurrencies = Map<int, List<Map<String, dynamic>>>.from(_methodCurrencies);
+        _methodCurrencies =
+            Map<int, List<Map<String, dynamic>>>.from(_methodCurrencies);
         _methodCurrencies[m.methodId] = list;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text('Failed: $e')));

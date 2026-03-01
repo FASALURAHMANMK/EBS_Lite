@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
-import 'package:ebs_lite/shared/pages/feature_detail_page.dart';
+import 'audit_logs_page.dart';
+import 'cash_register_page.dart';
+import 'ledgers_page.dart';
+import 'vouchers_page.dart';
 
 class AccountingPage extends StatelessWidget {
   const AccountingPage({super.key});
@@ -12,35 +15,28 @@ class AccountingPage extends StatelessWidget {
         icon: Icons.point_of_sale_rounded,
         label: 'Cash Register',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FeatureDetailPage(title: 'Cash Register')),
-        ),
-      ),
-      FeatureItem(
-        icon: Icons.today_rounded,
-        label: 'Day Open/Close',
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FeatureDetailPage(title: 'Day Open/Close')),
+          MaterialPageRoute(builder: (_) => const CashRegisterPage()),
         ),
       ),
       FeatureItem(
         icon: Icons.receipt_long_rounded,
         label: 'Vouchers',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FeatureDetailPage(title: 'Vouchers')),
+          MaterialPageRoute(builder: (_) => const VouchersPage()),
         ),
       ),
       FeatureItem(
         icon: Icons.menu_book_rounded,
         label: 'Ledgers',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FeatureDetailPage(title: 'Ledgers')),
+          MaterialPageRoute(builder: (_) => const LedgersPage()),
         ),
       ),
       FeatureItem(
         icon: Icons.fact_check_rounded,
-        label: 'Audit',
+        label: 'Audit Logs',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const FeatureDetailPage(title: 'Audit')),
+          MaterialPageRoute(builder: (_) => const AuditLogsPage()),
         ),
       ),
     ];
@@ -51,4 +47,3 @@ class AccountingPage extends StatelessWidget {
     );
   }
 }
-

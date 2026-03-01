@@ -30,7 +30,9 @@ class AttributeManagementPage extends ConsumerWidget {
             icon: const Icon(Icons.add_rounded),
             onPressed: () async {
               final created = await _showAttributeDialog(context, ref: ref);
-              if (created == true) ref.read(attributeManagementProvider.notifier).load();
+              if (created == true) {
+                ref.read(attributeManagementProvider.notifier).load();
+              }
             },
           ),
           const SizedBox(width: 4),
@@ -145,7 +147,9 @@ class _AttributeCard extends ConsumerWidget {
       onTap: () async {
         final updated =
             await _showAttributeDialog(context, ref: ref, existing: item);
-        if (updated == true) ref.read(attributeManagementProvider.notifier).load();
+        if (updated == true) {
+          ref.read(attributeManagementProvider.notifier).load();
+        }
       },
       child: Card(
         elevation: 0,
@@ -211,14 +215,19 @@ class _AttributeList extends ConsumerWidget {
         final a = items[i];
         return ListTile(
           tileColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: Text(a.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-          subtitle: Text('Type: ${a.type}${a.isRequired ? '  •  Required' : ''}'),
+          subtitle:
+              Text('Type: ${a.type}${a.isRequired ? '  •  Required' : ''}'),
           trailing: Text('ID: ${a.attributeId}',
               style: Theme.of(context).textTheme.labelMedium),
           onTap: () async {
-            final updated = await _showAttributeDialog(context, ref: ref, existing: a);
-            if (updated == true) ref.read(attributeManagementProvider.notifier).load();
+            final updated =
+                await _showAttributeDialog(context, ref: ref, existing: a);
+            if (updated == true) {
+              ref.read(attributeManagementProvider.notifier).load();
+            }
           },
         );
       },
@@ -226,12 +235,14 @@ class _AttributeList extends ConsumerWidget {
   }
 }
 
-Future<bool?> _showAttributeDialog(BuildContext context, {required WidgetRef ref, ProductAttributeDefinitionDto? existing}) async {
+Future<bool?> _showAttributeDialog(BuildContext context,
+    {required WidgetRef ref, ProductAttributeDefinitionDto? existing}) async {
   final isEdit = existing != null;
   final nameController = TextEditingController(text: existing?.name ?? '');
   String type = existing?.type ?? AttributeManagementPage._types.first;
   bool isRequired = existing?.isRequired ?? false;
-  final optionsController = TextEditingController(text: (existing?.options ?? const []).join(', '));
+  final optionsController =
+      TextEditingController(text: (existing?.options ?? const []).join(', '));
   final repo = ref.read(inventoryRepositoryProvider);
   bool saving = false;
   return showDialog<bool>(
@@ -286,19 +297,27 @@ Future<bool?> _showAttributeDialog(BuildContext context, {required WidgetRef ref
                   : () async {
                       final confirm = await showDialog<bool>(
                         context: context,
-                        builder: (_) => AlertDialog(
+                        builder: (dialogContext) => AlertDialog(
                           title: const Text('Delete Attribute'),
-                          content: const Text('Are you sure you want to delete this attribute?'),
+                          content: const Text(
+                              'Are you sure you want to delete this attribute?'),
                           actions: [
-                            TextButton(onPressed: () => Navigator.of(_).pop(false), child: const Text('Cancel')),
-                            FilledButton(onPressed: () => Navigator.of(_).pop(true), child: const Text('Delete')),
+                            TextButton(
+                                onPressed: () =>
+                                    Navigator.of(dialogContext).pop(false),
+                                child: const Text('Cancel')),
+                            FilledButton(
+                                onPressed: () =>
+                                    Navigator.of(dialogContext).pop(true),
+                                child: const Text('Delete')),
                           ],
                         ),
                       );
                       if (confirm == true) {
                         setState(() => saving = true);
                         try {
-                          await repo.deleteAttributeDefinition(existing.attributeId);
+                          await repo
+                              .deleteAttributeDefinition(existing.attributeId);
                           // Return true to trigger reload
                           // ignore: use_build_context_synchronously
                           Navigator.of(context).pop(true);
@@ -310,7 +329,8 @@ Future<bool?> _showAttributeDialog(BuildContext context, {required WidgetRef ref
               child: const Text('Delete'),
             ),
           TextButton(
-            onPressed: saving ? null : () => Navigator.of(context).maybePop(false),
+            onPressed:
+                saving ? null : () => Navigator.of(context).maybePop(false),
             child: const Text('Cancel'),
           ),
           FilledButton(
@@ -349,7 +369,10 @@ Future<bool?> _showAttributeDialog(BuildContext context, {required WidgetRef ref
                     }
                   },
             child: saving
-                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2.4))
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2.4))
                 : Text(isEdit ? 'Save' : 'Create'),
           ),
         ],
@@ -357,4 +380,3 @@ Future<bool?> _showAttributeDialog(BuildContext context, {required WidgetRef ref
     ),
   );
 }
-

@@ -63,7 +63,8 @@ class AuthRepository {
       final data =
           LoginResponse.fromJson(response.data['data'] as Map<String, dynamic>);
       await _secureStorage.write(key: accessTokenKey, value: data.accessToken);
-      await _secureStorage.write(key: refreshTokenKey, value: data.refreshToken);
+      await _secureStorage.write(
+          key: refreshTokenKey, value: data.refreshToken);
       await _secureStorage.write(key: sessionIdKey, value: data.sessionId);
       if (data.company != null) {
         await _prefs.setString(
@@ -127,8 +128,8 @@ class AuthRepository {
     try {
       final refresh = await _secureStorage.read(key: refreshTokenKey);
       if (refresh != null && refresh.isNotEmpty) {
-        final res = await _dio.post('/auth/refresh-token',
-            data: {'refresh_token': refresh});
+        final res = await _dio
+            .post('/auth/refresh-token', data: {'refresh_token': refresh});
         final data = res.data['data'] as Map<String, dynamic>;
         final newAccess = data['access_token'] as String;
         await _secureStorage.write(key: accessTokenKey, value: newAccess);

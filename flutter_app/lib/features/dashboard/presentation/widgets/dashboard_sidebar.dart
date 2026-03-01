@@ -251,7 +251,7 @@ class _CompanyLogo extends ConsumerWidget {
     }
     return CircleAvatar(
       radius: radius,
-      backgroundColor: theme.colorScheme.onPrimary.withOpacity(0.1),
+      backgroundColor: theme.colorScheme.onPrimary.withValues(alpha: 0.1),
       backgroundImage: provider,
       child: provider == null
           ? const Icon(Icons.business, color: Colors.white, size: 28)

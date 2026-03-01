@@ -10,10 +10,12 @@ class LocationsManagementPage extends ConsumerStatefulWidget {
   const LocationsManagementPage({super.key});
 
   @override
-  ConsumerState<LocationsManagementPage> createState() => _LocationsManagementPageState();
+  ConsumerState<LocationsManagementPage> createState() =>
+      _LocationsManagementPageState();
 }
 
-class _LocationsManagementPageState extends ConsumerState<LocationsManagementPage> {
+class _LocationsManagementPageState
+    extends ConsumerState<LocationsManagementPage> {
   bool _busy = false;
 
   Future<void> _refresh() async {
@@ -43,19 +45,24 @@ class _LocationsManagementPageState extends ConsumerState<LocationsManagementPag
               children: [
                 TextFormField(
                   controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder()),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+                  decoration: const InputDecoration(
+                      labelText: 'Name', border: OutlineInputBorder()),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Name is required'
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: addressCtrl,
-                  decoration: const InputDecoration(labelText: 'Address', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                      labelText: 'Address', border: OutlineInputBorder()),
                   maxLines: 3,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: phoneCtrl,
-                  decoration: const InputDecoration(labelText: 'Phone', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                      labelText: 'Phone', border: OutlineInputBorder()),
                   keyboardType: TextInputType.phone,
                 ),
               ],
@@ -63,7 +70,9 @@ class _LocationsManagementPageState extends ConsumerState<LocationsManagementPag
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel')),
           FilledButton(
             onPressed: () async {
               if (!(formKey.currentState?.validate() ?? false)) return;
@@ -72,18 +81,27 @@ class _LocationsManagementPageState extends ConsumerState<LocationsManagementPag
                   await repo.createLocation(
                     companyId: companyId,
                     name: nameCtrl.text.trim(),
-                    address: addressCtrl.text.trim().isEmpty ? null : addressCtrl.text.trim(),
-                    phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
+                    address: addressCtrl.text.trim().isEmpty
+                        ? null
+                        : addressCtrl.text.trim(),
+                    phone: phoneCtrl.text.trim().isEmpty
+                        ? null
+                        : phoneCtrl.text.trim(),
                   );
                 } else {
                   await repo.updateLocation(
                     locationId: initial.locationId,
                     name: nameCtrl.text.trim(),
-                    address: addressCtrl.text.trim().isEmpty ? null : addressCtrl.text.trim(),
-                    phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
+                    address: addressCtrl.text.trim().isEmpty
+                        ? null
+                        : addressCtrl.text.trim(),
+                    phone: phoneCtrl.text.trim().isEmpty
+                        ? null
+                        : phoneCtrl.text.trim(),
                   );
                 }
-                if (context.mounted) Navigator.of(context).pop(true);
+                if (!context.mounted) return;
+                Navigator.of(context).pop(true);
               } catch (e) {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context)
@@ -108,8 +126,12 @@ class _LocationsManagementPageState extends ConsumerState<LocationsManagementPag
         title: const Text('Delete Location'),
         content: Text("Are you sure you want to delete '${loc.name}'?"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete')),
         ],
       ),
     );
@@ -149,9 +171,12 @@ class _LocationsManagementPageState extends ConsumerState<LocationsManagementPag
             final selected = state.selected?.locationId == loc.locationId;
             return ListTile(
               tileColor: theme.colorScheme.surfaceContainerHighest,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               title: Text(loc.name),
-              leading: selected ? const Icon(Icons.check_circle, color: Colors.green) : const Icon(Icons.location_on),
+              leading: selected
+                  ? const Icon(Icons.check_circle, color: Colors.green)
+                  : const Icon(Icons.location_on),
               trailing: Wrap(spacing: 8, children: [
                 IconButton(
                   tooltip: 'Edit',
@@ -166,11 +191,11 @@ class _LocationsManagementPageState extends ConsumerState<LocationsManagementPag
               ]),
               onTap: () async {
                 await ref.read(locationNotifierProvider.notifier).select(loc);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(SnackBar(content: Text('Selected: ${loc.name}')));
-                }
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(
+                      SnackBar(content: Text('Selected: ${loc.name}')));
               },
             );
           },
@@ -179,4 +204,3 @@ class _LocationsManagementPageState extends ConsumerState<LocationsManagementPag
     );
   }
 }
-

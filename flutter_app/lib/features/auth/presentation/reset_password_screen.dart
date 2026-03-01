@@ -247,7 +247,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                                             color: strengthColor,
                                             backgroundColor: theme.colorScheme
                                                 .surfaceContainerHighest
-                                                .withOpacity(0.6),
+                                                .withValues(alpha: 0.6),
                                           ),
                                         ),
                                       ),

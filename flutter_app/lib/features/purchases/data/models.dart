@@ -21,22 +21,30 @@ class GoodsReceiptDto {
 
   factory GoodsReceiptDto.fromJson(Map<String, dynamic> json) {
     return GoodsReceiptDto(
-      goodsReceiptId: json['goods_receipt_id'] as int,
-      receiptNumber: (json['receipt_number'] ?? '').toString(),
-      purchaseId: json['purchase_id'] as int?,
-      locationId: json['location_id'] as int,
-      supplierId: json['supplier_id'] as int,
-      receivedDate: DateTime.tryParse((json['received_date'] ?? '').toString()) ?? DateTime.now(),
-      receivedBy: json['received_by'] as int? ?? 0,
-      supplierName: (json['supplier'] is Map && (json['supplier']['name'] ?? '') != null)
-          ? (json['supplier']['name'] as String)
-          : (json['supplier_name'] as String?)
-    );
+        goodsReceiptId: json['goods_receipt_id'] as int,
+        receiptNumber: (json['receipt_number'] ?? '').toString(),
+        purchaseId: json['purchase_id'] as int?,
+        locationId: json['location_id'] as int,
+        supplierId: json['supplier_id'] as int,
+        receivedDate:
+            DateTime.tryParse((json['received_date'] ?? '').toString()) ??
+                DateTime.now(),
+        receivedBy: json['received_by'] as int? ?? 0,
+        supplierName: (json['supplier'] is Map &&
+                (json['supplier']['name'] ?? '') != null)
+            ? (json['supplier']['name'] as String)
+            : (json['supplier_name'] as String?));
   }
 }
 
 class GrnCreateItem {
-  GrnCreateItem({required this.productId, required this.quantity, required this.unitPrice, this.taxId, this.discountPercent, this.discountAmount});
+  GrnCreateItem(
+      {required this.productId,
+      required this.quantity,
+      required this.unitPrice,
+      this.taxId,
+      this.discountPercent,
+      this.discountAmount});
   final int productId;
   final double quantity;
   final double unitPrice;
@@ -66,7 +74,9 @@ class GoodsReceiptItemDto {
   factory GoodsReceiptItemDto.fromJson(Map<String, dynamic> json) {
     Map<String, dynamic>? prod = json['product'] as Map<String, dynamic>?;
     return GoodsReceiptItemDto(
-      goodsReceiptItemId: json['goods_receipt_item_id'] as int? ?? json['receipt_item_id'] as int? ?? 0,
+      goodsReceiptItemId: json['goods_receipt_item_id'] as int? ??
+          json['receipt_item_id'] as int? ??
+          0,
       productId: json['product_id'] as int,
       receivedQuantity: (json['received_quantity'] as num?)?.toDouble() ?? 0,
       unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0,

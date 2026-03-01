@@ -58,7 +58,8 @@ class CustomerSummaryDto {
     required this.loyaltyPoints,
   });
 
-  factory CustomerSummaryDto.fromJson(Map<String, dynamic> json) => CustomerSummaryDto(
+  factory CustomerSummaryDto.fromJson(Map<String, dynamic> json) =>
+      CustomerSummaryDto(
         customerId: json['customer_id'] as int,
         totalSales: (json['total_sales'] as num?)?.toDouble() ?? 0,
         totalPayments: (json['total_payments'] as num?)?.toDouble() ?? 0,
@@ -84,13 +85,16 @@ class CustomerCollectionDto {
     this.referenceNumber,
   });
 
-  factory CustomerCollectionDto.fromJson(Map<String, dynamic> json) => CustomerCollectionDto(
+  factory CustomerCollectionDto.fromJson(Map<String, dynamic> json) =>
+      CustomerCollectionDto(
         collectionId: json['collection_id'] as int,
-        collectionNumber: (json['collection_number'] ?? json['number'] ?? '').toString(),
+        collectionNumber:
+            (json['collection_number'] ?? json['number'] ?? '').toString(),
         amount: (json['amount'] as num?)?.toDouble() ?? 0,
-        collectionDate: DateTime.tryParse((json['collection_date'] ?? json['date'] ?? '').toString()) ?? DateTime.now(),
+        collectionDate: DateTime.tryParse(
+                (json['collection_date'] ?? json['date'] ?? '').toString()) ??
+            DateTime.now(),
         paymentMethod: json['payment_method'] as String?,
         referenceNumber: json['reference_number'] as String?,
       );
 }
-

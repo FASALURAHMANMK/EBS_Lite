@@ -8,7 +8,8 @@ class SaleReturnDetailPage extends ConsumerStatefulWidget {
   final int returnId;
 
   @override
-  ConsumerState<SaleReturnDetailPage> createState() => _SaleReturnDetailPageState();
+  ConsumerState<SaleReturnDetailPage> createState() =>
+      _SaleReturnDetailPageState();
 }
 
 class _SaleReturnDetailPageState extends ConsumerState<SaleReturnDetailPage> {
@@ -36,10 +37,12 @@ class _SaleReturnDetailPageState extends ConsumerState<SaleReturnDetailPage> {
   @override
   Widget build(BuildContext context) {
     final d = _doc;
-    final items = (d?['items'] as List? ?? const []).cast<Map<String, dynamic>>();
+    final items =
+        (d?['items'] as List? ?? const []).cast<Map<String, dynamic>>();
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(d?['return_number']?.toString() ?? 'Sale Return')),
+      appBar:
+          AppBar(title: Text(d?['return_number']?.toString() ?? 'Sale Return')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -60,7 +63,9 @@ class _SaleReturnDetailPageState extends ConsumerState<SaleReturnDetailPage> {
                     'Customer #${d?['customer_id']}',
                   if (d?['return_date'] != null) (d?['return_date']).toString(),
                 ].where((e) => e.isNotEmpty).join(' · ')),
-                trailing: Text(((d?['total_amount'] as num?)?.toDouble() ?? 0).toStringAsFixed(2),
+                trailing: Text(
+                    ((d?['total_amount'] as num?)?.toDouble() ?? 0)
+                        .toStringAsFixed(2),
                     style: theme.textTheme.titleMedium),
               ),
             ),
@@ -73,9 +78,13 @@ class _SaleReturnDetailPageState extends ConsumerState<SaleReturnDetailPage> {
                 for (final it in items)
                   ListTile(
                     leading: const Icon(Icons.inventory_2_rounded),
-                    title: Text(it['product']?['name']?.toString() ?? 'Product #${it['product_id']}'),
-                    subtitle: Text('Qty: ${((it['quantity'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}'),
-                    trailing: Text(((it['unit_price'] as num?)?.toDouble() ?? 0).toStringAsFixed(2),
+                    title: Text(it['product']?['name']?.toString() ??
+                        'Product #${it['product_id']}'),
+                    subtitle: Text(
+                        'Qty: ${((it['quantity'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}'),
+                    trailing: Text(
+                        ((it['unit_price'] as num?)?.toDouble() ?? 0)
+                            .toStringAsFixed(2),
                         style: theme.textTheme.titleMedium),
                   ),
               ]),

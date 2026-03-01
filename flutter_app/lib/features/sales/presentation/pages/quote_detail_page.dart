@@ -116,8 +116,8 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final q = _quote;
-    final items = (q?['items'] as List<dynamic>? ?? [])
-        .cast<Map<String, dynamic>>();
+    final items =
+        (q?['items'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
     final status = q?['status']?.toString() ?? 'DRAFT';
     final number = q?['quote_number']?.toString() ?? '';
     final customer = q?['customer'] as Map<String, dynamic>?;
@@ -147,7 +147,9 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
                   await _updateStatus('ACCEPTED');
                   break;
                 case 'print':
-                  await ref.read(salesRepositoryProvider).printQuote(widget.quoteId);
+                  await ref
+                      .read(salesRepositoryProvider)
+                      .printQuote(widget.quoteId);
                   await _load();
                   break;
                 case 'share':
@@ -177,7 +179,8 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+                child: Text(_error!,
+                    style: TextStyle(color: theme.colorScheme.error)),
               ),
             if (q != null) ...[
               Card(

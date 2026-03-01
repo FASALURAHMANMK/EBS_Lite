@@ -30,4 +30,3 @@ class FeatureDetailPage extends StatelessWidget {
     );
   }
 }
-

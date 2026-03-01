@@ -37,12 +37,14 @@ class InvoicePdfBuilder {
           pw.SizedBox(height: 16),
           _itemsTable(items),
           pw.SizedBox(height: 12),
-          _totals(subtotal: subtotal, tax: tax, discount: discount, total: total),
+          _totals(
+              subtotal: subtotal, tax: tax, discount: discount, total: total),
           pw.SizedBox(height: 8),
           pw.Divider(),
           pw.Align(
             alignment: pw.Alignment.center,
-            child: pw.Text('Thank you for your business!', style: pw.TextStyle(fontSize: 10)),
+            child: pw.Text('Thank you for your business!',
+                style: pw.TextStyle(fontSize: 10)),
           ),
         ],
       ),
@@ -51,7 +53,8 @@ class InvoicePdfBuilder {
     return doc.save();
   }
 
-  static pw.Widget _header(Map<String, dynamic> company, String saleNumber, {pw.ImageProvider? logoProvider}) {
+  static pw.Widget _header(Map<String, dynamic> company, String saleNumber,
+      {pw.ImageProvider? logoProvider}) {
     final name = (company['name'] as String?) ?? '';
     final address = (company['address'] as String?) ?? '';
     final phone = (company['phone'] as String?) ?? '';
@@ -70,14 +73,18 @@ class InvoicePdfBuilder {
             ),
           ],
           pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Text(name, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-          if (address.isNotEmpty) pw.Text(address),
-          if (phone.isNotEmpty) pw.Text('Phone: $phone'),
-          if (email.isNotEmpty) pw.Text('Email: $email'),
+            pw.Text(name,
+                style:
+                    pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+            if (address.isNotEmpty) pw.Text(address),
+            if (phone.isNotEmpty) pw.Text('Phone: $phone'),
+            if (email.isNotEmpty) pw.Text('Email: $email'),
           ]),
         ]),
         pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-          pw.Text('INVOICE', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+          pw.Text('INVOICE',
+              style:
+                  pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
           pw.Text('No: $saleNumber'),
         ]),
       ],
@@ -85,7 +92,14 @@ class InvoicePdfBuilder {
   }
 
   static pw.Widget _itemsTable(List<Map<String, dynamic>> items) {
-    final headers = ['Item', 'Qty', 'Unit Price', 'Disc %', 'Tax', 'Line Total'];
+    final headers = [
+      'Item',
+      'Qty',
+      'Unit Price',
+      'Disc %',
+      'Tax',
+      'Line Total'
+    ];
     final data = items.map((it) {
       final name = _productName(it);
       final qty = _asDouble(it['quantity']);
@@ -130,8 +144,14 @@ class InvoicePdfBuilder {
     pw.Widget row(String label, String value, {bool bold = false}) => pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.Text(label, style: pw.TextStyle(fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
-            pw.Text(value, style: pw.TextStyle(fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+            pw.Text(label,
+                style: pw.TextStyle(
+                    fontWeight:
+                        bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+            pw.Text(value,
+                style: pw.TextStyle(
+                    fontWeight:
+                        bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
           ],
         );
     return pw.Container(
@@ -155,114 +175,18 @@ class InvoicePdfBuilder {
     PdfPageFormat? format,
     String? logoUrl,
   }) async {
-    final html = _buildHtml(sale, company, logoUrl: logoUrl);
-    return await Printing.convertHtml(
-      format: format ?? PdfPageFormat.a4,
-      html: html,
+    return buildPdfFromWidgets(
+      sale,
+      company,
+      format: format,
+      logoUrl: logoUrl,
     );
-  }
-
-  static String _buildHtml(Map<String, dynamic> sale, Map<String, dynamic> company, {String? logoUrl}) {
-    final saleNumber = (sale['sale_number'] as String?) ?? '';
-    final items = (sale['items'] as List<dynamic>? ?? const [])
-        .cast<Map<String, dynamic>>();
-    final subtotal = _fmt(_asDouble(sale['subtotal']));
-    final tax = _fmt(_asDouble(sale['tax_amount']));
-    final discount = _fmt(_asDouble(sale['discount_amount']));
-    final total = _fmt(_asDouble(sale['total_amount']));
-
-    final name = (company['name'] as String?) ?? '';
-    final address = (company['address'] as String?) ?? '';
-    final phone = (company['phone'] as String?) ?? '';
-    final email = (company['email'] as String?) ?? '';
-
-    final rows = items.map((it) {
-      final n = _productName(it);
-      final qty = _fmt(_asDouble(it['quantity']));
-      final unit = _fmt(_asDouble(it['unit_price']));
-      final disc = _fmt(_asDouble(it['discount_percentage']));
-      final tax = _fmt(_asDouble(it['tax_amount']));
-      final total = _fmt(_asDouble(it['line_total']));
-      return '<tr>'
-          '<td>$n</td>'
-          '<td class="r">$qty</td>'
-          '<td class="r">$unit</td>'
-          '<td class="r">$disc</td>'
-          '<td class="r">$tax</td>'
-          '<td class="r">$total</td>'
-          '</tr>';
-    }).join();
-
-    final logoImg = (logoUrl != null && logoUrl.isNotEmpty) ? '<img src="$logoUrl" style="max-height:56px;max-width:56px;margin-right:12px" />' : '';
-
-    return '''
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <style>
-    body { font-family: Arial, Helvetica, sans-serif; margin: 24px; }
-    .header { display:flex; justify-content:space-between; }
-    .title { font-size: 22px; font-weight: 700; }
-    .muted { color: #666; font-size: 12px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-    th, td { padding: 8px; border-bottom: 1px solid #eee; font-size: 12px; }
-    th { text-align: left; background: #f3f3f3; }
-    .r { text-align: right; }
-    .totals { margin-top: 12px; width: 100%; }
-    .totals td { padding: 4px 0; }
-    .totals .label { text-align: right; }
-    .totals .value { text-align: right; min-width: 120px; font-weight: 600; }
-    .footer { margin-top: 16px; text-align:center; color:#888; font-size: 11px; }
-  </style>
-  <title>Invoice $saleNumber</title>
-  </head>
-  <body>
-    <div class="header">
-      <div style="display:flex;align-items:flex-start;">
-        $logoImg
-        <div class="title">$name</div>
-        <div style="display:block">
-          <div class="muted">$address</div>
-          <div class="muted">$phone</div>
-          <div class="muted">$email</div>
-        </div>
-      </div>
-      <div>
-        <div class="title">INVOICE</div>
-        <div>No: $saleNumber</div>
-      </div>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Item</th>
-          <th class="r">Qty</th>
-          <th class="r">Unit Price</th>
-          <th class="r">Disc %</th>
-          <th class="r">Tax</th>
-          <th class="r">Line Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        $rows
-      </tbody>
-    </table>
-    <table class="totals">
-      <tr><td class="label">Subtotal</td><td class="value">$subtotal</td></tr>
-      <tr><td class="label">Tax</td><td class="value">$tax</td></tr>
-      <tr><td class="label">Discount</td><td class="value">$discount</td></tr>
-      <tr><td class="label">Total</td><td class="value">$total</td></tr>
-    </table>
-    <div class="footer">Thank you for your business!</div>
-  </body>
-</html>
-''';
   }
 
   static String _productName(Map<String, dynamic> it) {
     if (it['product'] is Map<String, dynamic>) {
-      return (it['product']['name'] as String?) ?? (it['product_name'] as String? ?? 'Item');
+      return (it['product']['name'] as String?) ??
+          (it['product_name'] as String? ?? 'Item');
     }
     return (it['product_name'] as String?) ?? 'Item';
   }

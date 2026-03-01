@@ -16,7 +16,8 @@ class PaymentMethodDto {
     required this.isActive,
   });
 
-  factory PaymentMethodDto.fromJson(Map<String, dynamic> json) => PaymentMethodDto(
+  factory PaymentMethodDto.fromJson(Map<String, dynamic> json) =>
+      PaymentMethodDto(
         methodId: json['method_id'] as int,
         name: json['name'] as String? ?? '',
         type: json['type'] as String? ?? 'OTHER',
@@ -42,7 +43,9 @@ class PaymentMethodsRepository {
   Future<List<PaymentMethodDto>> getMethods() async {
     final res = await _dio.get('/settings/payment-methods');
     final data = _extractList(res);
-    return data.map((e) => PaymentMethodDto.fromJson(e as Map<String, dynamic>)).toList();
+    return data
+        .map((e) => PaymentMethodDto.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<PaymentMethodDto> createMethod({
@@ -80,7 +83,9 @@ class PaymentMethodsRepository {
   Future<Map<int, List<Map<String, dynamic>>>> getMethodCurrencies() async {
     final res = await _dio.get('/settings/payment-methods/currencies');
     final body = res.data;
-    final list = body is Map<String, dynamic> ? (body['data'] as List<dynamic>? ?? const []) : (body as List<dynamic>? ?? const []);
+    final list = body is Map<String, dynamic>
+        ? (body['data'] as List<dynamic>? ?? const [])
+        : (body as List<dynamic>? ?? const []);
     final grouped = <int, List<Map<String, dynamic>>>{};
     for (final row in list) {
       final m = row as Map<String, dynamic>;
@@ -95,7 +100,8 @@ class PaymentMethodsRepository {
   }
 
   // Update currencies for a single method
-  Future<void> setMethodCurrenciesForMethod(int methodId, List<Map<String, dynamic>> currencies) async {
+  Future<void> setMethodCurrenciesForMethod(
+      int methodId, List<Map<String, dynamic>> currencies) async {
     final items = currencies
         .map((e) => {
               'currency_id': e['currency_id'],
@@ -108,7 +114,8 @@ class PaymentMethodsRepository {
   }
 }
 
-final paymentMethodsRepositoryProvider = Provider<PaymentMethodsRepository>((ref) {
+final paymentMethodsRepositoryProvider =
+    Provider<PaymentMethodsRepository>((ref) {
   final dio = ref.watch(dioProvider);
   return PaymentMethodsRepository(dio);
 });

@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platform_image_3.dart' hide PrinterDevice;
+import 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platform_image_3.dart'
+    hide PrinterDevice;
 import 'dart:io';
 
 import '../../../pos/data/printer_settings_repository.dart';
@@ -12,7 +13,8 @@ class PrinterSettingsPage extends ConsumerStatefulWidget {
   const PrinterSettingsPage({super.key});
 
   @override
-  ConsumerState<PrinterSettingsPage> createState() => _PrinterSettingsPageState();
+  ConsumerState<PrinterSettingsPage> createState() =>
+      _PrinterSettingsPageState();
 }
 
 class _PrinterSettingsPageState extends ConsumerState<PrinterSettingsPage> {
@@ -48,7 +50,8 @@ class _PrinterSettingsPageState extends ConsumerState<PrinterSettingsPage> {
   Future<void> _test(PrinterDevice p) async {
     try {
       if (p.kind.startsWith('thermal')) {
-        final bytes = buildTestTicketBytes(charsPerLine: p.kind == 'thermal_58' ? 32 : 48);
+        final bytes = buildTestTicketBytes(
+            charsPerLine: p.kind == 'thermal_58' ? 32 : 48);
         if (p.connectionType == 'network') {
           if (p.host != null && (p.port ?? 0) > 0) {
             final socket = await Socket.connect(p.host, p.port!);
@@ -85,16 +88,20 @@ class _PrinterSettingsPageState extends ConsumerState<PrinterSettingsPage> {
       } else {
         await Printing.layoutPdf(onLayout: (format) async {
           final doc = pw.Document();
-          doc.addPage(pw.Page(build: (ctx) => pw.Center(child: pw.Text('Test Print - ${p.name}'))));
+          doc.addPage(pw.Page(
+              build: (ctx) =>
+                  pw.Center(child: pw.Text('Test Print - ${p.name}'))));
           return doc.save();
         });
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Test sent to ${p.name}')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Test sent to ${p.name}')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Test failed: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Test failed: $e')));
       }
     }
   }
@@ -135,16 +142,28 @@ class _PrinterSettingsPageState extends ConsumerState<PrinterSettingsPage> {
                     final subtitle = _subtitleFor(p);
                     return ListTile(
                       leading: Icon(
-                        p.kind.startsWith('thermal') ? Icons.print_rounded : Icons.picture_as_pdf_rounded,
+                        p.kind.startsWith('thermal')
+                            ? Icons.print_rounded
+                            : Icons.picture_as_pdf_rounded,
                       ),
                       title: Text('${p.name} (${p.kind.toUpperCase()})'),
                       subtitle: Text(subtitle),
                       trailing: Wrap(spacing: 8, children: [
-                        if (p.isDefault) const Icon(Icons.star, color: Colors.amber)
-                        else TextButton(onPressed: () => _setDefault(p), child: const Text('Set Default')),
-                        IconButton(onPressed: () => _test(p), icon: const Icon(Icons.science_outlined)),
-                        IconButton(onPressed: () => _addOrEdit(edit: p), icon: const Icon(Icons.edit_rounded)),
-                        IconButton(onPressed: () => _delete(p), icon: const Icon(Icons.delete_outline_rounded)),
+                        if (p.isDefault)
+                          const Icon(Icons.star, color: Colors.amber)
+                        else
+                          TextButton(
+                              onPressed: () => _setDefault(p),
+                              child: const Text('Set Default')),
+                        IconButton(
+                            onPressed: () => _test(p),
+                            icon: const Icon(Icons.science_outlined)),
+                        IconButton(
+                            onPressed: () => _addOrEdit(edit: p),
+                            icon: const Icon(Icons.edit_rounded)),
+                        IconButton(
+                            onPressed: () => _delete(p),
+                            icon: const Icon(Icons.delete_outline_rounded)),
                       ]),
                     );
                   },
@@ -235,20 +254,25 @@ class _PrinterEditDialogState extends State<_PrinterEditDialog> {
                 TextFormField(
                   controller: _name,
                   decoration: const InputDecoration(labelText: 'Printer Name'),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Name required' : null,
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Name required' : null,
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   initialValue: _kind,
                   items: const [
-                    DropdownMenuItem(value: 'thermal_80', child: Text('Thermal 80mm')),
-                    DropdownMenuItem(value: 'thermal_58', child: Text('Thermal 58mm')),
+                    DropdownMenuItem(
+                        value: 'thermal_80', child: Text('Thermal 80mm')),
+                    DropdownMenuItem(
+                        value: 'thermal_58', child: Text('Thermal 58mm')),
                     DropdownMenuItem(value: 'a4', child: Text('A4')),
                     DropdownMenuItem(value: 'a5', child: Text('A5')),
                   ],
                   onChanged: (v) => setState(() {
                     _kind = v ?? 'a4';
-                    if (_kind.startsWith('thermal') && _conn == 'system') _conn = 'network';
+                    if (_kind.startsWith('thermal') && _conn == 'system') {
+                      _conn = 'network';
+                    }
                     if (!_kind.startsWith('thermal')) _conn = 'system';
                   }),
                   decoration: const InputDecoration(labelText: 'Type'),
@@ -257,12 +281,20 @@ class _PrinterEditDialogState extends State<_PrinterEditDialog> {
                 DropdownButtonFormField<String>(
                   initialValue: _conn,
                   items: [
-                    if (isThermal) const DropdownMenuItem(value: 'network', child: Text('Network (TCP/IP)')),
-                    if (isThermal) const DropdownMenuItem(value: 'bluetooth', child: Text('Bluetooth')),
-                    if (isThermal) const DropdownMenuItem(value: 'usb', child: Text('USB')),
-                    if (!isThermal) const DropdownMenuItem(value: 'system', child: Text('System')),
+                    if (isThermal)
+                      const DropdownMenuItem(
+                          value: 'network', child: Text('Network (TCP/IP)')),
+                    if (isThermal)
+                      const DropdownMenuItem(
+                          value: 'bluetooth', child: Text('Bluetooth')),
+                    if (isThermal)
+                      const DropdownMenuItem(value: 'usb', child: Text('USB')),
+                    if (!isThermal)
+                      const DropdownMenuItem(
+                          value: 'system', child: Text('System')),
                   ],
-                  onChanged: (v) => setState(() => _conn = v ?? (isThermal ? 'network' : 'system')),
+                  onChanged: (v) => setState(
+                      () => _conn = v ?? (isThermal ? 'network' : 'system')),
                   decoration: const InputDecoration(labelText: 'Connection'),
                 ),
                 if (isThermal && _conn == 'network') ...[
@@ -270,7 +302,8 @@ class _PrinterEditDialogState extends State<_PrinterEditDialog> {
                   TextFormField(
                     controller: _host,
                     decoration: const InputDecoration(labelText: 'IP Address'),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'IP required' : null,
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'IP required' : null,
                   ),
                   const SizedBox(height: 8),
                   TextFormField(
@@ -281,15 +314,27 @@ class _PrinterEditDialogState extends State<_PrinterEditDialog> {
                 ],
                 if (isThermal && _conn == 'bluetooth') ...[
                   const SizedBox(height: 8),
-                  TextFormField(controller: _btName, decoration: const InputDecoration(labelText: 'BT Name (optional)')),
+                  TextFormField(
+                      controller: _btName,
+                      decoration: const InputDecoration(
+                          labelText: 'BT Name (optional)')),
                   const SizedBox(height: 8),
-                  TextFormField(controller: _btAddr, decoration: const InputDecoration(labelText: 'BT Address/MAC')),
+                  TextFormField(
+                      controller: _btAddr,
+                      decoration:
+                          const InputDecoration(labelText: 'BT Address/MAC')),
                 ],
                 if (isThermal && _conn == 'usb') ...[
                   const SizedBox(height: 8),
-                  TextFormField(controller: _usbVid, decoration: const InputDecoration(labelText: 'USB Vendor ID')),
+                  TextFormField(
+                      controller: _usbVid,
+                      decoration:
+                          const InputDecoration(labelText: 'USB Vendor ID')),
                   const SizedBox(height: 8),
-                  TextFormField(controller: _usbPid, decoration: const InputDecoration(labelText: 'USB Product ID')),
+                  TextFormField(
+                      controller: _usbPid,
+                      decoration:
+                          const InputDecoration(labelText: 'USB Product ID')),
                 ],
                 const SizedBox(height: 8),
                 SwitchListTile(
@@ -303,7 +348,9 @@ class _PrinterEditDialogState extends State<_PrinterEditDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel')),
         FilledButton(
           onPressed: () {
             final form = _formKey.currentState;
@@ -317,7 +364,8 @@ class _PrinterEditDialogState extends State<_PrinterEditDialog> {
               host: _host.text.trim().isEmpty ? null : _host.text.trim(),
               port: int.tryParse(_port.text.trim()),
               btName: _btName.text.trim().isEmpty ? null : _btName.text.trim(),
-              btAddress: _btAddr.text.trim().isEmpty ? null : _btAddr.text.trim(),
+              btAddress:
+                  _btAddr.text.trim().isEmpty ? null : _btAddr.text.trim(),
               usbVendorId: int.tryParse(_usbVid.text.trim()),
               usbProductId: int.tryParse(_usbPid.text.trim()),
               isDefault: _isDefault,

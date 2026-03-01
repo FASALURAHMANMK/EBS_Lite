@@ -166,79 +166,103 @@ class _LoyaltyManagementPageState extends ConsumerState<LoyaltyManagementPage> {
                     child: Form(
                         key: _formKey,
                         child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Loyalty Settings',
-                              style: theme.textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                              controller: _pointsPerCurrency,
-                              decoration: const InputDecoration(
-                                  labelText: 'Points per currency'),
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              validator: (v) {
-                                final val = double.tryParse(v?.trim() ?? '');
-                                if (val == null) return 'Enter a valid number';
-                                if (val <= 0) return 'Must be greater than 0';
-                                return null;
-                              }),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                              controller: _pointValue,
-                              decoration: const InputDecoration(
-                                  labelText: 'Point value'),
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              validator: (v) {
-                                final val = double.tryParse(v?.trim() ?? '');
-                                if (val == null) return 'Enter a valid number';
-                                if (val <= 0) return 'Must be greater than 0';
-                                return null;
-                              }),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                              controller: _minRedemption,
-                              decoration: const InputDecoration(
-                                  labelText: 'Min redemption points'),
-                              keyboardType: TextInputType.number,
-                              validator: (v) {
-                                final val = int.tryParse(v?.trim() ?? '');
-                                if (val == null) return 'Enter a valid integer';
-                                if (val <= 0) return 'Must be greater than 0';
-                                return null;
-                              }),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                              controller: _minReserve,
-                              decoration: const InputDecoration(
-                                  labelText: 'Min points reserve'),
-                              keyboardType: TextInputType.number,
-                              validator: (v) {
-                                final val = int.tryParse(v?.trim() ?? '');
-                                if (val == null) return 'Enter a valid integer';
-                                if (val < 0) return 'Cannot be negative';
-                                return null;
-                              }),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                              controller: _expiryDays,
-                              decoration: const InputDecoration(
-                                  labelText: 'Points expiry days'),
-                              keyboardType: TextInputType.number,
-                              validator: (v) {
-                                final val = int.tryParse(v?.trim() ?? '');
-                                if (val == null) return 'Enter a valid integer';
-                                if (val <= 0) return 'Must be greater than 0';
-                                return null;
-                              }),
-                          const SizedBox(height: 12),
-                          Align(
-                              alignment: Alignment.centerRight,
-                              child: FilledButton.icon(
-                                  onPressed: _saveSettings,
-                                  icon: const Icon(Icons.save_rounded),
-                                  label: const Text('Save Settings'))),
-                        ])),
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Loyalty Settings',
+                                  style: theme.textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                  controller: _pointsPerCurrency,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Points per currency'),
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  validator: (v) {
+                                    final val =
+                                        double.tryParse(v?.trim() ?? '');
+                                    if (val == null) {
+                                      return 'Enter a valid number';
+                                    }
+                                    if (val <= 0) {
+                                      return 'Must be greater than 0';
+                                    }
+                                    return null;
+                                  }),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                  controller: _pointValue,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Point value'),
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  validator: (v) {
+                                    final val =
+                                        double.tryParse(v?.trim() ?? '');
+                                    if (val == null) {
+                                      return 'Enter a valid number';
+                                    }
+                                    if (val <= 0) {
+                                      return 'Must be greater than 0';
+                                    }
+                                    return null;
+                                  }),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                  controller: _minRedemption,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Min redemption points'),
+                                  keyboardType: TextInputType.number,
+                                  validator: (v) {
+                                    final val = int.tryParse(v?.trim() ?? '');
+                                    if (val == null) {
+                                      return 'Enter a valid integer';
+                                    }
+                                    if (val <= 0) {
+                                      return 'Must be greater than 0';
+                                    }
+                                    return null;
+                                  }),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                  controller: _minReserve,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Min points reserve'),
+                                  keyboardType: TextInputType.number,
+                                  validator: (v) {
+                                    final val = int.tryParse(v?.trim() ?? '');
+                                    if (val == null) {
+                                      return 'Enter a valid integer';
+                                    }
+                                    if (val < 0) return 'Cannot be negative';
+                                    return null;
+                                  }),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                  controller: _expiryDays,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Points expiry days'),
+                                  keyboardType: TextInputType.number,
+                                  validator: (v) {
+                                    final val = int.tryParse(v?.trim() ?? '');
+                                    if (val == null) {
+                                      return 'Enter a valid integer';
+                                    }
+                                    if (val <= 0) {
+                                      return 'Must be greater than 0';
+                                    }
+                                    return null;
+                                  }),
+                              const SizedBox(height: 12),
+                              Align(
+                                  alignment: Alignment.centerRight,
+                                  child: FilledButton.icon(
+                                      onPressed: _saveSettings,
+                                      icon: const Icon(Icons.save_rounded),
+                                      label: const Text('Save Settings'))),
+                            ])),
                   ),
                 );
               },

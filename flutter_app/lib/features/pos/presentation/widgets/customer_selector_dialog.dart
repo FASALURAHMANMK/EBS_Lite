@@ -8,10 +8,12 @@ class CustomerSelectorDialog extends ConsumerStatefulWidget {
   const CustomerSelectorDialog({super.key});
 
   @override
-  ConsumerState<CustomerSelectorDialog> createState() => _CustomerSelectorDialogState();
+  ConsumerState<CustomerSelectorDialog> createState() =>
+      _CustomerSelectorDialogState();
 }
 
-class _CustomerSelectorDialogState extends ConsumerState<CustomerSelectorDialog> {
+class _CustomerSelectorDialogState
+    extends ConsumerState<CustomerSelectorDialog> {
   final _controller = TextEditingController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -46,7 +48,11 @@ class _CustomerSelectorDialogState extends ConsumerState<CustomerSelectorDialog>
     setState(() => _adding = true);
     try {
       final repo = ref.read(posRepositoryProvider);
-      final c = await repo.quickAddCustomer(name: name, phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim());
+      final c = await repo.quickAddCustomer(
+          name: name,
+          phone: _phoneController.text.trim().isEmpty
+              ? null
+              : _phoneController.text.trim());
       if (!mounted) return;
       Navigator.of(context).pop(c);
     } catch (e) {
@@ -93,7 +99,9 @@ class _CustomerSelectorDialogState extends ConsumerState<CustomerSelectorDialog>
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8.0),
-                child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                child: Text(_error!,
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
               ),
             Flexible(
               child: ListView.builder(
@@ -103,7 +111,8 @@ class _CustomerSelectorDialogState extends ConsumerState<CustomerSelectorDialog>
                   final c = _results[index];
                   return ListTile(
                     title: Text(c.name),
-                    subtitle: Text([c.phone, c.email].whereType<String>().join(' • ')),
+                    subtitle: Text(
+                        [c.phone, c.email].whereType<String>().join(' • ')),
                     onTap: () => Navigator.of(context).pop(c),
                   );
                 },
@@ -112,7 +121,8 @@ class _CustomerSelectorDialogState extends ConsumerState<CustomerSelectorDialog>
             const Divider(height: 16),
             Align(
               alignment: Alignment.centerLeft,
-              child: Text('Quick Add', style: Theme.of(context).textTheme.titleSmall),
+              child: Text('Quick Add',
+                  style: Theme.of(context).textTheme.titleSmall),
             ),
             const SizedBox(height: 8),
             TextField(
@@ -141,11 +151,15 @@ class _CustomerSelectorDialogState extends ConsumerState<CustomerSelectorDialog>
         ),
         FilledButton.icon(
           onPressed: _adding ? null : _quickAdd,
-          icon: _adding ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.add_rounded),
+          icon: _adding
+              ? const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.add_rounded),
           label: const Text('Add'),
         ),
       ],
     );
   }
 }
-

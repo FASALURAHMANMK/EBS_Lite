@@ -3,16 +3,31 @@ package middleware
 import (
 	"fmt"
 	"log"
-	"time"
+
+	"erp-backend/internal/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // Logger middleware logs HTTP requests
 func Logger() gin.HandlerFunc {
 	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-		return fmt.Sprintf("[%s] %s %s %s %d %s %s\n",
+		requestID := ""
+		if param.Keys != nil {
+			if value, ok := param.Keys["request_id"]; ok {
+				if typed, ok := value.(string); ok {
+					requestID = typed
+				}
+			}
+		}
+		if requestID == "" && param.Request != nil {
+			requestID = param.Request.Header.Get("X-Request-ID")
+		}
+
+		return fmt.Sprintf("[%s] request_id=%s %s %s %s %d %s %s\n",
 			param.TimeStamp.Format("2006-01-02 15:04:05"),
+			requestID,
 			param.ClientIP,
 			param.Method,
 			param.Path,
@@ -26,11 +41,12 @@ func Logger() gin.HandlerFunc {
 // Recovery middleware recovers from panics
 func Recovery() gin.HandlerFunc {
 	return gin.CustomRecovery(func(c *gin.Context, recovered interface{}) {
-		log.Printf("Panic recovered: %v", recovered)
-		c.JSON(500, gin.H{
-			"success": false,
-			"message": "Internal server error",
-		})
+		requestID := c.GetString("request_id")
+		if requestID == "" {
+			requestID = c.GetHeader("X-Request-ID")
+		}
+		log.Printf("request_id=%s panic recovered: %v", requestID, recovered)
+		utils.InternalServerErrorResponse(c, "Internal server error", nil)
 	})
 }
 
@@ -39,22 +55,13 @@ func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestID := c.GetHeader("X-Request-ID")
 		if requestID == "" {
-			// Generate a simple request ID
-			requestID = fmt.Sprintf("%d", time.Now().UnixNano())
+			requestID = uuid.NewString()
 		}
 
+		c.Request.Header.Set("X-Request-ID", requestID)
 		c.Header("X-Request-ID", requestID)
 		c.Set("request_id", requestID)
 		c.Next()
 	}
 }
 
-// RateLimiter middleware (basic implementation)
-func RateLimiter() gin.HandlerFunc {
-	// This is a basic rate limiter - in production, use Redis or similar
-	return func(c *gin.Context) {
-		// Implement rate limiting logic here
-		// For now, just pass through
-		c.Next()
-	}
-}

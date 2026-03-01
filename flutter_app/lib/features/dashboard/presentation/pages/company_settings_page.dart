@@ -1,6 +1,7 @@
 import 'package:ebs_lite/features/auth/data/models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/l10n/app_localizations.dart';
 
 import '../../data/settings_repository.dart';
 import '../../data/currency_repository.dart';
@@ -10,6 +11,7 @@ import 'payment_modes_page.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../auth/controllers/auth_notifier.dart';
 import '../../../../core/api_client.dart';
+import '../../../../core/locale_preferences.dart';
 import 'locations_management_page.dart';
 import 'printer_settings_page.dart';
 
@@ -134,10 +136,10 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
           .read(authNotifierProvider.notifier)
           .setAuth(user: me.user.toUser(), company: me.company);
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(
-            const SnackBar(content: Text('Company settings updated')));
+        ..showSnackBar(SnackBar(content: Text(l10n.companySettingsUpdated)));
       Navigator.of(context).maybePop();
     } catch (e) {
       if (!mounted) return;
@@ -152,8 +154,20 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final localePrefs = ref.watch(localePreferencesProvider);
+    final languageOptions = [
+      DropdownMenuItem<Locale>(
+        value: const Locale('en'),
+        child: Text(l10n.languageEnglish),
+      ),
+      DropdownMenuItem<Locale>(
+        value: const Locale('ar'),
+        child: Text(l10n.languageArabic),
+      ),
+    ];
     return Scaffold(
-      appBar: AppBar(title: const Text('Company Settings')),
+      appBar: AppBar(title: Text(l10n.companySettingsTitle)),
       body: _loading
           ? const LinearProgressIndicator(minHeight: 2)
           : Form(
@@ -175,7 +189,7 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                       FilledButton.icon(
                         onPressed: _saving ? null : _pickAndUploadLogo,
                         icon: const Icon(Icons.upload_rounded),
-                        label: const Text('Upload Logo'),
+                        label: Text(l10n.uploadLogo),
                       ),
                     ],
                   ),
@@ -198,13 +212,15 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                   ListTile(
                     leading: const Icon(Icons.print_rounded),
                     title: const Text('Printer Settings (Device)'),
-                    subtitle: const Text('Configure thermal printer connectivity'),
+                    subtitle:
+                        const Text('Configure thermal printer connectivity'),
                     tileColor: theme.colorScheme.surface,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                     onTap: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const PrinterSettingsPage()),
+                        MaterialPageRoute(
+                            builder: (_) => const PrinterSettingsPage()),
                       );
                     },
                   ),
@@ -269,6 +285,53 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  Text(
+                    l10n.languageSectionTitle,
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: l10n.uiLanguageLabel,
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.language_rounded),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<Locale>(
+                        isExpanded: true,
+                        value: localePrefs.uiLocale,
+                        items: languageOptions,
+                        onChanged: (v) {
+                          if (v == null) return;
+                          ref
+                              .read(localePreferencesProvider.notifier)
+                              .setUiLocale(v);
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: l10n.receiptLanguageLabel,
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.receipt_long_rounded),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<Locale>(
+                        isExpanded: true,
+                        value: localePrefs.receiptLocale,
+                        items: languageOptions,
+                        onChanged: (v) {
+                          if (v == null) return;
+                          ref
+                              .read(localePreferencesProvider.notifier)
+                              .setReceiptLocale(v);
+                        },
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 24),
                   // Management sections
                   ListTile(
@@ -326,7 +389,7 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                                   strokeWidth: 2, color: Colors.white),
                             )
                           : const Icon(Icons.save_rounded),
-                      label: const Text('Save Changes'),
+                      label: Text(l10n.saveChanges),
                     ),
                   ),
                 ],

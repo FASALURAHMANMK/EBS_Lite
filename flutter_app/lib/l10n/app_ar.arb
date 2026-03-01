@@ -1,0 +1,13 @@
+{
+  "@@locale": "ar",
+  "appTitle": "إي بي إس لايت",
+  "companySettingsTitle": "إعدادات الشركة",
+  "uploadLogo": "رفع الشعار",
+  "companySettingsUpdated": "تم تحديث إعدادات الشركة",
+  "languageSectionTitle": "اللغة والمنطقة",
+  "uiLanguageLabel": "لغة التطبيق",
+  "receiptLanguageLabel": "لغة الإيصال",
+  "languageEnglish": "الإنجليزية",
+  "languageArabic": "العربية",
+  "saveChanges": "حفظ التغييرات"
+}

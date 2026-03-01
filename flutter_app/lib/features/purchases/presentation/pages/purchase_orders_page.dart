@@ -62,7 +62,12 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
     final q = _search.text.trim().toLowerCase();
     final filtered = q.isEmpty
         ? _all
-        : _all.where((e) => (e['purchase_number'] ?? '').toString().toLowerCase().contains(q)).toList();
+        : _all
+            .where((e) => (e['purchase_number'] ?? '')
+                .toString()
+                .toLowerCase()
+                .contains(q))
+            .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -77,9 +82,10 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
               );
               if (id != null) {
                 await _load();
-                if (!mounted) return;
+                if (!context.mounted) return;
                 await Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => PoDetailPage(purchaseId: id)),
+                  MaterialPageRoute(
+                      builder: (_) => PoDetailPage(purchaseId: id)),
                 );
               }
             },
@@ -97,7 +103,9 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
                 decoration: InputDecoration(
                   hintText: 'Search by PO number',
                   prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _load),
+                  suffixIcon: IconButton(
+                      icon: const Icon(Icons.refresh_rounded),
+                      onPressed: _load),
                 ),
                 onChanged: (_) => setState(() {}),
               ),
@@ -123,24 +131,36 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
                       : ListView.separated(
                           padding: const EdgeInsets.all(12),
                           itemCount: filtered.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 8),
                           itemBuilder: (context, i) {
                             final po = filtered[i];
                             return Card(
                               elevation: 0,
                               child: ListTile(
                                 leading: const Icon(Icons.description_rounded),
-                                title: Text(po['purchase_number']?.toString() ?? ''),
+                                title: Text(
+                                    po['purchase_number']?.toString() ?? ''),
                                 subtitle: Text([
-                                  if ((po['supplier']?['name'] ?? po['supplier_name'] ?? '') != '') (po['supplier']?['name'] ?? po['supplier_name']).toString(),
-                                  if (po['purchase_date'] != null) po['purchase_date'].toString(),
-                                  if ((po['status'] ?? '') != '') 'Status: ${po['status']}',
+                                  if ((po['supplier']?['name'] ??
+                                          po['supplier_name'] ??
+                                          '') !=
+                                      '')
+                                    (po['supplier']?['name'] ??
+                                            po['supplier_name'])
+                                        .toString(),
+                                  if (po['purchase_date'] != null)
+                                    po['purchase_date'].toString(),
+                                  if ((po['status'] ?? '') != '')
+                                    'Status: ${po['status']}',
                                 ].where((e) => e.isNotEmpty).join(' • ')),
                                 onTap: () async {
                                   final id = po['purchase_id'] as int?;
                                   if (id != null) {
                                     await Navigator.of(context).push(
-                                      MaterialPageRoute(builder: (_) => PoDetailPage(purchaseId: id)),
+                                      MaterialPageRoute(
+                                          builder: (_) =>
+                                              PoDetailPage(purchaseId: id)),
                                     );
                                     _load();
                                   }

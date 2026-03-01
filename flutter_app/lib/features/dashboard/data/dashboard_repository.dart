@@ -13,8 +13,7 @@ class DashboardRepository {
       '/dashboard/metrics',
       queryParameters: locationId != null ? {'location_id': locationId} : null,
     );
-    return DashboardMetrics.fromJson(
-        res.data['data'] as Map<String, dynamic>);
+    return DashboardMetrics.fromJson(res.data['data'] as Map<String, dynamic>);
   }
 
   Future<QuickActionCounts> getQuickActions({int? locationId}) async {
@@ -22,8 +21,7 @@ class DashboardRepository {
       '/dashboard/quick-actions',
       queryParameters: locationId != null ? {'location_id': locationId} : null,
     );
-    return QuickActionCounts.fromJson(
-        res.data['data'] as Map<String, dynamic>);
+    return QuickActionCounts.fromJson(res.data['data'] as Map<String, dynamic>);
   }
 }
 

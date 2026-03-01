@@ -6,19 +6,18 @@ services:
     image: postgres:15-alpine
     container_name: erp_postgres
     environment:
-      POSTGRES_DB: erp_db
-      POSTGRES_USER: erp_user
-      POSTGRES_PASSWORD: erp_password
-      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_DB: ${POSTGRES_DB:-erp_db}
+      POSTGRES_USER: ${POSTGRES_USER:-erp_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-erp_password}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      - "./Docs & Schema/PostgrSQL.sql:/docker-entrypoint-initdb.d/00_schema.sql:ro"
     networks:
       - erp_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U erp_user -d erp_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-erp_user} -d ${POSTGRES_DB:-erp_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -61,12 +60,12 @@ services:
       dockerfile: Dockerfile
     container_name: erp_api
     environment:
-      - DATABASE_URL=postgres://erp_user:erp_password@postgres:5432/erp_db?sslmode=disable
-      - REDIS_URL=redis://redis:6379
-      - MQTT_BROKER=tcp://mosquitto:1883
-      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-      - ENVIRONMENT=production
-      - GIN_MODE=release
+      - DATABASE_URL=${DATABASE_URL:-postgres://erp_user:erp_password@postgres:5432/erp_db?sslmode=disable}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - MQTT_BROKER=${MQTT_BROKER:-tcp://mosquitto:1883}
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - GIN_MODE=${GIN_MODE:-release}
     ports:
       - "8080:8080"
     depends_on:

@@ -114,6 +114,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(user: user, company: company);
   }
 
+  void resetAuth() {
+    state = const AuthState();
+  }
+
   Future<void> logout() async {
     await _repository.logout();
     state = const AuthState();

@@ -10,7 +10,8 @@ class GrnRepository {
   final Dio _dio;
   final Ref _ref;
 
-  int? get _locationId => _ref.read(locationNotifierProvider).selected?.locationId;
+  int? get _locationId =>
+      _ref.read(locationNotifierProvider).selected?.locationId;
 
   List<dynamic> _extractList(Response res) {
     final body = res.data;
@@ -27,10 +28,15 @@ class GrnRepository {
     final qp = <String, dynamic>{};
     final loc = _locationId;
     if (loc != null) qp['location_id'] = loc;
-    if (search != null && search.trim().isNotEmpty) qp['search'] = search.trim();
-    final res = await _dio.get('/goods-receipts', queryParameters: qp.isEmpty ? null : qp);
+    if (search != null && search.trim().isNotEmpty) {
+      qp['search'] = search.trim();
+    }
+    final res = await _dio.get('/goods-receipts',
+        queryParameters: qp.isEmpty ? null : qp);
     final data = _extractList(res);
-    return data.map((e) => GoodsReceiptDto.fromJson(e as Map<String, dynamic>)).toList();
+    return data
+        .map((e) => GoodsReceiptDto.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<GoodsReceiptDetailDto> getGoodsReceipt(int id) async {
@@ -54,7 +60,8 @@ class GrnRepository {
     final createBody = {
       'supplier_id': supplierId,
       if (_locationId != null) 'location_id': _locationId,
-      if (invoiceNumber != null && invoiceNumber.isNotEmpty) 'reference_number': invoiceNumber,
+      if (invoiceNumber != null && invoiceNumber.isNotEmpty)
+        'reference_number': invoiceNumber,
       if (notes != null && notes.isNotEmpty) 'notes': notes,
       'items': [
         for (final it in items)
@@ -63,18 +70,23 @@ class GrnRepository {
             'quantity': it.quantity,
             'unit_price': it.unitPrice,
             if (it.taxId != null) 'tax_id': it.taxId,
-            if (it.discountPercent != null) 'discount_percentage': it.discountPercent,
+            if (it.discountPercent != null)
+              'discount_percentage': it.discountPercent,
             if (it.discountAmount != null) 'discount_amount': it.discountAmount,
           }
       ]
     };
     final createRes = await _dio.post('/purchases/quick', data: createBody);
-    final created = (createRes.data is Map && createRes.data['data'] != null) ? createRes.data['data'] as Map<String, dynamic> : (createRes.data as Map<String, dynamic>);
+    final created = (createRes.data is Map && createRes.data['data'] != null)
+        ? createRes.data['data'] as Map<String, dynamic>
+        : (createRes.data as Map<String, dynamic>);
     final purchaseId = created['purchase_id'] as int;
 
     // 2) Fetch purchase details to map to purchase_detail_id
     final purRes = await _dio.get('/purchases/$purchaseId');
-    final details = ((purRes.data['data'] as Map<String, dynamic>)['items'] as List).cast<Map<String, dynamic>>();
+    final details =
+        ((purRes.data['data'] as Map<String, dynamic>)['items'] as List)
+            .cast<Map<String, dynamic>>();
 
     // Build receive items by matching product_id
     final receiveItems = <Map<String, dynamic>>[];

@@ -28,7 +28,8 @@ class _StockTransfersPageState extends ConsumerState<StockTransfersPage> {
     final loc = ref.read(locationNotifierProvider).selected;
     final repo = ref.read(inventoryRepositoryProvider);
     final locationId = loc?.locationId;
-    int? src; int? dst;
+    int? src;
+    int? dst;
     switch (_direction) {
       case 'INCOMING':
         dst = locationId;
@@ -47,7 +48,9 @@ class _StockTransfersPageState extends ConsumerState<StockTransfersPage> {
   }
 
   Future<void> _refresh() async {
-    setState(() { _future = _load(); });
+    setState(() {
+      _future = _load();
+    });
     await _future;
   }
 
@@ -63,7 +66,8 @@ class _StockTransfersPageState extends ConsumerState<StockTransfersPage> {
             icon: const Icon(Icons.add_rounded),
             onPressed: () async {
               final created = await Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const StockTransferFormPage()),
+                MaterialPageRoute(
+                    builder: (_) => const StockTransferFormPage()),
               );
               if (created == true) await _refresh();
             },
@@ -80,19 +84,31 @@ class _StockTransfersPageState extends ConsumerState<StockTransfersPage> {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 const Text('Status:'),
-                for (final s in ['ALL','PENDING','IN_TRANSIT','COMPLETED','CANCELLED'])
+                for (final s in [
+                  'ALL',
+                  'PENDING',
+                  'IN_TRANSIT',
+                  'COMPLETED',
+                  'CANCELLED'
+                ])
                   ChoiceChip(
                     label: Text(s.replaceAll('_', ' ')),
                     selected: _status == s,
-                    onSelected: (_) => setState(() { _status = s; _future = _load(); }),
+                    onSelected: (_) => setState(() {
+                      _status = s;
+                      _future = _load();
+                    }),
                   ),
                 const SizedBox(width: 16),
                 const Text('Direction:'),
-                for (final d in ['ALL','INCOMING','OUTGOING'])
+                for (final d in ['ALL', 'INCOMING', 'OUTGOING'])
                   ChoiceChip(
                     label: Text(d),
                     selected: _direction == d,
-                    onSelected: (_) => setState(() { _direction = d; _future = _load(); }),
+                    onSelected: (_) => setState(() {
+                      _direction = d;
+                      _future = _load();
+                    }),
                   ),
                 const SizedBox(width: 16),
                 FilledButton.icon(
@@ -100,7 +116,9 @@ class _StockTransfersPageState extends ConsumerState<StockTransfersPage> {
                   label: const Text('Request Stock'),
                   onPressed: () async {
                     final created = await Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const StockTransferFormPage(mode: TransferMode.request)),
+                      MaterialPageRoute(
+                          builder: (_) => const StockTransferFormPage(
+                              mode: TransferMode.request)),
                     );
                     if (created == true) await _refresh();
                   },
@@ -118,13 +136,17 @@ class _StockTransfersPageState extends ConsumerState<StockTransfersPage> {
                     return const LinearProgressIndicator(minHeight: 2);
                   }
                   if (snapshot.hasError) {
-                    return Center(child: Padding(
+                    return Center(
+                        child: Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: Text('Failed to load transfers: ${snapshot.error}', style: TextStyle(color: theme.colorScheme.error)),
+                      child: Text('Failed to load transfers: ${snapshot.error}',
+                          style: TextStyle(color: theme.colorScheme.error)),
                     ));
                   }
                   final items = snapshot.data ?? const [];
-                  if (items.isEmpty) return const Center(child: Text('No transfers'));
+                  if (items.isEmpty) {
+                    return const Center(child: Text('No transfers'));
+                  }
                   return ListView.separated(
                     padding: const EdgeInsets.all(12),
                     itemCount: items.length,
@@ -165,31 +187,48 @@ class _TransferTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final meLoc = ref.watch(locationNotifierProvider).selected?.locationId;
-    final incoming = meLoc != null && item.toLocationId == meLoc && item.fromLocationId != meLoc;
-    final outgoing = meLoc != null && item.fromLocationId == meLoc && item.toLocationId != meLoc;
+    final incoming = meLoc != null &&
+        item.toLocationId == meLoc &&
+        item.fromLocationId != meLoc;
+    final outgoing = meLoc != null &&
+        item.fromLocationId == meLoc &&
+        item.toLocationId != meLoc;
     return ListTile(
       tileColor: theme.colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       title: Row(children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(color: _statusColor(context), borderRadius: BorderRadius.circular(999)),
-          child: Text(item.status.replaceAll('_', ' '), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+          decoration: BoxDecoration(
+              color: _statusColor(context),
+              borderRadius: BorderRadius.circular(999)),
+          child: Text(item.status.replaceAll('_', ' '),
+              style:
+                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
         ),
         const SizedBox(width: 8),
-        Expanded(child: Text(item.transferNumber, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
+        Expanded(
+            child: Text(item.transferNumber,
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700))),
       ]),
-      subtitle: Text('${item.fromLocationName} → ${item.toLocationName} • ${item.transferDate.toLocal()}'),
+      subtitle: Text(
+          '${item.fromLocationName} → ${item.toLocationName} • ${item.transferDate.toLocal()}'),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (incoming) const Icon(Icons.call_received_rounded) else if (outgoing) const Icon(Icons.call_made_rounded),
+          if (incoming)
+            const Icon(Icons.call_received_rounded)
+          else if (outgoing)
+            const Icon(Icons.call_made_rounded),
           const SizedBox(width: 4),
           const Icon(Icons.chevron_right_rounded),
         ],
       ),
       onTap: () async {
-        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => StockTransferViewPage(transferId: item.transferId)));
+        await Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) =>
+                StockTransferViewPage(transferId: item.transferId)));
       },
     );
   }

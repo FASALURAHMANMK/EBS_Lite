@@ -41,7 +41,8 @@ class SupplierDto {
         isActive: json['is_active'] as bool? ?? true,
         totalPurchases: (json['total_purchases'] as num?)?.toDouble() ?? 0,
         totalReturns: (json['total_returns'] as num?)?.toDouble() ?? 0,
-        outstandingAmount: (json['outstanding_amount'] as num?)?.toDouble() ?? 0,
+        outstandingAmount:
+            (json['outstanding_amount'] as num?)?.toDouble() ?? 0,
         lastPurchaseDate: json['last_purchase_date'] != null
             ? DateTime.tryParse(json['last_purchase_date'] as String)
             : null,
@@ -63,12 +64,14 @@ class SupplierSummaryDto {
     required this.outstandingBalance,
   });
 
-  factory SupplierSummaryDto.fromJson(Map<String, dynamic> json) => SupplierSummaryDto(
+  factory SupplierSummaryDto.fromJson(Map<String, dynamic> json) =>
+      SupplierSummaryDto(
         supplierId: json['supplier_id'] as int,
         totalPurchases: (json['total_purchases'] as num?)?.toDouble() ?? 0,
         totalPayments: (json['total_payments'] as num?)?.toDouble() ?? 0,
         totalReturns: (json['total_returns'] as num?)?.toDouble() ?? 0,
-        outstandingBalance: (json['outstanding_balance'] as num?)?.toDouble() ?? 0,
+        outstandingBalance:
+            (json['outstanding_balance'] as num?)?.toDouble() ?? 0,
       );
 }
 
@@ -87,12 +90,13 @@ class SupplierPaymentDto {
     this.referenceNumber,
   });
 
-  factory SupplierPaymentDto.fromJson(Map<String, dynamic> json) => SupplierPaymentDto(
+  factory SupplierPaymentDto.fromJson(Map<String, dynamic> json) =>
+      SupplierPaymentDto(
         paymentId: json['payment_id'] as int,
         paymentNumber: json['payment_number'] as String? ?? '',
         amount: (json['amount'] as num?)?.toDouble() ?? 0,
-        paymentDate: DateTime.tryParse(json['payment_date'] as String? ?? '') ?? DateTime.now(),
+        paymentDate: DateTime.tryParse(json['payment_date'] as String? ?? '') ??
+            DateTime.now(),
         referenceNumber: json['reference_number'] as String?,
       );
 }
-

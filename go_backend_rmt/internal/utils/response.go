@@ -48,6 +48,7 @@ func ErrorResponse(c *gin.Context, statusCode int, message string, err error) {
 			response.Error = err.Error()
 		}
 	}
+	attachRequestID(c, &response)
 
 	c.JSON(statusCode, response)
 }
@@ -59,6 +60,7 @@ func ValidationErrorResponse(c *gin.Context, validationErrors map[string]string)
 		Message: "Validation failed",
 		Data:    validationErrors,
 	}
+	attachRequestID(c, &response)
 	c.JSON(http.StatusBadRequest, response)
 }
 
@@ -79,6 +81,7 @@ func NotFoundResponse(c *gin.Context, message string) {
 		Success: false,
 		Message: message,
 	}
+	attachRequestID(c, &response)
 	c.JSON(http.StatusNotFound, response)
 }
 
@@ -88,6 +91,7 @@ func UnauthorizedResponse(c *gin.Context, message string) {
 		Success: false,
 		Message: message,
 	}
+	attachRequestID(c, &response)
 	c.JSON(http.StatusUnauthorized, response)
 }
 
@@ -97,6 +101,7 @@ func ForbiddenResponse(c *gin.Context, message string) {
 		Success: false,
 		Message: message,
 	}
+	attachRequestID(c, &response)
 	c.JSON(http.StatusForbidden, response)
 }
 
@@ -106,6 +111,7 @@ func ConflictResponse(c *gin.Context, message string) {
 		Success: false,
 		Message: message,
 	}
+	attachRequestID(c, &response)
 	c.JSON(http.StatusConflict, response)
 }
 
@@ -122,6 +128,7 @@ func InternalServerErrorResponse(c *gin.Context, message string, err error) {
 			response.Error = err.Error()
 		}
 	}
+	attachRequestID(c, &response)
 
 	c.JSON(http.StatusInternalServerError, response)
 }
@@ -137,6 +144,9 @@ func logRequestError(c *gin.Context, err error) {
 	requestID := ""
 	if c != nil {
 		requestID = c.GetString("request_id")
+		if requestID == "" && c.Request != nil {
+			requestID = c.Request.Header.Get("X-Request-ID")
+		}
 	}
 	path := ""
 	method := ""
@@ -145,4 +155,17 @@ func logRequestError(c *gin.Context, err error) {
 		method = c.Request.Method
 	}
 	log.Printf("request_id=%s method=%s path=%s error=%v", requestID, method, path, err)
+}
+
+func attachRequestID(c *gin.Context, response *models.APIResponse) {
+	if c == nil || response == nil {
+		return
+	}
+	requestID := c.GetString("request_id")
+	if requestID == "" && c.Request != nil {
+		requestID = c.Request.Header.Get("X-Request-ID")
+	}
+	if requestID != "" {
+		response.RequestID = requestID
+	}
 }

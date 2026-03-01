@@ -6,6 +6,8 @@ servers:
 - url: /api/v1
 paths:
   /health:
+    servers:
+    - url: /
     get:
       summary: GET /health
       responses:
@@ -369,6 +371,32 @@ paths:
         required: true
         schema:
           type: string
+  /companies/{id}/logo:
+    post:
+      summary: POST /api/v1/companies/{id}/logo
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
   /locations:
     get:
       summary: GET /api/v1/locations
@@ -719,6 +747,42 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateBrandRequest'
+  /brands/{id}:
+    put:
+      summary: PUT /api/v1/brands/{id}
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+    delete:
+      summary: DELETE /api/v1/brands/{id}
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
   /units:
     get:
       summary: GET /api/v1/units
@@ -862,6 +926,64 @@ paths:
                       type: array
                       items:
                         $ref: '#/components/schemas/StockAdjustment'
+  /inventory/product-transactions:
+    get:
+      summary: GET /api/v1/inventory/product-transactions
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /inventory/stock-adjustment-documents:
+    post:
+      summary: Create a stock adjustment document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStockAdjustmentDocumentRequest'
+      responses:
+        '200':
+          description: Document created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+    get:
+      summary: List stock adjustment documents
+      responses:
+        '200':
+          description: Documents
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/StockAdjustmentDocument'
+  /inventory/stock-adjustment-documents/{id}:
+    get:
+      summary: Get a stock adjustment document
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Document detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
   /inventory/summary:
     get:
       summary: GET /api/v1/inventory/summary
@@ -1338,6 +1460,52 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
+  /pos/calculate:
+    post:
+      summary: POST /api/v1/pos/calculate
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /pos/hold:
+    post:
+      summary: POST /api/v1/pos/hold
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /pos/void/{id}:
+    post:
+      summary: POST /api/v1/pos/void/{id}
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
   /pos/print:
     post:
       summary: POST /api/v1/pos/print
@@ -1459,6 +1627,80 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
+    put:
+      summary: PUT /api/v1/loyalty/settings
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /loyalty/tiers:
+    get:
+      summary: GET /api/v1/loyalty/tiers
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+    post:
+      summary: POST /api/v1/loyalty/tiers
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /loyalty/tiers/{id}:
+    put:
+      summary: PUT /api/v1/loyalty/tiers/{id}
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+    delete:
+      summary: DELETE /api/v1/loyalty/tiers/{id}
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
   /loyalty/award-points:
     post:
       summary: POST /api/v1/loyalty/award-points
@@ -1566,6 +1808,21 @@ paths:
                 $ref: '#/components/schemas/APIResponse'
     post:
       summary: POST /api/v1/sale-returns
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /sale-returns/by-customer:
+    post:
+      summary: POST /api/v1/sale-returns/by-customer
       responses:
         '200':
           description: Successful response
@@ -1817,6 +2074,32 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
+  /purchases/{id}/invoice:
+    post:
+      summary: POST /api/v1/purchases/{id}/invoice
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
   /purchase-orders:
     post:
       summary: POST /api/v1/purchase-orders
@@ -1895,6 +2178,15 @@ paths:
             schema:
               $ref: '#/components/schemas/GenericObject'
   /goods-receipts:
+    get:
+      summary: GET /api/v1/goods-receipts
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
     post:
       summary: POST /api/v1/goods-receipts
       responses:
@@ -1909,6 +2201,22 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
+  /goods-receipts/{id}:
+    get:
+      summary: GET /api/v1/goods-receipts/{id}
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
   /purchase-returns:
     get:
       summary: GET /api/v1/purchase-returns
@@ -1989,6 +2297,32 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
+  /purchase-returns/{id}/receipt:
+    post:
+      summary: POST /api/v1/purchase-returns/{id}/receipt
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
   /customers:
     get:
       summary: GET /api/v1/customers
@@ -2055,6 +2389,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/APIResponse'
   /customers/{id}:
+    get:
+      summary: GET /api/v1/customers/{id}
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
     put:
       summary: PUT /api/v1/customers/{id}
       responses:
@@ -3401,6 +3750,37 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
+  /settings/payment-methods/currencies:
+    get:
+      summary: GET /api/v1/settings/payment-methods/currencies
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /settings/payment-methods/{id}/currencies:
+    put:
+      summary: PUT /api/v1/settings/payment-methods/{id}/currencies
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
   /settings/printer:
     get:
       summary: GET /api/v1/settings/printer
@@ -4455,54 +4835,6 @@ components:
         is_deleted:
           type: boolean
           nullable: true
-  /inventory/stock-adjustment-documents:
-    post:
-      summary: Create a stock adjustment document
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateStockAdjustmentDocumentRequest'
-      responses:
-        '200':
-          description: Document created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/APIResponse'
-    get:
-      summary: List stock adjustment documents
-      responses:
-        '200':
-          description: Documents
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/APIResponse'
-                - type: object
-                  properties:
-                    data:
-                      type: array
-                      items:
-                        $ref: '#/components/schemas/StockAdjustmentDocument'
-  /inventory/stock-adjustment-documents/{id}:
-    get:
-      summary: Get a stock adjustment document
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: Document detail
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/APIResponse'
     CreateStockAdjustmentDocumentRequest:
       type: object
       properties:

@@ -19,8 +19,8 @@ class SettingsPage extends ConsumerWidget {
             leading: const Icon(Icons.palette_rounded),
             title: const Text('Theme'),
             subtitle: const Text('Light / Dark'),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: theme.colorScheme.surface,
           ),
           const SizedBox(height: 12),
@@ -32,8 +32,8 @@ class SettingsPage extends ConsumerWidget {
             subtitle: const Text('Show floating quick actions'),
             secondary: const Icon(Icons.flash_on_rounded),
             tileColor: theme.colorScheme.surface,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           ),
           const SizedBox(height: 12),
@@ -41,8 +41,8 @@ class SettingsPage extends ConsumerWidget {
             leading: const Icon(Icons.notifications_rounded),
             title: const Text('Notifications'),
             subtitle: const Text('Manage alerts and reminders'),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: theme.colorScheme.surface,
           ),
           const SizedBox(height: 12),
@@ -50,8 +50,8 @@ class SettingsPage extends ConsumerWidget {
             leading: const Icon(Icons.business_rounded),
             title: const Text('Company Settings'),
             subtitle: const Text('Manage Company Settings'),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: theme.colorScheme.surface,
             onTap: () {
               Navigator.of(context).push(
@@ -59,13 +59,13 @@ class SettingsPage extends ConsumerWidget {
               );
             },
           ),
-           const SizedBox(height: 12),
+          const SizedBox(height: 12),
           ListTile(
             leading: const Icon(Icons.security_rounded),
             title: const Text('Security'),
             subtitle: const Text('Two-factor, sessions'),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: theme.colorScheme.surface,
           ),
         ],

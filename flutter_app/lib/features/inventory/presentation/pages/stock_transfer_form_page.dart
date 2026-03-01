@@ -14,16 +14,21 @@ class StockTransferFormPage extends ConsumerStatefulWidget {
   final TransferMode mode;
 
   @override
-  ConsumerState<StockTransferFormPage> createState() => _StockTransferFormPageState();
+  ConsumerState<StockTransferFormPage> createState() =>
+      _StockTransferFormPageState();
 }
 
-class _LineItem { int? productId; String? name; double qty = 0; }
+class _LineItem {
+  int? productId;
+  String? name;
+  double qty = 0;
+}
 
 class _StockTransferFormPageState extends ConsumerState<StockTransferFormPage> {
   final _formKey = GlobalKey<FormState>();
   int? _fromLocationId; // used only in request mode (override)
-  int? _toLocationId;   // used only in transfer mode (pick dest)
-  final List<_LineItem> _items = [ _LineItem() ];
+  int? _toLocationId; // used only in transfer mode (pick dest)
+  final List<_LineItem> _items = [_LineItem()];
   final _notes = TextEditingController();
   bool _saving = false;
 
@@ -51,10 +56,13 @@ class _StockTransferFormPageState extends ConsumerState<StockTransferFormPage> {
     setState(() => _saving = true);
     try {
       // Build items payload
-      final payload = _items.where((e) => (e.productId ?? 0) > 0 && e.qty > 0).map((e) => {
-        'product_id': e.productId,
-        'quantity': e.qty,
-      }).toList();
+      final payload = _items
+          .where((e) => (e.productId ?? 0) > 0 && e.qty > 0)
+          .map((e) => {
+                'product_id': e.productId,
+                'quantity': e.qty,
+              })
+          .toList();
       if (payload.isEmpty) throw Exception('At least one line item required');
 
       final selectedLoc = ref.read(locationNotifierProvider).selected;
@@ -74,7 +82,9 @@ class _StockTransferFormPageState extends ConsumerState<StockTransferFormPage> {
         // request: to = selected, from = chosen
         toId = selectedId;
         fromOverride = _fromLocationId;
-        if (fromOverride == null || fromOverride <= 0) throw Exception('Select source location');
+        if (fromOverride == null || fromOverride <= 0) {
+          throw Exception('Select source location');
+        }
         if (fromOverride == selectedId) {
           throw Exception('Source and destination cannot be the same location');
         }
@@ -85,16 +95,18 @@ class _StockTransferFormPageState extends ConsumerState<StockTransferFormPage> {
         final pid = e.productId;
         final qty = e.qty;
         if (pid == null || qty <= 0) continue;
-        final checkSource = (widget.mode == TransferMode.request)
-            ? fromOverride
-            : selectedId;
+        final checkSource =
+            (widget.mode == TransferMode.request) ? fromOverride : selectedId;
         if (checkSource == null || checkSource <= 0) {
           throw Exception('Source location is not selected');
         }
-        final stockItem = await repo.getStockForProductAtLocation(productId: pid, locationId: checkSource);
+        final stockItem = await repo.getStockForProductAtLocation(
+            productId: pid, locationId: checkSource);
         final avail = stockItem?.stock ?? 0;
-        if (qty > avail + 1e-9) { // tolerance
-          throw Exception("Requested quantity for '${e.name ?? 'Product #$pid'}' (${qty.toStringAsFixed(3)}) exceeds available (${avail.toStringAsFixed(3)}) at source.");
+        if (qty > avail + 1e-9) {
+          // tolerance
+          throw Exception(
+              "Requested quantity for '${e.name ?? 'Product #$pid'}' (${qty.toStringAsFixed(3)}) exceeds available (${avail.toStringAsFixed(3)}) at source.");
         }
       }
 
@@ -110,7 +122,8 @@ class _StockTransferFormPageState extends ConsumerState<StockTransferFormPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Failed to submit: ${ErrorHandler.message(e)}')));
+        ..showSnackBar(SnackBar(
+            content: Text('Failed to submit: ${ErrorHandler.message(e)}')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -153,7 +166,9 @@ class _StockTransferFormPageState extends ConsumerState<StockTransferFormPage> {
                 sourceLocationId: widget.mode == TransferMode.request
                     ? _fromLocationId
                     : ref.watch(locationNotifierProvider).selected?.locationId,
-                onRemove: _items.length > 1 ? () => setState(() => _items.removeAt(i)) : null,
+                onRemove: _items.length > 1
+                    ? () => setState(() => _items.removeAt(i))
+                    : null,
               ),
             const SizedBox(height: 8),
             Align(
@@ -178,7 +193,13 @@ class _StockTransferFormPageState extends ConsumerState<StockTransferFormPage> {
               alignment: Alignment.centerRight,
               child: FilledButton.icon(
                 onPressed: _saving ? null : _submit,
-                icon: _saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.send_rounded),
+                icon: _saving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.send_rounded),
                 label: Text(isRequest ? 'Send Request' : 'Create Transfer'),
               ),
             ),
@@ -190,7 +211,11 @@ class _StockTransferFormPageState extends ConsumerState<StockTransferFormPage> {
 }
 
 class _LocationDropdown extends StatelessWidget {
-  const _LocationDropdown({required this.label, required this.value, required this.locations, required this.onChanged});
+  const _LocationDropdown(
+      {required this.label,
+      required this.value,
+      required this.locations,
+      required this.onChanged});
   final String label;
   final int? value;
   final List<Location> locations;
@@ -199,12 +224,16 @@ class _LocationDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InputDecorator(
-      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+      decoration:
+          InputDecoration(labelText: label, border: const OutlineInputBorder()),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<int?>(
           isExpanded: true,
           value: value,
-          items: locations.map((l) => DropdownMenuItem<int?>(value: l.locationId, child: Text(l.name))).toList(),
+          items: locations
+              .map((l) => DropdownMenuItem<int?>(
+                  value: l.locationId, child: Text(l.name)))
+              .toList(),
           onChanged: onChanged,
         ),
       ),
@@ -213,7 +242,11 @@ class _LocationDropdown extends StatelessWidget {
 }
 
 class _LineEditor extends ConsumerStatefulWidget {
-  const _LineEditor({super.key, required this.line, this.onRemove, required this.sourceLocationId});
+  const _LineEditor(
+      {super.key,
+      required this.line,
+      this.onRemove,
+      required this.sourceLocationId});
   final _LineItem line;
   final VoidCallback? onRemove;
   final int? sourceLocationId;
@@ -260,7 +293,8 @@ class _LineEditorState extends ConsumerState<_LineEditor> {
     _lastSourceLoc = src;
     try {
       final repo = ref.read(inventoryRepositoryProvider);
-      final item = await repo.getStockForProductAtLocation(productId: pid, locationId: src);
+      final item = await repo.getStockForProductAtLocation(
+          productId: pid, locationId: src);
       if (!mounted) return;
       setState(() => _available = item?.stock);
     } catch (_) {
@@ -281,14 +315,21 @@ class _LineEditorState extends ConsumerState<_LineEditor> {
         child: Column(
           children: [
             Row(children: [
-              Expanded(child: _ProductPicker(line: widget.line, onPicked: () async { await _maybeLoadAvailable(); })),
+              Expanded(
+                  child: _ProductPicker(
+                      line: widget.line,
+                      onPicked: () async {
+                        await _maybeLoadAvailable();
+                      })),
               const SizedBox(width: 12),
               SizedBox(
                 width: 140,
                 child: TextFormField(
                   controller: _qtyCtrl,
-                  decoration: const InputDecoration(labelText: 'Quantity', border: OutlineInputBorder()),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                      labelText: 'Quantity', border: OutlineInputBorder()),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                   validator: (v) {
                     final q = double.tryParse((v ?? '').trim());
                     if (q == null || q <= 0) return 'Required';
@@ -297,21 +338,27 @@ class _LineEditorState extends ConsumerState<_LineEditor> {
                     }
                     return null;
                   },
-                  onChanged: (v) => widget.line.qty = double.tryParse(v.trim()) ?? 0,
+                  onChanged: (v) =>
+                      widget.line.qty = double.tryParse(v.trim()) ?? 0,
                 ),
               ),
               const SizedBox(width: 8),
               if (widget.onRemove != null)
-                IconButton(onPressed: widget.onRemove, icon: const Icon(Icons.remove_circle_outline_rounded)),
+                IconButton(
+                    onPressed: widget.onRemove,
+                    icon: const Icon(Icons.remove_circle_outline_rounded)),
             ]),
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 _available == null
-                    ? (widget.sourceLocationId == null ? 'Select source location to view availability' : 'Available: —')
+                    ? (widget.sourceLocationId == null
+                        ? 'Select source location to view availability'
+                        : 'Available: —')
                     : 'Available: ${_available!.toStringAsFixed(3)}',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
             ),
           ],
@@ -340,13 +387,18 @@ class _ProductPicker extends ConsumerWidget {
         }
       },
       child: InputDecorator(
-        decoration: const InputDecoration(prefixIcon: Icon(Icons.inventory_2_rounded), hintText: 'Select product', border: OutlineInputBorder()),
-        child: Text(line.name ?? 'Select product', style: theme.textTheme.bodyMedium),
+        decoration: const InputDecoration(
+            prefixIcon: Icon(Icons.inventory_2_rounded),
+            hintText: 'Select product',
+            border: OutlineInputBorder()),
+        child: Text(line.name ?? 'Select product',
+            style: theme.textTheme.bodyMedium),
       ),
     );
   }
 
-  Future<InventoryListItem?> _openDialog(BuildContext context, WidgetRef ref) async {
+  Future<InventoryListItem?> _openDialog(
+      BuildContext context, WidgetRef ref) async {
     final repo = ref.read(inventoryRepositoryProvider);
     String query = '';
     List<InventoryListItem> results = const [];
@@ -361,7 +413,9 @@ class _ProductPicker extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
-                  decoration: const InputDecoration(hintText: 'Search', prefixIcon: Icon(Icons.search_rounded)),
+                  decoration: const InputDecoration(
+                      hintText: 'Search',
+                      prefixIcon: Icon(Icons.search_rounded)),
                   onChanged: (v) async {
                     query = v.trim();
                     if (query.length < 2) {
@@ -381,7 +435,10 @@ class _ProductPicker extends ConsumerWidget {
                       final p = results[i];
                       return ListTile(
                         title: Text(p.name),
-                        subtitle: Text([(p.sku ?? ''), if ((p.categoryName ?? '').isNotEmpty) p.categoryName!].where((e) => e.toString().isNotEmpty).join(' · ')),
+                        subtitle: Text([
+                          (p.sku ?? ''),
+                          if ((p.categoryName ?? '').isNotEmpty) p.categoryName!
+                        ].where((e) => e.toString().isNotEmpty).join(' · ')),
                         onTap: () => Navigator.of(context).pop(p),
                       );
                     },
@@ -391,7 +448,9 @@ class _ProductPicker extends ConsumerWidget {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel')),
           ],
         ),
       ),

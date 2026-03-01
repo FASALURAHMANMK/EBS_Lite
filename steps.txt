@@ -70,6 +70,7 @@ Deliverable: you can deploy by running `PostgrSQL.sql` on a clean Postgres DB an
 --------------------------------------------
 3.1 Configurable base URL
 - Replace hardcoded base URL with `--dart-define=API_BASE_URL=https://api.yourdomain.com/api/v1`.
+- Default dev fallback is `http://127.0.0.1:8080/api/v1` when `API_BASE_URL` is not set.
 - Provide dev defaults for localhost/emulator, but production must be HTTPS.
 
 3.2 Feature gating

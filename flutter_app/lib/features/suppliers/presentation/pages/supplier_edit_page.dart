@@ -87,28 +87,54 @@ class _SupplierEditPageState extends ConsumerState<SupplierEditPage> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                TextField(controller: _name, decoration: const InputDecoration(labelText: 'Name')),
+                TextField(
+                    controller: _name,
+                    decoration: const InputDecoration(labelText: 'Name')),
                 const SizedBox(height: 8),
-                TextField(controller: _contact, decoration: const InputDecoration(labelText: 'Contact Person')),
+                TextField(
+                    controller: _contact,
+                    decoration:
+                        const InputDecoration(labelText: 'Contact Person')),
                 const SizedBox(height: 8),
-                TextField(controller: _phone, decoration: const InputDecoration(labelText: 'Phone')),
+                TextField(
+                    controller: _phone,
+                    decoration: const InputDecoration(labelText: 'Phone')),
                 const SizedBox(height: 8),
-                TextField(controller: _email, decoration: const InputDecoration(labelText: 'Email')),
+                TextField(
+                    controller: _email,
+                    decoration: const InputDecoration(labelText: 'Email')),
                 const SizedBox(height: 8),
-                TextField(controller: _address, decoration: const InputDecoration(labelText: 'Address')),
+                TextField(
+                    controller: _address,
+                    decoration: const InputDecoration(labelText: 'Address')),
                 const SizedBox(height: 8),
                 Row(children: [
-                  Expanded(child: TextField(controller: _terms, decoration: const InputDecoration(labelText: 'Payment Terms (days)'), keyboardType: TextInputType.number)),
+                  Expanded(
+                      child: TextField(
+                          controller: _terms,
+                          decoration: const InputDecoration(
+                              labelText: 'Payment Terms (days)'),
+                          keyboardType: TextInputType.number)),
                   const SizedBox(width: 12),
-                  Expanded(child: TextField(controller: _credit, decoration: const InputDecoration(labelText: 'Credit Limit'), keyboardType: TextInputType.number)),
+                  Expanded(
+                      child: TextField(
+                          controller: _credit,
+                          decoration:
+                              const InputDecoration(labelText: 'Credit Limit'),
+                          keyboardType: TextInputType.number)),
                 ]),
                 const SizedBox(height: 8),
-                SwitchListTile(value: _active, onChanged: (v) => setState(() => _active = v), title: const Text('Active')),
+                SwitchListTile(
+                    value: _active,
+                    onChanged: (v) => setState(() => _active = v),
+                    title: const Text('Active')),
                 const SizedBox(height: 12),
-                FilledButton.icon(onPressed: _saving ? null : _save, icon: const Icon(Icons.save_rounded), label: const Text('Save')),
+                FilledButton.icon(
+                    onPressed: _saving ? null : _save,
+                    icon: const Icon(Icons.save_rounded),
+                    label: const Text('Save')),
               ],
             ),
     );
   }
 }
-

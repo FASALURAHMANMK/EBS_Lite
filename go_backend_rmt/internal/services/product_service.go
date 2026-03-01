@@ -10,6 +10,8 @@ import (
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
+
+	"github.com/lib/pq"
 )
 
 type AttributeDefinitionProvider interface {
@@ -82,37 +84,49 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 	defer rows.Close()
 
 	var products []models.Product
+	productIDs := make([]int, 0)
 	for rows.Next() {
 		var product models.Product
-        err := rows.Scan(
-            &product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
-            &product.UnitID, &product.Name, &product.SKU, &product.Description,
-            &product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
-            &product.Dimensions, &product.IsSerialized, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
-            &product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
-        )
+		err := rows.Scan(
+			&product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
+			&product.UnitID, &product.Name, &product.SKU, &product.Description,
+			&product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
+			&product.Dimensions, &product.IsSerialized, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
+			&product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan product: %w", err)
 		}
 
-		product.Barcodes, err = s.getProductBarcodes(product.ProductID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get product barcodes: %w", err)
-		}
-
-		product.Attributes, err = s.getProductAttributes(product.ProductID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get product attributes: %w", err)
-		}
-
 		products = append(products, product)
+		productIDs = append(productIDs, product.ProductID)
+	}
+
+	if len(products) == 0 {
+		return products, nil
+	}
+
+	barcodesByProduct, err := s.getProductBarcodesByProductIDs(productIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get product barcodes: %w", err)
+	}
+
+	attributesByProduct, err := s.getProductAttributesByProductIDs(productIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get product attributes: %w", err)
+	}
+
+	for i := range products {
+		id := products[i].ProductID
+		products[i].Barcodes = barcodesByProduct[id]
+		products[i].Attributes = attributesByProduct[id]
 	}
 
 	return products, nil
 }
 
 func (s *ProductService) GetProductByID(productID, companyID int) (*models.Product, error) {
-    query := `
+	query := `
                 SELECT product_id, company_id, category_id, brand_id, unit_id, name, sku,
                            description, cost_price, selling_price, reorder_level, weight, dimensions,
                            is_serialized, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted,
@@ -122,14 +136,14 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
         `
 
 	var product models.Product
-    err := s.db.QueryRow(query, productID, companyID).Scan(
-        &product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
-        &product.UnitID, &product.Name, &product.SKU, &product.Description,
-        &product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
-        &product.Dimensions, &product.IsSerialized, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
-        &product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
-        &product.DefaultSupplierID, &product.TaxID,
-    )
+	err := s.db.QueryRow(query, productID, companyID).Scan(
+		&product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
+		&product.UnitID, &product.Name, &product.SKU, &product.Description,
+		&product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
+		&product.Dimensions, &product.IsSerialized, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
+		&product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
+		&product.DefaultSupplierID, &product.TaxID,
+	)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("product not found")
@@ -181,7 +195,7 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 	}
 	defer tx.Rollback()
 
-    query := `
+	query := `
                 INSERT INTO products (
                         company_id, category_id, brand_id, unit_id, tax_id, name, sku, description,
                         cost_price, selling_price, reorder_level, weight, dimensions, is_serialized,
@@ -191,11 +205,11 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
         `
 
 	var product models.Product
-    err = tx.QueryRow(query,
-        companyID, req.CategoryID, req.BrandID, req.UnitID, req.TaxID, req.Name, req.SKU,
-        req.Description, req.CostPrice, req.SellingPrice, req.ReorderLevel, req.Weight,
-        req.Dimensions, req.IsSerialized, userID, userID, req.DefaultSupplierID,
-    ).Scan(&product.ProductID, &product.CreatedAt)
+	err = tx.QueryRow(query,
+		companyID, req.CategoryID, req.BrandID, req.UnitID, req.TaxID, req.Name, req.SKU,
+		req.Description, req.CostPrice, req.SellingPrice, req.ReorderLevel, req.Weight,
+		req.Dimensions, req.IsSerialized, userID, userID, req.DefaultSupplierID,
+	).Scan(&product.ProductID, &product.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create product: %w", err)
 	}
@@ -222,8 +236,8 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 	product.CategoryID = req.CategoryID
 	product.BrandID = req.BrandID
 	product.UnitID = req.UnitID
-    product.Name = req.Name
-    product.TaxID = req.TaxID
+	product.Name = req.Name
+	product.TaxID = req.TaxID
 	product.SKU = req.SKU
 	product.Barcodes = req.Barcodes
 	product.Description = req.Description
@@ -236,8 +250,8 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 	product.IsActive = true
 	product.CreatedBy = userID
 	product.UpdatedBy = &userID
-    product.Attributes, _ = s.getProductAttributes(product.ProductID)
-    product.DefaultSupplierID = req.DefaultSupplierID
+	product.Attributes, _ = s.getProductAttributes(product.ProductID)
+	product.DefaultSupplierID = req.DefaultSupplierID
 
 	return &product, nil
 }
@@ -353,24 +367,24 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 		args = append(args, *req.IsSerialized)
 		changes["is_serialized"] = *req.IsSerialized
 	}
-    if req.IsActive != nil {
-        argCount++
-        setParts = append(setParts, fmt.Sprintf("is_active = $%d", argCount))
-        args = append(args, *req.IsActive)
-        changes["is_active"] = *req.IsActive
-    }
-    if req.TaxID != nil {
-        argCount++
-        setParts = append(setParts, fmt.Sprintf("tax_id = $%d", argCount))
-        args = append(args, *req.TaxID)
-        changes["tax_id"] = *req.TaxID
-    }
-    if req.DefaultSupplierID != nil {
-        argCount++
-        setParts = append(setParts, fmt.Sprintf("default_supplier_id = $%d", argCount))
-        args = append(args, *req.DefaultSupplierID)
-        changes["default_supplier_id"] = *req.DefaultSupplierID
-    }
+	if req.IsActive != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("is_active = $%d", argCount))
+		args = append(args, *req.IsActive)
+		changes["is_active"] = *req.IsActive
+	}
+	if req.TaxID != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("tax_id = $%d", argCount))
+		args = append(args, *req.TaxID)
+		changes["tax_id"] = *req.TaxID
+	}
+	if req.DefaultSupplierID != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("default_supplier_id = $%d", argCount))
+		args = append(args, *req.DefaultSupplierID)
+		changes["default_supplier_id"] = *req.DefaultSupplierID
+	}
 	if req.Barcodes != nil {
 		changes["barcodes"] = req.Barcodes
 	}
@@ -645,66 +659,66 @@ func (s *ProductService) CreateBrand(companyID, userID int, req *models.CreateBr
 }
 
 func (s *ProductService) UpdateBrand(companyID, brandID, userID int, req *models.UpdateBrandRequest) (*models.Brand, error) {
-    setParts := []string{}
-    args := []interface{}{}
-    argCount := 1
+	setParts := []string{}
+	args := []interface{}{}
+	argCount := 1
 
-    if req.Name != nil {
-        setParts = append(setParts, fmt.Sprintf("name = $%d", argCount))
-        args = append(args, *req.Name)
-        argCount++
-    }
-    if req.Description != nil {
-        setParts = append(setParts, fmt.Sprintf("description = $%d", argCount))
-        args = append(args, *req.Description)
-        argCount++
-    }
-    if req.IsActive != nil {
-        setParts = append(setParts, fmt.Sprintf("is_active = $%d", argCount))
-        args = append(args, *req.IsActive)
-        argCount++
-    }
+	if req.Name != nil {
+		setParts = append(setParts, fmt.Sprintf("name = $%d", argCount))
+		args = append(args, *req.Name)
+		argCount++
+	}
+	if req.Description != nil {
+		setParts = append(setParts, fmt.Sprintf("description = $%d", argCount))
+		args = append(args, *req.Description)
+		argCount++
+	}
+	if req.IsActive != nil {
+		setParts = append(setParts, fmt.Sprintf("is_active = $%d", argCount))
+		args = append(args, *req.IsActive)
+		argCount++
+	}
 
-    if len(setParts) == 0 {
-        return nil, fmt.Errorf("no fields to update")
-    }
+	if len(setParts) == 0 {
+		return nil, fmt.Errorf("no fields to update")
+	}
 
-    setParts = append(setParts, fmt.Sprintf("updated_by = $%d", argCount))
-    args = append(args, userID)
-    argCount++
+	setParts = append(setParts, fmt.Sprintf("updated_by = $%d", argCount))
+	args = append(args, userID)
+	argCount++
 
-    query := fmt.Sprintf(`UPDATE brands SET %s, updated_at = CURRENT_TIMESTAMP WHERE brand_id = $%d AND company_id = $%d RETURNING brand_id, company_id, name, description, is_active, created_by, updated_by, created_at, updated_at`, strings.Join(setParts, ", "), argCount, argCount+1)
-    args = append(args, brandID, companyID)
+	query := fmt.Sprintf(`UPDATE brands SET %s, updated_at = CURRENT_TIMESTAMP WHERE brand_id = $%d AND company_id = $%d RETURNING brand_id, company_id, name, description, is_active, created_by, updated_by, created_at, updated_at`, strings.Join(setParts, ", "), argCount, argCount+1)
+	args = append(args, brandID, companyID)
 
-    var brand models.Brand
-    err := s.db.QueryRow(query, args...).Scan(
-        &brand.BrandID, &brand.CompanyID, &brand.Name, &brand.Description,
-        &brand.IsActive, &brand.CreatedBy, &brand.UpdatedBy, &brand.CreatedAt, &brand.UpdatedAt,
-    )
-    if err != nil {
-        if err == sql.ErrNoRows {
-            return nil, fmt.Errorf("brand not found")
-        }
-        return nil, fmt.Errorf("failed to update brand: %w", err)
-    }
+	var brand models.Brand
+	err := s.db.QueryRow(query, args...).Scan(
+		&brand.BrandID, &brand.CompanyID, &brand.Name, &brand.Description,
+		&brand.IsActive, &brand.CreatedBy, &brand.UpdatedBy, &brand.CreatedAt, &brand.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("brand not found")
+		}
+		return nil, fmt.Errorf("failed to update brand: %w", err)
+	}
 
-    return &brand, nil
+	return &brand, nil
 }
 
 func (s *ProductService) DeleteBrand(companyID, brandID, userID int) error {
-    query := `UPDATE brands SET is_active = FALSE, updated_by = $3, updated_at = CURRENT_TIMESTAMP WHERE brand_id = $1 AND company_id = $2 AND is_active = TRUE`
-    res, err := s.db.Exec(query, brandID, companyID, userID)
-    if err != nil {
-        return fmt.Errorf("failed to delete brand: %w", err)
-    }
-    rows, err := res.RowsAffected()
-    if err != nil {
-        return fmt.Errorf("failed to get rows affected: %w", err)
-    }
-    if rows == 0 {
-        return fmt.Errorf("brand not found")
-    }
-    return nil
+	query := `UPDATE brands SET is_active = FALSE, updated_by = $3, updated_at = CURRENT_TIMESTAMP WHERE brand_id = $1 AND company_id = $2 AND is_active = TRUE`
+	res, err := s.db.Exec(query, brandID, companyID, userID)
+	if err != nil {
+		return fmt.Errorf("failed to delete brand: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("brand not found")
+	}
+	return nil
 }
 
 // Units
@@ -830,6 +844,53 @@ func (s *ProductService) getProductAttributes(productID int) ([]models.ProductAt
 		attrs = append(attrs, val)
 	}
 	return attrs, nil
+}
+
+func (s *ProductService) getProductBarcodesByProductIDs(productIDs []int) (map[int][]models.ProductBarcode, error) {
+	result := make(map[int][]models.ProductBarcode)
+	if len(productIDs) == 0 {
+		return result, nil
+	}
+
+	rows, err := s.db.Query(`SELECT barcode_id, product_id, barcode, pack_size, cost_price, selling_price, is_primary FROM product_barcodes WHERE product_id = ANY($1)`, pq.Array(productIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var bc models.ProductBarcode
+		if err := rows.Scan(&bc.BarcodeID, &bc.ProductID, &bc.Barcode, &bc.PackSize, &bc.CostPrice, &bc.SellingPrice, &bc.IsPrimary); err != nil {
+			return nil, err
+		}
+		result[bc.ProductID] = append(result[bc.ProductID], bc)
+	}
+
+	return result, nil
+}
+
+func (s *ProductService) getProductAttributesByProductIDs(productIDs []int) (map[int][]models.ProductAttributeValue, error) {
+	result := make(map[int][]models.ProductAttributeValue)
+	if len(productIDs) == 0 {
+		return result, nil
+	}
+
+	rows, err := s.db.Query(`SELECT pav.attribute_id, pav.product_id, pav.value, pa.company_id, pa.name, pa.type, pa.is_required, pa.options FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.attribute_id WHERE pav.product_id = ANY($1)`, pq.Array(productIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var val models.ProductAttributeValue
+		if err := rows.Scan(&val.AttributeID, &val.ProductID, &val.Value, &val.Definition.CompanyID, &val.Definition.Name, &val.Definition.Type, &val.Definition.IsRequired, &val.Definition.Options); err != nil {
+			return nil, err
+		}
+		val.Definition.AttributeID = val.AttributeID
+		result[val.ProductID] = append(result[val.ProductID], val)
+	}
+
+	return result, nil
 }
 
 type sqlExecutor interface {

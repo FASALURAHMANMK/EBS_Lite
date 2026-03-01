@@ -43,11 +43,12 @@ type SyncModel struct {
 
 // APIResponse is the standard response format
 type APIResponse struct {
-	Success bool        `json:"success"`
-	Message string      `json:"message,omitempty"`
-	Data    interface{} `json:"data,omitempty"`
-	Error   string      `json:"error,omitempty"`
-	Meta    *Meta       `json:"meta,omitempty"`
+	Success   bool        `json:"success"`
+	Message   string      `json:"message,omitempty"`
+	Data      interface{} `json:"data,omitempty"`
+	Error     string      `json:"error,omitempty"`
+	RequestID string      `json:"request_id,omitempty"`
+	Meta      *Meta       `json:"meta,omitempty"`
 }
 
 // Meta contains pagination and other metadata

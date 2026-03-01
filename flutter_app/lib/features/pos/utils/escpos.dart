@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platform_image_3.dart' hide PrinterDevice;
+import 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platform_image_3.dart'
+    hide PrinterDevice;
 
 import '../data/printer_settings_repository.dart';
 
@@ -61,7 +62,9 @@ Future<void> printThermalOverTcp({
   final width = paperSize == '58mm' ? 32 : 48; // typical char widths
   final p = _ticketFromSale(sale: sale, company: company, charsPerLine: width);
 
-  if (settings.connectionType == 'network' && settings.host != null && (settings.port ?? 0) > 0) {
+  if (settings.connectionType == 'network' &&
+      settings.host != null &&
+      (settings.port ?? 0) > 0) {
     final socket = await Socket.connect(settings.host, settings.port!);
     socket.add(p.bytes());
     await socket.flush();
@@ -78,7 +81,8 @@ Future<void> printThermalOverBluetooth({
   required String paperSize,
 }) async {
   final width = paperSize == '58mm' ? 32 : 48;
-  final ticket = _ticketFromSale(sale: sale, company: company, charsPerLine: width);
+  final ticket =
+      _ticketFromSale(sale: sale, company: company, charsPerLine: width);
   final printerManager = PrinterManager.instance;
   final btName = settings.btName ?? '';
   final btAddr = settings.btAddress ?? '';
@@ -98,7 +102,8 @@ Future<void> printThermalOverUsb({
   required String paperSize,
 }) async {
   final width = paperSize == '58mm' ? 32 : 48;
-  final ticket = _ticketFromSale(sale: sale, company: company, charsPerLine: width);
+  final ticket =
+      _ticketFromSale(sale: sale, company: company, charsPerLine: width);
   final printerManager = PrinterManager.instance;
   await printerManager.connect(
     type: PrinterType.usb,
@@ -120,7 +125,8 @@ EscPos _ticketFromSale({
   final p = EscPos(charsPerLine: charsPerLine)..init();
 
   final saleNumber = (sale['sale_number'] as String?) ?? '';
-  final items = (sale['items'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>();
+  final items = (sale['items'] as List<dynamic>? ?? const [])
+      .cast<Map<String, dynamic>>();
   final subtotal = _asDouble(sale['subtotal']);
   final tax = _asDouble(sale['tax_amount']);
   final discount = _asDouble(sale['discount_amount']);
@@ -180,7 +186,8 @@ List<int> buildTestTicketBytes({int charsPerLine = 48}) {
 
 String _productName(Map<String, dynamic> it) {
   if (it['product'] is Map<String, dynamic>) {
-    return (it['product']['name'] as String?) ?? (it['product_name'] as String? ?? 'Item');
+    return (it['product']['name'] as String?) ??
+        (it['product_name'] as String? ?? 'Item');
   }
   return (it['product_name'] as String?) ?? 'Item';
 }
@@ -203,5 +210,3 @@ String _padLeft(String text, int width) {
   if (text.length >= width) return text;
   return (' ' * (width - text.length)) + text;
 }
-
-

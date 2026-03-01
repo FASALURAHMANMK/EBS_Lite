@@ -6,12 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:ebs_lite/l10n/app_localizations.dart';
 
 import 'core/theme_notifier.dart';
 import 'core/app_theme.dart';
 import 'core/api_client.dart';
 import 'core/secure_storage.dart';
 import 'core/auth_events.dart';
+import 'core/locale_preferences.dart';
 
 import 'features/auth/controllers/auth_notifier.dart';
 import 'features/auth/data/auth_repository.dart';
@@ -82,7 +85,7 @@ class _MyAppState extends ConsumerState<MyApp> {
       final storage = ref.read(secureStorageProvider);
       await _purgeAllAuthPrefs(prefs, storage);
       if (mounted) {
-        ref.read(authNotifierProvider.notifier).state = const AuthState();
+        ref.read(authNotifierProvider.notifier).resetAuth();
       }
     });
   }
@@ -102,7 +105,7 @@ class _MyAppState extends ConsumerState<MyApp> {
     if (!hasTokens) {
       // Ensure clean state when there are no tokens.
       await _purgeAllAuthPrefs(prefs, secureStorage);
-      ref.read(authNotifierProvider.notifier).state = const AuthState();
+      ref.read(authNotifierProvider.notifier).resetAuth();
       if (mounted) setState(() => _validating = false);
       return;
     }
@@ -138,19 +141,19 @@ class _MyAppState extends ConsumerState<MyApp> {
       // Any 401 => session is invalid. Purge everything and show Login.
       if (e.response?.statusCode == 401) {
         await _purgeAllAuthPrefs(prefs, secureStorage);
-        ref.read(authNotifierProvider.notifier).state = const AuthState();
+        ref.read(authNotifierProvider.notifier).resetAuth();
       } else {
         // Non-auth errors shouldn't keep a stale session around.
         // Be safe: treat as logged out if we cannot confirm.
         debugPrint('authRepo.me error: $e');
         await _purgeAllAuthPrefs(prefs, secureStorage);
-        ref.read(authNotifierProvider.notifier).state = const AuthState();
+        ref.read(authNotifierProvider.notifier).resetAuth();
       }
     } catch (e) {
       // Any unexpected error -> safe fallback: logged out
       debugPrint('authRepo.me error: $e');
       await _purgeAllAuthPrefs(prefs, secureStorage);
-      ref.read(authNotifierProvider.notifier).state = const AuthState();
+      ref.read(authNotifierProvider.notifier).resetAuth();
     } finally {
       if (mounted) setState(() => _validating = false);
     }
@@ -166,6 +169,7 @@ class _MyAppState extends ConsumerState<MyApp> {
   Widget build(BuildContext context) {
     final mode = ref.watch(themeNotifierProvider);
     final authState = ref.watch(authNotifierProvider);
+    final localePrefs = ref.watch(localePreferencesProvider);
 
     final home = _validating
         ? const SplashScreen()
@@ -179,10 +183,18 @@ class _MyAppState extends ConsumerState<MyApp> {
       key: ValueKey(
           'auth:${authState.user != null}:${authState.company != null}'),
       debugShowCheckedModeBanner: false,
-      title: 'EBS Lite',
+      onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: mode,
+      locale: localePrefs.uiLocale,
+      supportedLocales: LocalePreferencesNotifier.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       home: home,
     );
   }

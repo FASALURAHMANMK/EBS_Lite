@@ -11,7 +11,8 @@ class StockTransferViewPage extends ConsumerStatefulWidget {
   final int transferId;
 
   @override
-  ConsumerState<StockTransferViewPage> createState() => _StockTransferViewPageState();
+  ConsumerState<StockTransferViewPage> createState() =>
+      _StockTransferViewPageState();
 }
 
 class _StockTransferViewPageState extends ConsumerState<StockTransferViewPage> {
@@ -19,11 +20,17 @@ class _StockTransferViewPageState extends ConsumerState<StockTransferViewPage> {
   @override
   void initState() {
     super.initState();
-    _future = ref.read(inventoryRepositoryProvider).getStockTransfer(widget.transferId);
+    _future = ref
+        .read(inventoryRepositoryProvider)
+        .getStockTransfer(widget.transferId);
   }
 
   Future<void> _refresh() async {
-    setState(() { _future = ref.read(inventoryRepositoryProvider).getStockTransfer(widget.transferId); });
+    setState(() {
+      _future = ref
+          .read(inventoryRepositoryProvider)
+          .getStockTransfer(widget.transferId);
+    });
     await _future;
   }
 
@@ -37,11 +44,15 @@ class _StockTransferViewPageState extends ConsumerState<StockTransferViewPage> {
         child: FutureBuilder<StockTransferDetailDto>(
           future: _future,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator(minHeight: 2);
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const LinearProgressIndicator(minHeight: 2);
+            }
             if (snapshot.hasError) {
-              return Center(child: Padding(
+              return Center(
+                  child: Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: Text('Failed to load: ${snapshot.error}', style: TextStyle(color: theme.colorScheme.error)),
+                child: Text('Failed to load: ${snapshot.error}',
+                    style: TextStyle(color: theme.colorScheme.error)),
               ));
             }
             final t = snapshot.data!;
@@ -55,16 +66,18 @@ class _StockTransferViewPageState extends ConsumerState<StockTransferViewPage> {
                 Card(
                   elevation: 0,
                   color: theme.colorScheme.surfaceContainerHighest,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const ListTile(title: Text('Items')),
                       const Divider(height: 1),
                       ...t.items.map((it) => ListTile(
-                        title: Text(it.productName),
-                        subtitle: Text('Qty: ${it.quantity} ${it.unitSymbol ?? ''}${(it.productSku ?? '').isNotEmpty ? ' · SKU: ${it.productSku}' : ''}'),
-                      )),
+                            title: Text(it.productName),
+                            subtitle: Text(
+                                'Qty: ${it.quantity} ${it.unitSymbol ?? ''}${(it.productSku ?? '').isNotEmpty ? ' · SKU: ${it.productSku}' : ''}'),
+                          )),
                     ],
                   ),
                 ),
@@ -88,8 +101,11 @@ class _Header extends StatelessWidget {
       color: theme.colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        title: Text('${t.transferNumber} • ${t.status.replaceAll('_', ' ')}', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-        subtitle: Text('${t.fromLocationName} → ${t.toLocationName}\n${t.transferDate.toLocal()}'),
+        title: Text('${t.transferNumber} • ${t.status.replaceAll('_', ' ')}',
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700)),
+        subtitle: Text(
+            '${t.fromLocationName} → ${t.toLocationName}\n${t.transferDate.toLocal()}'),
         isThreeLine: true,
       ),
     );
@@ -105,8 +121,10 @@ class _Actions extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final repo = ref.read(inventoryRepositoryProvider);
     final locId = ref.watch(locationNotifierProvider).selected?.locationId;
-    final isIncoming = locId != null && t.toLocationId == locId && t.fromLocationId != locId;
-    final isOutgoing = locId != null && t.fromLocationId == locId && t.toLocationId != locId;
+    final isIncoming =
+        locId != null && t.toLocationId == locId && t.fromLocationId != locId;
+    final isOutgoing =
+        locId != null && t.fromLocationId == locId && t.toLocationId != locId;
     // Correct role gating:
     // - Approve (dispatch) must be done by source (outgoing) location when Pending
     // - Receive (complete) must be done by destination (incoming) location when In Transit
@@ -115,7 +133,7 @@ class _Actions extends ConsumerWidget {
     final canComplete = t.status == 'IN_TRANSIT' && isIncoming;
     final canCancel = t.status == 'PENDING' && isOutgoing;
 
-    Future<void> _do(Future<void> Function() f, String ok) async {
+    Future<void> runAction(Future<void> Function() f, String ok) async {
       try {
         await f();
         await onChanged();
@@ -128,7 +146,8 @@ class _Actions extends ConsumerWidget {
         if (context.mounted) {
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
-            ..showSnackBar(SnackBar(content: Text('Failed: ${ErrorHandler.message(e)}')));
+            ..showSnackBar(
+                SnackBar(content: Text('Failed: ${ErrorHandler.message(e)}')));
         }
       }
     }
@@ -138,19 +157,22 @@ class _Actions extends ConsumerWidget {
       children: [
         if (canApprove)
           FilledButton.icon(
-            onPressed: () => _do(() => repo.approveStockTransfer(t.transferId), 'Approved'),
-            icon: const Icon(Icons.check_circle_outline_rounded),
-            label: const Text('Approve (Dispatch)')),
+              onPressed: () => runAction(
+                  () => repo.approveStockTransfer(t.transferId), 'Approved'),
+              icon: const Icon(Icons.check_circle_outline_rounded),
+              label: const Text('Approve (Dispatch)')),
         if (canComplete)
           FilledButton.icon(
-            onPressed: () => _do(() => repo.completeStockTransfer(t.transferId), 'Completed'),
-            icon: const Icon(Icons.inventory_rounded),
-            label: const Text('Receive')),
+              onPressed: () => runAction(
+                  () => repo.completeStockTransfer(t.transferId), 'Completed'),
+              icon: const Icon(Icons.inventory_rounded),
+              label: const Text('Receive')),
         if (canCancel)
           TextButton.icon(
-            onPressed: () => _do(() => repo.cancelStockTransfer(t.transferId), 'Cancelled'),
-            icon: const Icon(Icons.cancel_outlined),
-            label: const Text('Cancel')),
+              onPressed: () => runAction(
+                  () => repo.cancelStockTransfer(t.transferId), 'Cancelled'),
+              icon: const Icon(Icons.cancel_outlined),
+              label: const Text('Cancel')),
       ],
     );
   }

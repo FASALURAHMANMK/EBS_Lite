@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -585,7 +586,7 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 
 		if err != nil {
 			// Log error but don't fail the sale
-			fmt.Printf("Warning: Failed to record promotion %d for sale %d: %v\n", promotionID, saleID, err)
+			log.Printf("sales_service: failed to record promotion %d for sale %d: %v", promotionID, saleID, err)
 		}
 	}
 
@@ -605,7 +606,7 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 			err := loyaltyService.AwardPoints(companyID, *req.CustomerID, totalAmount, saleID)
 			if err != nil {
 				// Log error but don't fail the sale
-				fmt.Printf("Warning: Failed to award loyalty points for sale %d: %v\n", saleID, err)
+				log.Printf("sales_service: failed to award loyalty points for sale %d: %v", saleID, err)
 			}
 		}()
 	}
@@ -1508,7 +1509,7 @@ func (s *SalesService) ShareQuote(quoteID, companyID int, req *models.ShareQuote
 	if err := s.PrintQuote(quoteID, companyID); err != nil {
 		return err
 	}
-	fmt.Printf("Share requested for quote ID: %d with %s\n", quoteID, req.Email)
+	log.Printf("sales_service: share requested for quote %d", quoteID)
 	return nil
 }
 

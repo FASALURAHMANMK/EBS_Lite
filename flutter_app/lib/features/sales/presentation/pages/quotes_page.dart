@@ -89,7 +89,8 @@ class _QuotesPageState extends ConsumerState<QuotesPage> {
                       DropdownMenuItem(value: 'ALL', child: Text('All')),
                       DropdownMenuItem(value: 'DRAFT', child: Text('Draft')),
                       DropdownMenuItem(value: 'SENT', child: Text('Sent')),
-                      DropdownMenuItem(value: 'ACCEPTED', child: Text('Accepted')),
+                      DropdownMenuItem(
+                          value: 'ACCEPTED', child: Text('Accepted')),
                     ],
                     onChanged: (value) async {
                       if (value == null) return;
@@ -108,13 +109,15 @@ class _QuotesPageState extends ConsumerState<QuotesPage> {
                       : ListView.separated(
                           padding: const EdgeInsets.all(12),
                           itemCount: _quotes.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 8),
                           itemBuilder: (context, index) {
                             final q = _quotes[index];
                             final number = q['quote_number']?.toString() ?? '';
                             final status = q['status']?.toString() ?? 'DRAFT';
-                            final total = ((q['total_amount'] as num?)?.toDouble() ?? 0.0)
-                                .toStringAsFixed(2);
+                            final total =
+                                ((q['total_amount'] as num?)?.toDouble() ?? 0.0)
+                                    .toStringAsFixed(2);
                             final customerName =
                                 (q['customer'] is Map<String, dynamic>)
                                     ? (q['customer']['name']?.toString() ?? '')
@@ -124,7 +127,8 @@ class _QuotesPageState extends ConsumerState<QuotesPage> {
                             return Card(
                               elevation: 0,
                               child: ListTile(
-                                leading: const Icon(Icons.request_quote_rounded),
+                                leading:
+                                    const Icon(Icons.request_quote_rounded),
                                 title: Text(number.isEmpty ? 'Quote' : number),
                                 subtitle: Text([
                                   if (customerName.isNotEmpty) customerName,

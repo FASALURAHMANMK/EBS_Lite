@@ -67,29 +67,42 @@ func RequireAuth() gin.HandlerFunc {
 		if claims.RoleID != nil {
 			c.Set("role_id", *claims.RoleID)
 		}
-               c.Set("user", user)
+		c.Set("user", user)
 
-               // Update device session activity if session ID is present
-               if claims.SessionID != "" {
-                       c.Set("session_id", claims.SessionID)
-                       db := database.GetDB()
-                       ipAddr := c.ClientIP()
-                       ua := c.GetHeader("User-Agent")
-                       var ipVal interface{}
-                       if ipAddr != "" {
-                               ipVal = ipAddr
-                       }
-                       var uaVal interface{}
-                       if ua != "" {
-                               uaVal = ua
-                       }
-                       _, err := db.Exec(`UPDATE device_sessions SET last_seen = NOW(), ip_address = COALESCE($2, ip_address), user_agent = COALESCE($3, user_agent) WHERE session_id = $1`, claims.SessionID, ipVal, uaVal)
-                       if err != nil {
-                               log.Printf("Failed to update device session %s: %v", claims.SessionID, err)
-                       }
-               } else {
-                       log.Println("No session ID in JWT claims")
-               }
+		// Update device session activity if session ID is present (throttled)
+		if claims.SessionID != "" {
+			c.Set("session_id", claims.SessionID)
+			limiter := getSessionLastSeenLimiter()
+			shouldUpdate := true
+			if limiter != nil {
+				allowed, err := limiter.Allow(c.Request.Context(), claims.SessionID)
+				if err != nil {
+					log.Printf("Failed to evaluate session last_seen throttle for %s: %v", claims.SessionID, err)
+					shouldUpdate = false
+				} else {
+					shouldUpdate = allowed
+				}
+			}
+			if shouldUpdate {
+				db := database.GetDB()
+				ipAddr := c.ClientIP()
+				ua := c.GetHeader("User-Agent")
+				var ipVal interface{}
+				if ipAddr != "" {
+					ipVal = ipAddr
+				}
+				var uaVal interface{}
+				if ua != "" {
+					uaVal = ua
+				}
+				_, err := db.Exec(`UPDATE device_sessions SET last_seen = NOW(), ip_address = COALESCE($2, ip_address), user_agent = COALESCE($3, user_agent) WHERE session_id = $1`, claims.SessionID, ipVal, uaVal)
+				if err != nil {
+					log.Printf("Failed to update device session %s: %v", claims.SessionID, err)
+				}
+			}
+		} else {
+			log.Println("No session ID in JWT claims")
+		}
 
 		c.Next()
 	}

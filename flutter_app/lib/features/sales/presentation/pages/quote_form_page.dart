@@ -47,8 +47,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
     try {
       final repo = ref.read(salesRepositoryProvider);
       final quote = await repo.getQuote(widget.quoteId!);
-      final discount =
-          (quote['discount_amount'] as num?)?.toDouble() ?? 0.0;
+      final discount = (quote['discount_amount'] as num?)?.toDouble() ?? 0.0;
       _discountCtrl.text = discount.toStringAsFixed(2);
       _notesCtrl.text = quote['notes']?.toString() ?? '';
       final customer = quote['customer'] as Map<String, dynamic>?;
@@ -64,28 +63,24 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       if (validUntilStr != null && validUntilStr.isNotEmpty) {
         _validUntil = DateTime.tryParse(validUntilStr);
       }
-      final items = (quote['items'] as List<dynamic>? ?? [])
-          .map((raw) {
-            final i = raw as Map<String, dynamic>;
-            final productId = i['product_id'] as int? ?? 0;
-            final name = (i['product_name'] ??
-                    i['product']?['name'] ??
-                    'Item')
-                .toString();
-            return PosCartItem(
-              product: PosProductDto(
-                productId: productId,
-                name: name,
-                price: (i['unit_price'] as num?)?.toDouble() ?? 0.0,
-                stock: 0,
-              ),
-              quantity: (i['quantity'] as num?)?.toDouble() ?? 0.0,
-              unitPrice: (i['unit_price'] as num?)?.toDouble() ?? 0.0,
-              discountPercent:
-                  (i['discount_percentage'] as num?)?.toDouble() ?? 0.0,
-            );
-          })
-          .toList();
+      final items = (quote['items'] as List<dynamic>? ?? []).map((raw) {
+        final i = raw as Map<String, dynamic>;
+        final productId = i['product_id'] as int? ?? 0;
+        final name =
+            (i['product_name'] ?? i['product']?['name'] ?? 'Item').toString();
+        return PosCartItem(
+          product: PosProductDto(
+            productId: productId,
+            name: name,
+            price: (i['unit_price'] as num?)?.toDouble() ?? 0.0,
+            stock: 0,
+          ),
+          quantity: (i['quantity'] as num?)?.toDouble() ?? 0.0,
+          unitPrice: (i['unit_price'] as num?)?.toDouble() ?? 0.0,
+          discountPercent:
+              (i['discount_percentage'] as num?)?.toDouble() ?? 0.0,
+        );
+      }).toList();
       _items = items;
     } catch (e) {
       _error = e.toString();
@@ -155,15 +150,13 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                         prefixIcon: const Icon(Icons.search_rounded),
                         suffixIcon: IconButton(
                           icon: const Icon(Icons.search_rounded),
-                          onPressed: () =>
-                              doSearch(controller.text.trim()),
+                          onPressed: () => doSearch(controller.text.trim()),
                         ),
                       ),
                       onSubmitted: (v) => doSearch(v.trim()),
                     ),
                     const SizedBox(height: 8),
-                    if (loading)
-                      const LinearProgressIndicator(minHeight: 2),
+                    if (loading) const LinearProgressIndicator(minHeight: 2),
                     Expanded(
                       child: results.isEmpty && !loading
                           ? const Center(child: Text('No customers'))
@@ -177,8 +170,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                                     if ((c.phone ?? '').isNotEmpty) c.phone!,
                                     if ((c.email ?? '').isNotEmpty) c.email!,
                                   ].where((e) => e.isNotEmpty).join(' - ')),
-                                  onTap: () =>
-                                      Navigator.of(context).pop(c),
+                                  onTap: () => Navigator.of(context).pop(c),
                                 );
                               },
                             ),
@@ -245,15 +237,13 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                         prefixIcon: const Icon(Icons.search_rounded),
                         suffixIcon: IconButton(
                           icon: const Icon(Icons.search_rounded),
-                          onPressed: () =>
-                              doSearch(controller.text.trim()),
+                          onPressed: () => doSearch(controller.text.trim()),
                         ),
                       ),
                       onSubmitted: (v) => doSearch(v.trim()),
                     ),
                     const SizedBox(height: 8),
-                    if (loading)
-                      const LinearProgressIndicator(minHeight: 2),
+                    if (loading) const LinearProgressIndicator(minHeight: 2),
                     Expanded(
                       child: results.isEmpty && !loading
                           ? const Center(child: Text('No products'))
@@ -265,8 +255,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                                   title: Text(p.name),
                                   subtitle: Text(
                                       'Price: ${p.price.toStringAsFixed(2)}'),
-                                  onTap: () =>
-                                      Navigator.of(context).pop(p),
+                                  onTap: () => Navigator.of(context).pop(p),
                                 );
                               },
                             ),
@@ -291,8 +280,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       final idx =
           items.indexWhere((i) => i.product.productId == picked.productId);
       if (idx >= 0) {
-        items[idx] =
-            items[idx].copyWith(quantity: items[idx].quantity + 1);
+        items[idx] = items[idx].copyWith(quantity: items[idx].quantity + 1);
       } else {
         items.add(PosCartItem(
           product: picked,
@@ -305,10 +293,8 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
   }
 
   Future<void> _editItem(PosCartItem item) async {
-    final qtyCtrl =
-        TextEditingController(text: item.quantity.toString());
-    final priceCtrl =
-        TextEditingController(text: item.unitPrice.toString());
+    final qtyCtrl = TextEditingController(text: item.quantity.toString());
+    final priceCtrl = TextEditingController(text: item.unitPrice.toString());
     final discCtrl =
         TextEditingController(text: item.discountPercent.toString());
     final ok = await showDialog<bool>(
@@ -331,8 +317,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
             TextField(
               controller: discCtrl,
               keyboardType: TextInputType.number,
-              decoration:
-                  const InputDecoration(labelText: 'Discount %'),
+              decoration: const InputDecoration(labelText: 'Discount %'),
             ),
           ],
         ),
@@ -350,8 +335,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
     );
     if (ok == true) {
       final qty = double.tryParse(qtyCtrl.text.trim()) ?? item.quantity;
-      final price =
-          double.tryParse(priceCtrl.text.trim()) ?? item.unitPrice;
+      final price = double.tryParse(priceCtrl.text.trim()) ?? item.unitPrice;
       final disc =
           double.tryParse(discCtrl.text.trim()) ?? item.discountPercent;
       final updated = item.copyWith(
@@ -437,7 +421,8 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+                child: Text(_error!,
+                    style: TextStyle(color: theme.colorScheme.error)),
               ),
             const SizedBox(height: 8),
             Card(
@@ -447,7 +432,9 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                   ListTile(
                     leading: const Icon(Icons.person_rounded),
                     title: Text(_customer?.name ?? 'Walk in'),
-                    subtitle: Text(_customer == null ? 'No customer selected' : 'Customer'),
+                    subtitle: Text(_customer == null
+                        ? 'No customer selected'
+                        : 'Customer'),
                     trailing: TextButton(
                       onPressed: _pickCustomer,
                       child: const Text('Select'),

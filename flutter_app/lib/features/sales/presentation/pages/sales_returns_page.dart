@@ -35,13 +35,15 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
     super.dispose();
   }
 
-
   Future<void> _findInvoice() async {
     final code = _invoiceCtrl.text.trim();
     if (code.isEmpty) return;
     setState(() => _linking = true);
     try {
-      final list = await ref.read(salesRepositoryProvider).getSalesHistory(saleNumber: code);
+      final list = await ref
+          .read(salesRepositoryProvider)
+          .getSalesHistory(saleNumber: code);
+      if (!mounted) return;
       if (list.isEmpty) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
@@ -52,7 +54,8 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
       if (id == null) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(const SnackBar(content: Text('Invalid invoice selected')));
+          ..showSnackBar(
+              const SnackBar(content: Text('Invalid invoice selected')));
         return;
       }
       final sale = await ref.read(posRepositoryProvider).getSaleById(id);
@@ -94,13 +97,16 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
         if (sale == null) {
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
-            ..showSnackBar(const SnackBar(content: Text('Invoice number required for walk-in returns')));
+            ..showSnackBar(const SnackBar(
+                content: Text('Invoice number required for walk-in returns')));
           return;
         }
         returnId = await ref.read(salesRepositoryProvider).createSaleReturn(
               saleId: sale.saleId,
               items: items,
-              reason: _reasonCtrl.text.trim().isEmpty ? null : _reasonCtrl.text.trim(),
+              reason: _reasonCtrl.text.trim().isEmpty
+                  ? null
+                  : _reasonCtrl.text.trim(),
             );
       } else {
         if (sale != null) {
@@ -108,22 +114,30 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
           returnId = await ref.read(salesRepositoryProvider).createSaleReturn(
                 saleId: sale.saleId,
                 items: items,
-                reason: _reasonCtrl.text.trim().isEmpty ? null : _reasonCtrl.text.trim(),
+                reason: _reasonCtrl.text.trim().isEmpty
+                    ? null
+                    : _reasonCtrl.text.trim(),
               );
         } else {
           // Customer selected, invoice optional – let backend locate a sale
-          returnId = await ref.read(salesRepositoryProvider).createSaleReturnByCustomer(
+          returnId = await ref
+              .read(salesRepositoryProvider)
+              .createSaleReturnByCustomer(
                 customerId: customer.customerId,
                 items: items,
-                reason: _reasonCtrl.text.trim().isEmpty ? null : _reasonCtrl.text.trim(),
+                reason: _reasonCtrl.text.trim().isEmpty
+                    ? null
+                    : _reasonCtrl.text.trim(),
               );
         }
       }
       if (!mounted) return;
       await Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => SaleReturnDetailPage(returnId: returnId)),
+        MaterialPageRoute(
+            builder: (_) => SaleReturnDetailPage(returnId: returnId)),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text('Failed: $e')));
@@ -139,12 +153,15 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _CustomerPicker(customer: _customer, onPicked: (c) => setState(() => _customer = c)),
+            _CustomerPicker(
+                customer: _customer,
+                onPicked: (c) => setState(() => _customer = c)),
             const SizedBox(height: 12),
             TextField(
               controller: _invoiceCtrl,
               decoration: InputDecoration(
-                labelText: 'Invoice Number ${_customer == null ? '(required for walk-in)' : '(optional)'}',
+                labelText:
+                    'Invoice Number ${_customer == null ? '(required for walk-in)' : '(optional)'}',
                 prefixIcon: const Icon(Icons.receipt_long_outlined),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.search_rounded),
@@ -162,9 +179,11 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
                   leading: const Icon(Icons.receipt_long_rounded),
                   title: Text(sale.saleNumber),
                   subtitle: Text([
-                    if ((sale.customerName ?? '').isNotEmpty) sale.customerName!,
+                    if ((sale.customerName ?? '').isNotEmpty)
+                      sale.customerName!,
                   ].where((e) => e.isNotEmpty).join(' · ')),
-                  trailing: Text(sale.totalAmount.toStringAsFixed(2), style: Theme.of(context).textTheme.titleMedium),
+                  trailing: Text(sale.totalAmount.toStringAsFixed(2),
+                      style: Theme.of(context).textTheme.titleMedium),
                 ),
               ),
             const SizedBox(height: 12),
@@ -189,7 +208,10 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
               ),
             ),
             const SizedBox(height: 16),
-            SizedBox(height: 48, child: FilledButton(onPressed: _save, child: const Text('Save Return'))),
+            SizedBox(
+                height: 48,
+                child: FilledButton(
+                    onPressed: _save, child: const Text('Save Return'))),
           ],
         ),
       ),
@@ -212,14 +234,16 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
             padding: const EdgeInsets.all(12),
             child: Column(
               children: [
-                _LineProductPicker(line: _lines[i], defaultPrices: defaultPrices),
+                _LineProductPicker(
+                    line: _lines[i], defaultPrices: defaultPrices),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
                       child: TextField(
                         controller: _lines[i].qty,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                         decoration: const InputDecoration(
                           labelText: 'Quantity',
                           prefixIcon: Icon(Icons.format_list_numbered_rounded),
@@ -230,7 +254,8 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
                     Expanded(
                       child: TextField(
                         controller: _lines[i].price,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                         decoration: const InputDecoration(
                           labelText: 'Unit Price',
                           prefixIcon: Icon(Icons.currency_rupee_rounded),
@@ -285,7 +310,8 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
   Future<void> _search(String q) async {
     setState(() => _loading = true);
     try {
-      final list = await ref.read(inventoryRepositoryProvider).searchProducts(q);
+      final list =
+          await ref.read(inventoryRepositoryProvider).searchProducts(q);
       if (!mounted) return;
       setState(() => _suggestions = list.take(8).toList());
     } finally {
@@ -306,7 +332,10 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
             suffixIcon: _loading
                 ? const Padding(
                     padding: EdgeInsets.all(10.0),
-                    child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                    child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2)),
                   )
                 : IconButton(
                     icon: const Icon(Icons.clear_rounded),
@@ -328,13 +357,18 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
                         dense: true,
                         leading: const Icon(Icons.inventory_2_outlined),
                         title: Text(p.name),
-                        subtitle: Text('Stock: ${p.stock.toStringAsFixed(2)}  ·  Price: ${(p.price ?? 0).toStringAsFixed(2)}'),
+                        subtitle: Text(
+                            'Stock: ${p.stock.toStringAsFixed(2)}  ·  Price: ${(p.price ?? 0).toStringAsFixed(2)}'),
                         onTap: () {
                           setState(() {
                             widget.line.product = p;
                             _controller.text = p.name;
-                            final defaultPrice = widget.defaultPrices[p.productId] ?? p.price ?? 0.0;
-                            widget.line.price.text = defaultPrice.toStringAsFixed(2);
+                            final defaultPrice =
+                                widget.defaultPrices[p.productId] ??
+                                    p.price ??
+                                    0.0;
+                            widget.line.price.text =
+                                defaultPrice.toStringAsFixed(2);
                             _suggestions = const [];
                           });
                         },

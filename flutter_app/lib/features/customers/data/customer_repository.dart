@@ -10,7 +10,8 @@ class CustomerRepository {
   final Dio _dio;
   final Ref _ref;
 
-  int? get _locationId => _ref.read(locationNotifierProvider).selected?.locationId;
+  int? get _locationId =>
+      _ref.read(locationNotifierProvider).selected?.locationId;
 
   List<dynamic> _extractList(Response res) {
     final body = res.data;
@@ -25,10 +26,15 @@ class CustomerRepository {
 
   Future<List<CustomerDto>> getCustomers({String? search}) async {
     final qp = <String, dynamic>{};
-    if (search != null && search.trim().isNotEmpty) qp['search'] = search.trim();
-    final res = await _dio.get('/customers', queryParameters: qp.isEmpty ? null : qp);
+    if (search != null && search.trim().isNotEmpty) {
+      qp['search'] = search.trim();
+    }
+    final res =
+        await _dio.get('/customers', queryParameters: qp.isEmpty ? null : qp);
     final data = _extractList(res);
-    return data.map((e) => CustomerDto.fromJson(e as Map<String, dynamic>)).toList();
+    return data
+        .map((e) => CustomerDto.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<CustomerDto> getCustomer(int id) async {
@@ -52,21 +58,26 @@ class CustomerRepository {
     return data.cast<Map<String, dynamic>>();
   }
 
-  Future<List<Map<String, dynamic>>> getSaleReturns({required int customerId}) async {
+  Future<List<Map<String, dynamic>>> getSaleReturns(
+      {required int customerId}) async {
     final qp = <String, dynamic>{'customer_id': customerId};
     final res = await _dio.get('/sale-returns', queryParameters: qp);
     final data = _extractList(res);
     return data.cast<Map<String, dynamic>>();
   }
 
-  Future<List<CustomerCollectionDto>> getCollections({required int customerId}) async {
+  Future<List<CustomerCollectionDto>> getCollections(
+      {required int customerId}) async {
     final qp = <String, dynamic>{'customer_id': customerId};
     final res = await _dio.get('/collections', queryParameters: qp);
     final data = _extractList(res);
-    return data.map((e) => CustomerCollectionDto.fromJson(e as Map<String, dynamic>)).toList();
+    return data
+        .map((e) => CustomerCollectionDto.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
-  Future<List<Map<String, dynamic>>> getOutstandingInvoices({required int customerId}) async {
+  Future<List<Map<String, dynamic>>> getOutstandingInvoices(
+      {required int customerId}) async {
     // Use history endpoint (no location requirement) and compute outstanding client-side
     final qp = <String, dynamic>{'customer_id': customerId};
     final res = await _dio.get('/sales/history', queryParameters: qp);
@@ -95,7 +106,8 @@ class CustomerRepository {
       'customer_id': customerId,
       'amount': amount,
       if (paymentMethodId != null) 'payment_method_id': paymentMethodId,
-      if (receivedDate != null) 'received_date': receivedDate.toIso8601String().split('T').first,
+      if (receivedDate != null)
+        'received_date': receivedDate.toIso8601String().split('T').first,
       // Backend expects 'reference' (maps to reference_number column)
       if (reference != null && reference.isNotEmpty) 'reference': reference,
       if (notes != null && notes.isNotEmpty) 'notes': notes,
@@ -107,7 +119,8 @@ class CustomerRepository {
     if (loc == null) {
       throw StateError('Location not selected');
     }
-    final res = await _dio.post('/collections', data: payload, queryParameters: {'location_id': loc});
+    final res = await _dio.post('/collections',
+        data: payload, queryParameters: {'location_id': loc});
     final body = res.data is Map && (res.data['data'] != null)
         ? res.data['data'] as Map<String, dynamic>
         : res.data as Map<String, dynamic>;
@@ -133,7 +146,8 @@ class CustomerRepository {
     if (creditLimit != null) body['credit_limit'] = creditLimit;
     body['is_loyalty'] = isLoyalty;
     final res = await _dio.post('/customers', data: body);
-    final bodyRes = res.data is Map<String, dynamic> ? res.data['data'] : res.data;
+    final bodyRes =
+        res.data is Map<String, dynamic> ? res.data['data'] : res.data;
     return CustomerDto.fromJson(bodyRes as Map<String, dynamic>);
   }
 
@@ -160,7 +174,8 @@ class CustomerRepository {
     if (isLoyalty != null) body['is_loyalty'] = isLoyalty;
     if (isActive != null) body['is_active'] = isActive;
     final res = await _dio.put('/customers/$customerId', data: body);
-    final bodyRes = res.data is Map<String, dynamic> ? res.data['data'] : res.data;
+    final bodyRes =
+        res.data is Map<String, dynamic> ? res.data['data'] : res.data;
     return CustomerDto.fromJson(bodyRes as Map<String, dynamic>);
   }
 }

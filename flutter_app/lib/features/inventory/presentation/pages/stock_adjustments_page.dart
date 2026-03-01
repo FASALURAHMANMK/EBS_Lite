@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -12,7 +11,8 @@ class StockAdjustmentsPage extends ConsumerStatefulWidget {
   final String? initialQuery;
 
   @override
-  ConsumerState<StockAdjustmentsPage> createState() => _StockAdjustmentsPageState();
+  ConsumerState<StockAdjustmentsPage> createState() =>
+      _StockAdjustmentsPageState();
 }
 
 class _StockAdjustmentsPageState extends ConsumerState<StockAdjustmentsPage> {
@@ -63,7 +63,11 @@ class _StockAdjustmentsPageState extends ConsumerState<StockAdjustmentsPage> {
     final q = _search.text.trim().toLowerCase();
     final filtered = q.isEmpty
         ? groups
-        : groups.where((g) => g.documentNumber.toLowerCase().contains(q) || (g.reason ?? '').toLowerCase().contains(q)).toList();
+        : groups
+            .where((g) =>
+                g.documentNumber.toLowerCase().contains(q) ||
+                (g.reason ?? '').toLowerCase().contains(q))
+            .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -74,7 +78,8 @@ class _StockAdjustmentsPageState extends ConsumerState<StockAdjustmentsPage> {
             icon: const Icon(Icons.add_rounded),
             onPressed: () async {
               final docId = await Navigator.of(context).push<String>(
-                MaterialPageRoute(builder: (_) => const _AdjustmentDocumentFormPage()),
+                MaterialPageRoute(
+                    builder: (_) => const _AdjustmentDocumentFormPage()),
               );
               if (docId != null) {
                 await _load();
@@ -83,7 +88,9 @@ class _StockAdjustmentsPageState extends ConsumerState<StockAdjustmentsPage> {
                 if (id != null) {
                   // ignore: use_build_context_synchronously
                   await Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => StockAdjustmentDocumentDetailPage(documentId: id)),
+                    MaterialPageRoute(
+                        builder: (_) =>
+                            StockAdjustmentDocumentDetailPage(documentId: id)),
                   );
                 }
               }
@@ -100,9 +107,12 @@ class _StockAdjustmentsPageState extends ConsumerState<StockAdjustmentsPage> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
               child: Row(
                 children: [
-                  Icon(Icons.place_rounded, size: 18, color: theme.colorScheme.onSurfaceVariant),
+                  Icon(Icons.place_rounded,
+                      size: 18, color: theme.colorScheme.onSurfaceVariant),
                   const SizedBox(width: 6),
-                  Text('Location: $locName', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  Text('Location: $locName',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant)),
                 ],
               ),
             ),
@@ -129,12 +139,17 @@ class _StockAdjustmentsPageState extends ConsumerState<StockAdjustmentsPage> {
                           itemBuilder: (context, i) {
                             final g = filtered[i];
                             final adj = _sum(g.items.map((e) => e.adjustment));
-                            final color = adj >= 0 ? Colors.green : theme.colorScheme.error;
+                            final color = adj >= 0
+                                ? Colors.green
+                                : theme.colorScheme.error;
                             return Card(
                               elevation: 0,
                               child: ListTile(
                                 onTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute(builder: (_) => StockAdjustmentDocumentDetailPage(documentId: g.documentId)),
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          StockAdjustmentDocumentDetailPage(
+                                              documentId: g.documentId)),
                                 ),
                                 title: Text(g.documentNumber),
                                 subtitle: Text([
@@ -143,13 +158,17 @@ class _StockAdjustmentsPageState extends ConsumerState<StockAdjustmentsPage> {
                                   '${g.items.length} item(s)'
                                 ].join(' • ')),
                                 trailing: Text(
-                                  (adj >= 0 ? '+ ' : '') + adj.toStringAsFixed(2),
-                                  style: TextStyle(color: color, fontWeight: FontWeight.w700),
+                                  (adj >= 0 ? '+ ' : '') +
+                                      adj.toStringAsFixed(2),
+                                  style: TextStyle(
+                                      color: color,
+                                      fontWeight: FontWeight.w700),
                                 ),
                               ),
                             );
                           },
-                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 8),
                           itemCount: filtered.length,
                         )),
             ),
@@ -162,15 +181,16 @@ class _StockAdjustmentsPageState extends ConsumerState<StockAdjustmentsPage> {
   double _sum(Iterable<double> vals) => vals.fold(0.0, (a, b) => a + b);
 }
 
-
 class _AdjustmentDocumentFormPage extends ConsumerStatefulWidget {
   const _AdjustmentDocumentFormPage();
 
   @override
-  ConsumerState<_AdjustmentDocumentFormPage> createState() => _AdjustmentDocumentFormPageState();
+  ConsumerState<_AdjustmentDocumentFormPage> createState() =>
+      _AdjustmentDocumentFormPageState();
 }
 
-class _AdjustmentDocumentFormPageState extends ConsumerState<_AdjustmentDocumentFormPage> {
+class _AdjustmentDocumentFormPageState
+    extends ConsumerState<_AdjustmentDocumentFormPage> {
   final _docReason = TextEditingController();
   bool _saving = false;
   final List<_AdjLine> _lines = [
@@ -221,7 +241,10 @@ class _AdjustmentDocumentFormPageState extends ConsumerState<_AdjustmentDocument
               child: FilledButton(
                 onPressed: _saving ? null : _save,
                 child: _saving
-                    ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2.4))
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2.4))
                     : const Text('Create Document'),
               ),
             ),
@@ -248,7 +271,8 @@ class _AdjustmentDocumentFormPageState extends ConsumerState<_AdjustmentDocument
                     Expanded(
                       child: TextField(
                         controller: _lines[i].qty,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true, signed: true),
                         decoration: const InputDecoration(
                           labelText: 'Adjustment (+ add, - remove)',
                           prefixIcon: Icon(Icons.tune_rounded),
@@ -274,9 +298,11 @@ class _AdjustmentDocumentFormPageState extends ConsumerState<_AdjustmentDocument
                     children: [
                       for (final d in const [-10.0, -5.0, -1.0, 1.0, 5.0, 10.0])
                         ActionChip(
-                          label: Text(d > 0 ? '+${d.toInt()}' : d.toInt().toString()),
+                          label: Text(
+                              d > 0 ? '+${d.toInt()}' : d.toInt().toString()),
                           onPressed: () {
-                            final cur = double.tryParse(_lines[i].qty.text.trim()) ?? 0;
+                            final cur =
+                                double.tryParse(_lines[i].qty.text.trim()) ?? 0;
                             final next = cur + d;
                             _lines[i].qty.text = next == next.roundToDouble()
                                 ? next.toInt().toString()
@@ -297,18 +323,24 @@ class _AdjustmentDocumentFormPageState extends ConsumerState<_AdjustmentDocument
 
   Future<void> _save() async {
     // Validate
-    final validLines = _lines.where((l) => l.product != null && (double.tryParse(l.qty.text.trim()) ?? 0) != 0).toList();
+    final validLines = _lines
+        .where((l) =>
+            l.product != null && (double.tryParse(l.qty.text.trim()) ?? 0) != 0)
+        .toList();
     if (validLines.isEmpty) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Add at least one product with a non-zero adjustment')));
+        ..showSnackBar(const SnackBar(
+            content:
+                Text('Add at least one product with a non-zero adjustment')));
       return;
     }
     final docReason = _docReason.text.trim();
     if (docReason.isEmpty) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Please enter a document reason')));
+        ..showSnackBar(
+            const SnackBar(content: Text('Please enter a document reason')));
       return;
     }
 
@@ -322,7 +354,8 @@ class _AdjustmentDocumentFormPageState extends ConsumerState<_AdjustmentDocument
             'adjustment': double.tryParse(l.qty.text.trim()) ?? 0,
           }
       ];
-      final doc = await repo.createStockAdjustmentDocument(reason: docReason, items: items);
+      final doc = await repo.createStockAdjustmentDocument(
+          reason: docReason, items: items);
       if (!mounted) return;
       Navigator.of(context).pop(doc.documentId.toString());
     } catch (e) {
@@ -373,7 +406,9 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
           children: [
             Expanded(
               child: Text(
-                p == null ? 'Tap to select a product' : '${p.name}${(p.sku ?? '').isNotEmpty ? ' • SKU: ${p.sku}' : ''}',
+                p == null
+                    ? 'Tap to select a product'
+                    : '${p.name}${(p.sku ?? '').isNotEmpty ? ' • SKU: ${p.sku}' : ''}',
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -394,6 +429,7 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
     List<InventoryListItem> results = List.of(initial);
     int? selectedId = widget.line.product?.productId;
     String query = '';
+    if (!context.mounted) return null;
     return showDialog<InventoryListItem?>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -423,22 +459,26 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
                 Flexible(
                   child: results.isEmpty
                       ? const Center(child: Text('No products'))
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: results.length,
-                          itemBuilder: (context, i) {
-                            final it = results[i];
-                            return RadioListTile<int>(
-                              value: it.productId,
-                              groupValue: selectedId,
-                              onChanged: (v) => setInner(() => selectedId = v),
-                              title: Text(it.name),
-                              subtitle: Text([
-                                if ((it.sku ?? '').isNotEmpty) 'SKU: ${it.sku}',
-                                'Stock: ${it.stock.toStringAsFixed(2)}'
-                              ].join(' • ')),
-                            );
-                          },
+                      : RadioGroup<int>(
+                          groupValue: selectedId,
+                          onChanged: (value) =>
+                              setInner(() => selectedId = value),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: results.length,
+                            itemBuilder: (context, i) {
+                              final it = results[i];
+                              return RadioListTile<int>(
+                                value: it.productId,
+                                title: Text(it.name),
+                                subtitle: Text([
+                                  if ((it.sku ?? '').isNotEmpty)
+                                    'SKU: ${it.sku}',
+                                  'Stock: ${it.stock.toStringAsFixed(2)}'
+                                ].join(' • ')),
+                              );
+                            },
+                          ),
                         ),
                 ),
               ],
@@ -453,7 +493,8 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
               onPressed: () {
                 final it = results.firstWhere(
                   (e) => e.productId == selectedId,
-                  orElse: () => widget.line.product ??
+                  orElse: () =>
+                      widget.line.product ??
                       InventoryListItem(
                         productId: -1,
                         name: '',
@@ -488,4 +529,3 @@ String _fmt(DateTime dt) {
   final mm = dt.minute.toString().padLeft(2, '0');
   return '$y-$m-$d $hh:$mm';
 }
-

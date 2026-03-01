@@ -100,7 +100,7 @@ final ThemeData lightTheme = () {
       filled: true,
       fillColor: scheme.surface,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      hintStyle: TextStyle(color: scheme.onSurface.withOpacity(0.5)),
+      hintStyle: TextStyle(color: scheme.onSurface.withValues(alpha: 0.5)),
       border: OutlineInputBorder(
           borderRadius: _rMd, borderSide: BorderSide(color: scheme.outline)),
       enabledBorder: OutlineInputBorder(
@@ -113,7 +113,7 @@ final ThemeData lightTheme = () {
       focusedErrorBorder: OutlineInputBorder(
           borderRadius: _rMd,
           borderSide: BorderSide(color: scheme.error, width: 2)),
-      labelStyle: TextStyle(color: scheme.onSurface.withOpacity(0.8)),
+      labelStyle: TextStyle(color: scheme.onSurface.withValues(alpha: 0.8)),
     ),
 
     // Buttons
@@ -164,14 +164,14 @@ final ThemeData lightTheme = () {
           s.contains(WidgetState.selected) ? scheme.primary : scheme.outline),
       trackColor: WidgetStateProperty.resolveWith((s) =>
           s.contains(WidgetState.selected)
-              ? scheme.primary.withOpacity(.25)
-              : scheme.outline.withOpacity(.4)),
+              ? scheme.primary.withValues(alpha: .25)
+              : scheme.outline.withValues(alpha: .4)),
     ),
 
     // Chips
     chipTheme: ChipThemeData(
       backgroundColor: scheme.surface,
-      selectedColor: scheme.primary.withOpacity(0.15),
+      selectedColor: scheme.primary.withValues(alpha: 0.15),
       disabledColor: scheme.surfaceContainerHighest,
       labelStyle: TextStyle(color: scheme.onSurface),
       side: BorderSide(color: scheme.outline),
@@ -189,18 +189,19 @@ final ThemeData lightTheme = () {
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
           fontSize: 12,
-          fontWeight:
-              states.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w600,
+          fontWeight: states.contains(WidgetState.selected)
+              ? FontWeight.w700
+              : FontWeight.w600,
           color: states.contains(WidgetState.selected)
               ? scheme.primary
-              : scheme.onSurface.withOpacity(.70),
+              : scheme.onSurface.withValues(alpha: .70),
         ),
       ),
       iconTheme: WidgetStateProperty.resolveWith(
         (s) => IconThemeData(
             color: s.contains(WidgetState.selected)
                 ? scheme.primary
-                : scheme.onSurface.withOpacity(.70)),
+                : scheme.onSurface.withValues(alpha: .70)),
       ),
       height: 64,
     ),
@@ -208,7 +209,7 @@ final ThemeData lightTheme = () {
     // Tabs
     tabBarTheme: TabBarThemeData(
       labelColor: scheme.primary,
-      unselectedLabelColor: scheme.onSurface.withOpacity(0.6),
+      unselectedLabelColor: scheme.onSurface.withValues(alpha: 0.6),
       indicator: UnderlineTabIndicator(
           borderSide: BorderSide(color: scheme.primary, width: 2)),
       labelStyle: const TextStyle(fontWeight: FontWeight.w700),
@@ -218,7 +219,7 @@ final ThemeData lightTheme = () {
       backgroundColor: scheme.surface,
       selectedIconTheme: IconThemeData(color: scheme.primary),
       unselectedIconTheme:
-          IconThemeData(color: scheme.onSurface.withOpacity(.70)),
+          IconThemeData(color: scheme.onSurface.withValues(alpha: .70)),
       selectedLabelTextStyle: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w700,
@@ -227,7 +228,7 @@ final ThemeData lightTheme = () {
       unselectedLabelTextStyle: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: scheme.onSurface.withOpacity(.70),
+        color: scheme.onSurface.withValues(alpha: .70),
       ),
     ),
 
@@ -237,8 +238,8 @@ final ThemeData lightTheme = () {
     listTileTheme: ListTileThemeData(
       shape: RoundedRectangleBorder(borderRadius: _rMd),
       tileColor: scheme.surface,
-      selectedTileColor: scheme.primary.withOpacity(0.06),
-      iconColor: scheme.onSurface.withOpacity(.8),
+      selectedTileColor: scheme.primary.withValues(alpha: 0.06),
+      iconColor: scheme.onSurface.withValues(alpha: .8),
       titleTextStyle: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w600,
@@ -275,7 +276,7 @@ final ThemeData lightTheme = () {
       shape: RoundedRectangleBorder(borderRadius: _rMd),
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(color: scheme.primary),
-    iconTheme: IconThemeData(color: scheme.onSurface.withOpacity(.85)),
+    iconTheme: IconThemeData(color: scheme.onSurface.withValues(alpha: .85)),
   );
 }();
 
@@ -315,7 +316,7 @@ final ThemeData darkTheme = () {
       filled: true,
       fillColor: scheme.surface,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      hintStyle: TextStyle(color: scheme.onSurface.withOpacity(0.55)),
+      hintStyle: TextStyle(color: scheme.onSurface.withValues(alpha: 0.55)),
       border: OutlineInputBorder(
           borderRadius: _rMd, borderSide: BorderSide(color: scheme.outline)),
       enabledBorder: OutlineInputBorder(
@@ -328,7 +329,7 @@ final ThemeData darkTheme = () {
       focusedErrorBorder: OutlineInputBorder(
           borderRadius: _rMd,
           borderSide: BorderSide(color: scheme.error, width: 2)),
-      labelStyle: TextStyle(color: scheme.onSurface.withOpacity(0.9)),
+      labelStyle: TextStyle(color: scheme.onSurface.withValues(alpha: 0.9)),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
@@ -375,12 +376,12 @@ final ThemeData darkTheme = () {
           s.contains(WidgetState.selected) ? scheme.primary : scheme.outline),
       trackColor: WidgetStateProperty.resolveWith((s) =>
           s.contains(WidgetState.selected)
-              ? scheme.primary.withOpacity(.35)
-              : scheme.outline.withOpacity(.5)),
+              ? scheme.primary.withValues(alpha: .35)
+              : scheme.outline.withValues(alpha: .5)),
     ),
     chipTheme: ChipThemeData(
       backgroundColor: scheme.surface,
-      selectedColor: scheme.primary.withOpacity(0.18),
+      selectedColor: scheme.primary.withValues(alpha: 0.18),
       disabledColor: scheme.surfaceContainerHighest,
       labelStyle: TextStyle(color: scheme.onSurface),
       side: BorderSide(color: scheme.outline),
@@ -396,24 +397,25 @@ final ThemeData darkTheme = () {
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
           fontSize: 12,
-          fontWeight:
-              states.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w600,
+          fontWeight: states.contains(WidgetState.selected)
+              ? FontWeight.w700
+              : FontWeight.w600,
           color: states.contains(WidgetState.selected)
               ? scheme.primary
-              : scheme.onSurface.withOpacity(.75),
+              : scheme.onSurface.withValues(alpha: .75),
         ),
       ),
       iconTheme: WidgetStateProperty.resolveWith(
         (s) => IconThemeData(
             color: s.contains(WidgetState.selected)
                 ? scheme.primary
-                : scheme.onSurface.withOpacity(.75)),
+                : scheme.onSurface.withValues(alpha: .75)),
       ),
       height: 64,
     ),
     tabBarTheme: TabBarThemeData(
       labelColor: scheme.primary,
-      unselectedLabelColor: scheme.onSurface.withOpacity(0.7),
+      unselectedLabelColor: scheme.onSurface.withValues(alpha: 0.7),
       indicator: UnderlineTabIndicator(
           borderSide: BorderSide(color: scheme.primary, width: 2)),
       labelStyle: const TextStyle(fontWeight: FontWeight.w700),
@@ -422,7 +424,7 @@ final ThemeData darkTheme = () {
       backgroundColor: scheme.surface,
       selectedIconTheme: IconThemeData(color: scheme.primary),
       unselectedIconTheme:
-          IconThemeData(color: scheme.onSurface.withOpacity(.75)),
+          IconThemeData(color: scheme.onSurface.withValues(alpha: .75)),
       selectedLabelTextStyle: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w700,
@@ -431,7 +433,7 @@ final ThemeData darkTheme = () {
       unselectedLabelTextStyle: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: scheme.onSurface.withOpacity(.75),
+        color: scheme.onSurface.withValues(alpha: .75),
       ),
     ),
     dividerTheme:
@@ -439,8 +441,8 @@ final ThemeData darkTheme = () {
     listTileTheme: ListTileThemeData(
       shape: RoundedRectangleBorder(borderRadius: _rMd),
       tileColor: scheme.surface,
-      selectedTileColor: scheme.primary.withOpacity(0.09),
-      iconColor: scheme.onSurface.withOpacity(.9),
+      selectedTileColor: scheme.primary.withValues(alpha: 0.09),
+      iconColor: scheme.onSurface.withValues(alpha: .9),
       titleTextStyle: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.w600,
@@ -471,6 +473,6 @@ final ThemeData darkTheme = () {
       shape: RoundedRectangleBorder(borderRadius: _rMd),
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(color: scheme.primary),
-    iconTheme: IconThemeData(color: scheme.onSurface.withOpacity(.9)),
+    iconTheme: IconThemeData(color: scheme.onSurface.withValues(alpha: .9)),
   );
 }();

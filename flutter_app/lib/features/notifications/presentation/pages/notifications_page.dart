@@ -45,7 +45,8 @@ class NotificationsPage extends StatelessWidget {
             ),
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor: theme.colorScheme.primary.withOpacity(.12),
+                backgroundColor:
+                    theme.colorScheme.primary.withValues(alpha: .12),
                 child: Icon(n.icon, color: theme.colorScheme.primary),
               ),
               title: Row(
@@ -100,4 +101,3 @@ class _NotificationItem {
     required this.icon,
   });
 }
-

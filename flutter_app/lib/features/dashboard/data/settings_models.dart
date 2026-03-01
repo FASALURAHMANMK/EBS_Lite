@@ -6,7 +6,8 @@ class CompanySettingsDto {
 
   CompanySettingsDto({this.name, this.address, this.phone, this.email});
 
-  factory CompanySettingsDto.fromJson(Map<String, dynamic> json) => CompanySettingsDto(
+  factory CompanySettingsDto.fromJson(Map<String, dynamic> json) =>
+      CompanySettingsDto(
         name: json['name'] as String?,
         address: json['address'] as String?,
         phone: json['phone'] as String?,
@@ -20,4 +21,3 @@ class CompanySettingsDto {
         if (email != null) 'email': email,
       };
 }
-

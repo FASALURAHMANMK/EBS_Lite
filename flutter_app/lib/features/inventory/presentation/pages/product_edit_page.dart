@@ -163,7 +163,13 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         _taxId = id;
         try {
           final taxes = await ref.read(taxesRepositoryProvider).getTaxes();
-          final t = taxes.firstWhere((e) => e.taxId == id, orElse: () => const TaxDto(taxId: -1, name: '', percentage: 0, isCompound: false, isActive: true));
+          final t = taxes.firstWhere((e) => e.taxId == id,
+              orElse: () => const TaxDto(
+                  taxId: -1,
+                  name: '',
+                  percentage: 0,
+                  isCompound: false,
+                  isActive: true));
           if (t.taxId == id) {
             final pct = _formatPercent(t.percentage);
             _taxName = '${t.name} ($pct%)';
@@ -260,12 +266,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     }
   }
 
-  String _formatPercent(double p) => (p % 1 == 0) ? p.toStringAsFixed(0) : p.toStringAsFixed(2);
-
-  
-
-  
-
+  String _formatPercent(double p) =>
+      (p % 1 == 0) ? p.toStringAsFixed(0) : p.toStringAsFixed(2);
 
   Future<void> _delete() async {
     final ok = await showDialog<bool>(
@@ -724,18 +726,20 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                 Flexible(
                   child: filtered.isEmpty
                       ? const Center(child: Text('No categories'))
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: filtered.length,
-                          itemBuilder: (context, i) {
-                            final c = filtered[i];
-                            return RadioListTile<int>(
-                              value: c.categoryId,
-                              groupValue: current,
-                              onChanged: (v) => setInner(() => current = v),
-                              title: Text(c.name),
-                            );
-                          },
+                      : RadioGroup<int>(
+                          groupValue: current,
+                          onChanged: (value) => setInner(() => current = value),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filtered.length,
+                            itemBuilder: (context, i) {
+                              final c = filtered[i];
+                              return RadioListTile<int>(
+                                value: c.categoryId,
+                                title: Text(c.name),
+                              );
+                            },
+                          ),
                         ),
                 ),
               ],
@@ -798,18 +802,20 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                 Flexible(
                   child: filtered.isEmpty
                       ? const Center(child: Text('No brands'))
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: filtered.length,
-                          itemBuilder: (context, i) {
-                            final b = filtered[i];
-                            return RadioListTile<int>(
-                              value: b.brandId,
-                              groupValue: current,
-                              onChanged: (v) => setInner(() => current = v),
-                              title: Text(b.name),
-                            );
-                          },
+                      : RadioGroup<int>(
+                          groupValue: current,
+                          onChanged: (value) => setInner(() => current = value),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filtered.length,
+                            itemBuilder: (context, i) {
+                              final b = filtered[i];
+                              return RadioListTile<int>(
+                                value: b.brandId,
+                                title: Text(b.name),
+                              );
+                            },
+                          ),
                         ),
                 ),
               ],
@@ -874,20 +880,22 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                 Flexible(
                   child: filtered.isEmpty
                       ? const Center(child: Text('No units'))
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: filtered.length,
-                          itemBuilder: (context, i) {
-                            final u = filtered[i];
-                            final label =
-                                '${u.name}${u.symbol != null ? ' (${u.symbol})' : ''}';
-                            return RadioListTile<int>(
-                              value: u.unitId,
-                              groupValue: current,
-                              onChanged: (v) => setInner(() => current = v),
-                              title: Text(label),
-                            );
-                          },
+                      : RadioGroup<int>(
+                          groupValue: current,
+                          onChanged: (value) => setInner(() => current = value),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filtered.length,
+                            itemBuilder: (context, i) {
+                              final u = filtered[i];
+                              final label =
+                                  '${u.name}${u.symbol != null ? ' (${u.symbol})' : ''}';
+                              return RadioListTile<int>(
+                                value: u.unitId,
+                                title: Text(label),
+                              );
+                            },
+                          ),
                         ),
                 ),
               ],
@@ -934,18 +942,20 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: opts.length,
-                    itemBuilder: (context, i) {
-                      final o = opts[i];
-                      return RadioListTile<String>(
-                        value: o,
-                        groupValue: current,
-                        onChanged: (v) => setInner(() => current = v),
-                        title: Text(o),
-                      );
-                    },
+                  child: RadioGroup<String>(
+                    groupValue: current,
+                    onChanged: (value) => setInner(() => current = value),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: opts.length,
+                      itemBuilder: (context, i) {
+                        final o = opts[i];
+                        return RadioListTile<String>(
+                          value: o,
+                          title: Text(o),
+                        );
+                      },
+                    ),
                   ),
                 ),
               ],
@@ -1018,6 +1028,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       ),
     );
   }
+
   Future<TaxDto?> _openTaxPicker() async {
     final repo = ref.read(taxesRepositoryProvider);
     List<TaxDto> taxes = [];
@@ -1028,6 +1039,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     if (current == null && taxes.isNotEmpty) {
       current = taxes.first.taxId;
     }
+    if (!mounted) return null;
     return showDialog<TaxDto?>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -1037,30 +1049,36 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
             width: 500,
             child: taxes.isEmpty
                 ? const Center(child: Text('No tax types'))
-                : ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: taxes.length,
-                    itemBuilder: (context, i) {
-                      final t = taxes[i];
-                      return RadioListTile<int>(
-                        value: t.taxId,
-                        groupValue: current,
-                        onChanged: (v) => setInner(() => current = v),
-                        title: Text(t.name),
-                        subtitle: Text('${(t.percentage % 1 == 0 ? t.percentage.toStringAsFixed(0) : t.percentage.toStringAsFixed(2))} %'),
-                      );
-                    },
+                : RadioGroup<int>(
+                    groupValue: current,
+                    onChanged: (value) => setInner(() => current = value),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: taxes.length,
+                      itemBuilder: (context, i) {
+                        final t = taxes[i];
+                        return RadioListTile<int>(
+                          value: t.taxId,
+                          title: Text(t.name),
+                          subtitle: Text(
+                              '${(t.percentage % 1 == 0 ? t.percentage.toStringAsFixed(0) : t.percentage.toStringAsFixed(2))} %'),
+                        );
+                      },
+                    ),
                   ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, null), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.pop(context, null),
+                child: const Text('Cancel')),
             FilledButton(
               onPressed: () {
                 if (current == null) {
                   Navigator.pop(context, null);
                   return;
                 }
-                final sel = taxes.firstWhere((e) => e.taxId == current, orElse: () => taxes.first);
+                final sel = taxes.firstWhere((e) => e.taxId == current,
+                    orElse: () => taxes.first);
                 Navigator.pop(context, sel);
               },
               child: const Text('Apply'),
@@ -1070,7 +1088,6 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       ),
     );
   }
-
 }
 
 class _SupplierPick {

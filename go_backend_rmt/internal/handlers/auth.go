@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
 	"erp-backend/internal/models"
@@ -43,6 +44,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	// Authenticate user
 	response, err := h.authService.Login(&req, ipAddress, userAgent)
 	if err != nil {
+		if errors.Is(err, services.ErrDeviceSessionCreate) {
+			utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to create device session", err)
+			return
+		}
 		utils.ErrorResponse(c, http.StatusUnauthorized, "Authentication failed", err)
 		return
 	}

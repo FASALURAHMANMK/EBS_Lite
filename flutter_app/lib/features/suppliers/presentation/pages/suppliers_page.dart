@@ -24,7 +24,8 @@ class _SuppliersPageState extends ConsumerState<SuppliersPage> {
 
   Future<List<SupplierDto>> _load() async {
     final repo = ref.read(supplierRepositoryProvider);
-    return repo.getSuppliers(search: _query.trim().isEmpty ? null : _query.trim());
+    return repo.getSuppliers(
+        search: _query.trim().isEmpty ? null : _query.trim());
   }
 
   Future<void> _refresh() async {
@@ -80,13 +81,17 @@ class _SuppliersPageState extends ConsumerState<SuppliersPage> {
                     return const LinearProgressIndicator(minHeight: 2);
                   }
                   if (snapshot.hasError) {
-                    return Center(child: Padding(
+                    return Center(
+                        child: Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: Text('Failed to load: ${snapshot.error}', style: TextStyle(color: theme.colorScheme.error)),
+                      child: Text('Failed to load: ${snapshot.error}',
+                          style: TextStyle(color: theme.colorScheme.error)),
                     ));
                   }
                   final items = snapshot.data ?? const [];
-                  if (items.isEmpty) return const Center(child: Text('No suppliers'));
+                  if (items.isEmpty) {
+                    return const Center(child: Text('No suppliers'));
+                  }
                   return ListView.separated(
                     padding: const EdgeInsets.all(12),
                     itemCount: items.length,
@@ -112,11 +117,15 @@ class _SupplierTile extends StatelessWidget {
     return ListTile(
       tileColor: theme.colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      title: Text(item.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-      subtitle: Text('Purchases: ${item.totalPurchases.toStringAsFixed(2)} • Outstanding: ${item.outstandingAmount.toStringAsFixed(2)}'),
+      title: Text(item.name,
+          style: theme.textTheme.titleMedium
+              ?.copyWith(fontWeight: FontWeight.w700)),
+      subtitle: Text(
+          'Purchases: ${item.totalPurchases.toStringAsFixed(2)} • Outstanding: ${item.outstandingAmount.toStringAsFixed(2)}'),
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => SupplierDetailPage(supplierId: item.supplierId)),
+        MaterialPageRoute(
+            builder: (_) => SupplierDetailPage(supplierId: item.supplierId)),
       ),
     );
   }

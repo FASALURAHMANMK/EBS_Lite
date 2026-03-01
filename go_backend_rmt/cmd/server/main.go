@@ -50,17 +50,23 @@ func main() {
 	router := gin.New()
 
 	// Apply global middleware
+	router.Use(middleware.RequestID())
 	router.Use(middleware.Logger())
 	router.Use(middleware.Recovery())
 	router.Use(middleware.CORS(cfg))
+	router.Use(middleware.RateLimiter(cfg))
 
 	// Initialize routes
 	routes.Initialize(router, cfg)
 
 	// Start server with graceful shutdown
 	server := &http.Server{
-		Addr:    ":" + cfg.Port,
-		Handler: router,
+		Addr:              ":" + cfg.Port,
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	go func() {

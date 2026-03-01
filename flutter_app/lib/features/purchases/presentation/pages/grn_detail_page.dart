@@ -9,10 +9,12 @@ class GoodsReceiptDetailPage extends ConsumerStatefulWidget {
   final int goodsReceiptId;
 
   @override
-  ConsumerState<GoodsReceiptDetailPage> createState() => _GoodsReceiptDetailPageState();
+  ConsumerState<GoodsReceiptDetailPage> createState() =>
+      _GoodsReceiptDetailPageState();
 }
 
-class _GoodsReceiptDetailPageState extends ConsumerState<GoodsReceiptDetailPage> {
+class _GoodsReceiptDetailPageState
+    extends ConsumerState<GoodsReceiptDetailPage> {
   GoodsReceiptDetailDto? _detail;
   bool _loading = true;
 
@@ -78,13 +80,17 @@ class _Header extends StatelessWidget {
           children: [
             Text(detail.receiptNumber, style: theme.textTheme.titleMedium),
             const SizedBox(height: 4),
-            Text([
-              if ((detail.supplierName ?? '').isNotEmpty) 'Supplier: ${detail.supplierName}',
-              'Date: ${_fmt(detail.receivedDate)}',
-            ].join(' • '), style: theme.textTheme.bodyMedium),
+            Text(
+                [
+                  if ((detail.supplierName ?? '').isNotEmpty)
+                    'Supplier: ${detail.supplierName}',
+                  'Date: ${_fmt(detail.receivedDate)}',
+                ].join(' • '),
+                style: theme.textTheme.bodyMedium),
             if (detail.purchaseId != null) ...[
               const SizedBox(height: 4),
-              Text('Purchase ID: ${detail.purchaseId}', style: theme.textTheme.bodySmall),
+              Text('Purchase ID: ${detail.purchaseId}',
+                  style: theme.textTheme.bodySmall),
             ],
           ],
         ),
@@ -101,7 +107,9 @@ class _Items extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (items.isEmpty) {
-      return const Card(elevation: 0, child: Padding(padding: EdgeInsets.all(12), child: Text('No items')));
+      return const Card(
+          elevation: 0,
+          child: Padding(padding: EdgeInsets.all(12), child: Text('No items')));
     }
     return Card(
       elevation: 0,
@@ -116,7 +124,8 @@ class _Items extends StatelessWidget {
                 'Qty: ${it.receivedQuantity.toStringAsFixed(2)}',
                 'Rate: ${it.unitPrice.toStringAsFixed(2)}',
               ].join(' • ')),
-              trailing: Text(it.lineTotal.toStringAsFixed(2), style: theme.textTheme.titleMedium),
+              trailing: Text(it.lineTotal.toStringAsFixed(2),
+                  style: theme.textTheme.titleMedium),
             ),
         ],
       ),
@@ -130,4 +139,3 @@ String _fmt(DateTime dt) {
   final d = dt.day.toString().padLeft(2, '0');
   return '$y-$m-$d';
 }
-

@@ -2,9 +2,15 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"log"
+	"net/url"
+	"path"
+	"strings"
 	"time"
 
+	"erp-backend/internal/config"
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
 	"erp-backend/internal/utils"
@@ -13,12 +19,16 @@ import (
 )
 
 type AuthService struct {
-	db *sql.DB
+	db  *sql.DB
+	cfg *config.Config
 }
+
+var ErrDeviceSessionCreate = errors.New("device session creation failed")
 
 func NewAuthService() *AuthService {
 	return &AuthService{
-		db: database.GetDB(),
+		db:  database.GetDB(),
+		cfg: config.Load(),
 	}
 }
 
@@ -99,7 +109,10 @@ func (s *AuthService) Login(req *models.LoginRequest, ipAddress, userAgent strin
 	}
 	err = s.db.QueryRow(`INSERT INTO device_sessions (user_id, device_id, device_name, ip_address, user_agent) VALUES ($1,$2,$3,$4,$5) RETURNING session_id`, user.UserID, req.DeviceID, req.DeviceName, ipVal, uaVal).Scan(&sessionID)
 	if err != nil {
-		fmt.Printf("Failed to create device session: %v\n", err)
+		return nil, fmt.Errorf("%w: %v", ErrDeviceSessionCreate, err)
+	}
+	if sessionID == "" {
+		return nil, fmt.Errorf("%w: empty session id", ErrDeviceSessionCreate)
 	}
 
 	// Generate tokens
@@ -117,14 +130,14 @@ func (s *AuthService) Login(req *models.LoginRequest, ipAddress, userAgent strin
 	err = s.updateLastLogin(user.UserID)
 	if err != nil {
 		// Log error but don't fail the login
-		fmt.Printf("Failed to update last login: %v\n", err)
+		log.Printf("auth_service: failed to update last login: %v", err)
 	}
 
 	// Get user permissions
 	permissions, err := s.getUserPermissions(user.UserID)
 	if err != nil {
 		// Log error but don't fail the login
-		fmt.Printf("Failed to get user permissions: %v\n", err)
+		log.Printf("auth_service: failed to get user permissions: %v", err)
 		permissions = []string{}
 	}
 
@@ -243,7 +256,10 @@ func (s *AuthService) ForgotPassword(req *models.ForgotPasswordRequest) error {
 	}
 
 	// Send email with reset link
-	resetLink := fmt.Sprintf("https://example.com/reset-password?token=%s", token)
+	resetLink, err := buildResetLink(s.cfg.FrontendBaseURL, token)
+	if err != nil {
+		return fmt.Errorf("failed to build reset link: %w", err)
+	}
 	subject := "Password Reset Request"
 	body := fmt.Sprintf("Click the link to reset your password: %s", resetLink)
 	if err := utils.SendEmail(user.Email, subject, body); err != nil {
@@ -251,6 +267,33 @@ func (s *AuthService) ForgotPassword(req *models.ForgotPasswordRequest) error {
 	}
 
 	return nil
+}
+
+func buildResetLink(baseURL, token string) (string, error) {
+	trimmed := strings.TrimSpace(baseURL)
+	if trimmed == "" {
+		return "", fmt.Errorf("frontend base url is empty")
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return "", fmt.Errorf("invalid frontend base url: %w", err)
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("frontend base url must include scheme and host")
+	}
+
+	resetPath := "reset-password"
+	joinedPath := path.Join(parsed.Path, resetPath)
+	if !strings.HasPrefix(joinedPath, "/") {
+		joinedPath = "/" + joinedPath
+	}
+
+	resetURL := *parsed
+	resetURL.Path = joinedPath
+	q := resetURL.Query()
+	q.Set("token", token)
+	resetURL.RawQuery = q.Encode()
+	return resetURL.String(), nil
 }
 
 func (s *AuthService) ResetPassword(req *models.ResetPasswordRequest) error {

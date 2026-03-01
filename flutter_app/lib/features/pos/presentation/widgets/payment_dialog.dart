@@ -61,11 +61,15 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
         ref.read(loyaltyRepositoryProvider).getSettings(),
         // Customer info for points if selected
         if (posState.customer != null)
-          ref.read(customerRepositoryProvider).getCustomerSummary(posState.customer!.customerId)
+          ref
+              .read(customerRepositoryProvider)
+              .getCustomerSummary(posState.customer!.customerId)
         else
           Future.value(null),
         if (posState.customer != null)
-          ref.read(customerRepositoryProvider).getCustomer(posState.customer!.customerId)
+          ref
+              .read(customerRepositoryProvider)
+              .getCustomer(posState.customer!.customerId)
         else
           Future.value(null),
       ]);
@@ -102,7 +106,8 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
               ),
       );
       final total = ref.read(posNotifierProvider).total;
-      final defaultMethod = _methods.isNotEmpty ? _methods.first.methodId : null;
+      final defaultMethod =
+          _methods.isNotEmpty ? _methods.first.methodId : null;
       final defaultCurrency = _baseCurrency?.currencyId;
       _lines.clear();
       final first = _PaymentLine(
@@ -121,7 +126,8 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
   Widget build(BuildContext context) {
     final state = ref.watch(posNotifierProvider);
     final total = state.total;
-    final redeemPts = _useLoyalty ? (double.tryParse(_redeemCtrl.text.trim()) ?? 0.0) : 0.0;
+    final redeemPts =
+        _useLoyalty ? (double.tryParse(_redeemCtrl.text.trim()) ?? 0.0) : 0.0;
     final redeemClamped = redeemPts.clamp(0.0, _availablePoints);
     final redeemValue = redeemClamped * _pointValue;
     final effectiveTotal = (total - redeemValue).clamp(0.0, double.infinity);
@@ -151,19 +157,36 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                     // Loyalty redemption (optional)
                     if (_availablePoints > 0) ...[
                       Row(children: [
-                        Checkbox(value: _useLoyalty, onChanged: (v) => setState(() {
-                          _useLoyalty = (v ?? false);
-                          if (_lines.isNotEmpty) {
-                            final newTotal = (state.total - ((_useLoyalty ? (double.tryParse(_redeemCtrl.text.trim()) ?? 0.0) : 0.0).clamp(0.0, _availablePoints) * _pointValue)).clamp(0.0, double.infinity);
-                            _lines.first.controller.text = newTotal.toStringAsFixed(2);
-                          }
-                        })),
+                        Checkbox(
+                            value: _useLoyalty,
+                            onChanged: (v) => setState(() {
+                                  _useLoyalty = (v ?? false);
+                                  if (_lines.isNotEmpty) {
+                                    final newTotal = (state.total -
+                                            ((_useLoyalty
+                                                        ? (double.tryParse(
+                                                                _redeemCtrl.text
+                                                                    .trim()) ??
+                                                            0.0)
+                                                        : 0.0)
+                                                    .clamp(
+                                                        0.0, _availablePoints) *
+                                                _pointValue))
+                                        .clamp(0.0, double.infinity);
+                                    _lines.first.controller.text =
+                                        newTotal.toStringAsFixed(2);
+                                  }
+                                })),
                         const Text('Redeem loyalty points'),
                       ]),
                       Row(children: [
-                        Chip(label: Text('Avail: ${_availablePoints.toStringAsFixed(0)} pts')),
+                        Chip(
+                            label: Text(
+                                'Avail: ${_availablePoints.toStringAsFixed(0)} pts')),
                         const SizedBox(width: 8),
-                        Chip(label: Text('Value/pt: ${_pointValue.toStringAsFixed(2)}')),
+                        Chip(
+                            label: Text(
+                                'Value/pt: ${_pointValue.toStringAsFixed(2)}')),
                       ]),
                       Row(children: [
                         SizedBox(
@@ -172,51 +195,75 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                             controller: _redeemCtrl,
                             enabled: _useLoyalty,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(labelText: 'Points to redeem'),
+                            decoration: const InputDecoration(
+                                labelText: 'Points to redeem'),
                             onChanged: (_) => setState(() {
                               // keep primary payment synced to effective total
                               if (_lines.isNotEmpty) {
-                                final newTotal = (state.total - ((double.tryParse(_redeemCtrl.text.trim()) ?? 0.0).clamp(0.0, _availablePoints) * _pointValue)).clamp(0.0, double.infinity);
-                                _lines.first.controller.text = newTotal.toStringAsFixed(2);
+                                final newTotal = (state.total -
+                                        ((double.tryParse(_redeemCtrl.text
+                                                        .trim()) ??
+                                                    0.0)
+                                                .clamp(0.0, _availablePoints) *
+                                            _pointValue))
+                                    .clamp(0.0, double.infinity);
+                                _lines.first.controller.text =
+                                    newTotal.toStringAsFixed(2);
                               }
                             }),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Text('= ${redeemValue.toStringAsFixed(2)}'),
-                      
                       ]),
                       Row(children: [
                         TextButton(
-                          onPressed: !_useLoyalty ? null : () {
-                            // Fill points needed to cover full bill amount
-                            final needed = (_pointValue > 0) ? (state.total / _pointValue) : 0.0;
-                            final clamped = needed.clamp(0.0, _availablePoints);
-                            setState(() => _redeemCtrl.text = clamped.toStringAsFixed(0));
-                          },
+                          onPressed: !_useLoyalty
+                              ? null
+                              : () {
+                                  // Fill points needed to cover full bill amount
+                                  final needed = (_pointValue > 0)
+                                      ? (state.total / _pointValue)
+                                      : 0.0;
+                                  final clamped =
+                                      needed.clamp(0.0, _availablePoints);
+                                  setState(() => _redeemCtrl.text =
+                                      clamped.toStringAsFixed(0));
+                                },
                           child: const Text('Full bill'),
                         ),
                         const SizedBox(width: 8),
                         TextButton(
-                          onPressed: !_useLoyalty ? null : () {
-                            // Full available points
-                            setState(() => _redeemCtrl.text = _availablePoints.toStringAsFixed(0));
-                          },
+                          onPressed: !_useLoyalty
+                              ? null
+                              : () {
+                                  // Full available points
+                                  setState(() => _redeemCtrl.text =
+                                      _availablePoints.toStringAsFixed(0));
+                                },
                           child: const Text('Full available'),
                         ),
                       ]),
                       if (_useLoyalty) ...[
                         Slider(
-                          value: (double.tryParse(_redeemCtrl.text.trim()) ?? 0.0).clamp(0.0, _availablePoints),
+                          value:
+                              (double.tryParse(_redeemCtrl.text.trim()) ?? 0.0)
+                                  .clamp(0.0, _availablePoints),
                           min: 0.0,
                           max: _availablePoints > 0 ? _availablePoints : 0.0,
-                          divisions: _availablePoints > 0 ? _availablePoints.toInt().clamp(1, 1000) : 1,
+                          divisions: _availablePoints > 0
+                              ? _availablePoints.toInt().clamp(1, 1000)
+                              : 1,
                           label: _redeemCtrl.text,
                           onChanged: (v) => setState(() {
                             _redeemCtrl.text = v.toStringAsFixed(0);
                             if (_lines.isNotEmpty) {
-                              final newTotal = (state.total - (v.clamp(0.0, _availablePoints) * _pointValue)).clamp(0.0, double.infinity);
-                              _lines.first.controller.text = newTotal.toStringAsFixed(2);
+                              final newTotal = (state.total -
+                                      (v.clamp(0.0, _availablePoints) *
+                                          _pointValue))
+                                  .clamp(0.0, double.infinity);
+                              _lines.first.controller.text =
+                                  newTotal.toStringAsFixed(2);
                             }
                           }),
                         ),
@@ -229,11 +276,14 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Payments', style: Theme.of(context).textTheme.titleSmall),
+                        Text('Payments',
+                            style: Theme.of(context).textTheme.titleSmall),
                         TextButton.icon(
                           onPressed: () => setState(() {
                             final l = _PaymentLine(
-                              methodId: _methods.isNotEmpty ? _methods.first.methodId : null,
+                              methodId: _methods.isNotEmpty
+                                  ? _methods.first.methodId
+                                  : null,
                               currencyId: _baseCurrency?.currencyId,
                               controller: TextEditingController(text: '0.00'),
                             );
@@ -260,19 +310,23 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                               child: Row(
                                 children: _methods
                                     .map((m) => Padding(
-                                          padding: const EdgeInsets.only(right: 16.0),
+                                          padding: const EdgeInsets.only(
+                                              right: 16.0),
                                           child: InkWell(
                                             onTap: () => setState(() {
                                               line.methodId = m.methodId;
-                                              _ensureAllowedCurrencyForLine(line);
+                                              _ensureAllowedCurrencyForLine(
+                                                  line);
                                             }),
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 Icon(
                                                   line.methodId == m.methodId
-                                                      ? Icons.radio_button_checked
-                                                      : Icons.radio_button_unchecked,
+                                                      ? Icons
+                                                          .radio_button_checked
+                                                      : Icons
+                                                          .radio_button_unchecked,
                                                   size: 20,
                                                 ),
                                                 Text(m.name),
@@ -289,27 +343,36 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                                 Expanded(
                                   child: TextField(
                                     controller: line.controller,
-                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                            decimal: true),
                                     decoration: InputDecoration(
                                       labelText: 'Amount',
                                       prefixIcon: InkWell(
                                         onTap: () async {
-                                          final picked = await _pickCurrencyFor(context, line.methodId);
-                                          if (picked != null) setState(() => line.currencyId = picked);
+                                          final picked = await _pickCurrencyFor(
+                                              context, line.methodId);
+                                          if (picked != null) {
+                                            setState(
+                                                () => line.currencyId = picked);
+                                          }
                                         },
                                         child: Container(
                                           alignment: Alignment.center,
                                           width: 80,
                                           child: Text(
                                             _codeFor(line.currencyId),
-                                            style: Theme.of(context).textTheme.titleMedium,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleMedium,
                                           ),
                                         ),
                                       ),
                                       suffixIcon: IconButton(
                                         tooltip: 'Clear',
                                         icon: const Icon(Icons.clear_rounded),
-                                        onPressed: () => setState(() => line.controller.text = '0.00'),
+                                        onPressed: () => setState(() =>
+                                            line.controller.text = '0.00'),
                                       ),
                                     ),
                                     onChanged: (_) => setState(() {}),
@@ -320,8 +383,10 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                                   tooltip: 'Remove',
                                   onPressed: _lines.length == 1
                                       ? null
-                                      : () => setState(() => _lines.removeAt(idx)),
-                                  icon: const Icon(Icons.remove_circle_outline_rounded),
+                                      : () =>
+                                          setState(() => _lines.removeAt(idx)),
+                                  icon: const Icon(
+                                      Icons.remove_circle_outline_rounded),
                                 )
                               ],
                             ),
@@ -333,15 +398,18 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Total Paid', style: Theme.of(context).textTheme.titleMedium),
-                        Text(_sumPaidInBase().toStringAsFixed(2), style: Theme.of(context).textTheme.titleMedium),
+                        Text('Total Paid',
+                            style: Theme.of(context).textTheme.titleMedium),
+                        Text(_sumPaidInBase().toStringAsFixed(2),
+                            style: Theme.of(context).textTheme.titleMedium),
                       ],
                     ),
                     const SizedBox(height: 6),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(isChange ? 'Change' : 'Balance', style: Theme.of(context).textTheme.titleMedium),
+                        Text(isChange ? 'Change' : 'Balance',
+                            style: Theme.of(context).textTheme.titleMedium),
                         Text(
                           displayBalance.toStringAsFixed(2),
                           style: Theme.of(context).textTheme.titleMedium,
@@ -379,7 +447,8 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                     // Resolve redeem points within allowed range
                     double? redeemPoints;
                     if (_useLoyalty && _availablePoints > 0) {
-                      final want = double.tryParse(_redeemCtrl.text.trim()) ?? 0.0;
+                      final want =
+                          double.tryParse(_redeemCtrl.text.trim()) ?? 0.0;
                       final clamped = want.clamp(0.0, _availablePoints);
                       redeemPoints = clamped > 0 ? clamped : null;
                     }
@@ -389,16 +458,22 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                         .map((l) => PosPaymentLineDto(
                               methodId: l.methodId!,
                               currencyId: l.currencyId,
-                              amount: double.tryParse(l.controller.text.trim()) ?? 0.0,
+                              amount:
+                                  double.tryParse(l.controller.text.trim()) ??
+                                      0.0,
                             ))
                         .toList();
                     final result = await ref
                         .read(posNotifierProvider.notifier)
-                        .processCheckout(paymentMethodId: primaryMethod, paidAmount: paid, payments: payments, redeemPoints: redeemPoints);
-                    if (!mounted) return;
+                        .processCheckout(
+                            paymentMethodId: primaryMethod,
+                            paidAmount: paid,
+                            payments: payments,
+                            redeemPoints: redeemPoints);
+                    if (!context.mounted) return;
                     Navigator.of(context).pop(result);
                   } catch (e) {
-                    if (!mounted) return;
+                    if (!context.mounted) return;
                     setState(() => _submitting = false);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Failed to process: $e')),
@@ -406,7 +481,10 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                   }
                 },
           icon: _submitting
-              ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.check_circle_rounded),
           label: const Text('Finalize'),
         ),
@@ -415,7 +493,9 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
   }
 
   List<int> _allowedCurrenciesForMethod(int? methodId) {
-    if (methodId == null) return _baseCurrency != null ? [_baseCurrency!.currencyId] : <int>[];
+    if (methodId == null) {
+      return _baseCurrency != null ? [_baseCurrency!.currencyId] : <int>[];
+    }
     final list = _methodCurrencies[methodId] ?? const [];
     if (list.isEmpty) {
       return _baseCurrency != null ? [_baseCurrency!.currencyId] : <int>[];
@@ -426,7 +506,8 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
   String _codeFor(int? currencyId) {
     final cur = _currencies.firstWhere(
       (c) => c.currencyId == currencyId,
-      orElse: () => _baseCurrency ??
+      orElse: () =>
+          _baseCurrency ??
           CurrencyDto(
               currencyId: 0,
               code: 'BASE',
@@ -448,7 +529,15 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
         (found['rate'] as num?)?.toDouble();
     if (rate != null) return rate;
     // Fallback to global currency rate
-    final cur = _currencies.firstWhere((c) => c.currencyId == currencyId, orElse: () => _baseCurrency ?? CurrencyDto(currencyId: currencyId, code: 'CUR', symbol: null, isBase: false, exchangeRate: 1.0));
+    final cur = _currencies.firstWhere((c) => c.currencyId == currencyId,
+        orElse: () =>
+            _baseCurrency ??
+            CurrencyDto(
+                currencyId: currencyId,
+                code: 'CUR',
+                symbol: null,
+                isBase: false,
+                exchangeRate: 1.0));
     return cur.exchangeRate;
   }
 

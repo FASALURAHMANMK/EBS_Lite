@@ -1,0 +1,13 @@
+{
+  "@@locale": "en",
+  "appTitle": "EBS Lite",
+  "companySettingsTitle": "Company Settings",
+  "uploadLogo": "Upload Logo",
+  "companySettingsUpdated": "Company settings updated",
+  "languageSectionTitle": "Language & Region",
+  "uiLanguageLabel": "App Language",
+  "receiptLanguageLabel": "Receipt Language",
+  "languageEnglish": "English",
+  "languageArabic": "Arabic",
+  "saveChanges": "Save Changes"
+}

@@ -35,7 +35,8 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
     setState(() => _loading = true);
     try {
       final repo = ref.read(grnRepositoryProvider);
-      final list = await repo.getGoodsReceipts(search: _search.text.trim().isEmpty ? null : _search.text.trim());
+      final list = await repo.getGoodsReceipts(
+          search: _search.text.trim().isEmpty ? null : _search.text.trim());
       if (!mounted) return;
       setState(() => _list = list);
     } finally {
@@ -49,7 +50,11 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
     final q = _search.text.trim().toLowerCase();
     final filtered = q.isEmpty
         ? _list
-        : _list.where((gr) => gr.receiptNumber.toLowerCase().contains(q) || (gr.supplierName ?? '').toLowerCase().contains(q)).toList();
+        : _list
+            .where((gr) =>
+                gr.receiptNumber.toLowerCase().contains(q) ||
+                (gr.supplierName ?? '').toLowerCase().contains(q))
+            .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -90,7 +95,8 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
                       ? const Center(child: Text('No goods receipts'))
                       : ListView.separated(
                           padding: const EdgeInsets.all(12),
-                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 8),
                           itemCount: filtered.length,
                           itemBuilder: (context, i) {
                             final gr = filtered[i];
@@ -100,12 +106,15 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
                                 leading: const Icon(Icons.receipt_long_rounded),
                                 title: Text(gr.receiptNumber),
                                 subtitle: Text([
-                                  if ((gr.supplierName ?? '').isNotEmpty) gr.supplierName!,
+                                  if ((gr.supplierName ?? '').isNotEmpty)
+                                    gr.supplierName!,
                                   _fmt(gr.receivedDate),
                                 ].join(' • ')),
                                 onTap: () async {
                                   await Navigator.of(context).push(
-                                    MaterialPageRoute(builder: (_) => GoodsReceiptDetailPage(goodsReceiptId: gr.goodsReceiptId)),
+                                    MaterialPageRoute(
+                                        builder: (_) => GoodsReceiptDetailPage(
+                                            goodsReceiptId: gr.goodsReceiptId)),
                                   );
                                 },
                               ),
@@ -126,9 +135,15 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
         title: const Text('Create Goods Receipt'),
         content: const Text('Choose entry type:'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, 'po'), child: const Text('With PO')),
-          FilledButton(onPressed: () => Navigator.pop(context, 'no_po'), child: const Text('Without PO')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, 'po'),
+              child: const Text('With PO')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, 'no_po'),
+              child: const Text('Without PO')),
         ],
       ),
     );
@@ -136,9 +151,11 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
     if (choice == 'po') {
       // Pick an APPROVED or PARTIALLY_RECEIVED PO and receive
       final picked = await _pickPO();
+      if (!mounted) return;
       if (picked != null) {
         await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => _ReceiveAgainstPoPage(purchaseId: picked)),
+          MaterialPageRoute(
+              builder: (_) => _ReceiveAgainstPoPage(purchaseId: picked)),
         );
         if (!mounted) return;
         _load();
@@ -157,7 +174,9 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
     try {
       final pending = await repo.getPendingOrders();
       // Keep only PARTIALLY_RECEIVED from this set
-      list = pending.where((e) => (e['status'] ?? '') == 'PARTIALLY_RECEIVED').toList();
+      list = pending
+          .where((e) => (e['status'] ?? '') == 'PARTIALLY_RECEIVED')
+          .toList();
     } catch (_) {}
     try {
       final approved = await repo.getOrders(status: 'APPROVED');
@@ -171,7 +190,9 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
         }
       }
     } catch (_) {}
-    int? selected = list.isNotEmpty ? (list.first['purchase_id'] as int?) : null;
+    int? selected =
+        list.isNotEmpty ? (list.first['purchase_id'] as int?) : null;
+    if (!mounted) return null;
     return showDialog<int?>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -183,24 +204,34 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
                 ? const Text('No pending/partial orders')
                 : SizedBox(
                     height: 360,
-                    child: ListView.builder(
-                      itemCount: list.length,
-                      itemBuilder: (context, i) {
-                        final it = list[i];
-                        return RadioListTile<int>(
-                          value: it['purchase_id'] as int,
-                          groupValue: selected,
-                          onChanged: (v) => setInner(() => selected = v),
-                          title: Text(it['purchase_number']?.toString() ?? ''),
-                          subtitle: Text((it['supplier']?['name'] ?? it['supplier_name'] ?? '').toString()),
-                        );
-                      },
+                    child: RadioGroup<int>(
+                      groupValue: selected,
+                      onChanged: (value) => setInner(() => selected = value),
+                      child: ListView.builder(
+                        itemCount: list.length,
+                        itemBuilder: (context, i) {
+                          final it = list[i];
+                          return RadioListTile<int>(
+                            value: it['purchase_id'] as int,
+                            title:
+                                Text(it['purchase_number']?.toString() ?? ''),
+                            subtitle: Text((it['supplier']?['name'] ??
+                                    it['supplier_name'] ??
+                                    '')
+                                .toString()),
+                          );
+                        },
+                      ),
                     ),
                   ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(context, selected), child: const Text('Select')),
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, selected),
+                child: const Text('Select')),
           ],
         ),
       ),
@@ -219,7 +250,8 @@ class _ReceiveAgainstPoPage extends ConsumerStatefulWidget {
   const _ReceiveAgainstPoPage({required this.purchaseId});
   final int purchaseId;
   @override
-  ConsumerState<_ReceiveAgainstPoPage> createState() => _ReceiveAgainstPoPageState();
+  ConsumerState<_ReceiveAgainstPoPage> createState() =>
+      _ReceiveAgainstPoPageState();
 }
 
 class _ReceiveAgainstPoPageState extends ConsumerState<_ReceiveAgainstPoPage> {
@@ -235,7 +267,9 @@ class _ReceiveAgainstPoPageState extends ConsumerState<_ReceiveAgainstPoPage> {
 
   @override
   void dispose() {
-    for (final c in _qty) { c.dispose(); }
+    for (final c in _qty) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -246,10 +280,13 @@ class _ReceiveAgainstPoPageState extends ConsumerState<_ReceiveAgainstPoPage> {
       final po = await repo.getPurchase(widget.purchaseId);
       if (!mounted) return;
       _qty.clear();
-      final items = (po['items'] as List? ?? const []).cast<Map<String, dynamic>>();
+      final items =
+          (po['items'] as List? ?? const []).cast<Map<String, dynamic>>();
       for (final it in items) {
-        final qty = ((it['quantity'] as num?)?.toDouble() ?? 0) - ((it['received_quantity'] as num?)?.toDouble() ?? 0);
-        _qty.add(TextEditingController(text: qty > 0 ? qty.toStringAsFixed(2) : '0'));
+        final qty = ((it['quantity'] as num?)?.toDouble() ?? 0) -
+            ((it['received_quantity'] as num?)?.toDouble() ?? 0);
+        _qty.add(TextEditingController(
+            text: qty > 0 ? qty.toStringAsFixed(2) : '0'));
       }
       setState(() => _po = po);
     } finally {
@@ -260,7 +297,8 @@ class _ReceiveAgainstPoPageState extends ConsumerState<_ReceiveAgainstPoPage> {
   @override
   Widget build(BuildContext context) {
     final po = _po;
-    final items = (po?['items'] as List? ?? const []).cast<Map<String, dynamic>>();
+    final items =
+        (po?['items'] as List? ?? const []).cast<Map<String, dynamic>>();
     return Scaffold(
       appBar: AppBar(title: Text('Receive ${po?['purchase_number'] ?? ''}')),
       body: SafeArea(
@@ -273,11 +311,19 @@ class _ReceiveAgainstPoPageState extends ConsumerState<_ReceiveAgainstPoPage> {
                     Card(
                       elevation: 0,
                       child: ListTile(
-                        title: Text(items[i]['product']?['name']?.toString() ?? 'Product #${items[i]['product_id']}'),
-                        subtitle: Text('Remaining: ${(((items[i]['quantity'] as num?)?.toDouble() ?? 0) - ((items[i]['received_quantity'] as num?)?.toDouble() ?? 0)).toStringAsFixed(2)}'),
+                        title: Text(items[i]['product']?['name']?.toString() ??
+                            'Product #${items[i]['product_id']}'),
+                        subtitle: Text(
+                            'Remaining: ${(((items[i]['quantity'] as num?)?.toDouble() ?? 0) - ((items[i]['received_quantity'] as num?)?.toDouble() ?? 0)).toStringAsFixed(2)}'),
                         trailing: SizedBox(
                           width: 120,
-                          child: TextField(controller: _qty[i], keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Receive')),
+                          child: TextField(
+                              controller: _qty[i],
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                              decoration:
+                                  const InputDecoration(labelText: 'Receive')),
                         ),
                       ),
                     ),
@@ -298,28 +344,41 @@ class _ReceiveAgainstPoPageState extends ConsumerState<_ReceiveAgainstPoPage> {
   Future<void> _receive() async {
     final po = _po;
     if (po == null) return;
-    final items = (po['items'] as List? ?? const []).cast<Map<String, dynamic>>();
+    final items =
+        (po['items'] as List? ?? const []).cast<Map<String, dynamic>>();
     final payload = <Map<String, dynamic>>[];
     for (int i = 0; i < items.length; i++) {
-      final rem = ((items[i]['quantity'] as num?)?.toDouble() ?? 0) - ((items[i]['received_quantity'] as num?)?.toDouble() ?? 0);
+      final rem = ((items[i]['quantity'] as num?)?.toDouble() ?? 0) -
+          ((items[i]['received_quantity'] as num?)?.toDouble() ?? 0);
       final val = double.tryParse(_qty[i].text.trim()) ?? 0;
       if (val > 0) {
         final take = val > rem ? rem : val;
-        payload.add({'purchase_detail_id': items[i]['purchase_detail_id'] as int, 'received_quantity': take});
+        payload.add({
+          'purchase_detail_id': items[i]['purchase_detail_id'] as int,
+          'received_quantity': take
+        });
       }
     }
     if (payload.isEmpty) {
-      ScaffoldMessenger.of(context)..hideCurrentSnackBar()..showSnackBar(const SnackBar(content: Text('Enter quantities to receive')));
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+            const SnackBar(content: Text('Enter quantities to receive')));
       return;
     }
     try {
       final repo = ref.read(purchasesRepositoryProvider);
-      await repo.receiveAgainstPO(purchaseId: widget.purchaseId, items: payload);
+      await repo.receiveAgainstPO(
+          purchaseId: widget.purchaseId, items: payload);
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context)..hideCurrentSnackBar()..showSnackBar(const SnackBar(content: Text('GRN recorded')));
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('GRN recorded')));
     } catch (e) {
-      ScaffoldMessenger.of(context)..hideCurrentSnackBar()..showSnackBar(SnackBar(content: Text('Failed: $e')));
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Failed: $e')));
     }
   }
 }

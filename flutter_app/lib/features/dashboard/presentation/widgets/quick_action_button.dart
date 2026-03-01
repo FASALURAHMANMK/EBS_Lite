@@ -266,6 +266,7 @@ class _QuickActionButtonState extends State<QuickActionButton>
                     backgroundColor: primary,
                     foregroundColor: iconColor,
                     onPressed: _toggle,
+                    shape: const CircleBorder(),
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 200),
                       transitionBuilder: (child, anim) => RotationTransition(
@@ -273,7 +274,6 @@ class _QuickActionButtonState extends State<QuickActionButton>
                           child: FadeTransition(opacity: anim, child: child)),
                       child: Icon(icon, key: ValueKey<bool>(_open)),
                     ),
-                    shape: const CircleBorder(),
                   );
                 },
               ),

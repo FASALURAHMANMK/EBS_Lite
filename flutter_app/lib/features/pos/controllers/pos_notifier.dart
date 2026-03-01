@@ -61,9 +61,12 @@ class PosState {
   }) {
     return PosState(
       receiptPreview: receiptPreview ?? this.receiptPreview,
-      committedReceipt: clearCommittedReceipt ? null : (committedReceipt ?? this.committedReceipt),
+      committedReceipt: clearCommittedReceipt
+          ? null
+          : (committedReceipt ?? this.committedReceipt),
       customer: clearCustomer ? null : (customer ?? this.customer),
-      customerLabel: clearCustomer ? 'Walk in' : (customerLabel ?? this.customerLabel),
+      customerLabel:
+          clearCustomer ? 'Walk in' : (customerLabel ?? this.customerLabel),
       query: query ?? this.query,
       suggestions: suggestions ?? this.suggestions,
       cart: cart ?? this.cart,
@@ -72,7 +75,8 @@ class PosState {
       isLoading: isLoading ?? this.isLoading,
       error: error,
       paymentMethods: paymentMethods ?? this.paymentMethods,
-      activeSaleId: clearActiveSaleId ? null : (activeSaleId ?? this.activeSaleId),
+      activeSaleId:
+          clearActiveSaleId ? null : (activeSaleId ?? this.activeSaleId),
     );
   }
 }
@@ -111,7 +115,8 @@ class PosNotifier extends StateNotifier<PosState> {
     // Applying a total discount clears any line-item discounts
     if (value > 0) {
       final cleared = state.cart
-          .map((i) => i.discountPercent > 0 ? i.copyWith(discountPercent: 0) : i)
+          .map(
+              (i) => i.discountPercent > 0 ? i.copyWith(discountPercent: 0) : i)
           .toList();
       state = state.copyWith(cart: cleared, discount: value);
     } else {
@@ -156,7 +161,9 @@ class PosNotifier extends StateNotifier<PosState> {
   }
 
   void updateQty(PosCartItem item, double qty) {
-    final items = state.cart.map((i) => i == item ? i.copyWith(quantity: qty) : i).toList();
+    final items = state.cart
+        .map((i) => i == item ? i.copyWith(quantity: qty) : i)
+        .toList();
     state = state.copyWith(cart: items);
     // ignore: unawaited_futures
     _recalculateTotals();
@@ -288,7 +295,8 @@ class PosNotifier extends StateNotifier<PosState> {
       return;
     }
     try {
-      final res = await _repo.calculateTotals(items: state.cart, discountAmount: state.discount);
+      final res = await _repo.calculateTotals(
+          items: state.cart, discountAmount: state.discount);
       state = state.copyWith(tax: res['tax_amount'] ?? 0.0);
     } catch (_) {
       // Soft-fail; leave previous tax value
@@ -298,7 +306,8 @@ class PosNotifier extends StateNotifier<PosState> {
   Future<void> refreshPreview() async {
     try {
       final preview = await _repo.getNextReceiptPreview();
-      state = state.copyWith(receiptPreview: preview, clearCommittedReceipt: true);
+      state =
+          state.copyWith(receiptPreview: preview, clearCommittedReceipt: true);
     } catch (_) {}
   }
 }

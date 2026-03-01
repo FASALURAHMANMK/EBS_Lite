@@ -39,7 +39,10 @@ class _SaleDetailPageState extends ConsumerState<SaleDetailPage> {
     final s = _sale;
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(s?.saleNumber.isNotEmpty == true ? s!.saleNumber : 'Sale #${widget.saleId}')),
+      appBar: AppBar(
+          title: Text(s?.saleNumber.isNotEmpty == true
+              ? s!.saleNumber
+              : 'Sale #${widget.saleId}')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -54,7 +57,8 @@ class _SaleDetailPageState extends ConsumerState<SaleDetailPage> {
                   subtitle: Text([
                     if ((s.customerName ?? '').isNotEmpty) s.customerName!,
                   ].where((e) => e.isNotEmpty).join(' · ')),
-                  trailing: Text(s.totalAmount.toStringAsFixed(2), style: theme.textTheme.titleMedium),
+                  trailing: Text(s.totalAmount.toStringAsFixed(2),
+                      style: theme.textTheme.titleMedium),
                 ),
               ),
               const SizedBox(height: 8),
@@ -66,9 +70,16 @@ class _SaleDetailPageState extends ConsumerState<SaleDetailPage> {
                   for (final it in s.items)
                     ListTile(
                       leading: const Icon(Icons.inventory_2_rounded),
-                      title: Text(it.productName ?? (it.productId != null ? 'Product #${it.productId}' : 'Item')),
-                      subtitle: Text('Qty: ${it.quantity.toStringAsFixed(2)} × ${it.unitPrice.toStringAsFixed(2)}'),
-                      trailing: Text(((it.quantity * it.unitPrice) * (1 - (it.discountPercent / 100))).toStringAsFixed(2),
+                      title: Text(it.productName ??
+                          (it.productId != null
+                              ? 'Product #${it.productId}'
+                              : 'Item')),
+                      subtitle: Text(
+                          'Qty: ${it.quantity.toStringAsFixed(2)} × ${it.unitPrice.toStringAsFixed(2)}'),
+                      trailing: Text(
+                          ((it.quantity * it.unitPrice) *
+                                  (1 - (it.discountPercent / 100)))
+                              .toStringAsFixed(2),
                           style: theme.textTheme.bodyLarge),
                     ),
                 ]),
@@ -80,4 +91,3 @@ class _SaleDetailPageState extends ConsumerState<SaleDetailPage> {
     );
   }
 }
-

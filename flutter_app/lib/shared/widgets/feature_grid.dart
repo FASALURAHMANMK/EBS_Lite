@@ -42,7 +42,7 @@ class FeatureGrid extends StatelessWidget {
               onTap: item.onTap,
               color: theme.colorScheme.surface,
               fg: theme.colorScheme.onSurface,
-              highlight: theme.colorScheme.primary.withOpacity(0.08),
+              highlight: theme.colorScheme.primary.withValues(alpha: 0.08),
             );
           },
         );
@@ -85,7 +85,7 @@ class _FeatureTile extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Icon(icon, size: 28, color: fg.withOpacity(0.90)),
+              Icon(icon, size: 28, color: fg.withValues(alpha: 0.90)),
               const SizedBox(height: 10),
               Text(
                 label,
@@ -102,4 +102,3 @@ class _FeatureTile extends StatelessWidget {
     );
   }
 }
-

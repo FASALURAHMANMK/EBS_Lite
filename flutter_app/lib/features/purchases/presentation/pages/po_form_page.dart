@@ -246,6 +246,7 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
     } catch (_) {}
     List<InventoryListItem> results = List.of(initial);
     int? selectedId = widget.line.product?.productId;
+    if (!context.mounted) return null;
     return showDialog<InventoryListItem?>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -274,22 +275,26 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
                 Flexible(
                   child: results.isEmpty
                       ? const Center(child: Text('No products'))
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: results.length,
-                          itemBuilder: (context, i) {
-                            final it = results[i];
-                            return RadioListTile<int>(
-                              value: it.productId,
-                              groupValue: selectedId,
-                              onChanged: (v) => setInner(() => selectedId = v),
-                              title: Text(it.name),
-                              subtitle: Text([
-                                if ((it.sku ?? '').isNotEmpty) 'SKU: ${it.sku}',
-                                'Stock: ${it.stock.toStringAsFixed(2)}'
-                              ].join(' • ')),
-                            );
-                          },
+                      : RadioGroup<int>(
+                          groupValue: selectedId,
+                          onChanged: (value) =>
+                              setInner(() => selectedId = value),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: results.length,
+                            itemBuilder: (context, i) {
+                              final it = results[i];
+                              return RadioListTile<int>(
+                                value: it.productId,
+                                title: Text(it.name),
+                                subtitle: Text([
+                                  if ((it.sku ?? '').isNotEmpty)
+                                    'SKU: ${it.sku}',
+                                  'Stock: ${it.stock.toStringAsFixed(2)}'
+                                ].join(' • ')),
+                              );
+                            },
+                          ),
                         ),
                 ),
               ],
@@ -366,6 +371,7 @@ class _SupplierPicker extends ConsumerWidget {
     } catch (_) {}
     String q = '';
     int? selected;
+    if (!context.mounted) return null;
     return showDialog<(int, String)?>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -391,21 +397,25 @@ class _SupplierPicker extends ConsumerWidget {
                 Flexible(
                   child: results.isEmpty
                       ? const Center(child: Text('No suppliers'))
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: results.length,
-                          itemBuilder: (context, i) {
-                            final s = results[i];
-                            return RadioListTile<int>(
-                              value: s.supplierId,
-                              groupValue: selected,
-                              onChanged: (v) => setInner(() => selected = v),
-                              title: Text(s.name),
-                              subtitle: Text([(s.phone ?? ''), (s.email ?? '')]
-                                  .where((e) => e.isNotEmpty)
-                                  .join(' • ')),
-                            );
-                          },
+                      : RadioGroup<int>(
+                          groupValue: selected,
+                          onChanged: (value) =>
+                              setInner(() => selected = value),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: results.length,
+                            itemBuilder: (context, i) {
+                              final s = results[i];
+                              return RadioListTile<int>(
+                                value: s.supplierId,
+                                title: Text(s.name),
+                                subtitle: Text([
+                                  (s.phone ?? ''),
+                                  (s.email ?? '')
+                                ].where((e) => e.isNotEmpty).join(' • ')),
+                              );
+                            },
+                          ),
                         ),
                 ),
               ],

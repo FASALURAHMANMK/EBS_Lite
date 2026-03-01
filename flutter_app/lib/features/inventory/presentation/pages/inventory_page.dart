@@ -32,16 +32,14 @@ class InventoryPage extends StatelessWidget {
         icon: Icons.swap_horiz_rounded,
         label: 'Stock Transfer',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-              builder: (_) => const StockTransfersPage()),
+          MaterialPageRoute(builder: (_) => const StockTransfersPage()),
         ),
       ),
       FeatureItem(
         icon: Icons.tune_rounded,
         label: 'Stock Adjustments',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-              builder: (_) => const StockAdjustmentsPage()),
+          MaterialPageRoute(builder: (_) => const StockAdjustmentsPage()),
         ),
       ),
       FeatureItem(
@@ -62,8 +60,7 @@ class InventoryPage extends StatelessWidget {
         icon: Icons.build_rounded,
         label: 'Attributes',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-              builder: (_) => const AttributeManagementPage()),
+          MaterialPageRoute(builder: (_) => const AttributeManagementPage()),
         ),
       ),
     ];

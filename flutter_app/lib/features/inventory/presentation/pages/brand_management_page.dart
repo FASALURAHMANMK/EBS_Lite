@@ -28,7 +28,9 @@ class BrandManagementPage extends ConsumerWidget {
             icon: const Icon(Icons.add_rounded),
             onPressed: () async {
               final created = await _showBrandDialog(context, ref: ref);
-              if (created == true) ref.read(brandManagementProvider.notifier).load();
+              if (created == true) {
+                ref.read(brandManagementProvider.notifier).load();
+              }
             },
           ),
           const SizedBox(width: 4),
@@ -141,46 +143,47 @@ class _BrandCard extends ConsumerWidget {
     final theme = Theme.of(context);
     return InkWell(
       onTap: () async {
-        final updated = await _showBrandDialog(context, ref: ref, existing: item);
+        final updated =
+            await _showBrandDialog(context, ref: ref, existing: item);
         if (updated == true) ref.read(brandManagementProvider.notifier).load();
       },
       child: Card(
-      elevation: 0,
-      color: theme.colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              item.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'ID: ${item.brandId}',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-            const Spacer(),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: Text(
-                item.isActive ? 'Active' : 'Inactive',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: item.isActive
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurfaceVariant,
+        elevation: 0,
+        color: theme.colorScheme.surfaceContainerHighest,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'ID: ${item.brandId}',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+              const Spacer(),
+              Align(
+                alignment: Alignment.bottomRight,
+                child: Text(
+                  item.isActive ? 'Active' : 'Inactive',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: item.isActive
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -200,7 +203,8 @@ class _BrandList extends ConsumerWidget {
         final b = items[i];
         return ListTile(
           tileColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: Text(b.name, maxLines: 1, overflow: TextOverflow.ellipsis),
           subtitle: Text('ID: ${b.brandId}'),
           trailing: Text(
@@ -208,8 +212,11 @@ class _BrandList extends ConsumerWidget {
             style: Theme.of(context).textTheme.labelMedium,
           ),
           onTap: () async {
-            final updated = await _showBrandDialog(context, ref: ref, existing: b);
-            if (updated == true) ref.read(brandManagementProvider.notifier).load();
+            final updated =
+                await _showBrandDialog(context, ref: ref, existing: b);
+            if (updated == true) {
+              ref.read(brandManagementProvider.notifier).load();
+            }
           },
         );
       },
@@ -217,7 +224,8 @@ class _BrandList extends ConsumerWidget {
   }
 }
 
-Future<bool?> _showBrandDialog(BuildContext context, {required WidgetRef ref, BrandDto? existing}) async {
+Future<bool?> _showBrandDialog(BuildContext context,
+    {required WidgetRef ref, BrandDto? existing}) async {
   final isEdit = existing != null;
   final controller = TextEditingController(text: existing?.name ?? '');
   final repo = ref.read(inventoryRepositoryProvider);
@@ -251,7 +259,8 @@ Future<bool?> _showBrandDialog(BuildContext context, {required WidgetRef ref, Br
         ),
         actions: [
           TextButton(
-            onPressed: saving ? null : () => Navigator.of(context).maybePop(false),
+            onPressed:
+                saving ? null : () => Navigator.of(context).maybePop(false),
             child: const Text('Cancel'),
           ),
           FilledButton(
@@ -261,17 +270,24 @@ Future<bool?> _showBrandDialog(BuildContext context, {required WidgetRef ref, Br
                     setState(() => saving = true);
                     try {
                       if (isEdit) {
-                        await repo.updateBrand(id: existing.brandId, name: controller.text.trim(), isActive: active);
+                        await repo.updateBrand(
+                            id: existing.brandId,
+                            name: controller.text.trim(),
+                            isActive: active);
                       } else {
                         await repo.createBrand(name: controller.text.trim());
                       }
+                      if (!context.mounted) return;
                       Navigator.of(context).pop(true);
                     } finally {
                       setState(() => saving = false);
                     }
                   },
             child: saving
-                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2.4))
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2.4))
                 : Text(isEdit ? 'Save' : 'Create'),
           ),
         ],

@@ -109,9 +109,8 @@ class UserResponse {
         lastLogin: json['last_login'] != null
             ? DateTime.tryParse(json['last_login'] as String)
             : null,
-        permissions: (json['permissions'] as List?)
-            ?.map((e) => e.toString())
-            .toList(),
+        permissions:
+            (json['permissions'] as List?)?.map((e) => e.toString()).toList(),
         preferences: (json['preferences'] as Map<String, dynamic>?)
             ?.map((k, v) => MapEntry(k, v.toString())),
       );

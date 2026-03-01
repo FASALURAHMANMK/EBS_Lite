@@ -26,8 +26,7 @@ class DashboardMetrics {
         (json['credit_outstanding'] as num?)?.toDouble() ?? 0;
     final inventoryValue = (json['inventory_value'] as num?)?.toDouble() ?? 0;
     var todaySales = (json['today_sales'] as num?)?.toDouble() ?? 0;
-    var todayPurchases =
-        (json['today_purchases'] as num?)?.toDouble() ?? 0;
+    var todayPurchases = (json['today_purchases'] as num?)?.toDouble() ?? 0;
 
     // Backend exposes cash_in and cash_out. If daily_cash_summary is not
     // present, compute it as (cash_in - cash_out).
@@ -45,7 +44,9 @@ class DashboardMetrics {
 
     // If today's values are zero and totals exist, use totals as a fallback so the dashboard isn't empty
     if ((todaySales == 0) && (tSales != null)) todaySales = tSales;
-    if ((todayPurchases == 0) && (tPurchases != null)) todayPurchases = tPurchases;
+    if ((todayPurchases == 0) && (tPurchases != null)) {
+      todayPurchases = tPurchases;
+    }
 
     // Fallback cash summary using totals if daily is zero
     if (dailyCashSummary == 0 && tCashIn != null && tCashOut != null) {
@@ -85,10 +86,12 @@ class QuickActionCounts {
     final sales = json['sales_today'] as int? ?? json['sales'] as int? ?? 0;
     final purchases =
         json['purchases_today'] as int? ?? json['purchases'] as int? ?? 0;
-    final collections = json['collections_today'] as int? ??
-        json['collections'] as int? ?? 0;
+    final collections =
+        json['collections_today'] as int? ?? json['collections'] as int? ?? 0;
     final expenses = json['expenses_today'] as int? ??
-        json['payments_today'] as int? ?? json['expenses'] as int? ?? 0;
+        json['payments_today'] as int? ??
+        json['expenses'] as int? ??
+        0;
 
     return QuickActionCounts(
       sales: sales,

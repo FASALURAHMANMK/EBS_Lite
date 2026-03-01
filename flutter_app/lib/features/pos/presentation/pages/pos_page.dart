@@ -251,7 +251,7 @@ class _BottomBar extends ConsumerWidget {
           color: Theme.of(context).colorScheme.surface,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),
@@ -282,10 +282,20 @@ class _BottomBar extends ConsumerWidget {
                   ),
                   const SizedBox(height: 2),
                   Builder(builder: (context) {
-                    final hasLineDiscount = state.cart.any((i) => i.discountPercent > 0);
-                    final lineDisc = state.cart.fold<double>(0.0, (s, i) => s + (i.quantity * i.unitPrice * (i.discountPercent.clamp(0.0, 100.0) / 100.0)));
-                    final displayDiscount = hasLineDiscount ? lineDisc : state.discount;
-                    final color = hasLineDiscount ? Theme.of(context).disabledColor : Theme.of(context).colorScheme.onSurface;
+                    final hasLineDiscount =
+                        state.cart.any((i) => i.discountPercent > 0);
+                    final lineDisc = state.cart.fold<double>(
+                        0.0,
+                        (s, i) =>
+                            s +
+                            (i.quantity *
+                                i.unitPrice *
+                                (i.discountPercent.clamp(0.0, 100.0) / 100.0)));
+                    final displayDiscount =
+                        hasLineDiscount ? lineDisc : state.discount;
+                    final color = hasLineDiscount
+                        ? Theme.of(context).disabledColor
+                        : Theme.of(context).colorScheme.onSurface;
                     return InkWell(
                       onTap: hasLineDiscount
                           ? null
@@ -303,7 +313,8 @@ class _BottomBar extends ConsumerWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text('Discount', style: TextStyle(color: color)),
-                          Text(displayDiscount.toStringAsFixed(2), style: TextStyle(color: color)),
+                          Text(displayDiscount.toStringAsFixed(2),
+                              style: TextStyle(color: color)),
                         ],
                       ),
                     );
@@ -360,7 +371,8 @@ class _BottomBar extends ConsumerWidget {
                       ? null
                       : () async {
                           await Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const PaymentPage()),
+                            MaterialPageRoute(
+                                builder: (_) => const PaymentPage()),
                           );
                         },
                   icon: const Icon(Icons.arrow_forward_rounded),
@@ -386,7 +398,8 @@ class _DiscountDialog extends StatefulWidget {
 }
 
 class _LineDiscountDialog extends StatefulWidget {
-  const _LineDiscountDialog({required this.initialPercent, required this.lineGross});
+  const _LineDiscountDialog(
+      {required this.initialPercent, required this.lineGross});
   final double initialPercent; // percent
   final double lineGross; // qty * unit price
   @override
@@ -402,7 +415,8 @@ class _LineDiscountDialogState extends State<_LineDiscountDialog> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.initialPercent.toStringAsFixed(0));
+    _controller =
+        TextEditingController(text: widget.initialPercent.toStringAsFixed(0));
   }
 
   @override
@@ -419,34 +433,36 @@ class _LineDiscountDialogState extends State<_LineDiscountDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Radio<_DiscMode>(
-              value: _DiscMode.amount,
-              groupValue: _mode,
-              onChanged: (v) => setState(() => _mode = v!),
-            ),
-            const Text('Amount'),
-            const SizedBox(width: 16),
-            Radio<_DiscMode>(
-              value: _DiscMode.percent,
-              groupValue: _mode,
-              onChanged: (v) => setState(() => _mode = v!),
-            ),
-            const Text('Percent'),
-          ]),
+          RadioGroup<_DiscMode>(
+            groupValue: _mode,
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => _mode = value);
+            },
+            child: Row(children: const [
+              Radio<_DiscMode>(value: _DiscMode.amount),
+              Text('Amount'),
+              SizedBox(width: 16),
+              Radio<_DiscMode>(value: _DiscMode.percent),
+              Text('Percent'),
+            ]),
+          ),
           const SizedBox(height: 8),
           TextField(
             controller: _controller,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
-              labelText: _mode == _DiscMode.percent ? 'Discount %' : 'Discount Amount',
+              labelText:
+                  _mode == _DiscMode.percent ? 'Discount %' : 'Discount Amount',
               prefixIcon: const Icon(Icons.local_offer_outlined),
             ),
           ),
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel')),
         FilledButton(
           onPressed: () {
             final raw = double.tryParse(_controller.text.trim()) ?? 0.0;
@@ -474,7 +490,8 @@ class _DiscountDialogState extends State<_DiscountDialog> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.initial.toStringAsFixed(2));
+    _controller =
+        TextEditingController(text: widget.initial.toStringAsFixed(2));
   }
 
   @override
@@ -491,27 +508,27 @@ class _DiscountDialogState extends State<_DiscountDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Radio<_DiscMode>(
-              value: _DiscMode.amount,
-              groupValue: _mode,
-              onChanged: (v) => setState(() => _mode = v!),
-            ),
-            const Text('Amount'),
-            const SizedBox(width: 16),
-            Radio<_DiscMode>(
-              value: _DiscMode.percent,
-              groupValue: _mode,
-              onChanged: (v) => setState(() => _mode = v!),
-            ),
-            const Text('Percent'),
-          ]),
+          RadioGroup<_DiscMode>(
+            groupValue: _mode,
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => _mode = value);
+            },
+            child: Row(children: const [
+              Radio<_DiscMode>(value: _DiscMode.amount),
+              Text('Amount'),
+              SizedBox(width: 16),
+              Radio<_DiscMode>(value: _DiscMode.percent),
+              Text('Percent'),
+            ]),
+          ),
           const SizedBox(height: 8),
           TextField(
             controller: _controller,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
-              labelText: _mode == _DiscMode.amount ? 'Discount Amount' : 'Discount %',
+              labelText:
+                  _mode == _DiscMode.amount ? 'Discount Amount' : 'Discount %',
               prefixIcon: const Icon(Icons.local_offer_outlined),
             ),
           ),
@@ -602,7 +619,8 @@ class _HeldSalesDialogState extends ConsumerState<_HeldSalesDialog> {
                               await ref
                                   .read(posNotifierProvider.notifier)
                                   .loadHeldSaleItems(s.saleId);
-                              if (mounted) Navigator.of(context).pop();
+                              if (!context.mounted) return;
+                              Navigator.of(context).pop();
                             },
                             child: const Text('Resume'),
                           ),

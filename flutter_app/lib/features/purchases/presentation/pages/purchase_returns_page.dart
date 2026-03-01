@@ -73,7 +73,7 @@ class _PurchaseReturnsPageState extends ConsumerState<PurchaseReturnsPage> {
               );
               if (id != null) {
                 await _load();
-                if (!mounted) return;
+                if (!context.mounted) return;
                 await Navigator.of(context).push(
                   MaterialPageRoute(
                       builder: (_) => PurchaseReturnDetailPage(returnId: id)),
@@ -219,10 +219,11 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
         });
       }
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loadingLink = false;
         });
+      }
     }
   }
 
@@ -272,6 +273,7 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
       final purchaseId = _linkedPurchaseId;
       final purchase = _linkedPurchase;
       if (purchaseId == null || purchase == null) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(const SnackBar(
@@ -310,6 +312,7 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
       if (!mounted) return;
       Navigator.of(context).pop(id);
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text('Failed: $e')));
@@ -396,19 +399,7 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
       ),
     );
   }
-}
 
-class _RetLine {
-  InventoryListItem? product;
-  final qty = TextEditingController();
-  final price = TextEditingController();
-  void dispose() {
-    qty.dispose();
-    price.dispose();
-  }
-}
-
-extension on _ReturnFormPageState {
   List<Widget> _buildLines(BuildContext context) {
     Theme.of(context);
     final details = ((_linkedPurchase?['items'] as List?) ?? const <dynamic>[])
@@ -458,6 +449,16 @@ extension on _ReturnFormPageState {
           ),
         ),
     ];
+  }
+}
+
+class _RetLine {
+  InventoryListItem? product;
+  final qty = TextEditingController();
+  final price = TextEditingController();
+  void dispose() {
+    qty.dispose();
+    price.dispose();
   }
 }
 
@@ -517,6 +518,7 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
     } catch (_) {}
     List<InventoryListItem> results = List.of(initial);
     int? selectedId = widget.line.product?.productId;
+    if (!context.mounted) return null;
     return showDialog<InventoryListItem?>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -542,24 +544,25 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
                     Flexible(
                         child: results.isEmpty
                             ? const Center(child: Text('No products'))
-                            : ListView.builder(
-                                shrinkWrap: true,
-                                itemCount: results.length,
-                                itemBuilder: (context, i) {
-                                  final it = results[i];
-                                  return RadioListTile<int>(
-                                      value: it.productId,
-                                      groupValue: selectedId,
-                                      onChanged: (v) =>
-                                          setInner(() => selectedId = v),
-                                      title: Text(it.name),
-                                      subtitle: Text([
-                                        (it.sku ?? '').isNotEmpty
-                                            ? 'SKU: ${it.sku}'
-                                            : null,
-                                        'Stock: ${it.stock.toStringAsFixed(2)}'
-                                      ].whereType<String>().join(' · ')));
-                                }))
+                            : RadioGroup<int>(
+                                groupValue: selectedId,
+                                onChanged: (value) =>
+                                    setInner(() => selectedId = value),
+                                child: ListView.builder(
+                                    shrinkWrap: true,
+                                    itemCount: results.length,
+                                    itemBuilder: (context, i) {
+                                      final it = results[i];
+                                      return RadioListTile<int>(
+                                          value: it.productId,
+                                          title: Text(it.name),
+                                          subtitle: Text([
+                                            (it.sku ?? '').isNotEmpty
+                                                ? 'SKU: ${it.sku}'
+                                                : null,
+                                            'Stock: ${it.stock.toStringAsFixed(2)}'
+                                          ].whereType<String>().join(' · ')));
+                                    })))
                   ]),
                 ),
                 actions: [
@@ -634,6 +637,7 @@ class _SupplierPicker extends ConsumerWidget {
       results = await repo.getSuppliers();
     } catch (_) {}
     int? selected;
+    if (!context.mounted) return null;
     return showDialog<(int, String)?>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -662,21 +666,25 @@ class _SupplierPicker extends ConsumerWidget {
                 Flexible(
                   child: results.isEmpty
                       ? const Center(child: Text('No suppliers'))
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: results.length,
-                          itemBuilder: (context, i) {
-                            final s = results[i];
-                            return RadioListTile<int>(
-                              value: s.supplierId,
-                              groupValue: selected,
-                              onChanged: (v) => setInner(() => selected = v),
-                              title: Text(s.name),
-                              subtitle: Text([(s.phone ?? ''), (s.email ?? '')]
-                                  .where((e) => e.isNotEmpty)
-                                  .join(' • ')),
-                            );
-                          },
+                      : RadioGroup<int>(
+                          groupValue: selected,
+                          onChanged: (value) =>
+                              setInner(() => selected = value),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: results.length,
+                            itemBuilder: (context, i) {
+                              final s = results[i];
+                              return RadioListTile<int>(
+                                value: s.supplierId,
+                                title: Text(s.name),
+                                subtitle: Text([
+                                  (s.phone ?? ''),
+                                  (s.email ?? '')
+                                ].where((e) => e.isNotEmpty).join(' • ')),
+                              );
+                            },
+                          ),
                         ),
                 ),
               ],

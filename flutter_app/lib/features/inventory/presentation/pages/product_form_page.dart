@@ -144,8 +144,10 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             barcodeId: barcodes[idx].barcodeId,
             barcode: code,
             packSize: barcodes[idx].packSize ?? 1,
-            costPrice: barcodes[idx].costPrice ?? double.tryParse(_cost.text.trim()),
-            sellingPrice: barcodes[idx].sellingPrice ?? double.tryParse(_price.text.trim()),
+            costPrice:
+                barcodes[idx].costPrice ?? double.tryParse(_cost.text.trim()),
+            sellingPrice: barcodes[idx].sellingPrice ??
+                double.tryParse(_price.text.trim()),
             isPrimary: true,
           );
         } else {
@@ -235,7 +237,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     return map;
   }
 
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -279,13 +280,20 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                         Expanded(
                           child: TextFormField(
                             controller: _itemCode,
-                            decoration: const InputDecoration(labelText: 'Item Code (12-digit if auto)'),
+                            decoration: const InputDecoration(
+                                labelText: 'Item Code (12-digit if auto)'),
                             keyboardType: TextInputType.number,
                             validator: (v) {
-                              if (v == null || v.trim().isEmpty) return 'Required';
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Required';
+                              }
                               final s = v.trim();
-                              if (!RegExp(r'^\d+$').hasMatch(s)) return 'Digits only';
-                              if (_autoItemCode && s.length != 12) return 'Must be 12 digits when auto';
+                              if (!RegExp(r'^\d+$').hasMatch(s)) {
+                                return 'Digits only';
+                              }
+                              if (_autoItemCode && s.length != 12) {
+                                return 'Must be 12 digits when auto';
+                              }
                               return null;
                             },
                             readOnly: _autoItemCode,
@@ -332,7 +340,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                             elevation: 0,
                             child: ListTile(
                               title: Text(b.barcode),
-                              subtitle: Text('Conversion: ${b.packSize ?? 1} • Selling: ${b.sellingPrice?.toStringAsFixed(2) ?? '-'}'),
+                              subtitle: Text(
+                                  'Conversion: ${b.packSize ?? 1} • Selling: ${b.sellingPrice?.toStringAsFixed(2) ?? '-'}'),
                               trailing: Wrap(
                                 spacing: 8,
                                 children: [
@@ -340,7 +349,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                                     tooltip: 'Edit',
                                     icon: const Icon(Icons.edit_outlined),
                                     onPressed: () async {
-                                      final edited = await _showBarcodeDialog(context, initial: b);
+                                      final edited = await _showBarcodeDialog(
+                                          context,
+                                          initial: b);
                                       if (edited != null) {
                                         setState(() => _barcodes[i] = edited);
                                       }
@@ -348,8 +359,10 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                                   ),
                                   IconButton(
                                     tooltip: 'Delete',
-                                    icon: const Icon(Icons.delete_outline_rounded),
-                                    onPressed: () => setState(() => _barcodes.removeAt(i)),
+                                    icon: const Icon(
+                                        Icons.delete_outline_rounded),
+                                    onPressed: () =>
+                                        setState(() => _barcodes.removeAt(i)),
                                   ),
                                 ],
                               ),
@@ -427,8 +440,10 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _initialStock,
-                      decoration: const InputDecoration(labelText: 'Initial Stock (optional)'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                          labelText: 'Initial Stock (optional)'),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                     ),
                     const Divider(height: 24),
                     if (_attrDefs.isNotEmpty) ...[
@@ -491,18 +506,20 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 Flexible(
                   child: filtered.isEmpty
                       ? const Center(child: Text('No categories'))
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: filtered.length,
-                          itemBuilder: (context, i) {
-                            final c = filtered[i];
-                            return RadioListTile<int>(
-                              value: c.categoryId,
-                              groupValue: current,
-                              onChanged: (v) => setInner(() => current = v),
-                              title: Text(c.name),
-                            );
-                          },
+                      : RadioGroup<int>(
+                          groupValue: current,
+                          onChanged: (value) => setInner(() => current = value),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filtered.length,
+                            itemBuilder: (context, i) {
+                              final c = filtered[i];
+                              return RadioListTile<int>(
+                                value: c.categoryId,
+                                title: Text(c.name),
+                              );
+                            },
+                          ),
                         ),
                 ),
               ],
@@ -565,18 +582,20 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 Flexible(
                   child: filtered.isEmpty
                       ? const Center(child: Text('No brands'))
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: filtered.length,
-                          itemBuilder: (context, i) {
-                            final b = filtered[i];
-                            return RadioListTile<int>(
-                              value: b.brandId,
-                              groupValue: current,
-                              onChanged: (v) => setInner(() => current = v),
-                              title: Text(b.name),
-                            );
-                          },
+                      : RadioGroup<int>(
+                          groupValue: current,
+                          onChanged: (value) => setInner(() => current = value),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filtered.length,
+                            itemBuilder: (context, i) {
+                              final b = filtered[i];
+                              return RadioListTile<int>(
+                                value: b.brandId,
+                                title: Text(b.name),
+                              );
+                            },
+                          ),
                         ),
                 ),
               ],
@@ -641,19 +660,22 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                 Flexible(
                   child: filtered.isEmpty
                       ? const Center(child: Text('No units'))
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: filtered.length,
-                          itemBuilder: (context, i) {
-                            final u = filtered[i];
-                            final label = '${u.name}${u.symbol != null ? ' (${u.symbol})' : ''}';
-                            return RadioListTile<int>(
-                              value: u.unitId,
-                              groupValue: current,
-                              onChanged: (v) => setInner(() => current = v),
-                              title: Text(label),
-                            );
-                          },
+                      : RadioGroup<int>(
+                          groupValue: current,
+                          onChanged: (value) => setInner(() => current = value),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filtered.length,
+                            itemBuilder: (context, i) {
+                              final u = filtered[i];
+                              final label =
+                                  '${u.name}${u.symbol != null ? ' (${u.symbol})' : ''}';
+                              return RadioListTile<int>(
+                                value: u.unitId,
+                                title: Text(label),
+                              );
+                            },
+                          ),
                         ),
                 ),
               ],
@@ -684,9 +706,11 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     );
   }
 
-  Future<String?> _openAttributeOptionDialog(ProductAttributeDefinitionDto d) async {
+  Future<String?> _openAttributeOptionDialog(
+      ProductAttributeDefinitionDto d) async {
     final opts = d.options ?? const <String>[];
-    String? current = _attrSelect[d.attributeId] ?? (opts.isNotEmpty ? opts.first : null);
+    String? current =
+        _attrSelect[d.attributeId] ?? (opts.isNotEmpty ? opts.first : null);
     return showDialog<String?>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -698,18 +722,20 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: opts.length,
-                    itemBuilder: (context, i) {
-                      final o = opts[i];
-                      return RadioListTile<String>(
-                        value: o,
-                        groupValue: current,
-                        onChanged: (v) => setInner(() => current = v),
-                        title: Text(o),
-                      );
-                    },
+                  child: RadioGroup<String>(
+                    groupValue: current,
+                    onChanged: (value) => setInner(() => current = value),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: opts.length,
+                      itemBuilder: (context, i) {
+                        final o = opts[i];
+                        return RadioListTile<String>(
+                          value: o,
+                          title: Text(o),
+                        );
+                      },
+                    ),
                   ),
                 ),
               ],
@@ -743,7 +769,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         final opts = d.options ?? const <String>[];
         return _SelectField(
           label: d.name + (d.isRequired ? ' *' : ''),
-          valueText: _attrSelect[d.attributeId] ?? (opts.isNotEmpty ? opts.first : ''),
+          valueText:
+              _attrSelect[d.attributeId] ?? (opts.isNotEmpty ? opts.first : ''),
           icon: Icons.list_rounded,
           onTap: () async {
             final picked = await _openAttributeOptionDialog(d);
@@ -880,8 +907,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     );
   }
 
-  
-
   Future<TaxDto?> _openTaxPicker() async {
     final repo = ref.read(taxesRepositoryProvider);
     List<TaxDto> taxes = [];
@@ -889,6 +914,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       taxes = await repo.getTaxes();
     } catch (_) {}
     int? current = _taxId ?? (taxes.isNotEmpty ? taxes.first.taxId : null);
+    if (!mounted) return null;
     return showDialog<TaxDto?>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -898,30 +924,36 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             width: 500,
             child: taxes.isEmpty
                 ? const Center(child: Text('No tax types'))
-                : ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: taxes.length,
-                    itemBuilder: (context, i) {
-                      final t = taxes[i];
-                      return RadioListTile<int>(
-                        value: t.taxId,
-                        groupValue: current,
-                        onChanged: (v) => setInner(() => current = v),
-                        title: Text(t.name),
-                        subtitle: Text('${(t.percentage % 1 == 0 ? t.percentage.toStringAsFixed(0) : t.percentage.toStringAsFixed(2))} %'),
-                      );
-                    },
+                : RadioGroup<int>(
+                    groupValue: current,
+                    onChanged: (value) => setInner(() => current = value),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: taxes.length,
+                      itemBuilder: (context, i) {
+                        final t = taxes[i];
+                        return RadioListTile<int>(
+                          value: t.taxId,
+                          title: Text(t.name),
+                          subtitle: Text(
+                              '${(t.percentage % 1 == 0 ? t.percentage.toStringAsFixed(0) : t.percentage.toStringAsFixed(2))} %'),
+                        );
+                      },
+                    ),
                   ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, null), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.pop(context, null),
+                child: const Text('Cancel')),
             FilledButton(
               onPressed: () {
                 if (current == null) {
                   Navigator.pop(context, null);
                   return;
                 }
-                final sel = taxes.firstWhere((e) => e.taxId == current, orElse: () => taxes.first);
+                final sel = taxes.firstWhere((e) => e.taxId == current,
+                    orElse: () => taxes.first);
                 Navigator.pop(context, sel);
               },
               child: const Text('Apply'),
@@ -946,12 +978,16 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
-                  decoration: const InputDecoration(hintText: 'Search', prefixIcon: Icon(Icons.search_rounded)),
+                  decoration: const InputDecoration(
+                      hintText: 'Search',
+                      prefixIcon: Icon(Icons.search_rounded)),
                   onChanged: (v) async {
                     query = v.trim();
                     final repo = ref.read(supplierRepositoryProvider);
                     final list = await repo.getSuppliers(search: query);
-                    setInner(() => results = list.map((e) => _SupplierPick(e.supplierId, e.name)).toList());
+                    setInner(() => results = list
+                        .map((e) => _SupplierPick(e.supplierId, e.name))
+                        .toList());
                   },
                 ),
                 const SizedBox(height: 8),
@@ -972,13 +1008,14 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel')),
           ],
         ),
       ),
     );
   }
-
 }
 
 class _SupplierPick {
@@ -988,7 +1025,11 @@ class _SupplierPick {
 }
 
 class _SelectField extends StatelessWidget {
-  const _SelectField({required this.label, required this.valueText, required this.icon, required this.onTap});
+  const _SelectField(
+      {required this.label,
+      required this.valueText,
+      required this.icon,
+      required this.onTap});
   final String label;
   final String valueText;
   final IconData icon;
@@ -1024,7 +1065,12 @@ class _SelectField extends StatelessWidget {
 }
 
 class _BarcodeRow extends StatefulWidget {
-  const _BarcodeRow({required this.value, required this.onChanged, required this.onDelete, required this.onPrimary, required this.isPrimary});
+  const _BarcodeRow(
+      {required this.value,
+      required this.onChanged,
+      required this.onDelete,
+      required this.onPrimary,
+      required this.isPrimary});
   final ProductBarcodeDto value;
   final ValueChanged<ProductBarcodeDto> onChanged;
   final VoidCallback onDelete;
@@ -1036,10 +1082,14 @@ class _BarcodeRow extends StatefulWidget {
 }
 
 class _BarcodeRowState extends State<_BarcodeRow> {
-  late final TextEditingController _code = TextEditingController(text: widget.value.barcode);
-  late final TextEditingController _pack = TextEditingController(text: (widget.value.packSize ?? 1).toString());
-  late final TextEditingController _cost = TextEditingController(text: widget.value.costPrice?.toString() ?? '');
-  late final TextEditingController _sell = TextEditingController(text: widget.value.sellingPrice?.toString() ?? '');
+  late final TextEditingController _code =
+      TextEditingController(text: widget.value.barcode);
+  late final TextEditingController _pack =
+      TextEditingController(text: (widget.value.packSize ?? 1).toString());
+  late final TextEditingController _cost =
+      TextEditingController(text: widget.value.costPrice?.toString() ?? '');
+  late final TextEditingController _sell =
+      TextEditingController(text: widget.value.sellingPrice?.toString() ?? '');
 
   @override
   void dispose() {
@@ -1092,7 +1142,8 @@ class _BarcodeRowState extends State<_BarcodeRow> {
                   Expanded(
                     child: TextField(
                       controller: _cost,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       decoration: const InputDecoration(labelText: 'Cost'),
                       onChanged: (_) => _emit(),
                     ),
@@ -1101,7 +1152,8 @@ class _BarcodeRowState extends State<_BarcodeRow> {
                   Expanded(
                     child: TextField(
                       controller: _sell,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       decoration: const InputDecoration(labelText: 'Price'),
                       onChanged: (_) => _emit(),
                     ),
@@ -1110,8 +1162,11 @@ class _BarcodeRowState extends State<_BarcodeRow> {
                   IconButton(
                     tooltip: widget.isPrimary ? 'Primary' : 'Make primary',
                     onPressed: () => widget.onPrimary(),
-                    icon: Icon(widget.isPrimary ? Icons.star : Icons.star_border),
-                    color: widget.isPrimary ? Theme.of(context).colorScheme.primary : null,
+                    icon:
+                        Icon(widget.isPrimary ? Icons.star : Icons.star_border),
+                    color: widget.isPrimary
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
                   ),
                   IconButton(
                     tooltip: 'Delete',
@@ -1128,10 +1183,12 @@ class _BarcodeRowState extends State<_BarcodeRow> {
   }
 }
 
-Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context, {ProductBarcodeDto? initial}) async {
+Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context,
+    {ProductBarcodeDto? initial}) async {
   final code = TextEditingController(text: initial?.barcode ?? '');
   final pack = TextEditingController(text: (initial?.packSize ?? 1).toString());
-  final sell = TextEditingController(text: initial?.sellingPrice?.toString() ?? '');
+  final sell =
+      TextEditingController(text: initial?.sellingPrice?.toString() ?? '');
   return showDialog<ProductBarcodeDto>(
     context: context,
     builder: (context) => AlertDialog(
@@ -1160,8 +1217,10 @@ Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context, {ProductBarc
                 Expanded(
                   child: TextField(
                     controller: sell,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Selling Price'),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration:
+                        const InputDecoration(labelText: 'Selling Price'),
                   ),
                 ),
               ],
@@ -1180,14 +1239,16 @@ Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context, {ProductBarc
             if (s.isEmpty || !RegExp(r'^\d+$').hasMatch(s)) {
               ScaffoldMessenger.of(context)
                 ..hideCurrentSnackBar()
-                ..showSnackBar(const SnackBar(content: Text('Barcode must be digits only')));
+                ..showSnackBar(const SnackBar(
+                    content: Text('Barcode must be digits only')));
               return;
             }
             final p = int.tryParse(pack.text.trim()) ?? 1;
             if (p < 1) {
               ScaffoldMessenger.of(context)
                 ..hideCurrentSnackBar()
-                ..showSnackBar(const SnackBar(content: Text('Conversion must be at least 1')));
+                ..showSnackBar(const SnackBar(
+                    content: Text('Conversion must be at least 1')));
               return;
             }
             final sp = double.tryParse(sell.text.trim());

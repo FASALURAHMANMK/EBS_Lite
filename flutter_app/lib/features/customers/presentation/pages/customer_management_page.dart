@@ -9,10 +9,12 @@ import 'customer_create_page.dart';
 class CustomerManagementPage extends ConsumerStatefulWidget {
   const CustomerManagementPage({super.key});
   @override
-  ConsumerState<CustomerManagementPage> createState() => _CustomerManagementPageState();
+  ConsumerState<CustomerManagementPage> createState() =>
+      _CustomerManagementPageState();
 }
 
-class _CustomerManagementPageState extends ConsumerState<CustomerManagementPage> {
+class _CustomerManagementPageState
+    extends ConsumerState<CustomerManagementPage> {
   String _query = '';
   late Future<List<CustomerDto>> _future;
 
@@ -24,7 +26,8 @@ class _CustomerManagementPageState extends ConsumerState<CustomerManagementPage>
 
   Future<List<CustomerDto>> _load() async {
     final repo = ref.read(customerRepositoryProvider);
-    return repo.getCustomers(search: _query.trim().isEmpty ? null : _query.trim());
+    return repo.getCustomers(
+        search: _query.trim().isEmpty ? null : _query.trim());
   }
 
   Future<void> _refresh() async {
@@ -91,7 +94,9 @@ class _CustomerManagementPageState extends ConsumerState<CustomerManagementPage>
                     );
                   }
                   final items = snapshot.data ?? const [];
-                  if (items.isEmpty) return const Center(child: Text('No customers'));
+                  if (items.isEmpty) {
+                    return const Center(child: Text('No customers'));
+                  }
                   return ListView.separated(
                     padding: const EdgeInsets.all(12),
                     itemCount: items.length,
@@ -117,13 +122,16 @@ class _CustomerTile extends StatelessWidget {
     return ListTile(
       tileColor: theme.colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      title: Text(item.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-      subtitle: Text('Credit Bal: ${item.creditBalance.toStringAsFixed(2)} • Limit: ${item.creditLimit.toStringAsFixed(2)}'),
+      title: Text(item.name,
+          style: theme.textTheme.titleMedium
+              ?.copyWith(fontWeight: FontWeight.w700)),
+      subtitle: Text(
+          'Credit Bal: ${item.creditBalance.toStringAsFixed(2)} • Limit: ${item.creditLimit.toStringAsFixed(2)}'),
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => CustomerDetailPage(customerId: item.customerId)),
+        MaterialPageRoute(
+            builder: (_) => CustomerDetailPage(customerId: item.customerId)),
       ),
     );
   }
 }
-

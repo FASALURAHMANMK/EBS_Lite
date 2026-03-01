@@ -53,7 +53,11 @@ class _SupplierDetailPageState extends ConsumerState<SupplierDetailPage> {
         onRefresh: () async {
           _reload();
           await Future.wait([
-            _supplierFuture, _summaryFuture, _purchasesFuture, _returnsFuture, _paymentsFuture
+            _supplierFuture,
+            _summaryFuture,
+            _purchasesFuture,
+            _returnsFuture,
+            _paymentsFuture
           ]);
         },
         child: ListView(
@@ -62,19 +66,26 @@ class _SupplierDetailPageState extends ConsumerState<SupplierDetailPage> {
             FutureBuilder<SupplierDto>(
               future: _supplierFuture,
               builder: (context, s) {
-                if (!s.hasData) return const LinearProgressIndicator(minHeight: 2);
+                if (!s.hasData) {
+                  return const LinearProgressIndicator(minHeight: 2);
+                }
                 final sup = s.data!;
                 return Card(
                   elevation: 0,
                   color: theme.colorScheme.surfaceContainerHighest,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   child: ListTile(
-                    title: Text(sup.name, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    title: Text(sup.name,
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700)),
                     subtitle: Text([
-                      if ((sup.contactPerson ?? '').isNotEmpty) 'Contact: ${sup.contactPerson}',
+                      if ((sup.contactPerson ?? '').isNotEmpty)
+                        'Contact: ${sup.contactPerson}',
                       if ((sup.phone ?? '').isNotEmpty) 'Phone: ${sup.phone}',
                       if ((sup.email ?? '').isNotEmpty) 'Email: ${sup.email}',
-                      if ((sup.address ?? '').isNotEmpty) 'Address: ${sup.address}',
+                      if ((sup.address ?? '').isNotEmpty)
+                        'Address: ${sup.address}',
                       'Credit Limit: ${sup.creditLimit.toStringAsFixed(2)} | Terms: ${sup.paymentTerms} days',
                     ].join('\n')),
                     isThreeLine: true,
@@ -83,7 +94,9 @@ class _SupplierDetailPageState extends ConsumerState<SupplierDetailPage> {
                       icon: const Icon(Icons.edit_outlined),
                       onPressed: () async {
                         final updated = await Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => SupplierEditPage(supplierId: sup.supplierId)),
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  SupplierEditPage(supplierId: sup.supplierId)),
                         );
                         if (updated == true && mounted) _reload();
                       },
@@ -101,7 +114,8 @@ class _SupplierDetailPageState extends ConsumerState<SupplierDetailPage> {
                 return Card(
                   elevation: 0,
                   color: theme.colorScheme.surfaceContainerHighest,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   child: Padding(
                     padding: const EdgeInsets.all(12.0),
                     child: Wrap(
@@ -126,11 +140,14 @@ class _SupplierDetailPageState extends ConsumerState<SupplierDetailPage> {
                 if (!s.hasData) return const SizedBox.shrink();
                 final items = s.data!;
                 return _simpleList(
-                  items.map((e) => _SimpleRow(
-                    title: (e['purchase_number'] ?? e['number'] ?? '').toString(),
-                    subtitle: (e['status'] ?? '').toString(),
-                    trailing: (e['total_amount'] ?? 0).toString(),
-                  )).toList(),
+                  items
+                      .map((e) => _SimpleRow(
+                            title: (e['purchase_number'] ?? e['number'] ?? '')
+                                .toString(),
+                            subtitle: (e['status'] ?? '').toString(),
+                            trailing: (e['total_amount'] ?? 0).toString(),
+                          ))
+                      .toList(),
                 );
               },
             ),
@@ -142,11 +159,14 @@ class _SupplierDetailPageState extends ConsumerState<SupplierDetailPage> {
                 if (!s.hasData) return const SizedBox.shrink();
                 final items = s.data!;
                 return _simpleList(
-                  items.map((e) => _SimpleRow(
-                    title: (e['return_number'] ?? e['number'] ?? '').toString(),
-                    subtitle: (e['status'] ?? '').toString(),
-                    trailing: (e['total_amount'] ?? 0).toString(),
-                  )).toList(),
+                  items
+                      .map((e) => _SimpleRow(
+                            title: (e['return_number'] ?? e['number'] ?? '')
+                                .toString(),
+                            subtitle: (e['status'] ?? '').toString(),
+                            trailing: (e['total_amount'] ?? 0).toString(),
+                          ))
+                      .toList(),
                 );
               },
             ),
@@ -158,11 +178,13 @@ class _SupplierDetailPageState extends ConsumerState<SupplierDetailPage> {
                 if (!s.hasData) return const SizedBox.shrink();
                 final items = s.data!;
                 return _simpleList(
-                  items.map((p) => _SimpleRow(
-                    title: p.paymentNumber,
-                    subtitle: p.paymentDate.toLocal().toString(),
-                    trailing: p.amount.toStringAsFixed(2),
-                  )).toList(),
+                  items
+                      .map((p) => _SimpleRow(
+                            title: p.paymentNumber,
+                            subtitle: p.paymentDate.toLocal().toString(),
+                            trailing: p.amount.toStringAsFixed(2),
+                          ))
+                      .toList(),
                 );
               },
             ),
@@ -182,7 +204,9 @@ class _SupplierDetailPageState extends ConsumerState<SupplierDetailPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label, style: const TextStyle(fontSize: 12)),
-          Text(value.toStringAsFixed(2), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          Text(value.toStringAsFixed(2),
+              style:
+                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
         ],
       );
 
@@ -268,13 +292,15 @@ class _PaySheetState extends ConsumerState<_PaySheet> {
       setState(() {
         _methods = methods;
         _methodId = methods.isNotEmpty
-            ? (methods.first['method_id'] as int? ?? methods.first['id'] as int?)
+            ? (methods.first['method_id'] as int? ??
+                methods.first['id'] as int?)
             : null;
         _methodName = methods.isNotEmpty
             ? ((methods.first['name'] ?? methods.first['method'])?.toString())
             : null;
       });
     } catch (e) {
+      if (!mounted) return;
       _showError(context, e);
     }
   }
@@ -282,7 +308,8 @@ class _PaySheetState extends ConsumerState<_PaySheet> {
   Future<void> _loadPurchases() async {
     try {
       final repo = ref.read(supplierRepositoryProvider);
-      final list = await repo.getOutstandingPurchases(supplierId: widget.supplierId);
+      final list =
+          await repo.getOutstandingPurchases(supplierId: widget.supplierId);
       final purchases = list
           .where((e) =>
               ((e['total_amount'] ?? 0) as num).toDouble() -
@@ -300,6 +327,7 @@ class _PaySheetState extends ConsumerState<_PaySheet> {
       });
       if (_invoiceMode) _autoAllocate();
     } catch (e) {
+      if (!mounted) return;
       _showError(context, e);
     }
   }
@@ -362,7 +390,8 @@ class _PaySheetState extends ConsumerState<_PaySheet> {
           if (val <= 0) continue;
           final out = _purchaseOutstanding(inv);
           if (val > out) {
-            _showInfo(context, 'Allocation for ${inv['purchase_number']} exceeds outstanding');
+            _showInfo(context,
+                'Allocation for ${inv['purchase_number']} exceeds outstanding');
             setState(() => _saving = false);
             return;
           }
@@ -375,7 +404,8 @@ class _PaySheetState extends ConsumerState<_PaySheet> {
           return;
         }
         if ((sum - amt).abs() > 0.009) {
-          _showInfo(context, 'Allocated total (${sum.toStringAsFixed(2)}) must equal amount (${amt.toStringAsFixed(2)})');
+          _showInfo(context,
+              'Allocated total (${sum.toStringAsFixed(2)}) must equal amount (${amt.toStringAsFixed(2)})');
           setState(() => _saving = false);
           return;
         }
@@ -386,7 +416,8 @@ class _PaySheetState extends ConsumerState<_PaySheet> {
             amount: (l['amount'] as num).toDouble(),
             paymentMethodId: _methodId,
             paymentDate: _date.value,
-            reference: _reference.text.trim().isEmpty ? null : _reference.text.trim(),
+            reference:
+                _reference.text.trim().isEmpty ? null : _reference.text.trim(),
             notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
           );
         }
@@ -397,7 +428,8 @@ class _PaySheetState extends ConsumerState<_PaySheet> {
           amount: amt,
           paymentMethodId: _methodId,
           paymentDate: _date.value,
-          reference: _reference.text.trim().isEmpty ? null : _reference.text.trim(),
+          reference:
+              _reference.text.trim().isEmpty ? null : _reference.text.trim(),
           notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
         );
       }
@@ -430,7 +462,9 @@ class _PaySheetState extends ConsumerState<_PaySheet> {
                 children: [
                   const Icon(Icons.payments_rounded),
                   const SizedBox(width: 8),
-                  const Text('Record Payment', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                  const Text('Record Payment',
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
                 ],
               ),
               const SizedBox(height: 12),
@@ -469,7 +503,8 @@ class _PaySheetState extends ConsumerState<_PaySheet> {
                         if (picked != null) _date.value = picked;
                       },
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8.0, vertical: 6.0),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -507,24 +542,46 @@ class _PaySheetState extends ConsumerState<_PaySheet> {
                             title: const Text('Select Payment Method'),
                             content: SizedBox(
                               width: double.maxFinite,
-                              child: ListView.builder(
-                                shrinkWrap: true,
-                                itemCount: _methods.length,
-                                itemBuilder: (_, i) {
-                                  final m = _methods[i];
-                                  final id = (m['method_id'] as int?) ?? (m['id'] as int?);
-                                  final name = (m['name'] ?? m['method'] ?? '').toString();
-                                  return RadioListTile<int>(
-                                    value: id ?? -1,
-                                    groupValue: _methodId ?? -1,
-                                    onChanged: (v) => Navigator.of(ctx).pop({'id': id, 'name': name}),
-                                    title: Text(name),
+                              child: RadioGroup<int>(
+                                groupValue: _methodId ?? -1,
+                                onChanged: (value) {
+                                  if (value == null) return;
+                                  final selected = _methods.firstWhere(
+                                    (m) =>
+                                        ((m['method_id'] as int?) ??
+                                            (m['id'] as int?)) ==
+                                        value,
+                                    orElse: () => const {},
                                   );
+                                  final name = (selected['name'] ??
+                                          selected['method'] ??
+                                          '')
+                                      .toString();
+                                  Navigator.of(ctx)
+                                      .pop({'id': value, 'name': name});
                                 },
+                                child: ListView.builder(
+                                  shrinkWrap: true,
+                                  itemCount: _methods.length,
+                                  itemBuilder: (_, i) {
+                                    final m = _methods[i];
+                                    final id = (m['method_id'] as int?) ??
+                                        (m['id'] as int?);
+                                    final name =
+                                        (m['name'] ?? m['method'] ?? '')
+                                            .toString();
+                                    return RadioListTile<int>(
+                                      value: id ?? -1,
+                                      title: Text(name),
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                             actions: [
-                              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+                              TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(),
+                                  child: const Text('Cancel')),
                             ],
                           ),
                         );
@@ -537,16 +594,24 @@ class _PaySheetState extends ConsumerState<_PaySheet> {
                       },
               ),
               const SizedBox(height: 8),
-              TextField(controller: _reference, decoration: const InputDecoration(labelText: 'Reference')), 
+              TextField(
+                  controller: _reference,
+                  decoration: const InputDecoration(labelText: 'Reference')),
               const SizedBox(height: 8),
-              TextField(controller: _notes, decoration: const InputDecoration(labelText: 'Notes')),
+              TextField(
+                  controller: _notes,
+                  decoration: const InputDecoration(labelText: 'Notes')),
               const SizedBox(height: 8),
               if (_invoiceMode) ...[
                 Row(
                   children: [
-                    const Text('Outstanding Purchases', style: TextStyle(fontWeight: FontWeight.w700)),
+                    const Text('Outstanding Purchases',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
                     const Spacer(),
-                    TextButton.icon(onPressed: _autoAllocate, icon: const Icon(Icons.auto_awesome_rounded), label: const Text('Auto allocate')),
+                    TextButton.icon(
+                        onPressed: _autoAllocate,
+                        icon: const Icon(Icons.auto_awesome_rounded),
+                        label: const Text('Auto allocate')),
                   ],
                 ),
                 const SizedBox(height: 4),

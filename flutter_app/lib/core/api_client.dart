@@ -4,16 +4,15 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../features/auth/data/auth_repository.dart';
+import 'app_config.dart';
 import 'auth_events.dart';
 
 class ApiClient {
   ApiClient(
     this._prefs,
     this._secureStorage, {
-    //String baseUrl = 'http://192.168.100.128:8080/api/v1',
-    String baseUrl = 'http://127.0.0.1:8080/api/v1',
-    //String baseUrl = 'http://10.0.2.2:8080/api/v1',
-  }) : dio = Dio(BaseOptions(baseUrl: baseUrl)) {
+    String? baseUrl,
+  }) : dio = Dio(BaseOptions(baseUrl: _resolveBaseUrl(baseUrl))) {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
@@ -97,6 +96,11 @@ class ApiClient {
 
   Future<void> _purgeTokens() async {
     await AuthRepository.purgeLocalSession(_prefs, _secureStorage);
+  }
+
+  static String _resolveBaseUrl(String? override) {
+    final candidate = (override ?? AppConfig.apiBaseUrl).trim();
+    return candidate.isEmpty ? AppConfig.apiBaseUrl : candidate;
   }
 }
 

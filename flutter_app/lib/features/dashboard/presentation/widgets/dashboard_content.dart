@@ -41,7 +41,10 @@ class DashboardContent extends ConsumerWidget {
           child: Text(
             state.error!,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.redAccent),
+            style: Theme.of(context)
+                .textTheme
+                .bodyLarge
+                ?.copyWith(color: Colors.redAccent),
           ),
         ),
       );
@@ -135,10 +138,18 @@ class DashboardContent extends ConsumerWidget {
                       Expanded(
                         child: FeatureGrid(
                           items: const [
-                            FeatureItem(icon: Icons.point_of_sale_rounded, label: 'New Sale'),
-                            FeatureItem(icon: Icons.inventory_2_rounded, label: 'Products'),
-                            FeatureItem(icon: Icons.people_alt_rounded, label: 'Customers'),
-                            FeatureItem(icon: Icons.point_of_sale_rounded, label: 'Cash Register'),
+                            FeatureItem(
+                                icon: Icons.point_of_sale_rounded,
+                                label: 'New Sale'),
+                            FeatureItem(
+                                icon: Icons.inventory_2_rounded,
+                                label: 'Products'),
+                            FeatureItem(
+                                icon: Icons.people_alt_rounded,
+                                label: 'Customers'),
+                            FeatureItem(
+                                icon: Icons.point_of_sale_rounded,
+                                label: 'Cash Register'),
                           ],
                         ),
                       ),

@@ -258,7 +258,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   title: Text(loc.name),
                   onTap: () async {
                     await notifier.select(loc);
-                    if (mounted) Navigator.of(context).pop();
+                    if (!context.mounted) return;
+                    Navigator.of(context).pop();
                   },
                 );
               },

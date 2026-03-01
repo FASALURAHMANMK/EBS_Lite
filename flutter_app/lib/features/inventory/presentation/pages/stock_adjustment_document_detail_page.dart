@@ -5,14 +5,17 @@ import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
 
 class StockAdjustmentDocumentDetailPage extends ConsumerStatefulWidget {
-  const StockAdjustmentDocumentDetailPage({super.key, required this.documentId});
+  const StockAdjustmentDocumentDetailPage(
+      {super.key, required this.documentId});
   final int documentId;
 
   @override
-  ConsumerState<StockAdjustmentDocumentDetailPage> createState() => _StockAdjustmentDocumentDetailPageState();
+  ConsumerState<StockAdjustmentDocumentDetailPage> createState() =>
+      _StockAdjustmentDocumentDetailPageState();
 }
 
-class _StockAdjustmentDocumentDetailPageState extends ConsumerState<StockAdjustmentDocumentDetailPage> {
+class _StockAdjustmentDocumentDetailPageState
+    extends ConsumerState<StockAdjustmentDocumentDetailPage> {
   StockAdjustmentDocumentDto? _doc;
   Map<int, ProductDto> _products = const {};
   bool _loading = true;
@@ -59,20 +62,24 @@ class _StockAdjustmentDocumentDetailPageState extends ConsumerState<StockAdjustm
             Text(d?.reason ?? '-', style: theme.textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(d?.createdAt != null ? _fmt(d!.createdAt!) : '',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 12),
             if (_loading) const LinearProgressIndicator(minHeight: 2),
             if (d != null)
               ...d.items.map((a) {
-                final name = _products[a.productId]?.name ?? 'Product #${a.productId}';
+                final name =
+                    _products[a.productId]?.name ?? 'Product #${a.productId}';
                 final qty = a.adjustment;
                 final color = qty >= 0 ? Colors.green : theme.colorScheme.error;
                 return Card(
                   elevation: 0,
                   child: ListTile(
                     title: Text(name),
-                    trailing: Text((qty >= 0 ? '+ ' : '') + qty.toStringAsFixed(2),
-                        style: TextStyle(color: color, fontWeight: FontWeight.w700)),
+                    trailing: Text(
+                        (qty >= 0 ? '+ ' : '') + qty.toStringAsFixed(2),
+                        style: TextStyle(
+                            color: color, fontWeight: FontWeight.w700)),
                   ),
                 );
               }),
@@ -91,4 +98,3 @@ String _fmt(DateTime dt) {
   final mm = dt.minute.toString().padLeft(2, '0');
   return '$y-$m-$d $hh:$mm';
 }
-

@@ -12,7 +12,8 @@ class InventoryRepository {
   final Dio _dio;
   final Ref _ref;
 
-  int? get _locationId => _ref.read(locationNotifierProvider).selected?.locationId;
+  int? get _locationId =>
+      _ref.read(locationNotifierProvider).selected?.locationId;
 
   // Custom error for missing location context
   static const String _locationRequiredMessage =
@@ -63,7 +64,10 @@ class InventoryRepository {
 
   Future<InventoryListItem?> getStockForProductAtLocation(
       {required int productId, required int locationId}) async {
-    final qp = <String, dynamic>{'product_id': productId, 'location_id': locationId};
+    final qp = <String, dynamic>{
+      'product_id': productId,
+      'location_id': locationId
+    };
     final res = await _dio.get('/inventory/stock', queryParameters: qp);
     final data = _extractList(res);
     if (data.isEmpty) return null;
@@ -98,7 +102,8 @@ class InventoryRepository {
     return CategoryDto.fromJson(res.data['data'] as Map<String, dynamic>);
   }
 
-  Future<CategoryDto> updateCategory({required int id, required String name}) async {
+  Future<CategoryDto> updateCategory(
+      {required int id, required String name}) async {
     final res = await _dio.put('/categories/$id', data: {'name': name});
     return CategoryDto.fromJson(res.data['data'] as Map<String, dynamic>);
   }
@@ -120,7 +125,8 @@ class InventoryRepository {
     return BrandDto.fromJson(res.data['data'] as Map<String, dynamic>);
   }
 
-  Future<BrandDto> updateBrand({required int id, required String name, bool? isActive}) async {
+  Future<BrandDto> updateBrand(
+      {required int id, required String name, bool? isActive}) async {
     final body = <String, dynamic>{'name': name};
     if (isActive != null) body['is_active'] = isActive;
     final res = await _dio.put('/brands/$id', data: body);
@@ -148,8 +154,8 @@ class InventoryRepository {
     final res = await _dio.get('/product-attribute-definitions');
     final data = _extractList(res);
     return data
-        .map((e) => ProductAttributeDefinitionDto.fromJson(
-            e as Map<String, dynamic>))
+        .map((e) =>
+            ProductAttributeDefinitionDto.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
@@ -200,7 +206,8 @@ class InventoryRepository {
   }
 
   Future<ProductDto> updateProduct(ProductDto product) async {
-    final res = await _dio.put('/products/${product.productId}', data: product.toUpdateJson());
+    final res = await _dio.put('/products/${product.productId}',
+        data: product.toUpdateJson());
     return ProductDto.fromJson(res.data['data'] as Map<String, dynamic>);
   }
 
@@ -222,7 +229,8 @@ class InventoryRepository {
     if (limit != null) qp['limit'] = limit;
     if (from != null) qp['from_date'] = from.toIso8601String();
     if (to != null) qp['to_date'] = to.toIso8601String();
-    final res = await _dio.get('/inventory/product-transactions', queryParameters: qp);
+    final res =
+        await _dio.get('/inventory/product-transactions', queryParameters: qp);
     final data = _extractList(res);
     return data
         .map((e) => ProductTransactionDto.fromJson(e as Map<String, dynamic>))
@@ -287,7 +295,8 @@ class InventoryRepository {
     );
     final data = _extractList(res);
     return data
-        .map((e) => StockAdjustmentDocumentDto.fromJson(e as Map<String, dynamic>))
+        .map((e) =>
+            StockAdjustmentDocumentDto.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
@@ -312,7 +321,9 @@ class InventoryRepository {
     final qp = <String, dynamic>{};
     if (locationId != null) qp['location_id'] = locationId;
     if (sourceLocationId != null) qp['source_location_id'] = sourceLocationId;
-    if (destinationLocationId != null) qp['destination_location_id'] = destinationLocationId;
+    if (destinationLocationId != null) {
+      qp['destination_location_id'] = destinationLocationId;
+    }
     if (status != null && status.isNotEmpty) qp['status'] = status;
     // Backend requires at least one location-related filter. If caller didn't
     // provide any, default to the currently selected location for safety.
@@ -324,9 +335,13 @@ class InventoryRepository {
         qp['location_id'] = loc;
       }
     }
-    final res = await _dio.get('/inventory/transfers', queryParameters: qp.isEmpty ? null : qp);
+    final res = await _dio.get('/inventory/transfers',
+        queryParameters: qp.isEmpty ? null : qp);
     final data = _extractList(res);
-    return data.map((e) => StockTransferListItemDto.fromJson(e as Map<String, dynamic>)).toList();
+    return data
+        .map(
+            (e) => StockTransferListItemDto.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<StockTransferDetailDto> getStockTransfer(int id) async {

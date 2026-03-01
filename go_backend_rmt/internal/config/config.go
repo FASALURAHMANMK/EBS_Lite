@@ -26,8 +26,12 @@ type Config struct {
 	AllowedHeaders []string
 
 	// Rate Limiting
-	RateLimitRequests int
-	RateLimitWindow   time.Duration
+	RateLimitEnabled   bool
+	RateLimitRequests  int
+	RateLimitWindow    time.Duration
+	RateLimitKeyBy     string
+	RateLimitKeyPrefix string
+	RateLimitFailOpen  bool
 
 	// MQTT
 	MQTTBroker   string
@@ -38,16 +42,21 @@ type Config struct {
 	// Redis
 	RedisURL string
 
+	// Session activity
+	SessionLastSeenThrottle time.Duration
+	SessionLastSeenUseRedis bool
+
 	// File Upload
 	MaxUploadSize int64
 	UploadPath    string
 
 	// Email
-	SMTPHost     string
-	SMTPPort     int
-	SMTPUsername string
-	SMTPPassword string
-	FromEmail    string
+	SMTPHost        string
+	SMTPPort        int
+	SMTPUsername    string
+	SMTPPassword    string
+	FromEmail       string
+	FrontendBaseURL string
 
 	// Printing
 	DefaultPrinter string
@@ -74,8 +83,12 @@ func Load() *Config {
 		AllowedHeaders: []string{"Content-Type", "Authorization", "Accept", "company_id", "location_id"},
 
 		// Rate Limiting
-		RateLimitRequests: parseInt("RATE_LIMIT_REQUESTS", 100),
-		RateLimitWindow:   parseDuration("RATE_LIMIT_WINDOW", "1h"),
+		RateLimitEnabled:   parseBool("RATE_LIMIT_ENABLED", true),
+		RateLimitRequests:  parseInt("RATE_LIMIT_REQUESTS", 100),
+		RateLimitWindow:    parseDuration("RATE_LIMIT_WINDOW", "1h"),
+		RateLimitKeyBy:     getEnv("RATE_LIMIT_KEY_BY", "ip"),
+		RateLimitKeyPrefix: getEnv("RATE_LIMIT_KEY_PREFIX", "rate_limit"),
+		RateLimitFailOpen:  parseBool("RATE_LIMIT_FAIL_OPEN", true),
 
 		// MQTT
 		MQTTBroker:   getEnv("MQTT_BROKER", "tcp://localhost:1883"),
@@ -86,16 +99,21 @@ func Load() *Config {
 		// Redis
 		RedisURL: getEnv("REDIS_URL", "redis://localhost:6379"),
 
+		// Session activity
+		SessionLastSeenThrottle: parseDuration("SESSION_LAST_SEEN_THROTTLE", "60s"),
+		SessionLastSeenUseRedis: parseBool("SESSION_LAST_SEEN_USE_REDIS", true),
+
 		// File Upload
 		MaxUploadSize: parseSize("MAX_UPLOAD_SIZE", "10MB"),
 		UploadPath:    getEnv("UPLOAD_PATH", "./uploads"),
 
 		// Email
-		SMTPHost:     getEnv("SMTP_HOST", ""),
-		SMTPPort:     parseInt("SMTP_PORT", 587),
-		SMTPUsername: getEnv("SMTP_USERNAME", ""),
-		SMTPPassword: getEnv("SMTP_PASSWORD", ""),
-		FromEmail:    getEnv("FROM_EMAIL", "noreply@company.com"),
+		SMTPHost:        getEnv("SMTP_HOST", ""),
+		SMTPPort:        parseInt("SMTP_PORT", 587),
+		SMTPUsername:    getEnv("SMTP_USERNAME", ""),
+		SMTPPassword:    getEnv("SMTP_PASSWORD", ""),
+		FromEmail:       getEnv("FROM_EMAIL", "noreply@company.com"),
+		FrontendBaseURL: getEnv("FRONTEND_BASE_URL", "http://localhost:3000"),
 
 		// Printing
 		DefaultPrinter: getEnv("DEFAULT_PRINTER", "default"),
@@ -113,6 +131,15 @@ func getEnv(key, defaultValue string) string {
 func parseInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		if parsed, err := strconv.Atoi(value); err == nil {
+			return parsed
+		}
+	}
+	return defaultValue
+}
+
+func parseBool(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		if parsed, err := strconv.ParseBool(value); err == nil {
 			return parsed
 		}
 	}

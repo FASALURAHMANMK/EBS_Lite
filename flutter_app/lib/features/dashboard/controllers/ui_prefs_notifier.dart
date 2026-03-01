@@ -27,4 +27,3 @@ final quickActionVisibilityProvider =
   final prefs = ref.watch(sharedPreferencesProvider);
   return QuickActionVisibilityNotifier(prefs);
 });
-

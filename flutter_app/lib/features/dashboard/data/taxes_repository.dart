@@ -88,4 +88,3 @@ final taxesRepositoryProvider = Provider<TaxesRepository>((ref) {
   final dio = ref.watch(dioProvider);
   return TaxesRepository(dio);
 });
-
