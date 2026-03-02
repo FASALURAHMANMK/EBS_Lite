@@ -145,6 +145,15 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 		req.ReferenceNumber, req.Notes, userID, userID, idemVal,
 	).Scan(&col.CollectionID, &col.CollectionNumber, &col.CollectionDate, &col.CreatedAt, &col.UpdatedAt)
 	if err != nil {
+		if idemKey != "" && isUniqueViolation(err) {
+			existing, lookupErr := s.getCollectionByIdempotencyKey(idemKey, companyID, locationID)
+			if lookupErr != nil {
+				return nil, lookupErr
+			}
+			if existing != nil {
+				return existing, nil
+			}
+		}
 		return nil, fmt.Errorf("failed to insert collection: %w", err)
 	}
 

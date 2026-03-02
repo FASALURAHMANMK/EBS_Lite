@@ -42,7 +42,7 @@ func (s *ReportsService) GetSalesSummary(companyID int, fromDate, toDate, groupB
               SUM(s.total_amount - s.paid_amount) AS outstanding
        FROM sales s
        JOIN locations l ON s.location_id = l.location_id
-       WHERE l.company_id = $1 AND s.is_deleted = FALSE
+       WHERE l.company_id = $1 AND s.is_deleted = FALSE AND COALESCE(s.is_training, FALSE) = FALSE
    `, dateFormat)
 
 	args := []interface{}{companyID}
@@ -127,7 +127,7 @@ func (s *ReportsService) GetTopProducts(companyID int, fromDate, toDate string, 
         JOIN sales s ON sd.sale_id = s.sale_id
         JOIN locations l ON s.location_id = l.location_id
         LEFT JOIN products p ON sd.product_id = p.product_id
-        WHERE l.company_id = $1 AND s.is_deleted = FALSE
+        WHERE l.company_id = $1 AND s.is_deleted = FALSE AND COALESCE(s.is_training, FALSE) = FALSE
     `
 
 	args := []interface{}{companyID}
@@ -174,7 +174,7 @@ func (s *ReportsService) GetCustomerBalances(companyID int) ([]models.CustomerBa
         SELECT c.customer_id, c.name,
                COALESCE(SUM(s.total_amount - s.paid_amount),0) AS total_due
         FROM customers c
-        LEFT JOIN sales s ON c.customer_id = s.customer_id AND s.is_deleted = FALSE
+        LEFT JOIN sales s ON c.customer_id = s.customer_id AND s.is_deleted = FALSE AND COALESCE(s.is_training, FALSE) = FALSE
         WHERE c.company_id = $1 AND c.is_deleted = FALSE
         GROUP BY c.customer_id, c.name
         HAVING COALESCE(SUM(s.total_amount - s.paid_amount),0) > 0
@@ -261,7 +261,7 @@ func (s *ReportsService) GetTaxReport(companyID int, fromDate, toDate string) ([
         JOIN sales s ON sd.sale_id = s.sale_id
         JOIN locations l ON s.location_id = l.location_id
         LEFT JOIN taxes t ON sd.tax_id = t.tax_id
-        WHERE l.company_id = $1 AND s.is_deleted = FALSE`
+        WHERE l.company_id = $1 AND s.is_deleted = FALSE AND COALESCE(s.is_training, FALSE) = FALSE`
 
 	args := []interface{}{companyID}
 	idx := 2

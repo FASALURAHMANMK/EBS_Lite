@@ -20,6 +20,7 @@ type Sale struct {
 	Status          string         `json:"status" db:"status"`
 	POSStatus       string         `json:"pos_status" db:"pos_status"`
 	IsQuickSale     bool           `json:"is_quick_sale" db:"is_quick_sale"`
+	IsTraining      bool           `json:"is_training" db:"is_training"`
 	Notes           *string        `json:"notes,omitempty" db:"notes"`
 	CreatedBy       int            `json:"created_by" db:"created_by"`
 	UpdatedBy       *int           `json:"updated_by,omitempty" db:"updated_by"`

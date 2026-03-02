@@ -17,6 +17,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
+  /ready:
+    servers:
+    - url: /
+    get:
+      summary: GET /ready
+      responses:
+        '200':
+          description: Ready (DB + Redis ok)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+        '503':
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
   /auth/login:
     post:
       summary: Authenticate a user
@@ -127,6 +145,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
+  /auth/verify:
+    post:
+      summary: Verify credentials (manager override)
+      responses:
+        '200':
+          description: Verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
   /device-sessions:
     get:
       summary: GET /api/v1/device-sessions
@@ -3077,6 +3110,26 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
+  /cash-registers/training/enable:
+    post:
+      summary: POST /api/v1/cash-registers/training/enable
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /cash-registers/training/disable:
+    post:
+      summary: POST /api/v1/cash-registers/training/disable
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
   /cash-registers/tally:
     post:
       summary: POST /api/v1/cash-registers/tally
@@ -3092,6 +3145,46 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
+  /cash-registers/movement:
+    post:
+      summary: POST /api/v1/cash-registers/movement
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /cash-registers/force-close:
+    post:
+      summary: POST /api/v1/cash-registers/force-close
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+  /cash-registers/events:
+    get:
+      summary: GET /api/v1/cash-registers/events
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
   /reports/sales-summary:
     get:
       summary: GET /api/v1/reports/sales-summary
@@ -4150,6 +4243,22 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
+  /support/bundle:
+    get:
+      summary: GET /api/v1/support/bundle
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+        '403':
+          description: Disabled or forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
   /workflow-requests:
     get:
       summary: GET /api/v1/workflow-requests

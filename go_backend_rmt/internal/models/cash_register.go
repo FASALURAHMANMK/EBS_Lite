@@ -15,6 +15,10 @@ type CashRegister struct {
 	OpenedBy        *int      `json:"opened_by,omitempty" db:"opened_by"`
 	ClosedBy        *int      `json:"closed_by,omitempty" db:"closed_by"`
 	Status          string    `json:"status" db:"status"`
+	TrainingMode    bool      `json:"training_mode" db:"training_mode"`
+	// Updated whenever training mode is enabled/disabled.
+	TrainingModeUpdatedAt *time.Time `json:"training_mode_updated_at,omitempty" db:"training_mode_updated_at"`
+	TrainingModeUpdatedBy *int       `json:"training_mode_updated_by,omitempty" db:"training_mode_updated_by"`
 	SyncModel
 }
 
@@ -24,9 +28,12 @@ type OpenCashRegisterRequest struct {
 
 type CloseCashRegisterRequest struct {
 	ClosingBalance float64 `json:"closing_balance" validate:"required"`
+	Denominations  *JSONB  `json:"denominations,omitempty"`
 }
 
 type CashTallyRequest struct {
 	Count float64 `json:"count" validate:"required"`
 	Notes *string `json:"notes,omitempty"`
+	// Optional breakdown captured as a JSON object, e.g. {"100":2,"50":1}
+	Denominations *JSONB `json:"denominations,omitempty"`
 }

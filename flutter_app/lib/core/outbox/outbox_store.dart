@@ -55,4 +55,27 @@ class OutboxStore {
     final db = await _open();
     await db.delete('outbox', where: 'id = ?', whereArgs: [id]);
   }
+
+  Future<List<OutboxItem>> listFailed({int limit = 50}) async {
+    final db = await _open();
+    final rows = await db.query(
+      'outbox',
+      where: 'status = ?',
+      whereArgs: const ['failed'],
+      orderBy: 'created_at DESC, id DESC',
+      limit: limit,
+    );
+    return rows.map(OutboxItem.fromDb).toList();
+  }
+
+  Future<List<OutboxItem>> listPending({int limit = 200}) async {
+    final db = await _open();
+    final rows = await db.query(
+      'outbox',
+      where: "status IN ('queued','failed')",
+      orderBy: 'created_at DESC, id DESC',
+      limit: limit,
+    );
+    return rows.map(OutboxItem.fromDb).toList();
+  }
 }

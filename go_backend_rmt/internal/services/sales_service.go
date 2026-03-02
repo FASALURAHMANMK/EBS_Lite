@@ -77,7 +77,7 @@ func (s *SalesService) GetSales(companyID, locationID int, filters map[string]st
 	query := `
 		SELECT s.sale_id, s.sale_number, s.location_id, s.customer_id, s.sale_date, s.sale_time,
 			   s.subtotal, s.tax_amount, s.discount_amount, s.total_amount, s.paid_amount,
-			   s.payment_method_id, s.status, s.pos_status, s.is_quick_sale, s.notes,
+			   s.payment_method_id, s.status, s.pos_status, s.is_quick_sale, COALESCE(s.is_training, FALSE) AS is_training, s.notes,
 			   s.created_by, s.updated_by, s.sync_status, s.created_at, s.updated_at,
 			   c.name as customer_name, pm.name as payment_method_name
 		FROM sales s
@@ -140,7 +140,7 @@ func (s *SalesService) GetSales(companyID, locationID int, filters map[string]st
 			&sale.SaleDate, &sale.SaleTime, &sale.Subtotal, &sale.TaxAmount,
 			&sale.DiscountAmount, &sale.TotalAmount, &sale.PaidAmount,
 			&sale.PaymentMethodID, &sale.Status, &sale.POSStatus, &sale.IsQuickSale,
-			&sale.Notes, &sale.CreatedBy, &sale.UpdatedBy, &sale.SyncStatus,
+			&sale.IsTraining, &sale.Notes, &sale.CreatedBy, &sale.UpdatedBy, &sale.SyncStatus,
 			&sale.CreatedAt, &sale.UpdatedAt, &customerName, &paymentMethodName,
 		)
 		if err != nil {
@@ -174,7 +174,7 @@ func (s *SalesService) GetSaleByID(saleID, companyID int) (*models.Sale, error) 
 	query := `
 		SELECT s.sale_id, s.sale_number, s.location_id, s.customer_id, s.sale_date, s.sale_time,
 			   s.subtotal, s.tax_amount, s.discount_amount, s.total_amount, s.paid_amount,
-			   s.payment_method_id, s.status, s.pos_status, s.is_quick_sale, s.notes,
+			   s.payment_method_id, s.status, s.pos_status, s.is_quick_sale, COALESCE(s.is_training, FALSE) AS is_training, s.notes,
 			   s.created_by, s.updated_by, s.sync_status, s.created_at, s.updated_at,
 			   c.name as customer_name, pm.name as payment_method_name
 		FROM sales s
@@ -192,7 +192,7 @@ func (s *SalesService) GetSaleByID(saleID, companyID int) (*models.Sale, error) 
 		&sale.SaleDate, &sale.SaleTime, &sale.Subtotal, &sale.TaxAmount,
 		&sale.DiscountAmount, &sale.TotalAmount, &sale.PaidAmount,
 		&sale.PaymentMethodID, &sale.Status, &sale.POSStatus, &sale.IsQuickSale,
-		&sale.Notes, &sale.CreatedBy, &sale.UpdatedBy, &sale.SyncStatus,
+		&sale.IsTraining, &sale.Notes, &sale.CreatedBy, &sale.UpdatedBy, &sale.SyncStatus,
 		&sale.CreatedAt, &sale.UpdatedAt, &customerName, &paymentMethodName,
 	)
 
@@ -350,7 +350,20 @@ func (s *SalesService) GetSaleByNumber(saleNumber string, companyID int) (*model
 // 	return s.GetSaleByID(saleID, companyID)
 // }
 
+type CreateSaleOptions struct {
+	IsTraining bool
+}
+
 func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models.CreateSaleRequest, idempotencyKey *string) (*models.Sale, error) {
+	return s.CreateSaleWithOptions(companyID, locationID, userID, req, idempotencyKey, CreateSaleOptions{})
+}
+
+func (s *SalesService) CreateSaleWithOptions(
+	companyID, locationID, userID int,
+	req *models.CreateSaleRequest,
+	idempotencyKey *string,
+	opts CreateSaleOptions,
+) (*models.Sale, error) {
 	// Validate customer belongs to company if provided
 	if req.CustomerID != nil {
 		err := s.validateCustomerInCompany(*req.CustomerID, companyID)
@@ -359,10 +372,10 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 		}
 	}
 
-	// Check for applicable promotions
+	// Check for applicable promotions (skip in training mode; training should not consume promotion logic by default).
 	var totalDiscount float64
 	var appliedPromotions []int
-	if req.CustomerID != nil {
+	if !opts.IsTraining && req.CustomerID != nil {
 		loyaltyService := NewLoyaltyService()
 
 		// Calculate subtotal for promotion eligibility
@@ -471,7 +484,11 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 
 	// Generate sale number using numbering sequence service
 	ns := NewNumberingSequenceService()
-	saleNumber, err := ns.NextNumber(tx, "sale", companyID, &locationID)
+	sequenceName := "sale"
+	if opts.IsTraining {
+		sequenceName = "sale_training"
+	}
+	saleNumber, err := ns.NextNumber(tx, sequenceName, companyID, &locationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sale number: %w", err)
 	}
@@ -480,14 +497,23 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 	var saleID int
 	err = tx.QueryRow(`
                INSERT INTO sales (sale_number, location_id, customer_id, sale_date, sale_time,
-                                                 subtotal, tax_amount, discount_amount, total_amount, paid_amount,
-                                                 payment_method_id, status, pos_status, is_quick_sale, notes, created_by, updated_by, idempotency_key)
-               VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIME, $4, $5, $6, $7, $8, $9, 'COMPLETED', 'COMPLETED', FALSE, $10, $11, $11, $12)
+                                                  subtotal, tax_amount, discount_amount, total_amount, paid_amount,
+                                                  payment_method_id, status, pos_status, is_quick_sale, is_training, notes, created_by, updated_by, idempotency_key)
+               VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIME, $4, $5, $6, $7, $8, $9, 'COMPLETED', 'COMPLETED', FALSE, $10, $11, $12, $12, $13)
                RETURNING sale_id
        `, saleNumber, locationID, req.CustomerID, subtotal, totalTax, req.DiscountAmount,
-		totalAmount, req.PaidAmount, req.PaymentMethodID, req.Notes, userID, nullIfEmpty(idemKey)).Scan(&saleID)
+		totalAmount, req.PaidAmount, req.PaymentMethodID, opts.IsTraining, req.Notes, userID, nullIfEmpty(idemKey)).Scan(&saleID)
 
 	if err != nil {
+		if idemKey != "" && isUniqueViolation(err) {
+			existing, lookupErr := s.getSaleByIdempotencyKey(idemKey, companyID, locationID)
+			if lookupErr != nil {
+				return nil, lookupErr
+			}
+			if existing != nil {
+				return existing, nil
+			}
+		}
 		return nil, fmt.Errorf("failed to create sale: %w", err)
 	}
 
@@ -568,8 +594,8 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 			return nil, fmt.Errorf("failed to create sale item: %w", err)
 		}
 
-		// Update stock if product_id is provided
-		if item.ProductID != nil {
+		// Update stock if product_id is provided (skip in training mode).
+		if !opts.IsTraining && item.ProductID != nil {
 			err = s.updateStock(tx, locationID, *item.ProductID, -item.Quantity)
 			if err != nil {
 				return nil, fmt.Errorf("failed to update stock: %w", err)
@@ -578,15 +604,17 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 	}
 
 	// Record applied promotions (if any)
-	for _, promotionID := range appliedPromotions {
-		_, err = tx.Exec(`
-			INSERT INTO sale_promotions (sale_id, promotion_id, discount_amount)
-			VALUES ($1, $2, $3)
-		`, saleID, promotionID, totalDiscount/float64(len(appliedPromotions))) // Distribute discount evenly
+	if !opts.IsTraining {
+		for _, promotionID := range appliedPromotions {
+			_, err = tx.Exec(`
+				INSERT INTO sale_promotions (sale_id, promotion_id, discount_amount)
+				VALUES ($1, $2, $3)
+			`, saleID, promotionID, totalDiscount/float64(len(appliedPromotions))) // Distribute discount evenly
 
-		if err != nil {
-			// Log error but don't fail the sale
-			log.Printf("sales_service: failed to record promotion %d for sale %d: %v", promotionID, saleID, err)
+			if err != nil {
+				// Log error but don't fail the sale
+				log.Printf("sales_service: failed to record promotion %d for sale %d: %v", promotionID, saleID, err)
+			}
 		}
 	}
 
@@ -595,20 +623,22 @@ func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	// Record ledger entry
-	ledgerService := NewLedgerService()
-	_ = ledgerService.RecordSale(companyID, saleID, totalAmount, userID)
+	if !opts.IsTraining {
+		// Record ledger entry
+		ledgerService := NewLedgerService()
+		_ = ledgerService.RecordSale(companyID, saleID, totalAmount, userID)
 
-	// Award loyalty points if customer is provided (async operation)
-	if req.CustomerID != nil {
-		go func() {
-			loyaltyService := NewLoyaltyService()
-			err := loyaltyService.AwardPoints(companyID, *req.CustomerID, totalAmount, saleID)
-			if err != nil {
-				// Log error but don't fail the sale
-				log.Printf("sales_service: failed to award loyalty points for sale %d: %v", saleID, err)
-			}
-		}()
+		// Award loyalty points if customer is provided (async operation)
+		if req.CustomerID != nil {
+			go func() {
+				loyaltyService := NewLoyaltyService()
+				err := loyaltyService.AwardPoints(companyID, *req.CustomerID, totalAmount, saleID)
+				if err != nil {
+					// Log error but don't fail the sale
+					log.Printf("sales_service: failed to award loyalty points for sale %d: %v", saleID, err)
+				}
+			}()
+		}
 	}
 
 	// Return created sale
@@ -968,7 +998,7 @@ func (s *SalesService) GetSalesHistory(companyID int, filters map[string]string)
 	query := `
                 SELECT s.sale_id, s.sale_number, s.location_id, s.customer_id, s.sale_date, s.sale_time,
                        s.subtotal, s.tax_amount, s.discount_amount, s.total_amount, s.paid_amount,
-                       s.payment_method_id, s.status, s.pos_status, s.is_quick_sale, s.notes,
+                       s.payment_method_id, s.status, s.pos_status, s.is_quick_sale, COALESCE(s.is_training, FALSE) AS is_training, s.notes,
                        s.created_by, s.updated_by, s.sync_status, s.created_at, s.updated_at,
                        c.name as customer_name, pm.name as payment_method_name
                 FROM sales s
@@ -1030,7 +1060,7 @@ func (s *SalesService) GetSalesHistory(companyID int, filters map[string]string)
 			&sale.SaleDate, &sale.SaleTime, &sale.Subtotal, &sale.TaxAmount,
 			&sale.DiscountAmount, &sale.TotalAmount, &sale.PaidAmount,
 			&sale.PaymentMethodID, &sale.Status, &sale.POSStatus, &sale.IsQuickSale,
-			&sale.Notes, &sale.CreatedBy, &sale.UpdatedBy, &sale.SyncStatus,
+			&sale.IsTraining, &sale.Notes, &sale.CreatedBy, &sale.UpdatedBy, &sale.SyncStatus,
 			&sale.CreatedAt, &sale.UpdatedAt, &customerName, &paymentMethodName,
 		)
 		if err != nil {

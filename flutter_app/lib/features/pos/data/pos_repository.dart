@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api_client.dart';
 import '../../../core/outbox/outbox_item.dart';
 import '../../../core/outbox/outbox_notifier.dart';
+import '../../accounts/controllers/training_mode_notifier.dart';
 import '../../dashboard/controllers/location_notifier.dart';
 import '../../dashboard/data/payment_methods_repository.dart';
 import 'models.dart';
@@ -140,7 +141,11 @@ class PosRepository {
         'X-Idempotency-Key': idempotencyKey,
     };
     final outbox = _ref.read(outboxNotifierProvider.notifier);
+    final trainingEnabled = _ref.read(trainingModeNotifierProvider).enabled;
     if (!outbox.isOnline) {
+      if (trainingEnabled) {
+        throw Exception('Training mode checkout requires an online connection');
+      }
       await outbox.enqueue(
         OutboxItem(
           type: 'pos_checkout',
@@ -164,6 +169,7 @@ class PosRepository {
       );
     } on DioException catch (e) {
       if (outbox.isNetworkError(e)) {
+        if (trainingEnabled) rethrow;
         await outbox.enqueue(
           OutboxItem(
             type: 'pos_checkout',

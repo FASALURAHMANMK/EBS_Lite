@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -228,6 +229,14 @@ func (h *PurchaseHandler) CreateQuickPurchase(c *gin.Context) {
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create quick purchase", err)
 		return
+	}
+
+	if idemKey != "" {
+		requestID := c.GetString("request_id")
+		if requestID == "" {
+			requestID = c.GetHeader("X-Request-ID")
+		}
+		log.Printf("request_id=%s idempotency_key=%s purchase_id=%d", requestID, idemKey, purchase.PurchaseID)
 	}
 
 	utils.CreatedResponse(c, "Quick purchase created successfully", purchase)

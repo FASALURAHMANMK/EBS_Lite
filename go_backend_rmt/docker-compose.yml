@@ -68,6 +68,10 @@ services:
       - GIN_MODE=${GIN_MODE:-release}
       - RUN_MIGRATIONS=${RUN_MIGRATIONS:-true}
       - MIGRATIONS_DIR=${MIGRATIONS_DIR:-migrations}
+      - READY_CHECK_REDIS=${READY_CHECK_REDIS:-true}
+      - READY_CHECK_TIMEOUT=${READY_CHECK_TIMEOUT:-2s}
+      - SUPPORT_BUNDLE_ENABLED=${SUPPORT_BUNDLE_ENABLED:-false}
+      - SUPPORT_BUNDLE_LOG_LINES=${SUPPORT_BUNDLE_LOG_LINES:-200}
     ports:
       - "8080:8080"
     depends_on:

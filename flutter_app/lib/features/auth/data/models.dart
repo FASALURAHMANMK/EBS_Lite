@@ -186,3 +186,25 @@ class CompanyResponse {
   factory CompanyResponse.fromJson(Map<String, dynamic> json) =>
       CompanyResponse(Company.fromJson(json));
 }
+
+class VerifyCredentialsResponse {
+  final int userId;
+  final String username;
+  final List<String> permissions;
+
+  VerifyCredentialsResponse({
+    required this.userId,
+    required this.username,
+    required this.permissions,
+  });
+
+  factory VerifyCredentialsResponse.fromJson(Map<String, dynamic> json) {
+    return VerifyCredentialsResponse(
+      userId: json['user_id'] as int? ?? 0,
+      username: (json['username'] ?? '').toString(),
+      permissions:
+          (json['permissions'] as List?)?.map((e) => e.toString()).toList() ??
+              const [],
+    );
+  }
+}

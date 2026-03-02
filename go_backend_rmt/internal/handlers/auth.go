@@ -108,6 +108,40 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	utils.SuccessResponse(c, "Token refreshed successfully", response)
 }
 
+// POST /auth/verify
+// Verifies credentials for manager override without issuing tokens.
+// Requires the caller to be authenticated and have a company context so the
+// override user must belong to the same company.
+func (h *AuthHandler) VerifyCredentials(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ErrorResponse(c, http.StatusForbidden, "Company access required", nil)
+		return
+	}
+
+	var req models.VerifyCredentialsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+
+	resp, err := h.authService.VerifyCredentials(companyID, &req)
+	if err != nil {
+		if err.Error() == "insufficient permissions" {
+			utils.ForbiddenResponse(c, "Insufficient permissions")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusUnauthorized, "Invalid credentials", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Verified", resp)
+}
+
 // GET /auth/me
 func (h *AuthHandler) GetMe(c *gin.Context) {
 	userID := c.GetInt("user_id")

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -140,6 +141,14 @@ func (h *POSHandler) ProcessCheckout(c *gin.Context) {
 		}
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to process checkout", err)
 		return
+	}
+
+	if idemKey != "" {
+		requestID := c.GetString("request_id")
+		if requestID == "" {
+			requestID = c.GetHeader("X-Request-ID")
+		}
+		log.Printf("request_id=%s idempotency_key=%s sale_id=%d", requestID, idemKey, sale.SaleID)
 	}
 
 	utils.CreatedResponse(c, "Checkout completed successfully", map[string]interface{}{

@@ -334,6 +334,15 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 		paymentTerms, dueDate, "PENDING", req.ReferenceNumber, req.Notes, userID, idemVal,
 	).Scan(&purchase.PurchaseID, &purchase.CreatedAt)
 	if err != nil {
+		if idemKey != "" && isUniqueViolation(err) {
+			existing, lookupErr := s.getPurchaseByIdempotencyKey(idemKey, companyID, locationID)
+			if lookupErr != nil {
+				return nil, lookupErr
+			}
+			if existing != nil {
+				return existing, nil
+			}
+		}
 		return nil, fmt.Errorf("failed to insert purchase: %w", err)
 	}
 

@@ -24,6 +24,39 @@ To disable automatic migrations (not recommended for dev):
 
 Docker: `go_backend_rmt/docker-compose.yml` runs `postgres` + `erp-api`; on a clean DB the base schema is initialized from `Docs & Schema/PostgrSQL.sql` and then the API applies migrations on startup.
 
+## Backup / Restore (operator-friendly)
+
+Minimal recommended backup (run daily, keep at least 7 days):
+
+```bash
+pg_dump --format=custom --no-owner --file ebs_lite_$(date +%F).dump "$DATABASE_URL"
+```
+
+PowerShell equivalent:
+
+```powershell
+$d = Get-Date -Format yyyy-MM-dd
+pg_dump --format=custom --no-owner --file "ebs_lite_$d.dump" "$env:DATABASE_URL"
+```
+
+Restore to a new empty database:
+
+```bash
+createdb ebs_lite_restored
+pg_restore --no-owner --clean --if-exists --dbname "$DATABASE_URL" ebs_lite_YYYY-MM-DD.dump
+```
+
+Notes:
+- Test restore at least once before going live.
+- Store backups off the POS device (NAS/cloud/USB rotation).
+
+## Readiness + Support bundle
+
+- Liveness: `GET /health` (always returns 200 when the server is running)
+- Readiness: `GET /ready` (returns 200 only when DB + Redis checks pass)
+- Support bundle (non-production by default): `GET /api/v1/support/bundle` (requires auth + `VIEW_SETTINGS`)
+  - Enable in production only if required: set `SUPPORT_BUNDLE_ENABLED=true`
+
 ## API
 
 ### GET /api/v1/customers

@@ -83,6 +83,37 @@ class OutboxNotifier extends StateNotifier<OutboxState> {
     await processQueue();
   }
 
+  Future<List<OutboxItem>> listFailed({int limit = 50}) {
+    return _store.listFailed(limit: limit);
+  }
+
+  Future<List<OutboxItem>> listPending({int limit = 200}) {
+    return _store.listPending(limit: limit);
+  }
+
+  Future<void> retryItem(int id) async {
+    await _store.markQueued(id);
+    if (state.isOnline) {
+      await processQueue();
+    }
+  }
+
+  Future<void> discardItem(int id) async {
+    await _store.delete(id);
+    final count = await _store.countPending();
+    state = state.copyWith(queuedCount: count);
+  }
+
+  Map<String, dynamic> _buildHeaders(OutboxItem item) {
+    final headers = <String, dynamic>{...?item.headers};
+    final idemKey = (item.idempotencyKey ?? '').trim();
+    if (idemKey.isNotEmpty) {
+      headers.putIfAbsent('Idempotency-Key', () => idemKey);
+      headers.putIfAbsent('X-Idempotency-Key', () => idemKey);
+    }
+    return headers;
+  }
+
   Future<void> processQueue() async {
     if (!_ready) return;
     if (!state.isOnline || state.isSyncing) return;
@@ -176,8 +207,8 @@ class OutboxNotifier extends StateNotifier<OutboxState> {
     required String path,
   }) async {
     final dio = _ref.read(dioProvider);
-    final options =
-        (item.headers ?? {}).isEmpty ? null : Options(headers: item.headers);
+    final headers = _buildHeaders(item);
+    final options = headers.isEmpty ? null : Options(headers: headers);
     if (method.toUpperCase() == 'POST') {
       await dio.post(
         path,
@@ -204,6 +235,8 @@ class OutboxNotifier extends StateNotifier<OutboxState> {
 
   Future<void> _processQuickGrn(OutboxItem item) async {
     final dio = _ref.read(dioProvider);
+    final headers = _buildHeaders(item);
+    final options = headers.isEmpty ? null : Options(headers: headers);
     final payload = item.meta ?? {};
     final items =
         (payload['items'] as List? ?? const []).cast<Map<String, dynamic>>();
@@ -213,7 +246,7 @@ class OutboxNotifier extends StateNotifier<OutboxState> {
       '/purchases/quick',
       data: payload['create_body'],
       queryParameters: item.queryParams,
-      options: item.headers == null ? null : Options(headers: item.headers),
+      options: options,
     );
     final created =
         (purchaseRes.data is Map && purchaseRes.data['data'] != null)

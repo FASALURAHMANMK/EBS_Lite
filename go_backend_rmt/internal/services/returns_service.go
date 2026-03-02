@@ -207,12 +207,13 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 	// Get sale details for location and customer
 	var locationID int
 	var customerID *int
+	var isTraining bool
 	err = s.db.QueryRow(`
-		SELECT s.location_id, s.customer_id
+		SELECT s.location_id, s.customer_id, COALESCE(s.is_training, FALSE)
 		FROM sales s
 		JOIN locations l ON s.location_id = l.location_id
 		WHERE s.sale_id = $1 AND l.company_id = $2
-	`, req.SaleID, companyID).Scan(&locationID, &customerID)
+	`, req.SaleID, companyID).Scan(&locationID, &customerID, &isTraining)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sale details: %w", err)
@@ -275,24 +276,28 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 			return nil, fmt.Errorf("failed to create return item: %w", err)
 		}
 
-		// Update stock (add back returned quantity)
-		err = s.updateStock(tx, locationID, item.ProductID, item.Quantity)
-		if err != nil {
-			return nil, fmt.Errorf("failed to update stock: %w", err)
+		// Update stock (add back returned quantity) - skip in training mode.
+		if !isTraining {
+			err = s.updateStock(tx, locationID, item.ProductID, item.Quantity)
+			if err != nil {
+				return nil, fmt.Errorf("failed to update stock: %w", err)
+			}
 		}
 	}
 
 	// Update original sale's paid amount if needed
 	// This is optional business logic - you might want to create a credit note instead
-	_, err = tx.Exec(`
-		UPDATE sales s
-		SET paid_amount = paid_amount - $1, updated_at = CURRENT_TIMESTAMP
-		FROM locations l
-		WHERE s.sale_id = $2 AND s.location_id = l.location_id AND l.company_id = $3
-	`, totalAmount, req.SaleID, companyID)
+	if !isTraining {
+		_, err = tx.Exec(`
+			UPDATE sales s
+			SET paid_amount = paid_amount - $1, updated_at = CURRENT_TIMESTAMP
+			FROM locations l
+			WHERE s.sale_id = $2 AND s.location_id = l.location_id AND l.company_id = $3
+		`, totalAmount, req.SaleID, companyID)
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to update original sale: %w", err)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update original sale: %w", err)
+		}
 	}
 
 	// Commit transaction

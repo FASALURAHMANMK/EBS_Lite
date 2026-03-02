@@ -247,6 +247,8 @@ func defaultPrefixFor(name string) *string {
 	switch n {
 	case "sale":
 		p = "INV-"
+	case "sale_training":
+		p = "TRN-"
 	case "quote":
 		p = "QOT-"
 	case "purchase":

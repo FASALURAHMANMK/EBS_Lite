@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -109,6 +110,14 @@ func (h *CollectionHandler) CreateCollection(c *gin.Context) {
 		}
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create collection", err)
 		return
+	}
+
+	if idemKey != "" {
+		requestID := c.GetString("request_id")
+		if requestID == "" {
+			requestID = c.GetHeader("X-Request-ID")
+		}
+		log.Printf("request_id=%s idempotency_key=%s collection_id=%d", requestID, idemKey, col.CollectionID)
 	}
 
 	utils.CreatedResponse(c, "Collection recorded successfully", col)

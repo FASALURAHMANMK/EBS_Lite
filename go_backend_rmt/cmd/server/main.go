@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"erp-backend/internal/database"
 	"erp-backend/internal/middleware"
 	"erp-backend/internal/routes"
+	"erp-backend/internal/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -27,6 +29,12 @@ func main() {
 
 	// Load configuration
 	cfg := config.Load()
+
+	// Capture recent logs for support bundles.
+	logBuffer := utils.InitDefaultLogBuffer(cfg.SupportBundleLogLines)
+	log.SetOutput(io.MultiWriter(os.Stdout, logBuffer))
+	gin.DefaultWriter = io.MultiWriter(os.Stdout, logBuffer)
+	gin.DefaultErrorWriter = io.MultiWriter(os.Stderr, logBuffer)
 
 	// Initialize database
 	if _, err := database.Initialize(cfg.DatabaseURL); err != nil {

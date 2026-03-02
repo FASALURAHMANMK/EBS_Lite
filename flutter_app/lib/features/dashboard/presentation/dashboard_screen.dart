@@ -14,13 +14,10 @@ import '../controllers/location_notifier.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/sales_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/purchases_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/inventory_page.dart';
-import 'package:ebs_lite/features/reports/presentation/pages/reports_page.dart';
 import 'package:ebs_lite/features/customers/presentation/pages/customers_page.dart';
-import 'package:ebs_lite/features/accounts/presentation/pages/accounting_page.dart';
-import 'package:ebs_lite/features/hr/presentation/pages/hr_page.dart';
-import 'pages/settings_page.dart';
 import 'package:ebs_lite/features/pos/presentation/pages/pos_page.dart';
 import 'package:ebs_lite/features/notifications/presentation/pages/notifications_page.dart';
+import 'dashboard_navigation.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -55,31 +52,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   ];
 
   int _bottomIndex = 0;
-
-  void _onSelectSecondaryByLabel(BuildContext context, String label) {
-    // Push a sample page for secondary items to keep primary tabs persistent
-    Widget page;
-    switch (label) {
-      case 'Reports':
-        page = const ReportsPage();
-        break;
-      case 'Accounting':
-        page = const AccountingPage();
-        break;
-      case 'HR':
-        page = const HRPage();
-        break;
-      case 'Settings':
-        page = const SettingsPage();
-        break;
-      default:
-        page = Scaffold(
-          appBar: AppBar(title: Text(label)),
-          body: Center(child: Text('$label page')),
-        );
-    }
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -153,7 +125,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           : DashboardSidebar(
               onSelect: (label) {
                 Navigator.of(context).maybePop();
-                _onSelectSecondaryByLabel(context, label);
+                DashboardNavigation.pushForLabel(context, label);
               },
             ),
       body: Row(
@@ -188,8 +160,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                   )
                   .toList(),
-              onDestinationSelected: (i) =>
-                  _onSelectSecondaryByLabel(context, _secondaryItems[i].label),
+              onDestinationSelected: (i) => DashboardNavigation.pushForLabel(
+                context,
+                _secondaryItems[i].label,
+              ),
               selectedIndex: null,
             ),
           Expanded(

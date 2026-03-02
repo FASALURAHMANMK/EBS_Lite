@@ -42,6 +42,7 @@ class AccountsRepository {
 
   Future<void> closeCashRegister({
     required double closingBalance,
+    Map<String, int>? denominations,
     int? locationId,
   }) async {
     final loc = locationId ?? _locationId;
@@ -49,7 +50,11 @@ class AccountsRepository {
     if (loc != null) qp['location_id'] = loc;
     await _dio.post(
       '/cash-registers/close',
-      data: {'closing_balance': closingBalance},
+      data: {
+        'closing_balance': closingBalance,
+        if (denominations != null && denominations.isNotEmpty)
+          'denominations': denominations,
+      },
       queryParameters: qp.isEmpty ? null : qp,
     );
   }
@@ -57,6 +62,7 @@ class AccountsRepository {
   Future<void> recordCashTally({
     required double count,
     String? notes,
+    Map<String, int>? denominations,
     int? locationId,
   }) async {
     final loc = locationId ?? _locationId;
@@ -67,7 +73,74 @@ class AccountsRepository {
       data: {
         'count': count,
         if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+        if (denominations != null && denominations.isNotEmpty)
+          'denominations': denominations,
       },
+      queryParameters: qp.isEmpty ? null : qp,
+    );
+  }
+
+  Future<int> recordCashMovement({
+    required String direction, // IN | OUT
+    required double amount,
+    required String reasonCode,
+    String? notes,
+    int? locationId,
+  }) async {
+    final loc = locationId ?? _locationId;
+    final qp = <String, dynamic>{};
+    if (loc != null) qp['location_id'] = loc;
+    final res = await _dio.post(
+      '/cash-registers/movement',
+      data: {
+        'direction': direction,
+        'amount': amount,
+        'reason_code': reasonCode.trim(),
+        if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      },
+      queryParameters: qp.isEmpty ? null : qp,
+    );
+    final data = _extractMap(res);
+    return (data['event_id'] as int?) ?? 0;
+  }
+
+  Future<void> forceCloseCashRegister({
+    required String reason,
+    double? closingBalance,
+    Map<String, int>? denominations,
+    int? locationId,
+  }) async {
+    final loc = locationId ?? _locationId;
+    final qp = <String, dynamic>{};
+    if (loc != null) qp['location_id'] = loc;
+    await _dio.post(
+      '/cash-registers/force-close',
+      data: {
+        'reason': reason.trim(),
+        if (closingBalance != null) 'closing_balance': closingBalance,
+        if (denominations != null && denominations.isNotEmpty)
+          'denominations': denominations,
+      },
+      queryParameters: qp.isEmpty ? null : qp,
+    );
+  }
+
+  Future<void> enableTrainingMode({int? locationId}) async {
+    final loc = locationId ?? _locationId;
+    final qp = <String, dynamic>{};
+    if (loc != null) qp['location_id'] = loc;
+    await _dio.post(
+      '/cash-registers/training/enable',
+      queryParameters: qp.isEmpty ? null : qp,
+    );
+  }
+
+  Future<void> disableTrainingMode({int? locationId}) async {
+    final loc = locationId ?? _locationId;
+    final qp = <String, dynamic>{};
+    if (loc != null) qp['location_id'] = loc;
+    await _dio.post(
+      '/cash-registers/training/disable',
       queryParameters: qp.isEmpty ? null : qp,
     );
   }

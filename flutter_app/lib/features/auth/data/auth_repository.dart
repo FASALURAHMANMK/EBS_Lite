@@ -165,4 +165,25 @@ class AuthRepository {
     }
     return data;
   }
+
+  Future<VerifyCredentialsResponse> verifyCredentials({
+    String? username,
+    String? email,
+    required String password,
+    List<String>? requiredPermissions,
+  }) async {
+    final payload = <String, dynamic>{
+      'password': password,
+      if (username != null && username.trim().isNotEmpty)
+        'username': username.trim(),
+      if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+      if (requiredPermissions != null && requiredPermissions.isNotEmpty)
+        'required_permissions': requiredPermissions,
+    };
+    final res = await _dio.post('/auth/verify', data: payload);
+    final data = (res.data is Map && res.data['data'] != null)
+        ? res.data['data'] as Map<String, dynamic>
+        : res.data as Map<String, dynamic>;
+    return VerifyCredentialsResponse.fromJson(data);
+  }
 }

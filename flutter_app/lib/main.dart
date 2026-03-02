@@ -23,6 +23,7 @@ import 'features/auth/presentation/splash_screen.dart';
 import 'features/auth/presentation/create_company_screen.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/dashboard/controllers/location_notifier.dart';
+import 'shared/widgets/training_mode_overlay.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -184,6 +185,8 @@ class _MyAppState extends ConsumerState<MyApp> {
           'auth:${authState.user != null}:${authState.company != null}'),
       debugShowCheckedModeBanner: false,
       onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
+      builder: (context, child) =>
+          TrainingModeOverlay(child: child ?? const SizedBox.shrink()),
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: mode,

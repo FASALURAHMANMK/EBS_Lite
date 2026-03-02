@@ -379,6 +379,79 @@ func (s *AuthService) GetMe(userID int) (*models.AuthMeResponse, error) {
 	}, nil
 }
 
+func (s *AuthService) VerifyCredentials(companyID int, req *models.VerifyCredentialsRequest) (*models.VerifyCredentialsResponse, error) {
+	if req == nil {
+		return nil, fmt.Errorf("request is nil")
+	}
+	if strings.TrimSpace(req.Password) == "" {
+		return nil, fmt.Errorf("invalid credentials")
+	}
+	identifierUser := strings.TrimSpace(req.Username)
+	identifierEmail := strings.TrimSpace(req.Email)
+	if identifierUser == "" && identifierEmail == "" {
+		return nil, fmt.Errorf("invalid credentials")
+	}
+
+	var (
+		user *models.User
+		err  error
+	)
+	if identifierUser != "" {
+		user, err = s.getUserByUsername(identifierUser)
+	} else {
+		user, err = s.getUserByEmail(identifierEmail)
+	}
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("invalid credentials")
+		}
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+	if user.CompanyID == nil || *user.CompanyID != companyID {
+		return nil, fmt.Errorf("invalid credentials")
+	}
+	if !user.IsActive || user.IsLocked {
+		return nil, fmt.Errorf("invalid credentials")
+	}
+
+	valid, err := utils.VerifyPassword(req.Password, user.PasswordHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify password: %w", err)
+	}
+	if !valid {
+		return nil, fmt.Errorf("invalid credentials")
+	}
+
+	perms, err := s.getUserPermissions(user.UserID)
+	if err != nil {
+		perms = []string{}
+	}
+	required := make(map[string]struct{}, len(req.RequiredPermissions))
+	for _, p := range req.RequiredPermissions {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			required[p] = struct{}{}
+		}
+	}
+	if len(required) > 0 {
+		have := make(map[string]struct{}, len(perms))
+		for _, p := range perms {
+			have[p] = struct{}{}
+		}
+		for p := range required {
+			if _, ok := have[p]; !ok {
+				return nil, fmt.Errorf("insufficient permissions")
+			}
+		}
+	}
+
+	return &models.VerifyCredentialsResponse{
+		UserID:      user.UserID,
+		Username:    user.Username,
+		Permissions: perms,
+	}, nil
+}
+
 // Helper methods
 func (s *AuthService) getUserByEmail(email string) (*models.User, error) {
 	query := `

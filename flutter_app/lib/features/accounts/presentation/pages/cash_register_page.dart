@@ -7,6 +7,9 @@ import '../../../dashboard/data/models.dart';
 import '../../../accounts/data/accounts_repository.dart';
 import '../../../accounts/data/models.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/manager_override_dialog.dart';
+import '../../controllers/training_mode_notifier.dart';
+import 'day_end_flow_page.dart';
 
 class CashRegisterPage extends ConsumerStatefulWidget {
   const CashRegisterPage({super.key});
@@ -175,6 +178,154 @@ class _CashRegisterPageState extends ConsumerState<CashRegisterPage> {
     }
   }
 
+  Future<void> _movementDialog(
+    Location location, {
+    required String title,
+    required String direction,
+    required String reasonCode,
+  }) async {
+    final amountController = TextEditingController();
+    final notesController = TextEditingController();
+    final res = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: amountController,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Amount',
+                prefixIcon: Icon(Icons.payments_rounded),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: notesController,
+              decoration: const InputDecoration(
+                labelText: 'Notes (optional)',
+                prefixIcon: Icon(Icons.notes_rounded),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    if (res != true) return;
+    final amount = double.tryParse(amountController.text.trim()) ?? 0.0;
+    if (amount <= 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid amount')),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    final approved = await showManagerOverrideDialog(
+      context,
+      ref,
+      title: 'Manager override required',
+      requiredPermissions: const ['CASH_REGISTER_MOVEMENT'],
+    );
+    if (approved == null) return;
+
+    setState(() => _actionBusy = true);
+    try {
+      await ref.read(accountsRepositoryProvider).recordCashMovement(
+            direction: direction,
+            amount: amount,
+            reasonCode: reasonCode,
+            notes: notesController.text,
+            locationId: location.locationId,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$title recorded')),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ErrorHandler.message(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
+    }
+  }
+
+  Future<void> _forceCloseDialog(Location location) async {
+    final reasonController = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Force close session'),
+        content: TextField(
+          controller: reasonController,
+          decoration: const InputDecoration(
+            labelText: 'Reason',
+            prefixIcon: Icon(Icons.warning_rounded),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Force close'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final reason = reasonController.text.trim();
+    if (reason.isEmpty) return;
+
+    if (!mounted) return;
+    final approved = await showManagerOverrideDialog(
+      context,
+      ref,
+      title: 'Admin override required',
+      requiredPermissions: const ['FORCE_CLOSE_CASH_REGISTER'],
+    );
+    if (approved == null) return;
+
+    setState(() => _actionBusy = true);
+    try {
+      await ref.read(accountsRepositoryProvider).forceCloseCashRegister(
+            reason: reason,
+            locationId: location.locationId,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cash register force-closed')),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ErrorHandler.message(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
+    }
+  }
+
   Future<void> _tallyDialog(Location location) async {
     final countController = TextEditingController();
     final notesController = TextEditingController();
@@ -241,6 +392,72 @@ class _CashRegisterPageState extends ConsumerState<CashRegisterPage> {
     }
   }
 
+  Future<void> _setTrainingMode(Location location,
+      {required bool enabled}) async {
+    if (_actionBusy) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title:
+            Text(enabled ? 'Enable training mode?' : 'Disable training mode?'),
+        content: Text(
+          enabled
+              ? 'Training sales will not post to real stock/cash totals. Offline sync for checkout is disabled in training mode.'
+              : 'This returns the register to normal posting mode.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(enabled ? 'Enable' : 'Disable'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    if (!mounted) return;
+
+    final override = await showManagerOverrideDialog(
+      context,
+      ref,
+      title: enabled
+          ? 'Manager override: enable training'
+          : 'Manager override: disable training',
+      requiredPermissions: const ['TOGGLE_TRAINING_MODE'],
+    );
+    if (override == null) return;
+
+    setState(() => _actionBusy = true);
+    try {
+      final repo = ref.read(accountsRepositoryProvider);
+      if (enabled) {
+        await repo.enableTrainingMode(locationId: location.locationId);
+      } else {
+        await repo.disableTrainingMode(locationId: location.locationId);
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              enabled ? 'Training mode enabled' : 'Training mode disabled'),
+        ),
+      );
+      await _load();
+      await ref.read(trainingModeNotifierProvider.notifier).refresh();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ErrorHandler.message(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final locationState = ref.watch(locationNotifierProvider);
@@ -275,6 +492,25 @@ class _CashRegisterPageState extends ConsumerState<CashRegisterPage> {
                         register: openRegister,
                         theme: theme,
                       ),
+                      if (openRegister != null) ...[
+                        const SizedBox(height: 12),
+                        Card(
+                          elevation: 0,
+                          child: SwitchListTile.adaptive(
+                            value: openRegister.trainingMode,
+                            onChanged: _actionBusy || location == null
+                                ? null
+                                : (v) => _setTrainingMode(location, enabled: v),
+                            title: const Text('Training mode'),
+                            subtitle: Text(
+                              openRegister.trainingMode
+                                  ? 'ON — no posting to stock/cash; banner will remain visible'
+                                  : 'OFF — normal posting mode',
+                            ),
+                            secondary: const Icon(Icons.school_rounded),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       Row(
                         children: [
@@ -290,7 +526,9 @@ class _CashRegisterPageState extends ConsumerState<CashRegisterPage> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: _actionBusy || location == null
+                              onPressed: _actionBusy ||
+                                      location == null ||
+                                      openRegister == null
                                   ? null
                                   : () => _closeRegisterDialog(location),
                               icon: const Icon(Icons.lock_rounded),
@@ -301,11 +539,84 @@ class _CashRegisterPageState extends ConsumerState<CashRegisterPage> {
                       ),
                       const SizedBox(height: 8),
                       OutlinedButton.icon(
-                        onPressed: _actionBusy || location == null
+                        onPressed: _actionBusy ||
+                                location == null ||
+                                openRegister == null
                             ? null
                             : () => _tallyDialog(location),
                         icon: const Icon(Icons.calculate_rounded),
                         label: const Text('Record Tally'),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _actionBusy ||
+                                      location == null ||
+                                      openRegister == null
+                                  ? null
+                                  : () => _movementDialog(
+                                        location,
+                                        title: 'Cash drop',
+                                        direction: 'OUT',
+                                        reasonCode: 'DROP',
+                                      ),
+                              icon: const Icon(Icons.south_west_rounded),
+                              label: const Text('Cash Drop'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _actionBusy ||
+                                      location == null ||
+                                      openRegister == null
+                                  ? null
+                                  : () => _movementDialog(
+                                        location,
+                                        title: 'Cash payout',
+                                        direction: 'OUT',
+                                        reasonCode: 'PAYOUT',
+                                      ),
+                              icon: const Icon(Icons.money_off_rounded),
+                              label: const Text('Payout'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: _actionBusy ||
+                                      location == null ||
+                                      openRegister == null
+                                  ? null
+                                  : () => Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const DayEndFlowPage(),
+                                        ),
+                                      ),
+                              icon: const Icon(Icons.fact_check_rounded),
+                              label: const Text('Day End'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _actionBusy ||
+                                      location == null ||
+                                      openRegister == null
+                                  ? null
+                                  : () => _forceCloseDialog(location),
+                              icon: const Icon(Icons.warning_amber_rounded),
+                              label: const Text('Force Close'),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       Text(

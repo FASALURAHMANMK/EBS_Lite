@@ -13,6 +13,7 @@ class CashRegisterDto {
   final int? openedBy;
   final int? closedBy;
   final String status;
+  final bool trainingMode;
 
   CashRegisterDto({
     required this.registerId,
@@ -27,6 +28,7 @@ class CashRegisterDto {
     required this.openedBy,
     required this.closedBy,
     required this.status,
+    required this.trainingMode,
   });
 
   factory CashRegisterDto.fromJson(Map<String, dynamic> json) {
@@ -43,6 +45,7 @@ class CashRegisterDto {
       openedBy: _asNullableInt(json['opened_by']),
       closedBy: _asNullableInt(json['closed_by']),
       status: (json['status'] ?? '').toString(),
+      trainingMode: (json['training_mode'] as bool?) ?? false,
     );
   }
 }

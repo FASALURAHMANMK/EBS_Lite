@@ -97,22 +97,29 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 		return nil, err
 	}
 
-	// Validate stock availability for all items
-	for _, item := range req.Items {
-		if item.ProductID != nil {
-			available, err := s.checkStockAvailability(companyID, locationID, *item.ProductID, item.Quantity)
-			if err != nil {
-				return nil, fmt.Errorf("failed to check stock for product %d: %w", *item.ProductID, err)
-			}
-			if !available {
-				return nil, fmt.Errorf("insufficient stock for product %d", *item.ProductID)
+	trainingEnabled, err := s.isTrainingModeEnabled(companyID, locationID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !trainingEnabled {
+		// Validate stock availability for all items
+		for _, item := range req.Items {
+			if item.ProductID != nil {
+				available, err := s.checkStockAvailability(companyID, locationID, *item.ProductID, item.Quantity)
+				if err != nil {
+					return nil, fmt.Errorf("failed to check stock for product %d: %w", *item.ProductID, err)
+				}
+				if !available {
+					return nil, fmt.Errorf("insufficient stock for product %d", *item.ProductID)
+				}
 			}
 		}
 	}
 
 	if req.SaleID != nil {
 		// Finalize an existing held sale and keep its sale_number
-		sale, err := s.finalizeHeldSale(companyID, locationID, userID, *req.SaleID, req)
+		sale, err := s.finalizeHeldSale(companyID, locationID, userID, *req.SaleID, req, trainingEnabled)
 		if err != nil {
 			return nil, fmt.Errorf("failed to finalize held sale: %w", err)
 		}
@@ -142,7 +149,7 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 	// Apply loyalty points redemption as additional discount if requested
 	var plannedRedeemPoints float64
 	var plannedRedeemValue float64
-	if req.CustomerID != nil && req.RedeemPoints != nil && *req.RedeemPoints > 0 {
+	if !trainingEnabled && req.CustomerID != nil && req.RedeemPoints != nil && *req.RedeemPoints > 0 {
 		loyalty := NewLoyaltyService()
 		// Fetch current points
 		var current float64
@@ -169,13 +176,20 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 		}
 	}
 
-	sale, err := s.salesService.CreateSale(companyID, locationID, userID, saleReq, &idempotencyKey)
+	sale, err := s.salesService.CreateSaleWithOptions(
+		companyID,
+		locationID,
+		userID,
+		saleReq,
+		&idempotencyKey,
+		CreateSaleOptions{IsTraining: trainingEnabled},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process checkout: %w", err)
 	}
 
 	// After sale is created, persist redemption and reduce points
-	if sale != nil && req.CustomerID != nil && plannedRedeemPoints > 0 {
+	if !trainingEnabled && sale != nil && req.CustomerID != nil && plannedRedeemPoints > 0 {
 		loyalty := NewLoyaltyService()
 		if _, _, err := loyalty.RedeemPointsForSale(companyID, *req.CustomerID, sale.SaleID, plannedRedeemPoints); err != nil {
 			// Log but do not fail sale; mismatch could happen if race condition
@@ -357,6 +371,7 @@ func (s *POSService) GetSalesSummary(companyID, locationID int, dateFrom, dateTo
                 JOIN locations l ON s.location_id = l.location_id
                 WHERE l.company_id = $1 AND s.location_id = $2 AND s.is_deleted = FALSE
                 AND s.status = 'COMPLETED'
+                AND COALESCE(s.is_training, FALSE) = FALSE
         `
 
 	args := []interface{}{companyID, locationID}
@@ -391,6 +406,7 @@ func (s *POSService) GetSalesSummary(companyID, locationID int, dateFrom, dateTo
 		JOIN locations l ON s.location_id = l.location_id
 		WHERE l.company_id = $1 AND s.location_id = $2 AND s.is_deleted = FALSE
 		AND s.status = 'COMPLETED' AND sd.product_id IS NOT NULL
+		AND COALESCE(s.is_training, FALSE) = FALSE
 	`
 
 	topArgs := []interface{}{companyID, locationID}
@@ -464,11 +480,12 @@ func (s *POSService) validateLocationInCompany(locationID, companyID int) error 
 
 // finalizeHeldSale replaces the details of an existing DRAFT sale, updates totals
 // and stock, and marks it as COMPLETED while preserving sale_number.
-func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int, req *models.POSCheckoutRequest) (*models.Sale, error) {
+func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int, req *models.POSCheckoutRequest, trainingOverride bool) (*models.Sale, error) {
 	// Verify sale exists, belongs to company & location, and is DRAFT
 	var status string
 	var existingLocationID int
-	err := s.db.QueryRow(`SELECT s.status, s.location_id FROM sales s JOIN locations l ON s.location_id = l.location_id WHERE s.sale_id=$1 AND l.company_id=$2 AND s.is_deleted=FALSE`, saleID, companyID).Scan(&status, &existingLocationID)
+	var existingTraining bool
+	err := s.db.QueryRow(`SELECT s.status, s.location_id, COALESCE(s.is_training, FALSE) FROM sales s JOIN locations l ON s.location_id = l.location_id WHERE s.sale_id=$1 AND l.company_id=$2 AND s.is_deleted=FALSE`, saleID, companyID).Scan(&status, &existingLocationID, &existingTraining)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("sale not found")
@@ -484,6 +501,8 @@ func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int,
 	if status != "DRAFT" {
 		return nil, fmt.Errorf("sale already finalized")
 	}
+
+	isTraining := existingTraining || trainingOverride
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -552,8 +571,10 @@ func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int,
 		}
 
 		if item.ProductID != nil {
-			if err := s.salesService.updateStock(tx, locationID, *item.ProductID, -item.Quantity); err != nil {
-				return nil, fmt.Errorf("failed to update stock: %w", err)
+			if !isTraining {
+				if err := s.salesService.updateStock(tx, locationID, *item.ProductID, -item.Quantity); err != nil {
+					return nil, fmt.Errorf("failed to update stock: %w", err)
+				}
 			}
 		}
 	}
@@ -562,10 +583,10 @@ func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int,
 	if _, err := tx.Exec(`
         UPDATE sales s SET customer_id=$1, subtotal=$2, tax_amount=$3, discount_amount=$4, total_amount=$5,
                           paid_amount=$6, payment_method_id=$7, status='COMPLETED', pos_status='COMPLETED',
-                          is_quick_sale=FALSE, updated_by=$8, updated_at=CURRENT_TIMESTAMP
+                          is_quick_sale=FALSE, is_training=$8, updated_by=$9, updated_at=CURRENT_TIMESTAMP
         FROM locations l
-        WHERE s.sale_id=$9 AND s.location_id = l.location_id AND l.company_id = $10
-    `, req.CustomerID, subtotal, tax, req.DiscountAmount, total, req.PaidAmount, req.PaymentMethodID, userID, saleID, companyID); err != nil {
+        WHERE s.sale_id=$10 AND s.location_id = l.location_id AND l.company_id = $11
+    `, req.CustomerID, subtotal, tax, req.DiscountAmount, total, req.PaidAmount, req.PaymentMethodID, isTraining, userID, saleID, companyID); err != nil {
 		return nil, fmt.Errorf("failed to update sale: %w", err)
 	}
 
@@ -639,12 +660,13 @@ func (s *POSService) VoidSale(companyID, locationID, userID, originalSaleID int,
 	var status string
 	var origLocationID int
 	var subtotal, tax, discount, total float64
+	var origTraining bool
 	err := s.db.QueryRow(`
-        SELECT s.status, s.location_id, s.subtotal, s.tax_amount, s.discount_amount, s.total_amount
+        SELECT s.status, s.location_id, s.subtotal, s.tax_amount, s.discount_amount, s.total_amount, COALESCE(s.is_training, FALSE)
         FROM sales s
         JOIN locations l ON s.location_id = l.location_id
         WHERE s.sale_id=$1 AND l.company_id=$2 AND s.is_deleted=FALSE
-    `, originalSaleID, companyID).Scan(&status, &origLocationID, &subtotal, &tax, &discount, &total)
+    `, originalSaleID, companyID).Scan(&status, &origLocationID, &subtotal, &tax, &discount, &total, &origTraining)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("sale not found")
@@ -694,12 +716,12 @@ func (s *POSService) VoidSale(companyID, locationID, userID, originalSaleID int,
 	if err := tx.QueryRow(`
         INSERT INTO sales (sale_number, location_id, customer_id, sale_date, sale_time,
                            subtotal, tax_amount, discount_amount, total_amount, paid_amount,
-                           payment_method_id, status, pos_status, is_quick_sale, notes, created_by, updated_by, idempotency_key)
+                           payment_method_id, status, pos_status, is_quick_sale, is_training, notes, created_by, updated_by, idempotency_key)
         SELECT $1, s.location_id, s.customer_id, CURRENT_DATE, CURRENT_TIME,
-               $2, $3, $4, $5, 0, NULL, 'VOID','COMPLETED', FALSE, 'Void of sale ' || s.sale_number, $6, $6, $8
-        FROM sales s WHERE s.sale_id=$7
+               $2, $3, $4, $5, 0, NULL, 'VOID','COMPLETED', FALSE, $6, 'Void of sale ' || s.sale_number, $7, $7, $9
+        FROM sales s WHERE s.sale_id=$8
         RETURNING sale_id
-    `, voidNumber, vSubtotal, vTax, vDiscount, vTotal, userID, originalSaleID, nullIfEmpty(idemKey)).Scan(&voidSaleID); err != nil {
+    `, voidNumber, vSubtotal, vTax, vDiscount, vTotal, origTraining, userID, originalSaleID, nullIfEmpty(idemKey)).Scan(&voidSaleID); err != nil {
 		return nil, fmt.Errorf("failed to create void sale: %w", err)
 	}
 
@@ -735,7 +757,7 @@ func (s *POSService) VoidSale(companyID, locationID, userID, originalSaleID int,
             `, voidSaleID, productID, productName, nQty, unitPrice, discPct, nDiscAmt, taxID, nTaxAmt, nLineTotal, pq.Array(serials), notes); err != nil {
 				return nil, fmt.Errorf("failed to insert void item: %w", err)
 			}
-			if productID != nil {
+			if !origTraining && productID != nil {
 				// For sale, stock change was -quantity; for void we add back +quantity
 				if err := s.salesService.updateStock(tx, locationID, *productID, quantity); err != nil { // add back
 					return nil, fmt.Errorf("failed to revert stock: %w", err)
@@ -761,6 +783,12 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 	if err := s.validateLocationInCompany(locationID, companyID); err != nil {
 		return nil, err
 	}
+
+	isTraining, err := s.isTrainingModeEnabled(companyID, locationID)
+	if err != nil {
+		return nil, err
+	}
+
 	idemKey := strings.TrimSpace(idempotencyKey)
 	if idemKey != "" {
 		existing, err := s.salesService.getSaleByIdempotencyKey(idemKey, companyID, locationID)
@@ -781,7 +809,11 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 
 	// Generate sale number using numbering sequences
 	ns := NewNumberingSequenceService()
-	saleNumber, err := ns.NextNumber(tx, "sale", companyID, &locationID)
+	sequenceName := "sale"
+	if isTraining {
+		sequenceName = "sale_training"
+	}
+	saleNumber, err := ns.NextNumber(tx, sequenceName, companyID, &locationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sale number: %w", err)
 	}
@@ -853,10 +885,10 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 	err = tx.QueryRow(`
         INSERT INTO sales (sale_number, location_id, customer_id, sale_date, sale_time,
                            subtotal, tax_amount, discount_amount, total_amount, paid_amount,
-                           payment_method_id, status, pos_status, is_quick_sale, notes, created_by, updated_by, idempotency_key)
-        VALUES ($1,$2,$3,CURRENT_DATE,CURRENT_TIME,$4,$5,$6,$7,$8,$9,'DRAFT','HOLD',FALSE,$10,$11,$11,$12)
+                           payment_method_id, status, pos_status, is_quick_sale, is_training, notes, created_by, updated_by, idempotency_key)
+        VALUES ($1,$2,$3,CURRENT_DATE,CURRENT_TIME,$4,$5,$6,$7,$8,$9,'DRAFT','HOLD',FALSE,$10,$11,$12,$12,$13)
         RETURNING sale_id
-    `, saleNumber, locationID, req.CustomerID, subtotal, totalTax, req.DiscountAmount, totalAmount, 0.0, nil, nil, userID, nullIfEmpty(idemKey)).Scan(&saleID)
+    `, saleNumber, locationID, req.CustomerID, subtotal, totalTax, req.DiscountAmount, totalAmount, 0.0, nil, isTraining, nil, userID, nullIfEmpty(idemKey)).Scan(&saleID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create held sale: %w", err)
 	}
@@ -878,4 +910,22 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 	}
 
 	return s.salesService.GetSaleByID(saleID, companyID)
+}
+
+func (s *POSService) isTrainingModeEnabled(companyID, locationID int) (bool, error) {
+	var enabled bool
+	err := s.db.QueryRow(`
+        SELECT COALESCE(cr.training_mode, FALSE)
+        FROM cash_register cr
+        JOIN locations l ON cr.location_id = l.location_id
+        WHERE cr.location_id = $1 AND l.company_id = $2 AND cr.status = 'OPEN'
+        LIMIT 1
+    `, locationID, companyID).Scan(&enabled)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("failed to resolve training mode: %w", err)
+	}
+	return enabled, nil
 }

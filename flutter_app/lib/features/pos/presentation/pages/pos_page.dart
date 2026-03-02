@@ -7,6 +7,7 @@ import '../../data/models.dart';
 import '../../data/pos_repository.dart';
 import '../widgets/customer_selector_dialog.dart';
 import 'payment_page.dart';
+import '../../../../shared/widgets/manager_override_dialog.dart';
 
 class PosPage extends ConsumerWidget {
   const PosPage({super.key});
@@ -227,6 +228,16 @@ class _CartList extends ConsumerWidget {
                 ),
               );
               if (percent != null) {
+                if (percent >= 10) {
+                  if (!context.mounted) return;
+                  final approved = await showManagerOverrideDialog(
+                    context,
+                    ref,
+                    title: 'Manager override required (line discount)',
+                    requiredPermissions: const ['UPDATE_SALES'],
+                  );
+                  if (approved == null) return;
+                }
                 notifier.setItemDiscount(item, percent);
               }
             },
@@ -307,7 +318,23 @@ class _BottomBar extends ConsumerWidget {
                                   preTotal: state.subtotal + state.tax,
                                 ),
                               );
-                              if (value != null) notifier.setDiscount(value);
+                              if (value != null) {
+                                final pre = state.subtotal + state.tax;
+                                final pct = pre > 0 ? (value / pre * 100) : 0.0;
+                                if (pct >= 10) {
+                                  if (!context.mounted) return;
+                                  final approved =
+                                      await showManagerOverrideDialog(
+                                    context,
+                                    ref,
+                                    title:
+                                        'Manager override required (discount)',
+                                    requiredPermissions: const ['UPDATE_SALES'],
+                                  );
+                                  if (approved == null) return;
+                                }
+                                notifier.setDiscount(value);
+                              }
                             },
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -626,6 +653,13 @@ class _HeldSalesDialogState extends ConsumerState<_HeldSalesDialog> {
                           ),
                           TextButton(
                             onPressed: () async {
+                              final approved = await showManagerOverrideDialog(
+                                context,
+                                ref,
+                                title: 'Manager override required (void)',
+                                requiredPermissions: const ['UPDATE_SALES'],
+                              );
+                              if (approved == null) return;
                               await ref
                                   .read(posRepositoryProvider)
                                   .voidSale(s.saleId);

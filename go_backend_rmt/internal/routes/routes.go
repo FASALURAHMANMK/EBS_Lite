@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"erp-backend/internal/config"
+	"erp-backend/internal/database"
 	"erp-backend/internal/handlers"
 	"erp-backend/internal/middleware"
 	"erp-backend/internal/utils"
@@ -59,12 +60,39 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 	currencyHandler := handlers.NewCurrencyHandler()
 	taxHandler := handlers.NewTaxHandler()
 	userPreferencesHandler := handlers.NewUserPreferencesHandler()
+	supportHandler := handlers.NewSupportHandler(cfg)
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":  "ok",
 			"message": "Server is running",
 		})
+	})
+
+	// Readiness endpoint (checks DB + Redis connectivity)
+	router.GET("/ready", func(c *gin.Context) {
+		dbErr := database.HealthCheck()
+		redisErr := error(nil)
+		if cfg.ReadyCheckRedis {
+			redisErr = database.RedisHealthCheck(cfg.RedisURL, cfg.ReadyCheckTimeout)
+		}
+
+		if dbErr != nil || redisErr != nil {
+			data := gin.H{
+				"db_ok":    dbErr == nil,
+				"redis_ok": redisErr == nil,
+			}
+			if dbErr != nil {
+				data["db_error"] = dbErr.Error()
+			}
+			if redisErr != nil {
+				data["redis_error"] = redisErr.Error()
+			}
+			utils.JSONResponse(c, http.StatusServiceUnavailable, false, "Not ready", data, nil)
+			return
+		}
+
+		utils.SuccessResponse(c, "Ready", gin.H{"db_ok": true, "redis_ok": true})
 	})
 
 	// API version 1 routes
@@ -93,6 +121,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			{
 				authProtected.GET("/me", authHandler.GetMe)
 				authProtected.POST("/logout", authHandler.Logout)
+				authProtected.POST("/verify", authHandler.VerifyCredentials)
 			}
 
 			// Device session routes
@@ -494,7 +523,12 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				cashRegisters.GET("", middleware.RequirePermission("VIEW_CASH_REGISTERS"), cashRegisterHandler.GetCashRegisters)
 				cashRegisters.POST("/open", middleware.RequirePermission("OPEN_CASH_REGISTER"), cashRegisterHandler.OpenCashRegister)
 				cashRegisters.POST("/close", middleware.RequirePermission("CLOSE_CASH_REGISTER"), cashRegisterHandler.CloseCashRegister)
+				cashRegisters.POST("/training/enable", middleware.RequirePermission("TOGGLE_TRAINING_MODE"), cashRegisterHandler.EnableTrainingMode)
+				cashRegisters.POST("/training/disable", middleware.RequirePermission("TOGGLE_TRAINING_MODE"), cashRegisterHandler.DisableTrainingMode)
 				cashRegisters.POST("/tally", middleware.RequirePermission("TALLY_CASH_REGISTER"), cashRegisterHandler.RecordTally)
+				cashRegisters.POST("/movement", middleware.RequirePermission("CASH_REGISTER_MOVEMENT"), cashRegisterHandler.RecordMovement)
+				cashRegisters.POST("/force-close", middleware.RequirePermission("FORCE_CLOSE_CASH_REGISTER"), cashRegisterHandler.ForceClose)
+				cashRegisters.GET("/events", middleware.RequirePermission("VIEW_CASH_REGISTERS"), cashRegisterHandler.GetEvents)
 			}
 
 			reports := protected.Group("/reports")
@@ -665,6 +699,12 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				workflow.POST("", middleware.RequirePermission("CREATE_WORKFLOWS"), workflowHandler.CreateWorkflowRequest)
 				workflow.PUT("/:id/approve", middleware.RequirePermission("APPROVE_WORKFLOWS"), workflowHandler.ApproveWorkflowRequest)
 				workflow.PUT("/:id/reject", middleware.RequirePermission("APPROVE_WORKFLOWS"), workflowHandler.RejectWorkflowRequest)
+			}
+
+			// Support bundle (non-prod by default)
+			support := protected.Group("/support")
+			{
+				support.GET("/bundle", middleware.RequirePermission("VIEW_SETTINGS"), supportHandler.GetSupportBundle)
 			}
 		}
 	}

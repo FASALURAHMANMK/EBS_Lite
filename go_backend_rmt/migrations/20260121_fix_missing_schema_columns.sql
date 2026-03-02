@@ -25,9 +25,15 @@ ALTER TABLE IF EXISTS leaves
 	ADD COLUMN IF NOT EXISTS status VARCHAR(50);
 
 -- Backfill IDs when leave_id was newly added.
-UPDATE leaves
-SET leave_id = nextval(pg_get_serial_sequence('leaves', 'leave_id'))
-WHERE leave_id IS NULL;
+DO $$
+DECLARE
+	seq text;
+BEGIN
+	SELECT pg_get_serial_sequence('leaves', 'leave_id') INTO seq;
+	IF seq IS NOT NULL THEN
+		EXECUTE format('UPDATE leaves SET leave_id = nextval(%L) WHERE leave_id IS NULL', seq);
+	END IF;
+END $$;
 
 -- holidays
 ALTER TABLE IF EXISTS holidays
@@ -75,9 +81,15 @@ ALTER TABLE IF EXISTS customer_credit_transactions
 	ADD COLUMN IF NOT EXISTS created_by INTEGER;
 
 -- Backfill IDs when transaction_id was newly added.
-UPDATE customer_credit_transactions
-SET transaction_id = nextval(pg_get_serial_sequence('customer_credit_transactions', 'transaction_id'))
-WHERE transaction_id IS NULL;
+DO $$
+DECLARE
+	seq text;
+BEGIN
+	SELECT pg_get_serial_sequence('customer_credit_transactions', 'transaction_id') INTO seq;
+	IF seq IS NOT NULL THEN
+		EXECUTE format('UPDATE customer_credit_transactions SET transaction_id = nextval(%L) WHERE transaction_id IS NULL', seq);
+	END IF;
+END $$;
 
 -- Best-effort backfill company_id from customers when possible.
 UPDATE customer_credit_transactions cct
@@ -118,4 +130,3 @@ ALTER TABLE IF EXISTS payroll_deductions
 
 -- +goose Down
 -- No-op (schema fixes are forward-only).
-

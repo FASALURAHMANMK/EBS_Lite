@@ -54,6 +54,12 @@ type Config struct {
 	RunMigrations bool
 	MigrationsDir string
 
+	// Operational / support
+	SupportBundleEnabled  bool
+	SupportBundleLogLines int
+	ReadyCheckRedis       bool
+	ReadyCheckTimeout     time.Duration
+
 	// Email
 	SMTPHost        string
 	SMTPPort        int
@@ -114,6 +120,12 @@ func Load() *Config {
 		// Migrations
 		RunMigrations: parseBool("RUN_MIGRATIONS", true),
 		MigrationsDir: getEnv("MIGRATIONS_DIR", "migrations"),
+
+		// Operational / support
+		SupportBundleEnabled:  parseBool("SUPPORT_BUNDLE_ENABLED", false),
+		SupportBundleLogLines: parseInt("SUPPORT_BUNDLE_LOG_LINES", 200),
+		ReadyCheckRedis:       parseBool("READY_CHECK_REDIS", true),
+		ReadyCheckTimeout:     parseDuration("READY_CHECK_TIMEOUT", "2s"),
 
 		// Email
 		SMTPHost:        getEnv("SMTP_HOST", ""),
