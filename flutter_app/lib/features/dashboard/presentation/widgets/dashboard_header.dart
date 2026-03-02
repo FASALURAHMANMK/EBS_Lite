@@ -6,6 +6,9 @@ class DashboardHeader extends ConsumerStatefulWidget
   const DashboardHeader({
     super.key,
     this.isOnline = true,
+    this.queuedCount = 0,
+    this.isSyncing = false,
+    this.onRetry,
     this.onToggleTheme,
     this.onNotifications,
     this.title = 'Dashboard',
@@ -13,6 +16,9 @@ class DashboardHeader extends ConsumerStatefulWidget
 
   /// Realtime/Sync status
   final bool isOnline;
+  final int queuedCount;
+  final bool isSyncing;
+  final VoidCallback? onRetry;
 
   /// Callbacks
   final VoidCallback? onToggleTheme;
@@ -53,6 +59,46 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
             child: Icon(statusIcon, color: statusColor),
           ),
         ),
+        if (widget.queuedCount > 0 || widget.isSyncing)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: InkWell(
+              onTap: widget.onRetry,
+              borderRadius: BorderRadius.circular(16),
+              child: Tooltip(
+                message: widget.isSyncing
+                    ? 'Syncing queued changes'
+                    : '${widget.queuedCount} queued • Tap to retry',
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      widget.isSyncing
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.sync_rounded, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        widget.isSyncing
+                            ? 'Syncing...'
+                            : 'Queued ${widget.queuedCount}',
+                        style: theme.textTheme.labelMedium,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         // Theme toggle
         IconButton(
           tooltip: isDark ? 'Switch to light theme' : 'Switch to dark theme',

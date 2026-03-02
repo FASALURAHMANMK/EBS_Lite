@@ -672,6 +672,7 @@ CREATE TABLE purchases (
     reference_number VARCHAR(100),
     invoice_file VARCHAR(255),
     notes TEXT,
+    idempotency_key VARCHAR(100),
     created_by INTEGER NOT NULL REFERENCES users(user_id),
     updated_by INTEGER REFERENCES users(user_id),
     sync_status VARCHAR(20) DEFAULT 'synced',
@@ -828,6 +829,7 @@ CREATE TABLE collections (
     payment_method_id INTEGER REFERENCES payment_methods(method_id),
     reference_number VARCHAR(100),
     notes TEXT,
+    idempotency_key VARCHAR(100),
     created_by INTEGER NOT NULL REFERENCES users(user_id),
     updated_by INTEGER NOT NULL REFERENCES users(user_id),
     sync_status VARCHAR(20) DEFAULT 'synced',
@@ -1303,6 +1305,9 @@ CREATE INDEX idx_purchases_supplier ON purchases(supplier_id);
 CREATE INDEX idx_purchases_date ON purchases(purchase_date);
 CREATE INDEX idx_purchases_status ON purchases(status);
 CREATE INDEX idx_purchases_location_created_at ON purchases(location_id, created_at);
+CREATE UNIQUE INDEX idx_purchases_location_idempotency
+    ON purchases(location_id, idempotency_key)
+    WHERE idempotency_key IS NOT NULL;
 CREATE INDEX idx_purchase_details_purchase ON purchase_details(purchase_id);
 CREATE INDEX idx_purchase_details_product ON purchase_details(product_id);
 CREATE INDEX idx_goods_receipts_location_received_date ON goods_receipts(location_id, received_date);
@@ -1333,6 +1338,9 @@ CREATE INDEX idx_payments_location_created_at ON payments(location_id, created_a
 CREATE INDEX idx_collections_customer ON collections(customer_id);
 CREATE INDEX idx_collections_date ON collections(collection_date);
 CREATE INDEX idx_collections_location_created_at ON collections(location_id, created_at);
+CREATE UNIQUE INDEX idx_collections_location_idempotency
+    ON collections(location_id, idempotency_key)
+    WHERE idempotency_key IS NOT NULL;
 CREATE INDEX idx_expenses_location ON expenses(location_id);
 CREATE INDEX idx_expenses_category ON expenses(category_id);
 CREATE INDEX idx_expenses_date ON expenses(expense_date);

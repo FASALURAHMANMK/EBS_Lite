@@ -65,11 +65,12 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
       if (!mounted) return;
       setState(() => _error = ErrorHandler.message(e));
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _loadingMore = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadingMore = false;
+        });
+      }
     }
   }
 
@@ -109,7 +110,7 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: type,
+                  initialValue: type,
                   decoration: const InputDecoration(labelText: 'Type'),
                   items: const [
                     DropdownMenuItem(value: 'payment', child: Text('Payment')),
@@ -167,18 +168,19 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
         ),
       ),
     );
+    if (!mounted) return;
     if (saved != true) return;
     final id = int.tryParse(accountId.text.trim());
     final amt = double.tryParse(amount.text.trim());
     if (id == null || id <= 0 || amt == null || amt <= 0) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter valid account and amount')),
       );
       return;
     }
     if (reference.text.trim().isEmpty) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Reference is required')),
       );
@@ -192,13 +194,13 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
             reference: reference.text,
             description: description.text,
           );
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Voucher created')),
       );
       await _load(reset: true);
     } catch (e) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(ErrorHandler.message(e))),
       );
@@ -208,7 +210,7 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
   @override
   Widget build(BuildContext context) {
     final df = DateFormat('yyyy-MM-dd');
-    final dateLabel = (DateTime? d) => d == null ? 'Any' : df.format(d);
+    String dateLabel(DateTime? d) => d == null ? 'Any' : df.format(d);
 
     return Scaffold(
       appBar: AppBar(

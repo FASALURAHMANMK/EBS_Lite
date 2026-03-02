@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/outbox/outbox_notifier.dart';
 import '../data/models.dart';
 import '../data/pos_repository.dart';
 import '../../dashboard/data/payment_methods_repository.dart';
@@ -219,6 +220,20 @@ class PosNotifier extends StateNotifier<PosState> {
         tax: 0.0,
       );
       return result;
+    } on OutboxQueuedException {
+      _checkoutIdemKey = null;
+      final nextPreview = await _repo.getNextReceiptPreview();
+      state = state.copyWith(
+        clearCommittedReceipt: true,
+        clearActiveSaleId: true,
+        clearCustomer: true,
+        receiptPreview: nextPreview,
+        cart: const [],
+        suggestions: const [],
+        discount: 0.0,
+        tax: 0.0,
+      );
+      rethrow;
     } catch (_) {
       rethrow;
     }

@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/outbox/outbox_item.dart';
+import '../../../core/outbox/outbox_notifier.dart';
 import '../../dashboard/controllers/location_notifier.dart';
 import '../../dashboard/data/payment_methods_repository.dart';
 import 'models.dart';
@@ -137,12 +139,46 @@ class PosRepository {
       if ((idempotencyKey ?? '').isNotEmpty)
         'X-Idempotency-Key': idempotencyKey,
     };
-    final res = await _dio.post(
-      '/pos/checkout',
-      queryParameters: {'location_id': loc.locationId},
-      data: payload,
-      options: headers.isEmpty ? null : Options(headers: headers),
-    );
+    final outbox = _ref.read(outboxNotifierProvider.notifier);
+    if (!outbox.isOnline) {
+      await outbox.enqueue(
+        OutboxItem(
+          type: 'pos_checkout',
+          method: 'POST',
+          path: '/pos/checkout',
+          queryParams: {'location_id': loc.locationId},
+          headers: headers,
+          body: payload,
+          idempotencyKey: idempotencyKey,
+        ),
+      );
+      throw OutboxQueuedException('Checkout queued for sync');
+    }
+    Response res;
+    try {
+      res = await _dio.post(
+        '/pos/checkout',
+        queryParameters: {'location_id': loc.locationId},
+        data: payload,
+        options: headers.isEmpty ? null : Options(headers: headers),
+      );
+    } on DioException catch (e) {
+      if (outbox.isNetworkError(e)) {
+        await outbox.enqueue(
+          OutboxItem(
+            type: 'pos_checkout',
+            method: 'POST',
+            path: '/pos/checkout',
+            queryParams: {'location_id': loc.locationId},
+            headers: headers,
+            body: payload,
+            idempotencyKey: idempotencyKey,
+          ),
+        );
+        throw OutboxQueuedException('Checkout queued for sync');
+      }
+      rethrow;
+    }
     final data = (res.data is Map<String, dynamic>)
         ? (res.data['data'] as Map<String, dynamic>?)
         : null;

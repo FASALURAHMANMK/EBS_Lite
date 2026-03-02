@@ -32,7 +32,11 @@ func (h *PurchaseOrderHandler) CreatePurchaseOrder(c *gin.Context) {
 		return
 	}
 
-	purchase, err := h.purchaseService.CreatePurchase(companyID, locationID, userID, &req)
+	idemKey := c.GetHeader("Idempotency-Key")
+	if idemKey == "" {
+		idemKey = c.GetHeader("X-Idempotency-Key")
+	}
+	purchase, err := h.purchaseService.CreatePurchase(companyID, locationID, userID, &req, idemKey)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create purchase order", err)
 		return

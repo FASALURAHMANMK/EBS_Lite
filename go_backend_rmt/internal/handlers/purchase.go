@@ -176,7 +176,11 @@ func (h *PurchaseHandler) CreatePurchase(c *gin.Context) {
 		return
 	}
 
-	purchase, err := h.purchaseService.CreatePurchase(companyID, locationID, userID, &req)
+	idemKey := c.GetHeader("Idempotency-Key")
+	if idemKey == "" {
+		idemKey = c.GetHeader("X-Idempotency-Key")
+	}
+	purchase, err := h.purchaseService.CreatePurchase(companyID, locationID, userID, &req, idemKey)
 	if err != nil {
 		if err.Error() == "supplier not found" || err.Error() == "supplier does not belong to company" {
 			utils.NotFoundResponse(c, "Supplier not found")
@@ -216,7 +220,11 @@ func (h *PurchaseHandler) CreateQuickPurchase(c *gin.Context) {
 		return
 	}
 
-	purchase, err := h.purchaseService.CreatePurchase(companyID, locationID, userID, &req)
+	idemKey := c.GetHeader("Idempotency-Key")
+	if idemKey == "" {
+		idemKey = c.GetHeader("X-Idempotency-Key")
+	}
+	purchase, err := h.purchaseService.CreatePurchase(companyID, locationID, userID, &req, idemKey)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create quick purchase", err)
 		return

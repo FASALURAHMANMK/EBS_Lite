@@ -158,6 +158,7 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
         ),
       ),
     );
+    if (!mounted) return;
 
     if (ok != true) return;
     final empId = int.tryParse(emp.text.trim());
@@ -166,7 +167,7 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
     final deductionVal = double.tryParse(deductions.text.trim()) ?? 0;
 
     if (empId == null || empId <= 0 || basicVal == null || basicVal < 0) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter valid employee and salary')),
       );
@@ -181,13 +182,13 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
             allowances: allowanceVal,
             deductions: deductionVal,
           );
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Payroll generated')),
       );
       await _load();
     } catch (e) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     }
@@ -196,13 +197,13 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
   Future<void> _markPaid(PayrollDto payroll) async {
     try {
       await ref.read(hrRepositoryProvider).markPaid(payroll.payrollId);
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Payroll marked as paid')),
       );
       await _load();
     } catch (e) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     }

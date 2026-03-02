@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../pos/data/pos_repository.dart';
 import '../../../pos/data/models.dart';
+import '../utils/invoice_actions.dart';
 
 class SaleDetailPage extends ConsumerStatefulWidget {
   const SaleDetailPage({super.key, required this.saleId});
@@ -40,9 +41,29 @@ class _SaleDetailPageState extends ConsumerState<SaleDetailPage> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-          title: Text(s?.saleNumber.isNotEmpty == true
-              ? s!.saleNumber
-              : 'Sale #${widget.saleId}')),
+        title: Text(s?.saleNumber.isNotEmpty == true
+            ? s!.saleNumber
+            : 'Sale #${widget.saleId}'),
+        actions: [
+          IconButton(
+            tooltip: 'Print invoice',
+            icon: const Icon(Icons.print_rounded),
+            onPressed: s == null
+                ? null
+                : () => InvoiceActions(ref: ref, context: context)
+                    .printSmart(s.saleId),
+          ),
+          IconButton(
+            tooltip: 'Share invoice',
+            icon: const Icon(Icons.share_rounded),
+            onPressed: s == null
+                ? null
+                : () => InvoiceActions(ref: ref, context: context)
+                    .shareInvoice(s.saleId),
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),

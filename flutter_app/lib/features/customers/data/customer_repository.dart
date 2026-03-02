@@ -1,7 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/outbox/outbox_item.dart';
+import '../../../core/outbox/outbox_notifier.dart';
 import '../../dashboard/controllers/location_notifier.dart';
 import 'models.dart';
 
@@ -119,8 +122,49 @@ class CustomerRepository {
     if (loc == null) {
       throw StateError('Location not selected');
     }
-    final res = await _dio.post('/collections',
-        data: payload, queryParameters: {'location_id': loc});
+    final outbox = _ref.read(outboxNotifierProvider.notifier);
+    final idemKey = const Uuid().v4();
+    final headers = {
+      'Idempotency-Key': idemKey,
+      'X-Idempotency-Key': idemKey,
+    };
+    if (!outbox.isOnline) {
+      await outbox.enqueue(
+        OutboxItem(
+          type: 'collection',
+          method: 'POST',
+          path: '/collections',
+          queryParams: {'location_id': loc},
+          headers: headers,
+          body: payload,
+          idempotencyKey: idemKey,
+        ),
+      );
+      throw OutboxQueuedException('Collection queued for sync');
+    }
+    Response res;
+    try {
+      res = await _dio.post('/collections',
+          data: payload,
+          queryParameters: {'location_id': loc},
+          options: Options(headers: headers));
+    } on DioException catch (e) {
+      if (outbox.isNetworkError(e)) {
+        await outbox.enqueue(
+          OutboxItem(
+            type: 'collection',
+            method: 'POST',
+            path: '/collections',
+            queryParams: {'location_id': loc},
+            headers: headers,
+            body: payload,
+            idempotencyKey: idemKey,
+          ),
+        );
+        throw OutboxQueuedException('Collection queued for sync');
+      }
+      rethrow;
+    }
     final body = res.data is Map && (res.data['data'] != null)
         ? res.data['data'] as Map<String, dynamic>
         : res.data as Map<String, dynamic>;

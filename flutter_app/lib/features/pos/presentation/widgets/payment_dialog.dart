@@ -8,6 +8,7 @@ import '../../data/models.dart';
 import '../../../customers/data/customer_repository.dart';
 import '../../../customers/data/models.dart';
 import '../../../loyalty/data/loyalty_repository.dart';
+import '../../../../core/outbox/outbox_notifier.dart';
 
 class PaymentDialog extends ConsumerStatefulWidget {
   const PaymentDialog({super.key});
@@ -463,15 +464,35 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                                       0.0,
                             ))
                         .toList();
-                    final result = await ref
-                        .read(posNotifierProvider.notifier)
-                        .processCheckout(
-                            paymentMethodId: primaryMethod,
-                            paidAmount: paid,
-                            payments: payments,
-                            redeemPoints: redeemPoints);
-                    if (!context.mounted) return;
-                    Navigator.of(context).pop(result);
+                    try {
+                      final result = await ref
+                          .read(posNotifierProvider.notifier)
+                          .processCheckout(
+                              paymentMethodId: primaryMethod,
+                              paidAmount: paid,
+                              payments: payments,
+                              redeemPoints: redeemPoints);
+                      if (!context.mounted) return;
+                      Navigator.of(context).pop(result);
+                    } on OutboxQueuedException catch (e) {
+                      if (!context.mounted) return;
+                      setState(() => _submitting = false);
+                      await showDialog<void>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Queued for Sync'),
+                          content: Text(e.message),
+                          actions: [
+                            FilledButton(
+                              onPressed: () => Navigator.of(ctx).pop(),
+                              child: const Text('OK'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (!context.mounted) return;
+                      Navigator.of(context).pop(null);
+                    }
                   } catch (e) {
                     if (!context.mounted) return;
                     setState(() => _submitting = false);

@@ -66,11 +66,12 @@ class _LedgerEntriesPageState extends ConsumerState<LedgerEntriesPage> {
       if (!mounted) return;
       setState(() => _error = ErrorHandler.message(e));
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _loadingMore = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadingMore = false;
+        });
+      }
     }
   }
 
@@ -96,7 +97,7 @@ class _LedgerEntriesPageState extends ConsumerState<LedgerEntriesPage> {
   @override
   Widget build(BuildContext context) {
     final df = DateFormat('yyyy-MM-dd');
-    final dateLabel = (DateTime? d) => d == null ? 'Any' : df.format(d);
+    String dateLabel(DateTime? d) => d == null ? 'Any' : df.format(d);
 
     return Scaffold(
       appBar: AppBar(

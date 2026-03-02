@@ -130,7 +130,7 @@ class _ReportViewerPageState extends ConsumerState<ReportViewerPage> {
             shareTitle: widget.config.title,
           );
     } catch (e) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(ErrorHandler.message(e))),
       );
@@ -232,7 +232,7 @@ class _FiltersCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateLabel = (DateTime? d) =>
+    String dateLabel(DateTime? d) =>
         d == null ? 'Any' : DateFormat('yyyy-MM-dd').format(d);
 
     return Card(

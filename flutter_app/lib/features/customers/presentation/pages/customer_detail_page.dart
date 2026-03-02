@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/outbox/outbox_notifier.dart';
 import '../../data/models.dart';
 import '../../data/customer_repository.dart';
 import 'customer_edit_page.dart';
@@ -533,12 +534,17 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
       Navigator.of(context).pop();
       widget.onDone();
       _showInfo(context, 'Collection recorded');
-    } catch (e) {
-      if (!mounted) return;
-      _showError(context, e);
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
+      } on OutboxQueuedException catch (e) {
+        if (!mounted) return;
+        Navigator.of(context).pop();
+        widget.onDone();
+        _showInfo(context, e.message);
+      } catch (e) {
+        if (!mounted) return;
+        _showError(context, e);
+      } finally {
+        if (mounted) setState(() => _saving = false);
+      }
   }
 
   @override

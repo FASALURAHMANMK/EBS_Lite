@@ -196,7 +196,7 @@ func nullStringToStringPtr(ns sql.NullString) *string {
 	return &ns.String
 }
 
-func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req *models.CreatePurchaseRequest) (*models.Purchase, error) {
+func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req *models.CreatePurchaseRequest, idempotencyKey string) (*models.Purchase, error) {
 	// Start transaction
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -222,6 +222,17 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 	// Use provided location or default from context
 	if req.LocationID != nil {
 		locationID = *req.LocationID
+	}
+
+	idemKey := strings.TrimSpace(idempotencyKey)
+	if idemKey != "" {
+		existing, err := s.getPurchaseByIdempotencyKey(idemKey, companyID, locationID)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			return existing, nil
+		}
 	}
 
 	// Verify location belongs to company
@@ -310,16 +321,17 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 	insertQuery := `
 		INSERT INTO purchases (purchase_number, location_id, supplier_id, purchase_date,
 							  subtotal, tax_amount, discount_amount, total_amount, paid_amount,
-							  payment_terms, due_date, status, reference_number, notes, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+							  payment_terms, due_date, status, reference_number, notes, created_by, idempotency_key)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		RETURNING purchase_id, created_at
 	`
 
 	var purchase models.Purchase
+	idemVal := sql.NullString{String: idemKey, Valid: idemKey != ""}
 	err = tx.QueryRow(insertQuery,
 		purchaseNumber, locationID, req.SupplierID, purchaseDate,
 		subtotal, totalTax, totalDiscount, totalAmount, 0,
-		paymentTerms, dueDate, "PENDING", req.ReferenceNumber, req.Notes, userID,
+		paymentTerms, dueDate, "PENDING", req.ReferenceNumber, req.Notes, userID, idemVal,
 	).Scan(&purchase.PurchaseID, &purchase.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert purchase: %w", err)
@@ -424,6 +436,49 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 	purchase.CreatedBy = userID
 
 	return &purchase, nil
+}
+
+func (s *PurchaseService) getPurchaseByIdempotencyKey(key string, companyID, locationID int) (*models.Purchase, error) {
+	if strings.TrimSpace(key) == "" {
+		return nil, nil
+	}
+	query := `
+        SELECT p.purchase_id, p.purchase_number, p.location_id, p.supplier_id,
+               p.purchase_date, p.subtotal, p.tax_amount, p.discount_amount,
+               p.total_amount, p.paid_amount, p.payment_terms, p.due_date,
+               p.status, p.reference_number, p.notes, p.created_by, p.created_at, p.updated_at
+        FROM purchases p
+        JOIN locations l ON p.location_id = l.location_id
+        WHERE p.idempotency_key = $1 AND p.location_id = $2 AND l.company_id = $3 AND p.is_deleted = FALSE
+    `
+	var p models.Purchase
+	err := s.db.QueryRow(query, key, locationID, companyID).Scan(
+		&p.PurchaseID,
+		&p.PurchaseNumber,
+		&p.LocationID,
+		&p.SupplierID,
+		&p.PurchaseDate,
+		&p.Subtotal,
+		&p.TaxAmount,
+		&p.DiscountAmount,
+		&p.TotalAmount,
+		&p.PaidAmount,
+		&p.PaymentTerms,
+		&p.DueDate,
+		&p.Status,
+		&p.ReferenceNumber,
+		&p.Notes,
+		&p.CreatedBy,
+		&p.CreatedAt,
+		&p.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to lookup purchase idempotency key: %w", err)
+	}
+	return &p, nil
 }
 
 // ReceivePurchase marks a purchase as received and updates inventory

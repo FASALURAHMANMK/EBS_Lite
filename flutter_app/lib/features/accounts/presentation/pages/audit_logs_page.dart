@@ -147,8 +147,8 @@ class _AuditLogsPageState extends ConsumerState<AuditLogsPage> {
   @override
   Widget build(BuildContext context) {
     final df = DateFormat('yyyy-MM-dd HH:mm');
-    final dateLabel =
-        (DateTime? d) => d == null ? 'Any' : DateFormat('yyyy-MM-dd').format(d);
+    String dateLabel(DateTime? d) =>
+        d == null ? 'Any' : DateFormat('yyyy-MM-dd').format(d);
 
     return Scaffold(
       appBar: AppBar(

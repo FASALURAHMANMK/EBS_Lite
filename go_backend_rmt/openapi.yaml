@@ -2041,6 +2041,17 @@ paths:
   /purchases/quick:
     post:
       summary: POST /api/v1/purchases/quick
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: X-Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: Successful response
@@ -2746,6 +2757,17 @@ paths:
                 $ref: '#/components/schemas/APIResponse'
     post:
       summary: POST /api/v1/collections
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: X-Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: Successful response

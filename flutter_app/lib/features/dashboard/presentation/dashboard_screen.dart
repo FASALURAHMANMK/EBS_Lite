@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/outbox/outbox_notifier.dart';
 import '../../../core/theme_notifier.dart';
 import 'widgets/dashboard_content.dart';
 import 'widgets/dashboard_header.dart';
@@ -115,6 +116,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final railExtended = width >= 1300;
 
     final theme = Theme.of(context);
+    final outboxState = ref.watch(outboxNotifierProvider);
+    final outboxNotifier = ref.read(outboxNotifierProvider.notifier);
 
     // Primary tab pages (kept alive via IndexedStack)
     final pages = <Widget>[
@@ -132,7 +135,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Scaffold(
       appBar: DashboardHeader(
         onToggleTheme: () => themeNotifier.toggle(),
-        isOnline: true,
+        isOnline: outboxState.isOnline,
+        queuedCount: outboxState.queuedCount,
+        isSyncing: outboxState.isSyncing,
+        onRetry: outboxState.queuedCount > 0
+            ? () => outboxNotifier.retryNow()
+            : null,
         title: currentTitle,
         onNotifications: () {
           Navigator.of(context).push(

@@ -1,7 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/outbox/outbox_item.dart';
+import '../../../core/outbox/outbox_notifier.dart';
 import '../../dashboard/controllers/location_notifier.dart';
 import 'models.dart';
 
@@ -57,26 +60,79 @@ class GrnRepository {
     String? invoiceFilePath, // local file path to upload
   }) async {
     // 1) Create purchase
+    final itemMaps = [
+      for (final it in items)
+        {
+          'product_id': it.productId,
+          'quantity': it.quantity,
+          'unit_price': it.unitPrice,
+          if (it.taxId != null) 'tax_id': it.taxId,
+          if (it.discountPercent != null)
+            'discount_percentage': it.discountPercent,
+          if (it.discountAmount != null) 'discount_amount': it.discountAmount,
+        }
+    ];
     final createBody = {
       'supplier_id': supplierId,
       if (_locationId != null) 'location_id': _locationId,
       if (invoiceNumber != null && invoiceNumber.isNotEmpty)
         'reference_number': invoiceNumber,
       if (notes != null && notes.isNotEmpty) 'notes': notes,
-      'items': [
-        for (final it in items)
-          {
-            'product_id': it.productId,
-            'quantity': it.quantity,
-            'unit_price': it.unitPrice,
-            if (it.taxId != null) 'tax_id': it.taxId,
-            if (it.discountPercent != null)
-              'discount_percentage': it.discountPercent,
-            if (it.discountAmount != null) 'discount_amount': it.discountAmount,
-          }
-      ]
+      'items': itemMaps,
     };
-    final createRes = await _dio.post('/purchases/quick', data: createBody);
+    final outbox = _ref.read(outboxNotifierProvider.notifier);
+    final idemKey = const Uuid().v4();
+    final headers = {
+      'Idempotency-Key': idemKey,
+      'X-Idempotency-Key': idemKey,
+    };
+    if (!outbox.isOnline) {
+      await outbox.enqueue(
+        OutboxItem(
+          type: 'purchase_quick_grn',
+          method: 'POST',
+          path: '/purchases/quick',
+          headers: headers,
+          body: createBody,
+          meta: {
+            'create_body': createBody,
+            'items': itemMaps,
+            'invoice_file_path': invoiceFilePath,
+          },
+          idempotencyKey: idemKey,
+        ),
+      );
+      throw OutboxQueuedException('Purchase queued for sync');
+    }
+
+    Response createRes;
+    try {
+      createRes = await _dio.post(
+        '/purchases/quick',
+        data: createBody,
+        options: Options(headers: headers),
+      );
+    } on DioException catch (e) {
+      if (outbox.isNetworkError(e)) {
+        await outbox.enqueue(
+          OutboxItem(
+            type: 'purchase_quick_grn',
+            method: 'POST',
+            path: '/purchases/quick',
+            headers: headers,
+            body: createBody,
+            meta: {
+              'create_body': createBody,
+              'items': itemMaps,
+              'invoice_file_path': invoiceFilePath,
+            },
+            idempotencyKey: idemKey,
+          ),
+        );
+        throw OutboxQueuedException('Purchase queued for sync');
+      }
+      rethrow;
+    }
     final created = (createRes.data is Map && createRes.data['data'] != null)
         ? createRes.data['data'] as Map<String, dynamic>
         : (createRes.data as Map<String, dynamic>);

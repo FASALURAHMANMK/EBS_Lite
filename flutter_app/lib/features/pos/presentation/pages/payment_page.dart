@@ -8,6 +8,7 @@ import '../../utils/invoice_pdf.dart';
 import '../../data/printer_settings_repository.dart';
 import '../../utils/escpos.dart';
 import '../../../../core/api_client.dart';
+import '../../../../core/outbox/outbox_notifier.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../dashboard/data/payment_methods_repository.dart';
@@ -465,6 +466,25 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                     if (!context.mounted) return;
                                     Navigator.of(context)
                                         .pop(); // back to POS for next sale
+                                  } on OutboxQueuedException catch (e) {
+                                    if (!context.mounted) return;
+                                    setState(() => _submitting = false);
+                                    await showDialog<void>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('Queued for Sync'),
+                                        content: Text(e.message),
+                                        actions: [
+                                          FilledButton(
+                                            onPressed: () =>
+                                                Navigator.of(ctx).pop(),
+                                            child: const Text('OK'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (!context.mounted) return;
+                                    Navigator.of(context).pop();
                                   } catch (e) {
                                     if (!context.mounted) return;
                                     setState(() => _submitting = false);

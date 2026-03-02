@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"erp-backend/internal/database"
@@ -85,7 +86,7 @@ func (s *CollectionService) GetCollections(companyID int, filters map[string]str
 }
 
 // CreateCollection records a customer payment
-func (s *CollectionService) CreateCollection(companyID, locationID, userID int, req *models.CreateCollectionRequest) (*models.Collection, error) {
+func (s *CollectionService) CreateCollection(companyID, locationID, userID int, req *models.CreateCollectionRequest, idempotencyKey string) (*models.Collection, error) {
 	// Verify customer belongs to company
 	var custCompanyID int
 	err := s.db.QueryRow("SELECT company_id FROM customers WHERE customer_id = $1 AND is_deleted = FALSE", req.CustomerID).Scan(&custCompanyID)
@@ -105,6 +106,17 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 	}
 	defer tx.Rollback()
 
+	idemKey := strings.TrimSpace(idempotencyKey)
+	if idemKey != "" {
+		existing, err := s.getCollectionByIdempotencyKey(idemKey, companyID, locationID)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			return existing, nil
+		}
+	}
+
 	// Generate collection number using numbering sequence
 	ns := NewNumberingSequenceService()
 	number, err := ns.NextNumber(tx, "collection", companyID, &locationID)
@@ -123,13 +135,14 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 	var col models.Collection
 	insert := `
                 INSERT INTO collections (collection_number, customer_id, location_id, amount,
-                                         collection_date, payment_method_id, reference_number, notes, created_by, updated_by)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+                                         collection_date, payment_method_id, reference_number, notes, created_by, updated_by, idempotency_key)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
                 RETURNING collection_id, collection_number, collection_date, created_at, updated_at`
 
+	idemVal := sql.NullString{String: idemKey, Valid: idemKey != ""}
 	err = tx.QueryRow(insert,
 		number, req.CustomerID, locationID, req.Amount, collectionDate, req.PaymentMethodID,
-		req.ReferenceNumber, req.Notes, userID, userID,
+		req.ReferenceNumber, req.Notes, userID, userID, idemVal,
 	).Scan(&col.CollectionID, &col.CollectionNumber, &col.CollectionDate, &col.CreatedAt, &col.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert collection: %w", err)
@@ -243,6 +256,43 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 		_ = s.db.QueryRow("SELECT name FROM payment_methods WHERE method_id = $1", *col.PaymentMethodID).Scan(&col.PaymentMethod)
 	}
 
+	return &col, nil
+}
+
+func (s *CollectionService) getCollectionByIdempotencyKey(key string, companyID, locationID int) (*models.Collection, error) {
+	if strings.TrimSpace(key) == "" {
+		return nil, nil
+	}
+	query := `
+        SELECT c.collection_id, c.collection_number, c.customer_id, c.location_id, c.amount,
+               c.collection_date, c.payment_method_id, c.reference_number, c.notes, c.created_by, c.updated_by,
+               c.created_at, c.updated_at
+        FROM collections c
+        JOIN customers cu ON c.customer_id = cu.customer_id
+        WHERE c.idempotency_key = $1 AND c.location_id = $2 AND cu.company_id = $3
+    `
+	var col models.Collection
+	err := s.db.QueryRow(query, key, locationID, companyID).Scan(
+		&col.CollectionID,
+		&col.CollectionNumber,
+		&col.CustomerID,
+		&col.LocationID,
+		&col.Amount,
+		&col.CollectionDate,
+		&col.PaymentMethodID,
+		&col.ReferenceNumber,
+		&col.Notes,
+		&col.CreatedBy,
+		&col.UpdatedBy,
+		&col.CreatedAt,
+		&col.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to lookup collection idempotency key: %w", err)
+	}
 	return &col, nil
 }
 

@@ -303,8 +303,8 @@ class _AttendancePageState extends ConsumerState<AttendancePage>
 
   Widget _buildRecords() {
     final df = DateFormat('yyyy-MM-dd HH:mm');
-    final dateLabel =
-        (DateTime? d) => d == null ? 'Any' : DateFormat('yyyy-MM-dd').format(d);
+    String dateLabel(DateTime? d) =>
+        d == null ? 'Any' : DateFormat('yyyy-MM-dd').format(d);
 
     return Column(
       children: [
@@ -376,7 +376,7 @@ class _AttendancePageState extends ConsumerState<AttendancePage>
   }
 
   Widget _buildLeave() {
-    final dateLabel = (DateTime? d) =>
+    String dateLabel(DateTime? d) =>
         d == null ? 'Select' : DateFormat('yyyy-MM-dd').format(d);
 
     return ListView(

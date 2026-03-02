@@ -97,7 +97,11 @@ func (h *CollectionHandler) CreateCollection(c *gin.Context) {
 		return
 	}
 
-	col, err := h.collectionService.CreateCollection(companyID, locationID, userID, &req)
+	idemKey := c.GetHeader("Idempotency-Key")
+	if idemKey == "" {
+		idemKey = c.GetHeader("X-Idempotency-Key")
+	}
+	col, err := h.collectionService.CreateCollection(companyID, locationID, userID, &req, idemKey)
 	if err != nil {
 		if err.Error() == "customer not found" || err.Error() == "customer does not belong to company" {
 			utils.NotFoundResponse(c, err.Error())
