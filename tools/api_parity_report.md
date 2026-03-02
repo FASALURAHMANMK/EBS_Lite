@@ -1,7 +1,7 @@
 # API Parity Report (Flutter <-> OpenAPI)
 
-- Flutter unique paths: **88**
-- OpenAPI unique paths: **190**
+- Flutter unique paths: **124**
+- OpenAPI unique paths: **189**
 
 ## Flutter paths missing from OpenAPI
 - None
@@ -11,16 +11,7 @@
 
 ## OpenAPI paths unused by Flutter
 (Often means the UI is still a placeholder, or endpoints can be removed if truly not needed.)
-- `/attendance/check-in`
-- `/attendance/check-out`
-- `/attendance/holidays`
-- `/attendance/leave`
-- `/attendance/records`
-- `/audit-logs`
-- `/cash-registers`
-- `/cash-registers/close`
-- `/cash-registers/open`
-- `/cash-registers/tally`
+- `/auth/refresh-token`
 - `/collections/outstanding`
 - `/collections/{}`
 - `/collections/{}/receipt`
@@ -45,46 +36,20 @@
 - `/invoice-templates/{}`
 - `/languages`
 - `/languages/{}`
-- `/ledgers`
-- `/ledgers/{}/entries`
 - `/loyalty-programs`
 - `/loyalty-programs/{}`
 - `/loyalty-redemptions`
 - `/loyalty/award-points`
 - `/numbering-sequences/{}`
-- `/payrolls`
 - `/payrolls/{}/advances`
 - `/payrolls/{}/components`
 - `/payrolls/{}/deductions`
-- `/payrolls/{}/mark-paid`
-- `/payrolls/{}/payslip`
 - `/permissions`
 - `/pos/receipt/{}`
-- `/print/receipt`
 - `/products/{}/summary`
-- `/promotions`
 - `/promotions/check-eligibility`
-- `/promotions/{}`
 - `/purchase-orders/{}`
 - `/purchases/{}/receive`
-- `/reports/balance-sheet`
-- `/reports/customer-balances`
-- `/reports/daily-cash`
-- `/reports/expenses-summary`
-- `/reports/general-ledger`
-- `/reports/income-expense`
-- `/reports/item-movement`
-- `/reports/outstanding`
-- `/reports/profit-loss`
-- `/reports/purchase-vs-returns`
-- `/reports/sales-summary`
-- `/reports/stock-summary`
-- `/reports/supplier`
-- `/reports/tax`
-- `/reports/top-performers`
-- `/reports/top-products`
-- `/reports/trial-balance`
-- `/reports/valuation`
 - `/roles`
 - `/roles/{}`
 - `/roles/{}/permissions`
@@ -108,8 +73,6 @@
 - `/user-preferences/{}`
 - `/users`
 - `/users/{}`
-- `/vouchers`
-- `/vouchers/{}`
 - `/workflow-requests`
 - `/workflow-requests/{}/approve`
 - `/workflow-requests/{}/reject`

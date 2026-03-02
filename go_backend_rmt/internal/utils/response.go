@@ -19,6 +19,7 @@ func SuccessResponse(c *gin.Context, message string, data interface{}) {
 		Message: message,
 		Data:    data,
 	}
+	attachRequestID(c, &response)
 	c.JSON(http.StatusOK, response)
 }
 
@@ -32,6 +33,7 @@ func CreatedResponse(c *gin.Context, message string, data interface{}) {
 		Message: message,
 		Data:    data,
 	}
+	attachRequestID(c, &response)
 	c.JSON(http.StatusCreated, response)
 }
 
@@ -50,6 +52,24 @@ func ErrorResponse(c *gin.Context, statusCode int, message string, err error) {
 	}
 	attachRequestID(c, &response)
 
+	c.JSON(statusCode, response)
+}
+
+// JSONResponse sends a response with an explicit status and payload while
+// preserving request_id and consistent error logging behavior.
+func JSONResponse(c *gin.Context, statusCode int, success bool, message string, data interface{}, err error) {
+	response := models.APIResponse{
+		Success: success,
+		Message: message,
+		Data:    data,
+	}
+	if err != nil {
+		logRequestError(c, err)
+		if shouldExposeError() {
+			response.Error = err.Error()
+		}
+	}
+	attachRequestID(c, &response)
 	c.JSON(statusCode, response)
 }
 
@@ -72,6 +92,7 @@ func PaginatedResponse(c *gin.Context, message string, data interface{}, meta *m
 		Data:    data,
 		Meta:    meta,
 	}
+	attachRequestID(c, &response)
 	c.JSON(http.StatusOK, response)
 }
 

@@ -36,8 +36,8 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 	purchaseHandler := handlers.NewPurchaseHandler()
 	purchaseOrderHandler := handlers.NewPurchaseOrderHandler()
 	goodsReceiptHandler := handlers.NewGoodsReceiptHandler()
-    supplierHandler := handlers.NewSupplierHandler()
-    paymentHandler := handlers.NewPaymentHandler()
+	supplierHandler := handlers.NewSupplierHandler()
+	paymentHandler := handlers.NewPaymentHandler()
 	customerHandler := handlers.NewCustomerHandler()
 	collectionHandler := handlers.NewCollectionHandler()
 	cashRegisterHandler := handlers.NewCashRegisterHandler()
@@ -131,14 +131,14 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			// 	companies.DELETE("/:id", companyHandler.DeleteCompany)
 			// }
 
-            companies := protected.Group("/companies")
-            {
-                companies.GET("", middleware.RequirePermission("VIEW_COMPANIES"), companyHandler.GetCompanies)
-                companies.POST("", companyHandler.CreateCompany) // No admin requirement for CREATE only
-                companies.PUT("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), companyHandler.UpdateCompany)
-                companies.DELETE("/:id", middleware.RequireRole("Admin"), companyHandler.DeleteCompany)
-                companies.POST("/:id/logo", middleware.RequirePermission("MANAGE_SETTINGS"), companyHandler.UploadCompanyLogo)
-            }
+			companies := protected.Group("/companies")
+			{
+				companies.GET("", middleware.RequirePermission("VIEW_COMPANIES"), companyHandler.GetCompanies)
+				companies.POST("", companyHandler.CreateCompany) // No admin requirement for CREATE only
+				companies.PUT("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), companyHandler.UpdateCompany)
+				companies.DELETE("/:id", middleware.RequireRole("Admin"), companyHandler.DeleteCompany)
+				companies.POST("/:id/logo", middleware.RequirePermission("MANAGE_SETTINGS"), companyHandler.UploadCompanyLogo)
+			}
 
 			// Location management routes
 			locations := protected.Group("/locations")
@@ -220,28 +220,28 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 
 			// ADD THESE NEW INVENTORY ROUTES:
 			// Inventory management routes (require company and location)
-            inventory := protected.Group("/inventory")
-            inventory.Use(middleware.RequireCompanyAccess())
-            {
-                inventory.GET("/stock", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStock)
-                inventory.POST("/stock-adjustment", middleware.RequirePermission("ADJUST_STOCK"), inventoryHandler.AdjustStock)
-                inventory.GET("/stock-adjustments", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockAdjustments)
-                // Stock adjustment documents
-                inventory.POST("/stock-adjustment-documents", middleware.RequirePermission("ADJUST_STOCK"), inventoryHandler.CreateStockAdjustmentDocument)
-                inventory.GET("/stock-adjustment-documents", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockAdjustmentDocuments)
-                inventory.GET("/stock-adjustment-documents/:id", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockAdjustmentDocument)
-                inventory.GET("/summary", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetInventorySummary)
-                inventory.POST("/import", middleware.RequirePermission("ADJUST_STOCK"), inventoryHandler.ImportInventory)
-                inventory.GET("/export", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.ExportInventory)
-                inventory.POST("/barcode", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GenerateBarcode)
-                inventory.GET("/transfers", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockTransfers)
-                inventory.GET("/transfers/:id", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockTransfer)
-                inventory.POST("/transfers", middleware.RequirePermission("CREATE_TRANSFERS"), inventoryHandler.CreateStockTransfer)
-                inventory.PUT("/transfers/:id/approve", middleware.RequirePermission("APPROVE_TRANSFERS"), inventoryHandler.ApproveStockTransfer)
-                inventory.PUT("/transfers/:id/complete", middleware.RequirePermission("APPROVE_TRANSFERS"), inventoryHandler.CompleteStockTransfer)
-                inventory.DELETE("/transfers/:id", middleware.RequirePermission("CREATE_TRANSFERS"), inventoryHandler.CancelStockTransfer)
-                inventory.GET("/product-transactions", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetProductTransactions)
-            }
+			inventory := protected.Group("/inventory")
+			inventory.Use(middleware.RequireCompanyAccess())
+			{
+				inventory.GET("/stock", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStock)
+				inventory.POST("/stock-adjustment", middleware.RequirePermission("ADJUST_STOCK"), inventoryHandler.AdjustStock)
+				inventory.GET("/stock-adjustments", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockAdjustments)
+				// Stock adjustment documents
+				inventory.POST("/stock-adjustment-documents", middleware.RequirePermission("ADJUST_STOCK"), inventoryHandler.CreateStockAdjustmentDocument)
+				inventory.GET("/stock-adjustment-documents", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockAdjustmentDocuments)
+				inventory.GET("/stock-adjustment-documents/:id", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockAdjustmentDocument)
+				inventory.GET("/summary", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetInventorySummary)
+				inventory.POST("/import", middleware.RequirePermission("ADJUST_STOCK"), inventoryHandler.ImportInventory)
+				inventory.GET("/export", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.ExportInventory)
+				inventory.POST("/barcode", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GenerateBarcode)
+				inventory.GET("/transfers", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockTransfers)
+				inventory.GET("/transfers/:id", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockTransfer)
+				inventory.POST("/transfers", middleware.RequirePermission("CREATE_TRANSFERS"), inventoryHandler.CreateStockTransfer)
+				inventory.PUT("/transfers/:id/approve", middleware.RequirePermission("APPROVE_TRANSFERS"), inventoryHandler.ApproveStockTransfer)
+				inventory.PUT("/transfers/:id/complete", middleware.RequirePermission("APPROVE_TRANSFERS"), inventoryHandler.CompleteStockTransfer)
+				inventory.DELETE("/transfers/:id", middleware.RequirePermission("CREATE_TRANSFERS"), inventoryHandler.CancelStockTransfer)
+				inventory.GET("/product-transactions", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetProductTransactions)
+			}
 
 			// Sales management routes (require company and location)
 			sales := protected.Group("/sales")
@@ -272,21 +272,21 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			}
 
 			// POS specific routes (require company and location)
-                pos := protected.Group("/pos")
-                pos.Use(middleware.RequireCompanyAccess())
-                {
-                    pos.GET("/products", middleware.RequirePermission("VIEW_PRODUCTS"), posHandler.GetPOSProducts)
-                    pos.GET("/customers", middleware.RequirePermission("VIEW_CUSTOMERS"), posHandler.GetPOSCustomers)
-                    pos.POST("/checkout", middleware.RequirePermission("CREATE_SALES"), posHandler.ProcessCheckout)
-                    pos.POST("/calculate", middleware.RequirePermission("CREATE_SALES"), posHandler.CalculateTotals)
-                    pos.POST("/hold", middleware.RequirePermission("CREATE_SALES"), posHandler.HoldSale)
-                    pos.POST("/void/:id", middleware.RequirePermission("UPDATE_SALES"), posHandler.VoidSale)
-                    pos.POST("/print", middleware.RequirePermission("PRINT_INVOICES"), posHandler.PrintInvoice)
-                    pos.GET("/held-sales", middleware.RequirePermission("VIEW_SALES"), posHandler.GetHeldSales)
-                    pos.GET("/payment-methods", middleware.RequirePermission("VIEW_SALES"), posHandler.GetPaymentMethods)
-                    pos.GET("/sales-summary", middleware.RequirePermission("VIEW_REPORTS"), posHandler.GetSalesSummary)
-                    pos.GET("/receipt/:id", middleware.RequirePermission("VIEW_SALES"), posHandler.GetReceiptData)
-                }
+			pos := protected.Group("/pos")
+			pos.Use(middleware.RequireCompanyAccess())
+			{
+				pos.GET("/products", middleware.RequirePermission("VIEW_PRODUCTS"), posHandler.GetPOSProducts)
+				pos.GET("/customers", middleware.RequirePermission("VIEW_CUSTOMERS"), posHandler.GetPOSCustomers)
+				pos.POST("/checkout", middleware.RequirePermission("CREATE_SALES"), posHandler.ProcessCheckout)
+				pos.POST("/calculate", middleware.RequirePermission("CREATE_SALES"), posHandler.CalculateTotals)
+				pos.POST("/hold", middleware.RequirePermission("CREATE_SALES"), posHandler.HoldSale)
+				pos.POST("/void/:id", middleware.RequirePermission("UPDATE_SALES"), posHandler.VoidSale)
+				pos.POST("/print", middleware.RequirePermission("PRINT_INVOICES"), posHandler.PrintInvoice)
+				pos.GET("/held-sales", middleware.RequirePermission("VIEW_SALES"), posHandler.GetHeldSales)
+				pos.GET("/payment-methods", middleware.RequirePermission("VIEW_SALES"), posHandler.GetPaymentMethods)
+				pos.GET("/sales-summary", middleware.RequirePermission("VIEW_REPORTS"), posHandler.GetSalesSummary)
+				pos.GET("/receipt/:id", middleware.RequirePermission("VIEW_SALES"), posHandler.GetReceiptData)
+			}
 
 			loyalty := protected.Group("/loyalty-programs")
 			loyalty.Use(middleware.RequireCompanyAccess())
@@ -304,23 +304,23 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			}
 
 			// Loyalty Settings and Award Points
-            loyaltyGeneral := protected.Group("/loyalty")
-            loyaltyGeneral.Use(middleware.RequireCompanyAccess())
-            {
-                loyaltyGeneral.GET("/settings", middleware.RequirePermission("VIEW_LOYALTY"), loyaltyHandler.GetLoyaltySettings)
-                loyaltyGeneral.PUT("/settings", middleware.RequirePermission("MANAGE_SETTINGS"), loyaltyHandler.UpdateLoyaltySettings)
-                loyaltyGeneral.POST("/award-points", middleware.RequirePermission("AWARD_POINTS"), loyaltyHandler.AwardPoints)
-            }
+			loyaltyGeneral := protected.Group("/loyalty")
+			loyaltyGeneral.Use(middleware.RequireCompanyAccess())
+			{
+				loyaltyGeneral.GET("/settings", middleware.RequirePermission("VIEW_LOYALTY"), loyaltyHandler.GetLoyaltySettings)
+				loyaltyGeneral.PUT("/settings", middleware.RequirePermission("MANAGE_SETTINGS"), loyaltyHandler.UpdateLoyaltySettings)
+				loyaltyGeneral.POST("/award-points", middleware.RequirePermission("AWARD_POINTS"), loyaltyHandler.AwardPoints)
+			}
 
-            // Loyalty tiers
-            tiers := protected.Group("/loyalty/tiers")
-            tiers.Use(middleware.RequireCompanyAccess())
-            {
-                tiers.GET("", middleware.RequirePermission("VIEW_LOYALTY"), loyaltyHandler.GetTiers)
-                tiers.POST("", middleware.RequirePermission("MANAGE_SETTINGS"), loyaltyHandler.CreateTier)
-                tiers.PUT("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), loyaltyHandler.UpdateTier)
-                tiers.DELETE("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), loyaltyHandler.DeleteTier)
-            }
+			// Loyalty tiers
+			tiers := protected.Group("/loyalty/tiers")
+			tiers.Use(middleware.RequireCompanyAccess())
+			{
+				tiers.GET("", middleware.RequirePermission("VIEW_LOYALTY"), loyaltyHandler.GetTiers)
+				tiers.POST("", middleware.RequirePermission("MANAGE_SETTINGS"), loyaltyHandler.CreateTier)
+				tiers.PUT("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), loyaltyHandler.UpdateTier)
+				tiers.DELETE("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), loyaltyHandler.DeleteTier)
+			}
 
 			// Promotions routes
 			promotions := protected.Group("/promotions")
@@ -334,19 +334,19 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			}
 
 			// Sale Returns routes (separate from sales module for better organization)
-            saleReturns := protected.Group("/sale-returns")
-            saleReturns.Use(middleware.RequireCompanyAccess())
-            {
-                saleReturns.GET("", middleware.RequirePermission("VIEW_RETURNS"), returnsHandler.GetSaleReturns)
-                saleReturns.GET("/:id", middleware.RequirePermission("VIEW_RETURNS"), returnsHandler.GetSaleReturn)
-                saleReturns.POST("", middleware.RequirePermission("CREATE_RETURNS"), returnsHandler.CreateSaleReturn)
-                saleReturns.POST("/by-customer", middleware.RequirePermission("CREATE_RETURNS"), returnsHandler.CreateSaleReturnByCustomer)
-                saleReturns.PUT("/:id", middleware.RequirePermission("UPDATE_RETURNS"), returnsHandler.UpdateSaleReturn)
-                saleReturns.DELETE("/:id", middleware.RequirePermission("DELETE_RETURNS"), returnsHandler.DeleteSaleReturn)
-                saleReturns.GET("/summary", middleware.RequirePermission("VIEW_REPORTS"), returnsHandler.GetReturnsSummary)
-                saleReturns.GET("/search/:sale_id", middleware.RequirePermission("VIEW_RETURNS"), returnsHandler.SearchReturnableSale)
-                saleReturns.POST("/process/:sale_id", middleware.RequirePermission("CREATE_RETURNS"), returnsHandler.ProcessQuickReturn)
-            }
+			saleReturns := protected.Group("/sale-returns")
+			saleReturns.Use(middleware.RequireCompanyAccess())
+			{
+				saleReturns.GET("", middleware.RequirePermission("VIEW_RETURNS"), returnsHandler.GetSaleReturns)
+				saleReturns.GET("/:id", middleware.RequirePermission("VIEW_RETURNS"), returnsHandler.GetSaleReturn)
+				saleReturns.POST("", middleware.RequirePermission("CREATE_RETURNS"), returnsHandler.CreateSaleReturn)
+				saleReturns.POST("/by-customer", middleware.RequirePermission("CREATE_RETURNS"), returnsHandler.CreateSaleReturnByCustomer)
+				saleReturns.PUT("/:id", middleware.RequirePermission("UPDATE_RETURNS"), returnsHandler.UpdateSaleReturn)
+				saleReturns.DELETE("/:id", middleware.RequirePermission("DELETE_RETURNS"), returnsHandler.DeleteSaleReturn)
+				saleReturns.GET("/summary", middleware.RequirePermission("VIEW_REPORTS"), returnsHandler.GetReturnsSummary)
+				saleReturns.GET("/search/:sale_id", middleware.RequirePermission("VIEW_RETURNS"), returnsHandler.SearchReturnableSale)
+				saleReturns.POST("/process/:sale_id", middleware.RequirePermission("CREATE_RETURNS"), returnsHandler.ProcessQuickReturn)
+			}
 
 			// Purchase management routes (require company and location)
 			purchases := protected.Group("/purchases")
@@ -359,8 +359,8 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				purchases.POST("", middleware.RequirePermission("CREATE_PURCHASES"), purchaseHandler.CreatePurchase)
 				purchases.POST("/quick", middleware.RequirePermission("CREATE_PURCHASES"), purchaseHandler.CreateQuickPurchase)
 				purchases.PUT("/:id", middleware.RequirePermission("UPDATE_PURCHASES"), purchaseHandler.UpdatePurchase)
-                purchases.PUT("/:id/receive", middleware.RequirePermission("RECEIVE_PURCHASES"), purchaseHandler.ReceivePurchase)
-                purchases.POST("/:id/invoice", middleware.RequirePermission("UPDATE_PURCHASES"), purchaseHandler.UploadPurchaseInvoice)
+				purchases.PUT("/:id/receive", middleware.RequirePermission("RECEIVE_PURCHASES"), purchaseHandler.ReceivePurchase)
+				purchases.POST("/:id/invoice", middleware.RequirePermission("UPDATE_PURCHASES"), purchaseHandler.UploadPurchaseInvoice)
 				purchases.DELETE("/:id", middleware.RequirePermission("DELETE_PURCHASES"), purchaseHandler.DeletePurchase)
 			}
 
@@ -373,37 +373,37 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				purchaseOrders.PUT("/:id/approve", middleware.RequirePermission("UPDATE_PURCHASES"), purchaseOrderHandler.ApprovePurchaseOrder)
 			}
 
-            goodsReceipts := protected.Group("/goods-receipts")
-            goodsReceipts.Use(middleware.RequireCompanyAccess())
-            {
-                goodsReceipts.GET("", middleware.RequirePermission("VIEW_PURCHASES"), goodsReceiptHandler.GetGoodsReceipts)
-                goodsReceipts.GET("/:id", middleware.RequirePermission("VIEW_PURCHASES"), goodsReceiptHandler.GetGoodsReceipt)
-                goodsReceipts.POST("", middleware.RequirePermission("RECEIVE_PURCHASES"), goodsReceiptHandler.RecordGoodsReceipt)
-            }
+			goodsReceipts := protected.Group("/goods-receipts")
+			goodsReceipts.Use(middleware.RequireCompanyAccess())
+			{
+				goodsReceipts.GET("", middleware.RequirePermission("VIEW_PURCHASES"), goodsReceiptHandler.GetGoodsReceipts)
+				goodsReceipts.GET("/:id", middleware.RequirePermission("VIEW_PURCHASES"), goodsReceiptHandler.GetGoodsReceipt)
+				goodsReceipts.POST("", middleware.RequirePermission("RECEIVE_PURCHASES"), goodsReceiptHandler.RecordGoodsReceipt)
+			}
 
 			// Purchase Returns management routes (require company and location)
-            purchaseReturns := protected.Group("/purchase-returns")
-            purchaseReturns.Use(middleware.RequireCompanyAccess())
-            {
-                purchaseReturns.GET("", middleware.RequirePermission("VIEW_PURCHASE_RETURNS"), purchaseHandler.GetPurchaseReturns)
-                purchaseReturns.GET("/:id", middleware.RequirePermission("VIEW_PURCHASE_RETURNS"), purchaseHandler.GetPurchaseReturn)
-                purchaseReturns.POST("", middleware.RequirePermission("CREATE_PURCHASE_RETURNS"), purchaseHandler.CreatePurchaseReturn)
-                purchaseReturns.PUT("/:id", middleware.RequirePermission("UPDATE_PURCHASE_RETURNS"), purchaseHandler.UpdatePurchaseReturn)
-                purchaseReturns.DELETE("/:id", middleware.RequirePermission("DELETE_PURCHASE_RETURNS"), purchaseHandler.DeletePurchaseReturn)
-                purchaseReturns.POST("/:id/receipt", middleware.RequirePermission("UPDATE_PURCHASE_RETURNS"), purchaseHandler.UploadPurchaseReturnReceipt)
-            }
+			purchaseReturns := protected.Group("/purchase-returns")
+			purchaseReturns.Use(middleware.RequireCompanyAccess())
+			{
+				purchaseReturns.GET("", middleware.RequirePermission("VIEW_PURCHASE_RETURNS"), purchaseHandler.GetPurchaseReturns)
+				purchaseReturns.GET("/:id", middleware.RequirePermission("VIEW_PURCHASE_RETURNS"), purchaseHandler.GetPurchaseReturn)
+				purchaseReturns.POST("", middleware.RequirePermission("CREATE_PURCHASE_RETURNS"), purchaseHandler.CreatePurchaseReturn)
+				purchaseReturns.PUT("/:id", middleware.RequirePermission("UPDATE_PURCHASE_RETURNS"), purchaseHandler.UpdatePurchaseReturn)
+				purchaseReturns.DELETE("/:id", middleware.RequirePermission("DELETE_PURCHASE_RETURNS"), purchaseHandler.DeletePurchaseReturn)
+				purchaseReturns.POST("/:id/receipt", middleware.RequirePermission("UPDATE_PURCHASE_RETURNS"), purchaseHandler.UploadPurchaseReturnReceipt)
+			}
 
-            // Customer management routes (require company)
-            customers := protected.Group("/customers")
-            customers.Use(middleware.RequireCompanyAccess())
-            {
-                customers.GET("", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.GetCustomers)
-                customers.GET("/:id", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.GetCustomer)
-                customers.GET("/:id/summary", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.GetCustomerSummary)
-                customers.POST("", middleware.RequirePermission("CREATE_CUSTOMERS"), customerHandler.CreateCustomer)
-                customers.POST("/import", middleware.RequirePermission("CREATE_CUSTOMERS"), customerHandler.ImportCustomers)
-                customers.GET("/export", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.ExportCustomers)
-                customers.PUT("/:id", middleware.RequirePermission("UPDATE_CUSTOMERS"), customerHandler.UpdateCustomer)
+			// Customer management routes (require company)
+			customers := protected.Group("/customers")
+			customers.Use(middleware.RequireCompanyAccess())
+			{
+				customers.GET("", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.GetCustomers)
+				customers.GET("/:id", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.GetCustomer)
+				customers.GET("/:id/summary", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.GetCustomerSummary)
+				customers.POST("", middleware.RequirePermission("CREATE_CUSTOMERS"), customerHandler.CreateCustomer)
+				customers.POST("/import", middleware.RequirePermission("CREATE_CUSTOMERS"), customerHandler.ImportCustomers)
+				customers.GET("/export", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.ExportCustomers)
+				customers.PUT("/:id", middleware.RequirePermission("UPDATE_CUSTOMERS"), customerHandler.UpdateCustomer)
 				customers.DELETE("/:id", middleware.RequirePermission("DELETE_CUSTOMERS"), customerHandler.DeleteCustomer)
 
 				credit := customers.Group("/:id/credit")
@@ -521,26 +521,26 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			}
 
 			// Supplier management routes (require company)
-            suppliers := protected.Group("/suppliers")
-            suppliers.Use(middleware.RequireCompanyAccess())
-            {
-                suppliers.GET("", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.GetSuppliers)
-                suppliers.POST("/import", middleware.RequirePermission("CREATE_SUPPLIERS"), supplierHandler.ImportSuppliers)
-                suppliers.GET("/export", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.ExportSuppliers)
-                suppliers.GET("/:id/summary", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.GetSupplierSummary)
-                suppliers.GET("/:id", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.GetSupplier)
-                suppliers.POST("", middleware.RequirePermission("CREATE_SUPPLIERS"), supplierHandler.CreateSupplier)
-                suppliers.PUT("/:id", middleware.RequirePermission("UPDATE_SUPPLIERS"), supplierHandler.UpdateSupplier)
-                suppliers.DELETE("/:id", middleware.RequirePermission("DELETE_SUPPLIERS"), supplierHandler.DeleteSupplier)
-            }
+			suppliers := protected.Group("/suppliers")
+			suppliers.Use(middleware.RequireCompanyAccess())
+			{
+				suppliers.GET("", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.GetSuppliers)
+				suppliers.POST("/import", middleware.RequirePermission("CREATE_SUPPLIERS"), supplierHandler.ImportSuppliers)
+				suppliers.GET("/export", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.ExportSuppliers)
+				suppliers.GET("/:id/summary", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.GetSupplierSummary)
+				suppliers.GET("/:id", middleware.RequirePermission("VIEW_SUPPLIERS"), supplierHandler.GetSupplier)
+				suppliers.POST("", middleware.RequirePermission("CREATE_SUPPLIERS"), supplierHandler.CreateSupplier)
+				suppliers.PUT("/:id", middleware.RequirePermission("UPDATE_SUPPLIERS"), supplierHandler.UpdateSupplier)
+				suppliers.DELETE("/:id", middleware.RequirePermission("DELETE_SUPPLIERS"), supplierHandler.DeleteSupplier)
+			}
 
-            // Payments (supplier) routes
-            payments := protected.Group("/payments")
-            payments.Use(middleware.RequireCompanyAccess())
-            {
-                payments.GET("", middleware.RequirePermission("VIEW_PURCHASES"), paymentHandler.GetPayments)
-                payments.POST("", middleware.RequirePermission("CREATE_PURCHASES"), paymentHandler.CreatePayment)
-            }
+			// Payments (supplier) routes
+			payments := protected.Group("/payments")
+			payments.Use(middleware.RequireCompanyAccess())
+			{
+				payments.GET("", middleware.RequirePermission("VIEW_PURCHASES"), paymentHandler.GetPayments)
+				payments.POST("", middleware.RequirePermission("CREATE_PURCHASES"), paymentHandler.CreatePayment)
+			}
 
 			// Currency routes
 			currencies := protected.Group("/currencies")
@@ -554,15 +554,15 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			}
 
 			// Tax routes
-            taxes := protected.Group("/taxes")
-            taxes.Use(middleware.RequireCompanyAccess())
-            {
-                // Allow viewing taxes with VIEW_SETTINGS, but restrict modifications
-                taxes.GET("", middleware.RequirePermission("VIEW_SETTINGS"), taxHandler.GetTaxes)
-                taxes.POST("", middleware.RequirePermission("MANAGE_SETTINGS"), taxHandler.CreateTax)
-                taxes.PUT("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), taxHandler.UpdateTax)
-                taxes.DELETE("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), taxHandler.DeleteTax)
-            }
+			taxes := protected.Group("/taxes")
+			taxes.Use(middleware.RequireCompanyAccess())
+			{
+				// Allow viewing taxes with VIEW_SETTINGS, but restrict modifications
+				taxes.GET("", middleware.RequirePermission("VIEW_SETTINGS"), taxHandler.GetTaxes)
+				taxes.POST("", middleware.RequirePermission("MANAGE_SETTINGS"), taxHandler.CreateTax)
+				taxes.PUT("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), taxHandler.UpdateTax)
+				taxes.DELETE("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), taxHandler.DeleteTax)
+			}
 
 			// Settings routes
 			settings := protected.Group("/settings")
@@ -655,7 +655,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				invoiceTemplates.DELETE("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), invoiceTemplateHandler.DeleteInvoiceTemplate)
 			}
 
-            // Printing now handled client-side; server returns print data via /pos/print
+			// Printing now handled client-side; server returns print data via /pos/print
 
 			// Workflow & Approvals routes
 			workflow := protected.Group("/workflow-requests")
@@ -681,6 +681,6 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			"message": "Method not allowed",
 		})
 	})
-    // Serve uploaded files
-    router.Static("/uploads", cfg.UploadPath)
+	// Serve uploaded files
+	router.Static("/uploads", cfg.UploadPath)
 }

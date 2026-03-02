@@ -25,7 +25,7 @@ func NewSupplierService() *SupplierService {
 }
 
 func (s *SupplierService) GetSuppliers(companyID int, filters map[string]string) ([]models.SupplierWithStats, error) {
-    query := `
+	query := `
                 SELECT s.supplier_id, s.company_id, s.name, s.contact_person, s.phone, s.email,
                           s.address, s.tax_number, s.payment_terms, s.credit_limit, s.is_active,
                           s.created_by, s.updated_by, s.sync_status, s.created_at, s.updated_at,
@@ -97,7 +97,7 @@ func (s *SupplierService) GetSuppliers(companyID int, filters map[string]string)
 }
 
 func (s *SupplierService) GetSupplierByID(supplierID, companyID int) (*models.SupplierWithStats, error) {
-    query := `
+	query := `
                 SELECT s.supplier_id, s.company_id, s.name, s.contact_person, s.phone, s.email,
                           s.address, s.tax_number, s.payment_terms, s.credit_limit, s.is_active,
                           s.created_by, s.updated_by, s.sync_status, s.created_at, s.updated_at,

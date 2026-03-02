@@ -64,4 +64,3 @@ func RequestID() gin.HandlerFunc {
 		c.Next()
 	}
 }
-

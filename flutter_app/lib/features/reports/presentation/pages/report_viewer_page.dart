@@ -85,8 +85,7 @@ class _ReportViewerPageState extends ConsumerState<ReportViewerPage> {
     if (widget.config.supportsGroupBy) {
       qp['group_by'] = _groupBy;
     }
-    if (widget.config.supportsExpensesGroupBy &&
-        _expensesGroupBy != 'none') {
+    if (widget.config.supportsExpensesGroupBy && _expensesGroupBy != 'none') {
       qp['group_by'] = _expensesGroupBy;
     }
     if (widget.config.supportsLimit) {
@@ -381,9 +380,8 @@ class _ReportDataView extends StatelessWidget {
 
   Widget _buildRow(dynamic row) {
     if (row is Map) {
-      final entries = row.entries
-          .map((e) => MapEntry(e.key.toString(), e.value))
-          .toList();
+      final entries =
+          row.entries.map((e) => MapEntry(e.key.toString(), e.value)).toList();
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: entries

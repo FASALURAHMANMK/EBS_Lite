@@ -534,17 +534,17 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
       Navigator.of(context).pop();
       widget.onDone();
       _showInfo(context, 'Collection recorded');
-      } on OutboxQueuedException catch (e) {
-        if (!mounted) return;
-        Navigator.of(context).pop();
-        widget.onDone();
-        _showInfo(context, e.message);
-      } catch (e) {
-        if (!mounted) return;
-        _showError(context, e);
-      } finally {
-        if (mounted) setState(() => _saving = false);
-      }
+    } on OutboxQueuedException catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      widget.onDone();
+      _showInfo(context, e.message);
+    } catch (e) {
+      if (!mounted) return;
+      _showError(context, e);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override

@@ -176,9 +176,8 @@ class OutboxNotifier extends StateNotifier<OutboxState> {
     required String path,
   }) async {
     final dio = _ref.read(dioProvider);
-    final options = (item.headers ?? {}).isEmpty
-        ? null
-        : Options(headers: item.headers);
+    final options =
+        (item.headers ?? {}).isEmpty ? null : Options(headers: item.headers);
     if (method.toUpperCase() == 'POST') {
       await dio.post(
         path,
@@ -206,8 +205,8 @@ class OutboxNotifier extends StateNotifier<OutboxState> {
   Future<void> _processQuickGrn(OutboxItem item) async {
     final dio = _ref.read(dioProvider);
     final payload = item.meta ?? {};
-    final items = (payload['items'] as List? ?? const [])
-        .cast<Map<String, dynamic>>();
+    final items =
+        (payload['items'] as List? ?? const []).cast<Map<String, dynamic>>();
 
     // 1) Create purchase
     final purchaseRes = await dio.post(
@@ -216,9 +215,10 @@ class OutboxNotifier extends StateNotifier<OutboxState> {
       queryParameters: item.queryParams,
       options: item.headers == null ? null : Options(headers: item.headers),
     );
-    final created = (purchaseRes.data is Map && purchaseRes.data['data'] != null)
-        ? purchaseRes.data['data'] as Map<String, dynamic>
-        : (purchaseRes.data as Map<String, dynamic>);
+    final created =
+        (purchaseRes.data is Map && purchaseRes.data['data'] != null)
+            ? purchaseRes.data['data'] as Map<String, dynamic>
+            : (purchaseRes.data as Map<String, dynamic>);
     final purchaseId = created['purchase_id'] as int;
 
     // 2) Fetch purchase details to map to purchase_detail_id

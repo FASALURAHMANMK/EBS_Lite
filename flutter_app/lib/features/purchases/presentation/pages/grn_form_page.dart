@@ -212,8 +212,8 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
       return;
     }
     setState(() => _saving = true);
-      try {
-        final repo = ref.read(grnRepositoryProvider);
+    try {
+      final repo = ref.read(grnRepositoryProvider);
       final items = [
         for (final l in validLines)
           GrnCreateItem(
@@ -222,26 +222,26 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
             unitPrice: double.tryParse(l.price.text.trim()) ?? 0,
           )
       ];
-        await repo.createGrnWithoutPo(
-          supplierId: supplierId,
-          items: items,
-          invoiceNumber: _invoiceNumber.text.trim().isEmpty
-              ? null
-              : _invoiceNumber.text.trim(),
-          notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
-          invoiceFilePath: _invoiceFilePath,
-        );
-        if (!mounted) return;
-        Navigator.of(context).pop(true);
-      } on OutboxQueuedException catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(e.message)));
-        Navigator.of(context).pop(true);
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context)
+      await repo.createGrnWithoutPo(
+        supplierId: supplierId,
+        items: items,
+        invoiceNumber: _invoiceNumber.text.trim().isEmpty
+            ? null
+            : _invoiceNumber.text.trim(),
+        notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+        invoiceFilePath: _invoiceFilePath,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } on OutboxQueuedException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(e.message)));
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text('Failed: $e')));
     } finally {

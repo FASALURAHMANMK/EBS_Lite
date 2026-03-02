@@ -66,6 +66,8 @@ services:
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - GIN_MODE=${GIN_MODE:-release}
+      - RUN_MIGRATIONS=${RUN_MIGRATIONS:-true}
+      - MIGRATIONS_DIR=${MIGRATIONS_DIR:-migrations}
     ports:
       - "8080:8080"
     depends_on:

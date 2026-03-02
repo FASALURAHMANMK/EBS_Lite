@@ -386,6 +386,8 @@ paths:
           multipart/form-data:
             schema:
               type: object
+              required:
+              - file
               properties:
                 file:
                   type: string
@@ -2107,6 +2109,8 @@ paths:
           multipart/form-data:
             schema:
               type: object
+              required:
+              - file
               properties:
                 file:
                   type: string
@@ -2330,10 +2334,14 @@ paths:
           multipart/form-data:
             schema:
               type: object
+              required:
+              - file
               properties:
                 file:
                   type: string
                   format: binary
+                number:
+                  type: string
   /customers:
     get:
       summary: GET /api/v1/customers
@@ -4137,21 +4145,6 @@ paths:
         required: true
         schema:
           type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenericObject'
-  /print/receipt:
-    post:
-      summary: POST /api/v1/print/receipt
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/APIResponse'
       requestBody:
         content:
           application/json:

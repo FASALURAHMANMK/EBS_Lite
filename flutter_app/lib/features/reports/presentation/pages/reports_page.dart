@@ -19,27 +19,27 @@ class ReportsPage extends StatelessWidget {
               reports: const [
                 ReportConfig(
                   title: 'Sales Summary',
-                  endpoint: 'sales-summary',
+                  endpoint: '/reports/sales-summary',
                   description: 'Grouped sales totals and outstanding balances.',
                   supportsGroupBy: true,
                 ),
                 ReportConfig(
                   title: 'Top Products',
-                  endpoint: 'top-products',
+                  endpoint: '/reports/top-products',
                   description: 'Best-selling products by revenue.',
                   supportsLimit: true,
                   supportsLocation: false,
                 ),
                 ReportConfig(
                   title: 'Customer Balances',
-                  endpoint: 'customer-balances',
+                  endpoint: '/reports/customer-balances',
                   description: 'Outstanding balances by customer.',
                   supportsDateRange: false,
                   supportsLocation: false,
                 ),
                 ReportConfig(
                   title: 'Tax Report',
-                  endpoint: 'tax',
+                  endpoint: '/reports/tax',
                   description: 'Taxable sales and tax amount by tax type.',
                   supportsLocation: false,
                 ),
@@ -58,7 +58,7 @@ class ReportsPage extends StatelessWidget {
               reports: const [
                 ReportConfig(
                   title: 'Expenses Summary',
-                  endpoint: 'expenses-summary',
+                  endpoint: '/reports/expenses-summary',
                   description: 'Expenses grouped by category or period.',
                   supportsExpensesGroupBy: true,
                   supportsDateRange: false,
@@ -66,12 +66,12 @@ class ReportsPage extends StatelessWidget {
                 ),
                 ReportConfig(
                   title: 'Purchase vs Returns',
-                  endpoint: 'purchase-vs-returns',
+                  endpoint: '/reports/purchase-vs-returns',
                   description: 'Compare purchases against returns.',
                 ),
                 ReportConfig(
                   title: 'Supplier Report',
-                  endpoint: 'supplier',
+                  endpoint: '/reports/supplier',
                   description: 'Supplier performance and totals.',
                   supportsDateRange: false,
                   supportsLocation: false,
@@ -91,42 +91,42 @@ class ReportsPage extends StatelessWidget {
               reports: const [
                 ReportConfig(
                   title: 'Daily Cash',
-                  endpoint: 'daily-cash',
+                  endpoint: '/reports/daily-cash',
                   description: 'Daily cash activity overview.',
                 ),
                 ReportConfig(
                   title: 'Income vs Expense',
-                  endpoint: 'income-expense',
+                  endpoint: '/reports/income-expense',
                   description: 'Income and expense comparison.',
                 ),
                 ReportConfig(
                   title: 'General Ledger',
-                  endpoint: 'general-ledger',
+                  endpoint: '/reports/general-ledger',
                   description: 'General ledger report.',
                 ),
                 ReportConfig(
                   title: 'Trial Balance',
-                  endpoint: 'trial-balance',
+                  endpoint: '/reports/trial-balance',
                   description: 'Trial balance summary.',
                 ),
                 ReportConfig(
                   title: 'Profit & Loss',
-                  endpoint: 'profit-loss',
+                  endpoint: '/reports/profit-loss',
                   description: 'Profit and loss statement.',
                 ),
                 ReportConfig(
                   title: 'Balance Sheet',
-                  endpoint: 'balance-sheet',
+                  endpoint: '/reports/balance-sheet',
                   description: 'Balance sheet overview.',
                 ),
                 ReportConfig(
                   title: 'Outstanding',
-                  endpoint: 'outstanding',
+                  endpoint: '/reports/outstanding',
                   description: 'Outstanding invoices or payments.',
                 ),
                 ReportConfig(
                   title: 'Top Performers',
-                  endpoint: 'top-performers',
+                  endpoint: '/reports/top-performers',
                   description: 'Top performing employees or products.',
                 ),
               ],
@@ -144,18 +144,18 @@ class ReportsPage extends StatelessWidget {
               reports: const [
                 ReportConfig(
                   title: 'Stock Summary',
-                  endpoint: 'stock-summary',
+                  endpoint: '/reports/stock-summary',
                   description: 'Stock levels and valuation by location.',
                   supportsProductId: true,
                 ),
                 ReportConfig(
                   title: 'Item Movement',
-                  endpoint: 'item-movement',
+                  endpoint: '/reports/item-movement',
                   description: 'Stock movement report.',
                 ),
                 ReportConfig(
                   title: 'Valuation Report',
-                  endpoint: 'valuation',
+                  endpoint: '/reports/valuation',
                   description: 'Inventory valuation summary.',
                 ),
               ],

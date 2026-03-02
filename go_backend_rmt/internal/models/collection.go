@@ -16,7 +16,9 @@ type Collection struct {
 	PaymentMethod    *string             `json:"payment_method,omitempty" db:"payment_method"`
 	ReferenceNumber  *string             `json:"reference_number,omitempty" db:"reference_number"`
 	Notes            *string             `json:"notes,omitempty" db:"notes"`
+	IdempotencyKey   *string             `json:"idempotency_key,omitempty" db:"idempotency_key"`
 	CreatedBy        int                 `json:"created_by" db:"created_by"`
+	UpdatedBy        *int                `json:"updated_by,omitempty" db:"updated_by"`
 	SyncStatus       string              `json:"sync_status" db:"sync_status"`
 	CreatedAt        time.Time           `json:"created_at" db:"created_at"`
 	UpdatedAt        time.Time           `json:"updated_at" db:"updated_at"`
@@ -36,15 +38,15 @@ type CollectionInvoice struct {
 // ReceivedDate maps to collection_date in the database
 
 type CreateCollectionRequest struct {
-    CustomerID      int                        `json:"customer_id" validate:"required"`
-    Amount          float64                    `json:"amount" validate:"required,gt=0"`
-    PaymentMethodID *int                       `json:"payment_method_id,omitempty"`
-    ReceivedDate    *string                    `json:"received_date,omitempty"`
-    ReferenceNumber *string                    `json:"reference,omitempty"`
-    Notes           *string                    `json:"notes,omitempty"`
-    Invoices        []CollectionInvoiceRequest `json:"invoices,omitempty"`
-    // When true, do not auto-allocate the amount to invoices when no explicit invoices are provided.
-    SkipAllocation  *bool                      `json:"skip_allocation,omitempty"`
+	CustomerID      int                        `json:"customer_id" validate:"required"`
+	Amount          float64                    `json:"amount" validate:"required,gt=0"`
+	PaymentMethodID *int                       `json:"payment_method_id,omitempty"`
+	ReceivedDate    *string                    `json:"received_date,omitempty"`
+	ReferenceNumber *string                    `json:"reference,omitempty"`
+	Notes           *string                    `json:"notes,omitempty"`
+	Invoices        []CollectionInvoiceRequest `json:"invoices,omitempty"`
+	// When true, do not auto-allocate the amount to invoices when no explicit invoices are provided.
+	SkipAllocation *bool `json:"skip_allocation,omitempty"`
 }
 
 // CollectionInvoiceRequest represents invoice amounts in collection creation

@@ -65,10 +65,10 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
       if (selectedIds.isNotEmpty && singleCustomerId == null) {
         final selSet = selectedIds.toSet();
         filtered = sales.where((e) {
-          final cid = (e['customer'] is Map &&
-                  (e['customer']?['customer_id'] != null))
-              ? (e['customer']['customer_id'] as int?)
-              : (e['customer_id'] as int?);
+          final cid =
+              (e['customer'] is Map && (e['customer']?['customer_id'] != null))
+                  ? (e['customer']['customer_id'] as int?)
+                  : (e['customer_id'] as int?);
           return cid != null && selSet.contains(cid);
         }).toList();
       }

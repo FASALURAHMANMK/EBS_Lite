@@ -18,3 +18,4 @@ next_frontend_web/out/
 
 # Environment files
 .env*
+!.env.example

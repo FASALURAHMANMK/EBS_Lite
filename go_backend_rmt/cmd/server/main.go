@@ -33,6 +33,13 @@ func main() {
 		log.Fatal("Failed to connect to database:", err)
 	}
 	defer database.Close()
+
+	if cfg.RunMigrations {
+		if err := database.ApplyMigrations(database.GetDB(), cfg.MigrationsDir); err != nil {
+			log.Fatal("Migrations failed:", err)
+		}
+	}
+
 	if err := database.ValidateSchema(database.GetDB()); err != nil {
 		log.Fatal("Schema validation failed:", err)
 	}
@@ -55,6 +62,7 @@ func main() {
 	router.Use(middleware.Recovery())
 	router.Use(middleware.CORS(cfg))
 	router.Use(middleware.RateLimiter(cfg))
+	router.Use(middleware.UploadSizeLimiter(cfg.MaxUploadSize))
 
 	// Initialize routes
 	routes.Initialize(router, cfg)

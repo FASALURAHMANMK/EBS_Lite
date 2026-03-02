@@ -46,9 +46,8 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
     final minCtrl = TextEditingController(
         text: initial?.minAmount != null ? initial!.minAmount!.toString() : '');
     final condCtrl = TextEditingController(
-        text: initial?.conditions != null
-            ? jsonEncode(initial!.conditions)
-            : '');
+        text:
+            initial?.conditions != null ? jsonEncode(initial!.conditions) : '');
 
     DateTime? startDate = initial?.startDate;
     DateTime? endDate = initial?.endDate;
@@ -66,8 +65,7 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
           builder: (context, setStateDialog) {
             Future<void> pickDate(bool isStart) async {
               final now = DateTime.now();
-              final initialDate =
-                  (isStart ? startDate : endDate) ?? now;
+              final initialDate = (isStart ? startDate : endDate) ?? now;
               final picked = await showDatePicker(
                 context: context,
                 initialDate: initialDate,
@@ -95,8 +93,7 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                     children: [
                       TextField(
                         controller: nameCtrl,
-                        decoration:
-                            const InputDecoration(labelText: 'Name'),
+                        decoration: const InputDecoration(labelText: 'Name'),
                       ),
                       const SizedBox(height: 8),
                       TextField(
@@ -117,8 +114,7 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                           DropdownMenuItem(
                               value: 'FIXED', child: Text('Fixed Amount')),
                           DropdownMenuItem(
-                              value: 'BUY_X_GET_Y',
-                              child: Text('Buy X Get Y')),
+                              value: 'BUY_X_GET_Y', child: Text('Buy X Get Y')),
                         ],
                         onChanged: (v) =>
                             setStateDialog(() => discountType = v ?? ''),
@@ -212,8 +208,7 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                           contentPadding: EdgeInsets.zero,
                           value: isActive,
                           title: const Text('Active'),
-                          onChanged: (v) =>
-                              setStateDialog(() => isActive = v),
+                          onChanged: (v) => setStateDialog(() => isActive = v),
                         ),
                       ],
                     ],
@@ -232,15 +227,15 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                           final name = nameCtrl.text.trim();
                           if (name.isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Name is required')),
+                              const SnackBar(content: Text('Name is required')),
                             );
                             return;
                           }
                           if (startDate == null || endDate == null) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                  content: Text('Start and end dates required')),
+                                  content:
+                                      Text('Start and end dates required')),
                             );
                             return;
                           }
@@ -258,8 +253,7 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                             try {
                               final decoded = jsonDecode(condRaw);
                               if (decoded is Map) {
-                                conditions =
-                                    Map<String, dynamic>.from(decoded);
+                                conditions = Map<String, dynamic>.from(decoded);
                               } else {
                                 throw const FormatException(
                                     'Conditions must be a JSON object');
@@ -273,8 +267,7 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                             }
                           }
 
-                          final value =
-                              double.tryParse(valueCtrl.text.trim());
+                          final value = double.tryParse(valueCtrl.text.trim());
                           final minAmount =
                               double.tryParse(minCtrl.text.trim());
 
@@ -283,10 +276,9 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                             if (initial == null) {
                               await repo.createPromotion(
                                 name: name,
-                                description:
-                                    descCtrl.text.trim().isEmpty
-                                        ? null
-                                        : descCtrl.text.trim(),
+                                description: descCtrl.text.trim().isEmpty
+                                    ? null
+                                    : descCtrl.text.trim(),
                                 discountType:
                                     discountType.isEmpty ? null : discountType,
                                 value: value,
@@ -300,10 +292,9 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                               await repo.updatePromotion(
                                 initial.promotionId,
                                 name: name,
-                                description:
-                                    descCtrl.text.trim().isEmpty
-                                        ? null
-                                        : descCtrl.text.trim(),
+                                description: descCtrl.text.trim().isEmpty
+                                    ? null
+                                    : descCtrl.text.trim(),
                                 discountType:
                                     discountType.isEmpty ? null : discountType,
                                 value: value,
@@ -422,9 +413,8 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                       itemBuilder: (context, i) {
                         final p = _promotions[i];
                         final typeLabel = (p.discountType ?? 'N/A');
-                        final valueLabel = p.value != null
-                            ? p.value!.toStringAsFixed(2)
-                            : '—';
+                        final valueLabel =
+                            p.value != null ? p.value!.toStringAsFixed(2) : '—';
                         final subtitle = [
                           'Type: $typeLabel',
                           'Value: $valueLabel',
@@ -439,9 +429,8 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                               p.isActive
                                   ? Icons.local_offer_rounded
                                   : Icons.local_offer_outlined,
-                              color: p.isActive
-                                  ? theme.colorScheme.primary
-                                  : null,
+                              color:
+                                  p.isActive ? theme.colorScheme.primary : null,
                             ),
                             title: Text(p.name),
                             subtitle: Text(subtitle),
@@ -461,8 +450,8 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                                     await _load();
                                   } catch (e) {
                                     if (!context.mounted) return;
-                                    ScaffoldMessenger.of(context)
-                                        .showSnackBar(SnackBar(
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
                                             content:
                                                 Text('Update failed: $e')));
                                   }
@@ -477,8 +466,8 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                                 ),
                                 PopupMenuItem(
                                   value: 'toggle',
-                                  child:
-                                      Text(p.isActive ? 'Deactivate' : 'Activate'),
+                                  child: Text(
+                                      p.isActive ? 'Deactivate' : 'Activate'),
                                 ),
                                 const PopupMenuItem(
                                   value: 'delete',

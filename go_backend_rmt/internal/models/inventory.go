@@ -14,15 +14,15 @@ type Stock struct {
 }
 
 type StockWithProduct struct {
-    Stock
-    ProductName  string  `json:"product_name"`
-    ProductSKU   *string `json:"product_sku,omitempty"`
-    CategoryID   *int    `json:"category_id,omitempty"`
-    CategoryName *string `json:"category_name,omitempty"`
-    BrandName    *string `json:"brand_name,omitempty"`
-    UnitSymbol   *string `json:"unit_symbol,omitempty"`
-    ReorderLevel int     `json:"reorder_level"`
-    IsLowStock   bool    `json:"is_low_stock"`
+	Stock
+	ProductName  string  `json:"product_name"`
+	ProductSKU   *string `json:"product_sku,omitempty"`
+	CategoryID   *int    `json:"category_id,omitempty"`
+	CategoryName *string `json:"category_name,omitempty"`
+	BrandName    *string `json:"brand_name,omitempty"`
+	UnitSymbol   *string `json:"unit_symbol,omitempty"`
+	ReorderLevel int     `json:"reorder_level"`
+	IsLowStock   bool    `json:"is_low_stock"`
 }
 
 type StockAdjustment struct {
@@ -36,39 +36,39 @@ type StockAdjustment struct {
 }
 
 type CreateStockAdjustmentRequest struct {
-    ProductID  int     `json:"product_id" validate:"required"`
-    Adjustment float64 `json:"adjustment" validate:"required"`
-    Reason     string  `json:"reason" validate:"required,min=2,max=255"`
+	ProductID  int     `json:"product_id" validate:"required"`
+	Adjustment float64 `json:"adjustment" validate:"required"`
+	Reason     string  `json:"reason" validate:"required,min=2,max=255"`
 }
 
 // Stock adjustment document (header)
 type StockAdjustmentDocument struct {
-    DocumentID     int       `json:"document_id" db:"document_id"`
-    DocumentNumber string    `json:"document_number" db:"document_number"`
-    LocationID     int       `json:"location_id" db:"location_id"`
-    Reason         string    `json:"reason" db:"reason"`
-    CreatedBy      int       `json:"created_by" db:"created_by"`
-    CreatedAt      time.Time `json:"created_at" db:"created_at"`
-    Items          []StockAdjustmentDocumentItem `json:"items,omitempty"`
+	DocumentID     int                           `json:"document_id" db:"document_id"`
+	DocumentNumber string                        `json:"document_number" db:"document_number"`
+	LocationID     int                           `json:"location_id" db:"location_id"`
+	Reason         string                        `json:"reason" db:"reason"`
+	CreatedBy      int                           `json:"created_by" db:"created_by"`
+	CreatedAt      time.Time                     `json:"created_at" db:"created_at"`
+	Items          []StockAdjustmentDocumentItem `json:"items,omitempty"`
 }
 
 // Stock adjustment document detail (line)
 type StockAdjustmentDocumentItem struct {
-    ItemID     int     `json:"item_id" db:"item_id"`
-    DocumentID int     `json:"document_id" db:"document_id"`
-    ProductID  int     `json:"product_id" db:"product_id"`
-    Adjustment float64 `json:"adjustment" db:"adjustment"`
+	ItemID     int     `json:"item_id" db:"item_id"`
+	DocumentID int     `json:"document_id" db:"document_id"`
+	ProductID  int     `json:"product_id" db:"product_id"`
+	Adjustment float64 `json:"adjustment" db:"adjustment"`
 }
 
 // Create document request payload
 type CreateStockAdjustmentDocumentRequest struct {
-    Reason string                                      `json:"reason" validate:"required,min=2,max=255"`
-    Items  []CreateStockAdjustmentDocumentItemRequest `json:"items" validate:"required,min=1"`
+	Reason string                                     `json:"reason" validate:"required,min=2,max=255"`
+	Items  []CreateStockAdjustmentDocumentItemRequest `json:"items" validate:"required,min=1"`
 }
 
 type CreateStockAdjustmentDocumentItemRequest struct {
-    ProductID  int     `json:"product_id" validate:"required"`
-    Adjustment float64 `json:"adjustment" validate:"required"`
+	ProductID  int     `json:"product_id" validate:"required"`
+	Adjustment float64 `json:"adjustment" validate:"required"`
 }
 
 type StockTransfer struct {
@@ -197,19 +197,19 @@ type ProductSummary struct {
 
 // BarcodeRequest defines the payload for generating inventory labels
 type BarcodeRequest struct {
-    ProductIDs []int `json:"product_ids" validate:"required,min=1"`
+	ProductIDs []int `json:"product_ids" validate:"required,min=1"`
 }
 
 // ProductTransaction represents any stock-affecting transaction for a product
 type ProductTransaction struct {
-    Type         string    `json:"type"`
-    OccurredAt   time.Time `json:"occurred_at"`
-    Reference    string    `json:"reference"`
-    Quantity     float64   `json:"quantity"`
-    LocationID   int       `json:"location_id"`
-    LocationName string    `json:"location_name,omitempty"`
-    PartnerName  *string   `json:"partner_name,omitempty"`
-    Entity       string    `json:"entity"`
-    EntityID     int       `json:"entity_id"`
-    Notes        *string   `json:"notes,omitempty"`
+	Type         string    `json:"type"`
+	OccurredAt   time.Time `json:"occurred_at"`
+	Reference    string    `json:"reference"`
+	Quantity     float64   `json:"quantity"`
+	LocationID   int       `json:"location_id"`
+	LocationName string    `json:"location_name,omitempty"`
+	PartnerName  *string   `json:"partner_name,omitempty"`
+	Entity       string    `json:"entity"`
+	EntityID     int       `json:"entity_id"`
+	Notes        *string   `json:"notes,omitempty"`
 }

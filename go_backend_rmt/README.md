@@ -2,6 +2,28 @@
 
 ERP BACKEND
 
+## Configuration (required)
+
+1) Copy `go_backend_rmt/.env.example` to `go_backend_rmt/.env`
+2) Update values for your environment (at minimum `DATABASE_URL` and `JWT_SECRET`)
+3) Run checks:
+   - `go test ./...`
+   - `go vet ./...`
+
+To start the server locally, run `go run ./cmd/server` from `go_backend_rmt/` (ensure Postgres is running and `DATABASE_URL` is reachable).
+
+## Migrations
+
+The backend applies SQL migrations automatically on startup (using `pressly/goose`) when `RUN_MIGRATIONS=true`.
+
+- Migrations directory: `go_backend_rmt/migrations`
+- Legacy/notes scripts: `go_backend_rmt/Docs & Schema/migrations` (not executed directly)
+
+To disable automatic migrations (not recommended for dev):
+- set `RUN_MIGRATIONS=false`
+
+Docker: `go_backend_rmt/docker-compose.yml` runs `postgres` + `erp-api`; on a clean DB the base schema is initialized from `Docs & Schema/PostgrSQL.sql` and then the API applies migrations on startup.
+
 ## API
 
 ### GET /api/v1/customers

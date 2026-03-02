@@ -134,7 +134,7 @@ func (s *CompanyService) CreateCompany(req *models.CreateCompanyRequest, userID 
         ON CONFLICT DO NOTHING
     `, company.CompanyID); err != nil {
 		return nil, fmt.Errorf("failed to seed default tax: %w", err)
-    }
+	}
 
 	if _, err = tx.Exec(`
         INSERT INTO payment_methods (company_id, name, type, is_active)

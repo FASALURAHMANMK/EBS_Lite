@@ -12,19 +12,19 @@ import (
 )
 
 type InventoryService struct {
-    db *sql.DB
+	db *sql.DB
 }
 
 func NewInventoryService() *InventoryService {
-    return &InventoryService{
-        db: database.GetDB(),
-    }
+	return &InventoryService{
+		db: database.GetDB(),
+	}
 }
 
 func (s *InventoryService) GetStock(companyID, locationID int, productID *int) ([]models.StockWithProduct, error) {
-    // Select products in the company and left-join stock for the requested location.
-    // COALESCE stock fields to avoid NULL scans and to return zero-quantity rows.
-    query := `
+	// Select products in the company and left-join stock for the requested location.
+	// COALESCE stock fields to avoid NULL scans and to return zero-quantity rows.
+	query := `
         SELECT
             COALESCE(s.stock_id, 0) AS stock_id,
             $2 AS location_id,
@@ -49,35 +49,35 @@ func (s *InventoryService) GetStock(companyID, locationID int, productID *int) (
         WHERE p.company_id = $1 AND p.is_deleted = FALSE
     `
 
-    args := []interface{}{companyID, locationID}
-    argCount := 2
+	args := []interface{}{companyID, locationID}
+	argCount := 2
 
-    if productID != nil {
-        argCount++
-        query += fmt.Sprintf(" AND p.product_id = $%d", argCount)
-        args = append(args, *productID)
-    }
+	if productID != nil {
+		argCount++
+		query += fmt.Sprintf(" AND p.product_id = $%d", argCount)
+		args = append(args, *productID)
+	}
 
-    query += " ORDER BY p.name"
+	query += " ORDER BY p.name"
 
-    rows, err := s.db.Query(query, args...)
-    if err != nil {
-        return nil, fmt.Errorf("failed to get stock: %w", err)
-    }
-    defer rows.Close()
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get stock: %w", err)
+	}
+	defer rows.Close()
 
-    // Ensure empty slice ([]) instead of null when no rows
-    stockItems := make([]models.StockWithProduct, 0)
-    for rows.Next() {
-        var item models.StockWithProduct
-        err := rows.Scan(
-            &item.StockID, &item.LocationID, &item.ProductID, &item.Quantity,
-            &item.ReservedQuantity, &item.LastUpdated, &item.ProductName, &item.ProductSKU,
-            &item.ReorderLevel, &item.CategoryID, &item.CategoryName, &item.BrandName, &item.UnitSymbol,
-        )
-        if err != nil {
-            return nil, fmt.Errorf("failed to scan stock: %w", err)
-        }
+	// Ensure empty slice ([]) instead of null when no rows
+	stockItems := make([]models.StockWithProduct, 0)
+	for rows.Next() {
+		var item models.StockWithProduct
+		err := rows.Scan(
+			&item.StockID, &item.LocationID, &item.ProductID, &item.Quantity,
+			&item.ReservedQuantity, &item.LastUpdated, &item.ProductName, &item.ProductSKU,
+			&item.ReorderLevel, &item.CategoryID, &item.CategoryName, &item.BrandName, &item.UnitSymbol,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan stock: %w", err)
+		}
 
 		// Check if low stock
 		item.IsLowStock = item.Quantity <= float64(item.ReorderLevel)
@@ -171,56 +171,56 @@ func (s *InventoryService) GetStockAdjustments(companyID, locationID int) ([]mod
 
 // CreateStockAdjustmentDocument creates a header + items and applies stock changes atomically
 func (s *InventoryService) CreateStockAdjustmentDocument(companyID, locationID, userID int, req *models.CreateStockAdjustmentDocumentRequest) (*models.StockAdjustmentDocument, error) {
-    if len(req.Items) == 0 {
-        return nil, fmt.Errorf("no items to adjust")
-    }
+	if len(req.Items) == 0 {
+		return nil, fmt.Errorf("no items to adjust")
+	}
 
-    tx, err := s.db.Begin()
-    if err != nil {
-        return nil, fmt.Errorf("failed to start transaction: %w", err)
-    }
-    defer tx.Rollback()
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer tx.Rollback()
 
-    // Generate document number using numbering sequence, fallback to timestamp if not configured
-    ns := NewNumberingSequenceService()
-    docNumber, err := ns.NextNumber(tx, "stock_adjustment", companyID, &locationID)
-    if err != nil {
-        // fallback simple number
-        docNumber = fmt.Sprintf("ADJ-%d", time.Now().Unix())
-    }
+	// Generate document number using numbering sequence, fallback to timestamp if not configured
+	ns := NewNumberingSequenceService()
+	docNumber, err := ns.NextNumber(tx, "stock_adjustment", companyID, &locationID)
+	if err != nil {
+		// fallback simple number
+		docNumber = fmt.Sprintf("ADJ-%d", time.Now().Unix())
+	}
 
-    var docID int
-    var createdAt time.Time
-    err = tx.QueryRow(`
+	var docID int
+	var createdAt time.Time
+	err = tx.QueryRow(`
         INSERT INTO stock_adjustment_documents (document_number, location_id, reason, created_by)
         VALUES ($1,$2,$3,$4)
         RETURNING document_id, created_at
     `, docNumber, locationID, req.Reason, userID).Scan(&docID, &createdAt)
-    if err != nil {
-        return nil, fmt.Errorf("failed to create document: %w", err)
-    }
+	if err != nil {
+		return nil, fmt.Errorf("failed to create document: %w", err)
+	}
 
-    for _, it := range req.Items {
-        // Verify product belongs to company
-        var productCompanyID int
-        err := tx.QueryRow("SELECT company_id FROM products WHERE product_id = $1 AND is_deleted = FALSE", it.ProductID).Scan(&productCompanyID)
-        if err == sql.ErrNoRows || productCompanyID != companyID {
-            return nil, fmt.Errorf("product not found")
-        }
-        if err != nil {
-            return nil, fmt.Errorf("failed to verify product: %w", err)
-        }
+	for _, it := range req.Items {
+		// Verify product belongs to company
+		var productCompanyID int
+		err := tx.QueryRow("SELECT company_id FROM products WHERE product_id = $1 AND is_deleted = FALSE", it.ProductID).Scan(&productCompanyID)
+		if err == sql.ErrNoRows || productCompanyID != companyID {
+			return nil, fmt.Errorf("product not found")
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to verify product: %w", err)
+		}
 
-        // Insert item
-        if _, err := tx.Exec(`
+		// Insert item
+		if _, err := tx.Exec(`
             INSERT INTO stock_adjustment_document_items (document_id, product_id, adjustment)
             VALUES ($1,$2,$3)
         `, docID, it.ProductID, it.Adjustment); err != nil {
-            return nil, fmt.Errorf("failed to add document item: %w", err)
-        }
+			return nil, fmt.Errorf("failed to add document item: %w", err)
+		}
 
-        // Apply stock change (upsert)
-        if _, err := tx.Exec(`
+		// Apply stock change (upsert)
+		if _, err := tx.Exec(`
             INSERT INTO stock (location_id, product_id, quantity, last_updated)
             VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
             ON CONFLICT (location_id, product_id)
@@ -228,110 +228,110 @@ func (s *InventoryService) CreateStockAdjustmentDocument(companyID, locationID, 
                 quantity = stock.quantity + $3,
                 last_updated = CURRENT_TIMESTAMP
         `, locationID, it.ProductID, it.Adjustment); err != nil {
-            return nil, fmt.Errorf("failed to adjust stock: %w", err)
-        }
+			return nil, fmt.Errorf("failed to adjust stock: %w", err)
+		}
 
-        // Record adjustment history (keeps legacy listing working)
-        if _, err := tx.Exec(`
+		// Record adjustment history (keeps legacy listing working)
+		if _, err := tx.Exec(`
             INSERT INTO stock_adjustments (location_id, product_id, adjustment, reason, created_by)
             VALUES ($1,$2,$3,$4,$5)
         `, locationID, it.ProductID, it.Adjustment, fmt.Sprintf("%s | %s", docNumber, req.Reason), userID); err != nil {
-            return nil, fmt.Errorf("failed to record adjustment: %w", err)
-        }
-    }
+			return nil, fmt.Errorf("failed to record adjustment: %w", err)
+		}
+	}
 
-    if err := tx.Commit(); err != nil {
-        return nil, fmt.Errorf("failed to commit transaction: %w", err)
-    }
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
 
-    return &models.StockAdjustmentDocument{
-        DocumentID:     docID,
-        DocumentNumber: docNumber,
-        LocationID:     locationID,
-        Reason:         req.Reason,
-        CreatedBy:      userID,
-        CreatedAt:      createdAt,
-    }, nil
+	return &models.StockAdjustmentDocument{
+		DocumentID:     docID,
+		DocumentNumber: docNumber,
+		LocationID:     locationID,
+		Reason:         req.Reason,
+		CreatedBy:      userID,
+		CreatedAt:      createdAt,
+	}, nil
 }
 
 // GetStockAdjustmentDocuments returns document headers for a company/location
 func (s *InventoryService) GetStockAdjustmentDocuments(companyID, locationID int) ([]models.StockAdjustmentDocument, error) {
-    rows, err := s.db.Query(`
+	rows, err := s.db.Query(`
         SELECT d.document_id, d.document_number, d.location_id, d.reason, d.created_by, d.created_at
         FROM stock_adjustment_documents d
         JOIN locations l ON d.location_id = l.location_id
         WHERE l.company_id = $1 AND d.location_id = $2
         ORDER BY d.created_at DESC
     `, companyID, locationID)
-    if err != nil {
-        return nil, fmt.Errorf("failed to get documents: %w", err)
-    }
-    defer rows.Close()
-    list := make([]models.StockAdjustmentDocument, 0)
-    for rows.Next() {
-        var d models.StockAdjustmentDocument
-        if err := rows.Scan(&d.DocumentID, &d.DocumentNumber, &d.LocationID, &d.Reason, &d.CreatedBy, &d.CreatedAt); err != nil {
-            return nil, fmt.Errorf("failed to scan document: %w", err)
-        }
-        // include items for each document for list summaries
-        itsRows, err := s.db.Query(`
+	if err != nil {
+		return nil, fmt.Errorf("failed to get documents: %w", err)
+	}
+	defer rows.Close()
+	list := make([]models.StockAdjustmentDocument, 0)
+	for rows.Next() {
+		var d models.StockAdjustmentDocument
+		if err := rows.Scan(&d.DocumentID, &d.DocumentNumber, &d.LocationID, &d.Reason, &d.CreatedBy, &d.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan document: %w", err)
+		}
+		// include items for each document for list summaries
+		itsRows, err := s.db.Query(`
             SELECT item_id, document_id, product_id, adjustment
             FROM stock_adjustment_document_items
             WHERE document_id = $1
             ORDER BY item_id
         `, d.DocumentID)
-        if err == nil {
-            var items []models.StockAdjustmentDocumentItem
-            for itsRows.Next() {
-                var it models.StockAdjustmentDocumentItem
-                if err := itsRows.Scan(&it.ItemID, &it.DocumentID, &it.ProductID, &it.Adjustment); err == nil {
-                    items = append(items, it)
-                }
-            }
-            itsRows.Close()
-            d.Items = items
-        }
-        list = append(list, d)
-    }
-    return list, nil
+		if err == nil {
+			var items []models.StockAdjustmentDocumentItem
+			for itsRows.Next() {
+				var it models.StockAdjustmentDocumentItem
+				if err := itsRows.Scan(&it.ItemID, &it.DocumentID, &it.ProductID, &it.Adjustment); err == nil {
+					items = append(items, it)
+				}
+			}
+			itsRows.Close()
+			d.Items = items
+		}
+		list = append(list, d)
+	}
+	return list, nil
 }
 
 // GetStockAdjustmentDocument returns header + items
 func (s *InventoryService) GetStockAdjustmentDocument(documentID, companyID, locationID int) (*models.StockAdjustmentDocument, error) {
-    var d models.StockAdjustmentDocument
-    err := s.db.QueryRow(`
+	var d models.StockAdjustmentDocument
+	err := s.db.QueryRow(`
         SELECT d.document_id, d.document_number, d.location_id, d.reason, d.created_by, d.created_at
         FROM stock_adjustment_documents d
         JOIN locations l ON d.location_id = l.location_id
         WHERE d.document_id = $1 AND l.company_id = $2 AND d.location_id = $3
     `, documentID, companyID, locationID).Scan(&d.DocumentID, &d.DocumentNumber, &d.LocationID, &d.Reason, &d.CreatedBy, &d.CreatedAt)
-    if err == sql.ErrNoRows {
-        return nil, fmt.Errorf("document not found")
-    }
-    if err != nil {
-        return nil, fmt.Errorf("failed to get document: %w", err)
-    }
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("document not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get document: %w", err)
+	}
 
-    rows, err := s.db.Query(`
+	rows, err := s.db.Query(`
         SELECT item_id, document_id, product_id, adjustment
         FROM stock_adjustment_document_items
         WHERE document_id = $1
         ORDER BY item_id
     `, documentID)
-    if err != nil {
-        return nil, fmt.Errorf("failed to get document items: %w", err)
-    }
-    defer rows.Close()
-    var items []models.StockAdjustmentDocumentItem
-    for rows.Next() {
-        var it models.StockAdjustmentDocumentItem
-        if err := rows.Scan(&it.ItemID, &it.DocumentID, &it.ProductID, &it.Adjustment); err != nil {
-            return nil, fmt.Errorf("failed to scan item: %w", err)
-        }
-        items = append(items, it)
-    }
-    d.Items = items
-    return &d, nil
+	if err != nil {
+		return nil, fmt.Errorf("failed to get document items: %w", err)
+	}
+	defer rows.Close()
+	var items []models.StockAdjustmentDocumentItem
+	for rows.Next() {
+		var it models.StockAdjustmentDocumentItem
+		if err := rows.Scan(&it.ItemID, &it.DocumentID, &it.ProductID, &it.Adjustment); err != nil {
+			return nil, fmt.Errorf("failed to scan item: %w", err)
+		}
+		items = append(items, it)
+	}
+	d.Items = items
+	return &d, nil
 }
 
 func (s *InventoryService) CreateStockTransfer(companyID, fromLocationID, userID int, req *models.CreateStockTransferRequest) (*models.StockTransfer, error) {
@@ -457,9 +457,9 @@ func (s *InventoryService) ApproveStockTransfer(transferID, companyID, actingLoc
 	}
 	defer tx.Rollback()
 
-    var status string
-    var fromLocationID int
-    err = tx.QueryRow(`
+	var status string
+	var fromLocationID int
+	err = tx.QueryRow(`
                 SELECT st.status, st.from_location_id
                 FROM stock_transfers st
                 JOIN locations fl ON st.from_location_id = fl.location_id
@@ -474,14 +474,14 @@ func (s *InventoryService) ApproveStockTransfer(transferID, companyID, actingLoc
 		return fmt.Errorf("failed to get transfer: %w", err)
 	}
 
-    if status != "PENDING" {
-        return fmt.Errorf("only pending transfers can be approved")
-    }
+	if status != "PENDING" {
+		return fmt.Errorf("only pending transfers can be approved")
+	}
 
-    // Ensure approval is performed from source location
-    if actingLocationID != fromLocationID {
-        return fmt.Errorf("approval must be done from source location")
-    }
+	// Ensure approval is performed from source location
+	if actingLocationID != fromLocationID {
+		return fmt.Errorf("approval must be done from source location")
+	}
 
 	_, err = tx.Exec(`
                 UPDATE stock_transfers
@@ -504,8 +504,8 @@ func (s *InventoryService) CompleteStockTransfer(transferID, companyID, actingLo
 	defer tx.Rollback()
 
 	// Get transfer details
-    var fromLocationID, toLocationID int
-    var status string
+	var fromLocationID, toLocationID int
+	var status string
 	err = tx.QueryRow(`
 		SELECT from_location_id, to_location_id, status 
 		FROM stock_transfers 
@@ -519,49 +519,55 @@ func (s *InventoryService) CompleteStockTransfer(transferID, companyID, actingLo
 		return fmt.Errorf("failed to get transfer: %w", err)
 	}
 
-    if status != "IN_TRANSIT" {
-        return fmt.Errorf("transfer is not in transit")
-    }
+	if status != "IN_TRANSIT" {
+		return fmt.Errorf("transfer is not in transit")
+	}
 
-    // Ensure completion is performed at destination location
-    if actingLocationID != toLocationID {
-        return fmt.Errorf("completion must be done at destination location")
-    }
+	// Ensure completion is performed at destination location
+	if actingLocationID != toLocationID {
+		return fmt.Errorf("completion must be done at destination location")
+	}
 
-    // Get transfer items first (drain rows), then process updates to avoid
-    // issuing new queries while the result set is still open (lib/pq quirk).
-    rows, err := tx.Query(`
+	// Get transfer items first (drain rows), then process updates to avoid
+	// issuing new queries while the result set is still open (lib/pq quirk).
+	rows, err := tx.Query(`
         SELECT product_id, quantity FROM stock_transfer_details 
         WHERE transfer_id = $1
     `, transferID)
-    if err != nil {
-        return fmt.Errorf("failed to get transfer items: %w", err)
-    }
-    var items []struct{ productID int; quantity float64 }
-    for rows.Next() {
-        var productID int
-        var quantity float64
-        if err := rows.Scan(&productID, &quantity); err != nil {
-            rows.Close()
-            return fmt.Errorf("failed to scan transfer item: %w", err)
-        }
-        items = append(items, struct{ productID int; quantity float64 }{productID: productID, quantity: quantity})
-    }
-    if err := rows.Close(); err != nil {
-        return fmt.Errorf("failed to close items cursor: %w", err)
-    }
+	if err != nil {
+		return fmt.Errorf("failed to get transfer items: %w", err)
+	}
+	var items []struct {
+		productID int
+		quantity  float64
+	}
+	for rows.Next() {
+		var productID int
+		var quantity float64
+		if err := rows.Scan(&productID, &quantity); err != nil {
+			rows.Close()
+			return fmt.Errorf("failed to scan transfer item: %w", err)
+		}
+		items = append(items, struct {
+			productID int
+			quantity  float64
+		}{productID: productID, quantity: quantity})
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("failed to close items cursor: %w", err)
+	}
 
-    for _, it := range items {
-        // Reduce stock from source location
-        if _, err := tx.Exec(`
+	for _, it := range items {
+		// Reduce stock from source location
+		if _, err := tx.Exec(`
             UPDATE stock SET quantity = quantity - $1, last_updated = CURRENT_TIMESTAMP
             WHERE location_id = $2 AND product_id = $3
         `, it.quantity, fromLocationID, it.productID); err != nil {
-            return fmt.Errorf("failed to reduce source stock: %w", err)
-        }
+			return fmt.Errorf("failed to reduce source stock: %w", err)
+		}
 
-        // Add stock to destination location
-        if _, err := tx.Exec(`
+		// Add stock to destination location
+		if _, err := tx.Exec(`
             INSERT INTO stock (location_id, product_id, quantity, last_updated)
             VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
             ON CONFLICT (location_id, product_id)
@@ -569,9 +575,9 @@ func (s *InventoryService) CompleteStockTransfer(transferID, companyID, actingLo
                 quantity = stock.quantity + $3,
                 last_updated = CURRENT_TIMESTAMP
         `, toLocationID, it.productID, it.quantity); err != nil {
-            return fmt.Errorf("failed to add destination stock: %w", err)
-        }
-    }
+			return fmt.Errorf("failed to add destination stock: %w", err)
+		}
+	}
 
 	// Mark transfer as completed
 	_, err = tx.Exec(`
@@ -920,41 +926,41 @@ func (s *InventoryService) GenerateBarcode(companyID int, req *models.BarcodeReq
 // GetProductTransactions returns a combined chronological list of stock-affecting
 // transactions for a single product at an optional location.
 func (s *InventoryService) GetProductTransactions(companyID int, productID int, locationID *int, limit *int, fromDate, toDate string) ([]models.ProductTransaction, error) {
-    args := []interface{}{companyID, productID}
-    idx := 3
+	args := []interface{}{companyID, productID}
+	idx := 3
 
-    // Helper to add optional filters to each SELECT
-    buildWhere := func(base string, locCol string, dateCol string) (string, []interface{}, int) {
-        q := base
-        a := make([]interface{}, 0)
-        added := 0
-        if locationID != nil {
-            q += fmt.Sprintf(" AND %s = $%d", locCol, idx)
-            a = append(a, *locationID)
-            idx++
-            added++
-        }
-        if fromDate != "" {
-            q += fmt.Sprintf(" AND %s >= $%d", dateCol, idx)
-            a = append(a, fromDate)
-            idx++
-            added++
-        }
-        if toDate != "" {
-            q += fmt.Sprintf(" AND %s <= $%d", dateCol, idx)
-            a = append(a, toDate)
-            idx++
-            added++
-        }
-        return q, a, added
-    }
+	// Helper to add optional filters to each SELECT
+	buildWhere := func(base string, locCol string, dateCol string) (string, []interface{}, int) {
+		q := base
+		a := make([]interface{}, 0)
+		added := 0
+		if locationID != nil {
+			q += fmt.Sprintf(" AND %s = $%d", locCol, idx)
+			a = append(a, *locationID)
+			idx++
+			added++
+		}
+		if fromDate != "" {
+			q += fmt.Sprintf(" AND %s >= $%d", dateCol, idx)
+			a = append(a, fromDate)
+			idx++
+			added++
+		}
+		if toDate != "" {
+			q += fmt.Sprintf(" AND %s <= $%d", dateCol, idx)
+			a = append(a, toDate)
+			idx++
+			added++
+		}
+		return q, a, added
+	}
 
-    selects := make([]string, 0)
-    selectArgs := make([]interface{}, 0)
+	selects := make([]string, 0)
+	selectArgs := make([]interface{}, 0)
 
-    // Sales (outgoing)
-    {
-        base := `
+	// Sales (outgoing)
+	{
+		base := `
             SELECT
                 'SALE' AS type,
                 s.created_at AS occurred_at,
@@ -971,14 +977,14 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
             JOIN locations l ON s.location_id = l.location_id
             LEFT JOIN customers c ON s.customer_id = c.customer_id
             WHERE l.company_id = $1 AND sd.product_id = $2 AND s.is_deleted = FALSE`
-        with, a, _ := buildWhere(base, "s.location_id", "s.created_at")
-        selects = append(selects, with)
-        selectArgs = append(selectArgs, a...)
-    }
+		with, a, _ := buildWhere(base, "s.location_id", "s.created_at")
+		selects = append(selects, with)
+		selectArgs = append(selectArgs, a...)
+	}
 
-    // Sale returns (incoming)
-    {
-        base := `
+	// Sale returns (incoming)
+	{
+		base := `
             SELECT
                 'SALE_RETURN' AS type,
                 sr.created_at AS occurred_at,
@@ -995,14 +1001,14 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
             JOIN locations l ON sr.location_id = l.location_id
             LEFT JOIN customers c ON sr.customer_id = c.customer_id
             WHERE l.company_id = $1 AND srd.product_id = $2 AND sr.is_deleted = FALSE`
-        with, a, _ := buildWhere(base, "sr.location_id", "sr.created_at")
-        selects = append(selects, with)
-        selectArgs = append(selectArgs, a...)
-    }
+		with, a, _ := buildWhere(base, "sr.location_id", "sr.created_at")
+		selects = append(selects, with)
+		selectArgs = append(selectArgs, a...)
+	}
 
-    // Purchases (incoming) via Goods Receipts - show GRN number and per-receipt quantities
-    {
-        base := `
+	// Purchases (incoming) via Goods Receipts - show GRN number and per-receipt quantities
+	{
+		base := `
             SELECT
                 'PURCHASE' AS type,
                 gr.received_date AS occurred_at,
@@ -1019,14 +1025,14 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
             JOIN locations l ON gr.location_id = l.location_id
             LEFT JOIN suppliers s ON gr.supplier_id = s.supplier_id
             WHERE l.company_id = $1 AND gri.product_id = $2 AND gr.is_deleted = FALSE`
-        with, a, _ := buildWhere(base, "gr.location_id", "gr.received_date")
-        selects = append(selects, with)
-        selectArgs = append(selectArgs, a...)
-    }
+		with, a, _ := buildWhere(base, "gr.location_id", "gr.received_date")
+		selects = append(selects, with)
+		selectArgs = append(selectArgs, a...)
+	}
 
-    // Purchase returns (outgoing)
-    {
-        base := `
+	// Purchase returns (outgoing)
+	{
+		base := `
             SELECT
                 'PURCHASE_RETURN' AS type,
                 pr.created_at AS occurred_at,
@@ -1043,14 +1049,14 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
             JOIN locations l ON pr.location_id = l.location_id
             LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
             WHERE l.company_id = $1 AND prd.product_id = $2 AND pr.is_deleted = FALSE`
-        with, a, _ := buildWhere(base, "pr.location_id", "pr.created_at")
-        selects = append(selects, with)
-        selectArgs = append(selectArgs, a...)
-    }
+		with, a, _ := buildWhere(base, "pr.location_id", "pr.created_at")
+		selects = append(selects, with)
+		selectArgs = append(selectArgs, a...)
+	}
 
-    // Stock adjustments (could be +/-). If originating document exists, show its number and link to document.
-    {
-        base := `
+	// Stock adjustments (could be +/-). If originating document exists, show its number and link to document.
+	{
+		base := `
             SELECT
                 'ADJUSTMENT' AS type,
                 sa.created_at AS occurred_at,
@@ -1068,14 +1074,14 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
               ON d.location_id = sa.location_id
              AND sa.reason LIKE d.document_number || '%'
             WHERE l.company_id = $1 AND sa.product_id = $2`
-        with, a, _ := buildWhere(base, "sa.location_id", "sa.created_at")
-        selects = append(selects, with)
-        selectArgs = append(selectArgs, a...)
-    }
+		with, a, _ := buildWhere(base, "sa.location_id", "sa.created_at")
+		selects = append(selects, with)
+		selectArgs = append(selectArgs, a...)
+	}
 
-    // Transfers OUT (outgoing from source)
-    {
-        base := `
+	// Transfers OUT (outgoing from source)
+	{
+		base := `
             SELECT
                 'TRANSFER_OUT' AS type,
                 st.created_at AS occurred_at,
@@ -1092,14 +1098,14 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
             JOIN locations lf ON st.from_location_id = lf.location_id
             JOIN locations lt ON st.to_location_id = lt.location_id
             WHERE (lf.company_id = $1 OR lt.company_id = $1) AND std.product_id = $2`
-        with, a, _ := buildWhere(base, "st.from_location_id", "st.created_at")
-        selects = append(selects, with)
-        selectArgs = append(selectArgs, a...)
-    }
+		with, a, _ := buildWhere(base, "st.from_location_id", "st.created_at")
+		selects = append(selects, with)
+		selectArgs = append(selectArgs, a...)
+	}
 
-    // Transfers IN (incoming to destination)
-    {
-        base := `
+	// Transfers IN (incoming to destination)
+	{
+		base := `
             SELECT
                 'TRANSFER_IN' AS type,
                 st.created_at AS occurred_at,
@@ -1116,47 +1122,47 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
             JOIN locations lf ON st.from_location_id = lf.location_id
             JOIN locations lt ON st.to_location_id = lt.location_id
             WHERE (lf.company_id = $1 OR lt.company_id = $1) AND std.product_id = $2`
-        with, a, _ := buildWhere(base, "st.to_location_id", "st.created_at")
-        selects = append(selects, with)
-        selectArgs = append(selectArgs, a...)
-    }
+		with, a, _ := buildWhere(base, "st.to_location_id", "st.created_at")
+		selects = append(selects, with)
+		selectArgs = append(selectArgs, a...)
+	}
 
-    query := "(" + selects[0] + ")"
-    for i := 1; i < len(selects); i++ {
-        query += " UNION ALL (" + selects[i] + ")"
-    }
-    query += " ORDER BY occurred_at DESC"
-    if limit != nil && *limit > 0 {
-        query += fmt.Sprintf(" LIMIT $%d", idx)
-        selectArgs = append(selectArgs, *limit)
-        idx++
-    }
+	query := "(" + selects[0] + ")"
+	for i := 1; i < len(selects); i++ {
+		query += " UNION ALL (" + selects[i] + ")"
+	}
+	query += " ORDER BY occurred_at DESC"
+	if limit != nil && *limit > 0 {
+		query += fmt.Sprintf(" LIMIT $%d", idx)
+		selectArgs = append(selectArgs, *limit)
+		idx++
+	}
 
-    // Final args: base (company, product) + per-select additions + optional limit
-    finalArgs := append([]interface{}{}, args...)
-    finalArgs = append(finalArgs, selectArgs...)
+	// Final args: base (company, product) + per-select additions + optional limit
+	finalArgs := append([]interface{}{}, args...)
+	finalArgs = append(finalArgs, selectArgs...)
 
-    rows, err := s.db.Query(query, finalArgs...)
-    if err != nil {
-        return nil, fmt.Errorf("failed to get product transactions: %w", err)
-    }
-    defer rows.Close()
+	rows, err := s.db.Query(query, finalArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get product transactions: %w", err)
+	}
+	defer rows.Close()
 
-    res := make([]models.ProductTransaction, 0)
-    for rows.Next() {
-        var t models.ProductTransaction
-        var occurredAt time.Time
-        var partner *string
-        var notes *string
-        var locationName string
-        if err := rows.Scan(&t.Type, &occurredAt, &t.Reference, &t.Quantity, &t.LocationID, &locationName, &partner, &t.Entity, &t.EntityID, &notes); err != nil {
-            return nil, fmt.Errorf("failed to scan product transaction: %w", err)
-        }
-        t.OccurredAt = occurredAt
-        t.LocationName = locationName
-        t.PartnerName = partner
-        t.Notes = notes
-        res = append(res, t)
-    }
-    return res, nil
+	res := make([]models.ProductTransaction, 0)
+	for rows.Next() {
+		var t models.ProductTransaction
+		var occurredAt time.Time
+		var partner *string
+		var notes *string
+		var locationName string
+		if err := rows.Scan(&t.Type, &occurredAt, &t.Reference, &t.Quantity, &t.LocationID, &locationName, &partner, &t.Entity, &t.EntityID, &notes); err != nil {
+			return nil, fmt.Errorf("failed to scan product transaction: %w", err)
+		}
+		t.OccurredAt = occurredAt
+		t.LocationName = locationName
+		t.PartnerName = partner
+		t.Notes = notes
+		res = append(res, t)
+	}
+	return res, nil
 }

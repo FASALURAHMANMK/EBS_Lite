@@ -50,6 +50,10 @@ type Config struct {
 	MaxUploadSize int64
 	UploadPath    string
 
+	// Migrations
+	RunMigrations bool
+	MigrationsDir string
+
 	// Email
 	SMTPHost        string
 	SMTPPort        int
@@ -106,6 +110,10 @@ func Load() *Config {
 		// File Upload
 		MaxUploadSize: parseSize("MAX_UPLOAD_SIZE", "10MB"),
 		UploadPath:    getEnv("UPLOAD_PATH", "./uploads"),
+
+		// Migrations
+		RunMigrations: parseBool("RUN_MIGRATIONS", true),
+		MigrationsDir: getEnv("MIGRATIONS_DIR", "migrations"),
 
 		// Email
 		SMTPHost:        getEnv("SMTP_HOST", ""),
