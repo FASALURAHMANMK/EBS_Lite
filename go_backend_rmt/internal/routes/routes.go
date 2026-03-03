@@ -61,6 +61,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 	taxHandler := handlers.NewTaxHandler()
 	userPreferencesHandler := handlers.NewUserPreferencesHandler()
 	supportHandler := handlers.NewSupportHandler(cfg)
+	notificationsHandler := handlers.NewNotificationsHandler()
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -529,6 +530,14 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				cashRegisters.POST("/movement", middleware.RequirePermission("CASH_REGISTER_MOVEMENT"), cashRegisterHandler.RecordMovement)
 				cashRegisters.POST("/force-close", middleware.RequirePermission("FORCE_CLOSE_CASH_REGISTER"), cashRegisterHandler.ForceClose)
 				cashRegisters.GET("/events", middleware.RequirePermission("VIEW_CASH_REGISTERS"), cashRegisterHandler.GetEvents)
+			}
+
+			notifications := protected.Group("/notifications")
+			notifications.Use(middleware.RequireCompanyAccess())
+			{
+				notifications.GET("", middleware.RequirePermission("VIEW_NOTIFICATIONS"), notificationsHandler.List)
+				notifications.GET("/unread-count", middleware.RequirePermission("VIEW_NOTIFICATIONS"), notificationsHandler.UnreadCount)
+				notifications.POST("/mark-read", middleware.RequirePermission("MARK_NOTIFICATIONS_READ"), notificationsHandler.MarkRead)
 			}
 
 			reports := protected.Group("/reports")

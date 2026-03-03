@@ -206,6 +206,7 @@ class _PrinterEditDialogState extends State<_PrinterEditDialog> {
   final _usbVid = TextEditingController();
   final _usbPid = TextEditingController();
   bool _isDefault = false;
+  bool _cashDrawerKick = false;
   String _id = '';
 
   @override
@@ -223,6 +224,7 @@ class _PrinterEditDialogState extends State<_PrinterEditDialog> {
       _usbVid.text = (widget.initial!.usbVendorId ?? '').toString();
       _usbPid.text = (widget.initial!.usbProductId ?? '').toString();
       _isDefault = widget.initial!.isDefault;
+      _cashDrawerKick = widget.initial!.cashDrawerKick;
     }
   }
 
@@ -342,6 +344,13 @@ class _PrinterEditDialogState extends State<_PrinterEditDialog> {
                   onChanged: (v) => setState(() => _isDefault = v),
                   title: const Text('Set as default'),
                 ),
+                if (isThermal)
+                  SwitchListTile(
+                    value: _cashDrawerKick,
+                    onChanged: (v) => setState(() => _cashDrawerKick = v),
+                    title: const Text('Kick cash drawer'),
+                    subtitle: const Text('Sends ESC/POS drawer pulse on print'),
+                  ),
               ],
             ),
           ),
@@ -369,6 +378,7 @@ class _PrinterEditDialogState extends State<_PrinterEditDialog> {
               usbVendorId: int.tryParse(_usbVid.text.trim()),
               usbProductId: int.tryParse(_usbPid.text.trim()),
               isDefault: _isDefault,
+              cashDrawerKick: _cashDrawerKick,
             );
             Navigator.of(context).pop(dev);
           },

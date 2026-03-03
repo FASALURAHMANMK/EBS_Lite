@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
@@ -8,8 +9,10 @@ import '../../utils/invoice_pdf.dart';
 import '../../data/printer_settings_repository.dart';
 import '../../utils/escpos.dart';
 import '../../../../core/api_client.dart';
+import '../../../../core/error_handler.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../shared/widgets/manager_override_dialog.dart';
 
 import '../../../dashboard/data/payment_methods_repository.dart';
 import '../../controllers/pos_notifier.dart';
@@ -450,14 +453,67 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                             ))
                                         .toList();
 
-                                    final result = await ref
-                                        .read(posNotifierProvider.notifier)
-                                        .processCheckout(
-                                          paymentMethodId: primaryMethod,
-                                          paidAmount: paid,
-                                          payments: payments,
-                                          redeemPoints: redeemPoints,
+                                    Future<PosCheckoutResult> runCheckout({
+                                      String? overrideToken,
+                                      String? overrideReason,
+                                    }) {
+                                      return ref
+                                          .read(posNotifierProvider.notifier)
+                                          .processCheckout(
+                                            paymentMethodId: primaryMethod,
+                                            paidAmount: paid,
+                                            payments: payments,
+                                            redeemPoints: redeemPoints,
+                                            managerOverrideToken: overrideToken,
+                                            overrideReason: overrideReason,
+                                          );
+                                    }
+
+                                    PosCheckoutResult result;
+                                    try {
+                                      result = await runCheckout();
+                                    } on DioException catch (e) {
+                                      final data = e.response?.data;
+                                      final maybe =
+                                          (data is Map && data['data'] is Map)
+                                              ? Map<String, dynamic>.from(
+                                                  data['data'] as Map)
+                                              : null;
+                                      if (e.response?.statusCode == 403 &&
+                                          maybe?['code'] ==
+                                              'OVERRIDE_REQUIRED') {
+                                        if (!context.mounted) return;
+                                        final perms =
+                                            (maybe?['required_permissions']
+                                                        as List?)
+                                                    ?.map((x) => x.toString())
+                                                    .toList() ??
+                                                const <String>[];
+                                        final needReason =
+                                            maybe?['reason_required'] == true;
+                                        final approved =
+                                            await showManagerOverrideDialog(
+                                          context,
+                                          ref,
+                                          title: 'Manager override required',
+                                          requiredPermissions: perms,
+                                          requireReason: needReason,
+                                          reasonLabel: 'Reason',
                                         );
+                                        if (!context.mounted) return;
+                                        if (approved == null) {
+                                          if (!context.mounted) return;
+                                          setState(() => _submitting = false);
+                                          return;
+                                        }
+                                        result = await runCheckout(
+                                          overrideToken: approved.overrideToken,
+                                          overrideReason: approved.reason,
+                                        );
+                                      } else {
+                                        rethrow;
+                                      }
+                                    }
                                     if (!mounted) return;
                                     setState(() => _submitting = false);
 
@@ -491,7 +547,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                           content:
-                                              Text('Failed to process: $e')),
+                                              Text(ErrorHandler.message(e))),
                                     );
                                   }
                                 },

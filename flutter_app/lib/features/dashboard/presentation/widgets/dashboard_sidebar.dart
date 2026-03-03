@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../auth/controllers/auth_notifier.dart';
+import '../../../auth/controllers/auth_permissions_provider.dart';
 import '../../../../core/api_client.dart';
 import '../../controllers/location_notifier.dart';
 import '../../data/models.dart';
@@ -20,7 +21,10 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final authState = ref.watch(authNotifierProvider);
+    final perms = ref.watch(authPermissionsProvider);
     final locationState = ref.watch(locationNotifierProvider);
+
+    final showApprovals = perms.contains('VIEW_WORKFLOWS');
 
     return Drawer(
       shape: RoundedRectangleBorder(
@@ -117,6 +121,9 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                   _section(context, Icons.bar_chart_rounded, 'Reports',
                       const ['Sales', 'Purchase', 'Accounts', 'Inventory']),
                   const Divider(height: 24),
+                  if (showApprovals)
+                    _item(context, Icons.approval_rounded, 'Approvals'),
+                  if (showApprovals) const Divider(height: 24),
                   _item(context, Icons.settings_rounded, 'Settings'),
                   const Divider(height: 24),
                   ListTile(

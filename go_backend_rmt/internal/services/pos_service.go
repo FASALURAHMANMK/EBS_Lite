@@ -137,6 +137,30 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 		}
 	}
 
+	// Enforce role-based discount limits (staff limits) before creating a sale.
+	// Loyalty redemption is not counted toward manual discount limits.
+	manualDiscount := req.DiscountAmount
+	_, _, preTotal, err := s.salesService.CalculateTotals(companyID, &models.CreateSaleRequest{
+		CustomerID:     req.CustomerID,
+		Items:          req.Items,
+		DiscountAmount: 0,
+	})
+	if err != nil {
+		return nil, err
+	}
+	overrideApproverID, overrideUsed, err := s.enforceDiscountLimits(
+		companyID,
+		userID,
+		req.Items,
+		manualDiscount,
+		preTotal,
+		req.ManagerOverrideToken,
+		req.OverrideReason,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	// Normal flow: create a fresh sale
 	saleReq := &models.CreateSaleRequest{
 		CustomerID:      req.CustomerID,
@@ -176,6 +200,20 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 		}
 	}
 
+	// Credit limit check when the sale is not fully paid (i.e., creating new outstanding).
+	if !trainingEnabled && req.CustomerID != nil {
+		finalTotal := preTotal - manualDiscount - plannedRedeemValue
+		if finalTotal < 0 {
+			finalTotal = 0
+		}
+		outstandingDelta := finalTotal - req.PaidAmount
+		if outstandingDelta > 0.0001 {
+			if err := s.enforceCustomerCreditLimit(companyID, *req.CustomerID, outstandingDelta); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	sale, err := s.salesService.CreateSaleWithOptions(
 		companyID,
 		locationID,
@@ -201,6 +239,23 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 	if len(req.Payments) > 0 {
 		if err := s.recordSalePayments(nil, sale.SaleID, req.Payments); err != nil {
 			log.Printf("warning: failed to record sale payments for sale %d: %v", sale.SaleID, err)
+		}
+	}
+
+	// Best-effort audit log when a manager override was used (do not fail the sale).
+	if overrideUsed && sale != nil {
+		tx, err := s.db.Begin()
+		if err == nil {
+			recordID := sale.SaleID
+			actorID := userID
+			changes := models.JSONB{
+				"override":             true,
+				"override_type":        "discount",
+				"override_approver_id": overrideApproverID,
+				"manual_bill_discount": manualDiscount,
+			}
+			_ = LogAudit(tx, "OVERRIDE", "sales", &recordID, &actorID, nil, nil, &changes, nil, nil)
+			_ = tx.Commit()
 		}
 	}
 
@@ -527,6 +582,30 @@ func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int,
 		return nil, fmt.Errorf("invalid paid amount")
 	}
 
+	// Enforce role-based discount limits and credit limits during finalization as well
+	// to prevent bypass via "hold → resume → finalize".
+	preTotal := subtotal + tax
+	overrideApproverID, overrideUsed, err := s.enforceDiscountLimits(
+		companyID,
+		userID,
+		req.Items,
+		req.DiscountAmount,
+		preTotal,
+		req.ManagerOverrideToken,
+		req.OverrideReason,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if !isTraining && req.CustomerID != nil {
+		outstandingDelta := total - req.PaidAmount
+		if outstandingDelta > 0.0001 {
+			if err := s.enforceCustomerCreditLimit(companyID, *req.CustomerID, outstandingDelta); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	// Replace sale details
 	if _, err := tx.Exec(`
         DELETE FROM sale_details sd
@@ -535,6 +614,37 @@ func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int,
         WHERE sd.sale_id = s.sale_id AND s.sale_id = $1 AND l.company_id = $2
     `, saleID, companyID); err != nil {
 		return nil, fmt.Errorf("failed to clear sale details: %w", err)
+	}
+
+	productIDs := make([]int, 0, len(req.Items))
+	for _, item := range req.Items {
+		if item.ProductID != nil {
+			productIDs = append(productIDs, *item.ProductID)
+		}
+	}
+	metaByID, err := fetchProductMeta(tx, companyID, productIDs)
+	if err != nil {
+		return nil, err
+	}
+	taxIDs := make([]int, 0, len(req.Items))
+	for _, item := range req.Items {
+		var tid *int
+		if item.TaxID != nil {
+			tid = item.TaxID
+		} else if item.ProductID != nil {
+			meta, ok := metaByID[*item.ProductID]
+			if !ok {
+				return nil, fmt.Errorf("product not found")
+			}
+			tid = meta.TaxID
+		}
+		if tid != nil {
+			taxIDs = append(taxIDs, *tid)
+		}
+	}
+	taxPctByID, err := fetchTaxPercentages(tx, companyID, taxIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate tax: %w", err)
 	}
 
 	// Insert details and update stock
@@ -548,17 +658,18 @@ func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int,
 		if item.TaxID != nil {
 			effectiveTaxID = item.TaxID
 		} else if item.ProductID != nil {
-			var prodTaxID int
-			q := `SELECT tax_id FROM products WHERE product_id=$1 AND company_id=$2 AND is_deleted=FALSE`
-			if err := s.db.QueryRow(q, *item.ProductID, companyID).Scan(&prodTaxID); err == nil && prodTaxID > 0 {
-				effectiveTaxID = &prodTaxID
+			meta, ok := metaByID[*item.ProductID]
+			if !ok {
+				return nil, fmt.Errorf("product not found")
 			}
+			effectiveTaxID = meta.TaxID
 		}
 		if effectiveTaxID != nil {
-			taxAmount, err = s.salesService.calculateTax(companyID, lineTotal, *effectiveTaxID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to calculate tax: %w", err)
+			pct, ok := taxPctByID[*effectiveTaxID]
+			if !ok {
+				return nil, fmt.Errorf("failed to calculate tax: %w", fmt.Errorf("failed to get tax percentage: %w", sql.ErrNoRows))
 			}
+			taxAmount = lineTotal * (pct / 100)
 		}
 
 		if _, err := tx.Exec(`
@@ -599,6 +710,23 @@ func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int,
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit finalize: %w", err)
+	}
+
+	// Best-effort audit log when a manager override was used (do not fail the sale).
+	if overrideUsed {
+		tx2, err := s.db.Begin()
+		if err == nil {
+			recordID := saleID
+			actorID := userID
+			changes := models.JSONB{
+				"override":             true,
+				"override_type":        "discount",
+				"override_approver_id": overrideApproverID,
+				"manual_bill_discount": req.DiscountAmount,
+			}
+			_ = LogAudit(tx2, "OVERRIDE", "sales", &recordID, &actorID, nil, nil, &changes, nil, nil)
+			_ = tx2.Commit()
+		}
 	}
 
 	return s.salesService.GetSaleByID(saleID, companyID)
@@ -655,7 +783,7 @@ func (s *POSService) recordSalePaymentsTx(tx *sql.Tx, saleID int, lines []models
 // number. If the original sale was COMPLETED, this contains negative item
 // lines to reverse stock and amounts. If original was DRAFT/HELD, a zero-total
 // void invoice is created to record the event and advance numbering.
-func (s *POSService) VoidSale(companyID, locationID, userID, originalSaleID int, idempotencyKey string) (*models.Sale, error) {
+func (s *POSService) VoidSale(companyID, locationID, userID, originalSaleID int, idempotencyKey string, reason string, overrideApproverID *int, requestID string) (*models.Sale, error) {
 	// Load original sale header and items
 	var status string
 	var origLocationID int
@@ -766,6 +894,25 @@ func (s *POSService) VoidSale(companyID, locationID, userID, originalSaleID int,
 		}
 	}
 
+	// Audit log (must be present for voids).
+	{
+		recordID := originalSaleID
+		actorID := userID
+		changes := models.JSONB{
+			"void_sale_id": voidSaleID,
+			"reason":       reason,
+		}
+		if overrideApproverID != nil && *overrideApproverID > 0 {
+			changes["override_approver_id"] = *overrideApproverID
+		}
+		if strings.TrimSpace(requestID) != "" {
+			changes["request_id"] = requestID
+		}
+		if err := LogAudit(tx, "VOID", "sales", &recordID, &actorID, nil, nil, &changes, nil, nil); err != nil {
+			return nil, fmt.Errorf("failed to log audit: %w", err)
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit void: %w", err)
 	}
@@ -822,6 +969,37 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 	subtotal := float64(0)
 	totalTax := float64(0)
 
+	productIDs := make([]int, 0, len(req.Items))
+	for _, item := range req.Items {
+		if item.ProductID != nil {
+			productIDs = append(productIDs, *item.ProductID)
+		}
+	}
+	metaByID, err := fetchProductMeta(tx, companyID, productIDs)
+	if err != nil {
+		return nil, err
+	}
+	taxIDs := make([]int, 0, len(req.Items))
+	for _, item := range req.Items {
+		var tid *int
+		if item.TaxID != nil {
+			tid = item.TaxID
+		} else if item.ProductID != nil {
+			meta, ok := metaByID[*item.ProductID]
+			if !ok {
+				return nil, fmt.Errorf("product not found")
+			}
+			tid = meta.TaxID
+		}
+		if tid != nil {
+			taxIDs = append(taxIDs, *tid)
+		}
+	}
+	taxPctByID, err := fetchTaxPercentages(tx, companyID, taxIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate tax: %w", err)
+	}
+
 	// We'll also compute discount per line for persistence
 	type lineComputed struct {
 		qty     float64
@@ -847,16 +1025,18 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 		if item.TaxID != nil {
 			effectiveTaxID = item.TaxID
 		} else if item.ProductID != nil {
-			var prodTaxID int
-			if err := s.db.QueryRow(`SELECT tax_id FROM products WHERE product_id=$1 AND company_id=$2 AND is_deleted=FALSE`, *item.ProductID, companyID).Scan(&prodTaxID); err == nil && prodTaxID > 0 {
-				effectiveTaxID = &prodTaxID
+			meta, ok := metaByID[*item.ProductID]
+			if !ok {
+				return nil, fmt.Errorf("product not found")
 			}
+			effectiveTaxID = meta.TaxID
 		}
 		if effectiveTaxID != nil {
-			taxAmount, err = NewSalesService().calculateTax(companyID, lineTotal, *effectiveTaxID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to calculate tax: %w", err)
+			pct, ok := taxPctByID[*effectiveTaxID]
+			if !ok {
+				return nil, fmt.Errorf("failed to calculate tax: %w", fmt.Errorf("failed to get tax percentage: %w", sql.ErrNoRows))
 			}
+			taxAmount = lineTotal * (pct / 100)
 		}
 		subtotal += lineTotal
 		totalTax += taxAmount
@@ -928,4 +1108,107 @@ func (s *POSService) isTrainingModeEnabled(companyID, locationID int) (bool, err
 		return false, fmt.Errorf("failed to resolve training mode: %w", err)
 	}
 	return enabled, nil
+}
+
+func (s *POSService) enforceDiscountLimits(
+	companyID int,
+	userID int,
+	items []models.CreateSaleDetailRequest,
+	billDiscountAmount float64,
+	preTotal float64,
+	overrideToken *string,
+	overrideReason *string,
+) (approverUserID int, overrideUsed bool, err error) {
+	// Resolve current user's role limits.
+	permSvc := NewPermissionService()
+	roleID, err := permSvc.GetUserRoleID(userID)
+	if err != nil {
+		return 0, false, err
+	}
+	limitsSvc := NewPOSLimitsService()
+	limits, err := limitsSvc.GetLimitsForRole(roleID)
+	if err != nil {
+		return 0, false, err
+	}
+
+	// Max line discount (percent).
+	maxLine := float64(0)
+	for _, it := range items {
+		if it.DiscountPercent > maxLine {
+			maxLine = it.DiscountPercent
+		}
+	}
+
+	// Bill discount percent derived from preTotal (subtotal+tax before bill discount).
+	billPct := float64(0)
+	if preTotal > 0 && billDiscountAmount > 0 {
+		billPct = (billDiscountAmount / preTotal) * 100
+	}
+
+	needsOverride := maxLine > limits.MaxLineDiscountPct || billPct > limits.MaxBillDiscountPct
+	if !needsOverride {
+		return 0, false, nil
+	}
+
+	// Require a manager override token to proceed.
+	token := ""
+	if overrideToken != nil {
+		token = strings.TrimSpace(*overrideToken)
+	}
+	if token == "" {
+		return 0, false, &OverrideRequiredError{
+			Message:             "Manager override required",
+			RequiredPermissions: []string{"OVERRIDE_DISCOUNTS"},
+			ReasonRequired:      true,
+		}
+	}
+
+	ctx, err := ValidateOverrideToken(token, companyID, []string{"OVERRIDE_DISCOUNTS"})
+	if err != nil {
+		return 0, false, err
+	}
+
+	reason := ""
+	if overrideReason != nil {
+		reason = strings.TrimSpace(*overrideReason)
+	}
+	if reason == "" {
+		return 0, false, fmt.Errorf("override_reason is required")
+	}
+
+	return ctx.ApproverUserID, true, nil
+}
+
+func (s *POSService) enforceCustomerCreditLimit(companyID, customerID int, additionalOutstanding float64) error {
+	if additionalOutstanding <= 0 {
+		return nil
+	}
+
+	var limit float64
+	var current float64
+	err := s.db.QueryRow(`
+		SELECT c.credit_limit,
+			   COALESCE(SUM(s.total_amount - s.paid_amount),0) AS credit_balance
+		FROM customers c
+		LEFT JOIN sales s ON c.customer_id = s.customer_id AND s.is_deleted = FALSE
+		WHERE c.customer_id = $1 AND c.company_id = $2 AND c.is_deleted = FALSE
+		GROUP BY c.credit_limit
+	`, customerID, companyID).Scan(&limit, &current)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("customer not found")
+		}
+		return fmt.Errorf("failed to check credit limit: %w", err)
+	}
+
+	// A limit of 0 (or negative) means no credit allowed.
+	if limit <= 0 {
+		return &CreditLimitExceededError{CreditLimit: limit, CurrentBalance: current, AttemptedDelta: additionalOutstanding}
+	}
+
+	if current+additionalOutstanding > limit+0.0001 {
+		return &CreditLimitExceededError{CreditLimit: limit, CurrentBalance: current, AttemptedDelta: additionalOutstanding}
+	}
+
+	return nil
 }

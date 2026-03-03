@@ -15,8 +15,12 @@ import 'package:ebs_lite/features/sales/presentation/pages/sales_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/purchases_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/inventory_page.dart';
 import 'package:ebs_lite/features/customers/presentation/pages/customers_page.dart';
+import 'package:ebs_lite/features/customers/presentation/widgets/quick_collection_sheet.dart';
 import 'package:ebs_lite/features/pos/presentation/pages/pos_page.dart';
 import 'package:ebs_lite/features/notifications/presentation/pages/notifications_page.dart';
+import 'package:ebs_lite/features/notifications/controllers/notifications_providers.dart';
+import 'package:ebs_lite/features/purchases/presentation/pages/grn_form_page.dart';
+import 'package:ebs_lite/features/expenses/presentation/widgets/quick_expense_sheet.dart';
 import 'dashboard_navigation.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -52,6 +56,52 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   ];
 
   int _bottomIndex = 0;
+
+  Future<int?> _ensureLocationSelected() async {
+    final state = ref.read(locationNotifierProvider);
+    final selected = state.selected;
+    if (selected != null) return selected.locationId;
+
+    if (state.locations.isNotEmpty) {
+      await _showLocationPicker(state.locations);
+      return ref.read(locationNotifierProvider).selected?.locationId;
+    }
+
+    if (!mounted) return null;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('No locations available')));
+    return null;
+  }
+
+  Future<void> _quickPurchase() async {
+    final locId = await _ensureLocationSelected();
+    if (!mounted || locId == null) return;
+
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const GrnFormPage()),
+    );
+    if (!mounted) return;
+    if (created == true) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Purchase/GRN created')));
+    }
+  }
+
+  Future<void> _quickCollection() async {
+    final locId = await _ensureLocationSelected();
+    if (!mounted || locId == null) return;
+
+    await showQuickCollectionSheet(context, ref);
+  }
+
+  Future<void> _quickExpense() async {
+    final locId = await _ensureLocationSelected();
+    if (!mounted || locId == null) return;
+
+    await showQuickExpenseSheet(context, ref);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -90,6 +140,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final theme = Theme.of(context);
     final outboxState = ref.watch(outboxNotifierProvider);
     final outboxNotifier = ref.read(outboxNotifierProvider.notifier);
+    final unreadNotifications =
+        ref.watch(notificationsUnreadCountProvider).maybeWhen(
+              data: (v) => v,
+              orElse: () => 0,
+            );
 
     // Primary tab pages (kept alive via IndexedStack)
     final pages = <Widget>[
@@ -110,6 +165,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         isOnline: outboxState.isOnline,
         queuedCount: outboxState.queuedCount,
         isSyncing: outboxState.isSyncing,
+        unreadNotificationsCount: unreadNotifications,
         onRetry: outboxState.queuedCount > 0
             ? () => outboxNotifier.retryNow()
             : null,
@@ -205,13 +261,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     }),
                 QuickAction(
                     icon: Icons.shopping_cart_rounded,
-                    label: 'Purchase (${quickCounts?.purchases ?? 0})'),
+                    label: 'Purchase (${quickCounts?.purchases ?? 0})',
+                    onTap: _quickPurchase),
                 QuickAction(
                     icon: Icons.payments_rounded,
-                    label: 'Collection (${quickCounts?.collections ?? 0})'),
+                    label: 'Collection (${quickCounts?.collections ?? 0})',
+                    onTap: _quickCollection),
                 QuickAction(
                     icon: Icons.money_off_rounded,
-                    label: 'Expense (${quickCounts?.expenses ?? 0})'),
+                    label: 'Expense (${quickCounts?.expenses ?? 0})',
+                    onTap: _quickExpense),
               ],
               onOpenChanged: (open) {
                 // Example: dim app bar or log analytics here.

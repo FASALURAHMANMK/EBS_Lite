@@ -445,11 +445,29 @@ func (s *AuthService) VerifyCredentials(companyID int, req *models.VerifyCredent
 		}
 	}
 
-	return &models.VerifyCredentialsResponse{
+	resp := &models.VerifyCredentialsResponse{
 		UserID:      user.UserID,
 		Username:    user.Username,
 		Permissions: perms,
-	}, nil
+	}
+
+	// Issue a short-lived override token when permissions were explicitly requested.
+	// This token is later attached to high-risk requests (discount overrides, voids, etc.)
+	// so the backend can enforce approvals server-side.
+	if len(required) > 0 {
+		requiredList := make([]string, 0, len(required))
+		for p := range required {
+			requiredList = append(requiredList, p)
+		}
+		token, err := utils.GenerateManagerOverrideToken(user.UserID, companyID, requiredList, 5*time.Minute)
+		if err != nil {
+			return nil, err
+		}
+		resp.OverrideToken = token
+		resp.ExpiresAtUnix = time.Now().Add(5 * time.Minute).Unix()
+	}
+
+	return resp, nil
 }
 
 // Helper methods

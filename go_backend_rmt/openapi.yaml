@@ -159,7 +159,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/VerifyCredentialsRequest'
   /device-sessions:
     get:
       summary: GET /api/v1/device-sessions
@@ -1494,7 +1494,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/POSCheckoutRequest'
   /pos/calculate:
     post:
       summary: POST /api/v1/pos/calculate
@@ -1541,6 +1541,11 @@ paths:
         required: true
         schema:
           type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/POSVoidRequest'
   /pos/print:
     post:
       summary: POST /api/v1/pos/print
@@ -1854,7 +1859,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreateSaleReturnRequest'
   /sale-returns/by-customer:
     post:
       summary: POST /api/v1/sale-returns/by-customer
@@ -1869,7 +1874,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreateSaleReturnByCustomerRequest'
   /sale-returns/{id}:
     get:
       summary: GET /api/v1/sale-returns/{id}
@@ -1962,6 +1967,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuickSaleReturnRequest'
       parameters:
       - name: sale_id
         in: path
@@ -3185,6 +3195,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
+  /notifications:
+    get:
+      summary: GET /api/v1/notifications
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /notifications/unread-count:
+    get:
+      summary: GET /api/v1/notifications/unread-count
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /notifications/mark-read:
+    post:
+      summary: POST /api/v1/notifications/mark-read
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
   /reports/sales-summary:
     get:
       summary: GET /api/v1/reports/sales-summary
@@ -4440,6 +4485,134 @@ components:
         company:
           type: object
           nullable: true
+    VerifyCredentialsRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        required_permissions:
+          type: array
+          items:
+            type: string
+      required:
+        - password
+    VerifyCredentialsResponse:
+      type: object
+      properties:
+        user_id:
+          type: integer
+        username:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+        override_token:
+          type: string
+        expires_at_unix:
+          type: integer
+    POSPaymentLine:
+      type: object
+      properties:
+        method_id:
+          type: integer
+        currency_id:
+          type: integer
+          nullable: true
+        amount:
+          type: number
+      required:
+        - method_id
+        - amount
+    POSCheckoutRequest:
+      type: object
+      properties:
+        sale_id:
+          type: integer
+          nullable: true
+        customer_id:
+          type: integer
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GenericObject'
+        payment_method_id:
+          type: integer
+          nullable: true
+        discount_amount:
+          type: number
+        paid_amount:
+          type: number
+        payments:
+          type: array
+          items:
+            $ref: '#/components/schemas/POSPaymentLine'
+        redeem_points:
+          type: number
+          nullable: true
+        manager_override_token:
+          type: string
+          nullable: true
+        override_reason:
+          type: string
+          nullable: true
+    POSVoidRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+        manager_override_token:
+          type: string
+          nullable: true
+      required:
+        - reason
+    CreateSaleReturnRequest:
+      type: object
+      properties:
+        sale_id:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GenericObject'
+        reason:
+          type: string
+      required:
+        - sale_id
+        - items
+        - reason
+    CreateSaleReturnByCustomerRequest:
+      type: object
+      properties:
+        customer_id:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GenericObject'
+        reason:
+          type: string
+      required:
+        - customer_id
+        - items
+        - reason
+    QuickSaleReturnRequest:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GenericObject'
+        reason:
+          type: string
+      required:
+        - items
+        - reason
     UserResponse:
       type: object
       properties:

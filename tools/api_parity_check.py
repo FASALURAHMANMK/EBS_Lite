@@ -32,6 +32,11 @@ _DIO_CALL_RE = re.compile(
     re.MULTILINE,
 )
 
+_FILE_TRANSFER_DOWNLOAD_RE = re.compile(
+    r"\bFileTransfer\.downloadBytes\(\s*[^,]+,\s*'([^']+)'",
+    re.MULTILINE,
+)
+
 
 def _norm_path_param_syntax(path: str) -> str:
     # Normalize both OpenAPI `{id}` and Dart `$id` / `${id}` to a common token.
@@ -64,6 +69,16 @@ def read_flutter_calls(flutter_lib_dir: Path) -> list[FlutterCall]:
             calls.append(
                 FlutterCall(
                     method=method,
+                    path=_norm_flutter_path(raw_path),
+                    file=str(dart_file.as_posix()),
+                )
+            )
+        # Also detect endpoints called via shared download helper (exports).
+        for m in _FILE_TRANSFER_DOWNLOAD_RE.finditer(text):
+            raw_path = m.group(1)
+            calls.append(
+                FlutterCall(
+                    method="GET",
                     path=_norm_flutter_path(raw_path),
                     file=str(dart_file.as_posix()),
                 )

@@ -132,9 +132,11 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
           );
       // Refresh auth state to propagate changes (logo/name)
       final me = await ref.read(authRepositoryProvider).me();
-      ref
-          .read(authNotifierProvider.notifier)
-          .setAuth(user: me.user.toUser(), company: me.company);
+      ref.read(authNotifierProvider.notifier).setAuth(
+            user: me.user.toUser(),
+            company: me.company,
+            permissions: me.user.permissions ?? const [],
+          );
       if (!mounted) return;
       final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context)
@@ -429,9 +431,11 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
       setState(() => _logoPath = logo);
       // Also refresh auth so sidebar updates immediately
       final me = await ref.read(authRepositoryProvider).me();
-      ref
-          .read(authNotifierProvider.notifier)
-          .setAuth(user: me.user.toUser(), company: me.company);
+      ref.read(authNotifierProvider.notifier).setAuth(
+            user: me.user.toUser(),
+            company: me.company,
+            permissions: me.user.permissions ?? const [],
+          );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)

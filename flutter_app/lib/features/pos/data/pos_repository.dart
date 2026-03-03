@@ -111,6 +111,8 @@ class PosRepository {
     List<PosPaymentLineDto>? payments,
     double? redeemPoints,
     String? idempotencyKey,
+    String? managerOverrideToken,
+    String? overrideReason,
   }) async {
     final loc = _ref.read(locationNotifierProvider).selected;
     if (loc == null) {
@@ -134,6 +136,11 @@ class PosRepository {
         'payments': payments.map((p) => p.toJson()).toList(),
       if (redeemPoints != null && redeemPoints > 0)
         'redeem_points': redeemPoints,
+      if (managerOverrideToken != null &&
+          managerOverrideToken.trim().isNotEmpty)
+        'manager_override_token': managerOverrideToken.trim(),
+      if (overrideReason != null && overrideReason.trim().isNotEmpty)
+        'override_reason': overrideReason.trim(),
     };
     final headers = <String, dynamic>{
       if ((idempotencyKey ?? '').isNotEmpty) 'Idempotency-Key': idempotencyKey,
@@ -274,6 +281,16 @@ class PosRepository {
   }
 
   Future<void> voidSale(int saleId, {String? idempotencyKey}) async {
+    // Legacy method kept for compatibility; voids now require a reason.
+    throw UnimplementedError('Use voidSaleWithReason(...)');
+  }
+
+  Future<void> voidSaleWithReason(
+    int saleId, {
+    required String reason,
+    String? managerOverrideToken,
+    String? idempotencyKey,
+  }) async {
     final loc = _ref.read(locationNotifierProvider).selected;
     final key =
         (idempotencyKey ?? '').isEmpty ? 'void-$saleId' : idempotencyKey!;
@@ -281,11 +298,18 @@ class PosRepository {
       'Idempotency-Key': key,
       'X-Idempotency-Key': key,
     };
+    final payload = <String, dynamic>{
+      'reason': reason.trim(),
+      if (managerOverrideToken != null &&
+          managerOverrideToken.trim().isNotEmpty)
+        'manager_override_token': managerOverrideToken.trim(),
+    };
     await _dio.post(
       '/pos/void/$saleId',
       queryParameters: {
         if (loc != null) 'location_id': loc.locationId,
       },
+      data: payload,
       options: Options(headers: headers),
     );
   }

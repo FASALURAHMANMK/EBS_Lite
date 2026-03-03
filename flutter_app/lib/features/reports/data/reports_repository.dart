@@ -1,13 +1,8 @@
-import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
-
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/file_transfer.dart';
 
 class ReportsRepository {
   ReportsRepository(this._dio);
@@ -35,28 +30,22 @@ class ReportsRepository {
       if (queryParameters != null) ...queryParameters,
       'format': format,
     };
-    final res = await _getReport(
-      endpoint,
-      queryParameters: qp,
-      options: Options(responseType: ResponseType.bytes),
-    );
-
-    final contentType = _getContentType(res);
-    final bytes = _normalizeBytes(res.data);
-
-    if (contentType.contains('application/json')) {
-      final text = utf8.decode(bytes, allowMalformed: true);
-      throw Exception(_extractErrorMessage(text));
-    }
 
     final ext = format == 'excel' ? 'xlsx' : 'pdf';
     final filename = 'report-${_endpointSlug(endpoint)}.$ext';
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/$filename');
-    await file.writeAsBytes(bytes, flush: true);
+    final bytes = await FileTransfer.downloadBytes(
+      _dio,
+      endpoint,
+      queryParameters: qp,
+    );
+    final filePath = await FileTransfer.saveToTemp(bytes, filename);
+    final mimeType = FileTransfer.guessMimeTypeFromFilename(filename) ??
+        'application/octet-stream';
 
-    await Share.shareXFiles(
-      [XFile(file.path, name: filename, mimeType: contentType)],
+    await FileTransfer.shareTempFile(
+      filePath: filePath,
+      filename: filename,
+      mimeType: mimeType,
       subject: shareTitle ?? 'Report ${_endpointSlug(endpoint)}',
       text: 'Please find the attached report.',
     );
@@ -192,35 +181,11 @@ class ReportsRepository {
     return parts.last;
   }
 
-  String _getContentType(Response res) {
-    final header = res.headers.value('content-type')?.toLowerCase() ?? '';
-    if (header.isNotEmpty) return header;
-    return 'application/octet-stream';
-  }
-
-  Uint8List _normalizeBytes(dynamic data) {
-    if (data is Uint8List) return data;
-    if (data is List<int>) return Uint8List.fromList(data);
-    if (data is String) return Uint8List.fromList(utf8.encode(data));
-    return Uint8List(0);
-  }
-
   dynamic _extractData(dynamic body) {
     if (body is Map<String, dynamic>) {
       if (body.containsKey('data')) return body['data'];
     }
     return body;
-  }
-
-  String _extractErrorMessage(String text) {
-    try {
-      final decoded = jsonDecode(text);
-      if (decoded is Map<String, dynamic>) {
-        if (decoded['error'] is String) return decoded['error'] as String;
-        if (decoded['message'] is String) return decoded['message'] as String;
-      }
-    } catch (_) {}
-    return text.isEmpty ? 'Export failed' : text;
   }
 }
 

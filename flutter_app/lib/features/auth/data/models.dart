@@ -191,11 +191,15 @@ class VerifyCredentialsResponse {
   final int userId;
   final String username;
   final List<String> permissions;
+  final String? overrideToken;
+  final int? expiresAtUnix;
 
   VerifyCredentialsResponse({
     required this.userId,
     required this.username,
     required this.permissions,
+    this.overrideToken,
+    this.expiresAtUnix,
   });
 
   factory VerifyCredentialsResponse.fromJson(Map<String, dynamic> json) {
@@ -205,6 +209,10 @@ class VerifyCredentialsResponse {
       permissions:
           (json['permissions'] as List?)?.map((e) => e.toString()).toList() ??
               const [],
+      overrideToken: (json['override_token'] as String?)?.trim().isEmpty == true
+          ? null
+          : (json['override_token'] as String?),
+      expiresAtUnix: (json['expires_at_unix'] as num?)?.toInt(),
     );
   }
 }

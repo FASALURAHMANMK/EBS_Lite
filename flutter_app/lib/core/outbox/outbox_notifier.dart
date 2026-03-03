@@ -186,6 +186,13 @@ class OutboxNotifier extends StateNotifier<OutboxState> {
         case 'purchase_quick_grn':
           await _processQuickGrn(item);
           return true;
+        case 'expense':
+          await _send(
+            item,
+            method: 'POST',
+            path: '/expenses',
+          );
+          return true;
         default:
           await _store.markFailed(item.id!, 'Unknown outbox type');
           return true;

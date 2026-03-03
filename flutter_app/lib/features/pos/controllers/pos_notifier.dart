@@ -193,6 +193,8 @@ class PosNotifier extends StateNotifier<PosState> {
     required double paidAmount,
     List<PosPaymentLineDto>? payments,
     double? redeemPoints,
+    String? managerOverrideToken,
+    String? overrideReason,
   }) async {
     _checkoutIdemKey ??= const Uuid().v4();
     try {
@@ -206,6 +208,8 @@ class PosNotifier extends StateNotifier<PosState> {
         payments: payments,
         redeemPoints: redeemPoints,
         idempotencyKey: _checkoutIdemKey,
+        managerOverrideToken: managerOverrideToken,
+        overrideReason: overrideReason,
       );
       _checkoutIdemKey = null;
       final nextPreview = await _repo.getNextReceiptPreview();

@@ -131,6 +131,7 @@ class _MyAppState extends ConsumerState<MyApp> {
       ref.read(authNotifierProvider.notifier).setAuth(
             user: user,
             company: company,
+            permissions: res.user.permissions ?? const [],
           );
 
       if (company != null) {

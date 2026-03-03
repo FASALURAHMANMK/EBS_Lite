@@ -12,6 +12,7 @@ import '../../hr/presentation/pages/payroll_page.dart';
 import '../../reports/presentation/pages/report_category_page.dart';
 import '../../reports/presentation/pages/reports_page.dart';
 import '../../reports/presentation/report_categories.dart';
+import '../../workflow/presentation/pages/workflow_requests_page.dart';
 import 'pages/settings_page.dart';
 
 class DashboardNavigation {
@@ -63,6 +64,8 @@ class DashboardNavigation {
         return const AttendancePage();
       case 'Payroll Management':
         return const PayrollPage();
+      case 'Approvals':
+        return const WorkflowRequestsPage();
       case 'Settings':
         return const SettingsPage();
       default:

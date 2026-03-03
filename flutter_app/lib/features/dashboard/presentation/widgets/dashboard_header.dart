@@ -11,6 +11,7 @@ class DashboardHeader extends ConsumerStatefulWidget
     this.onRetry,
     this.onToggleTheme,
     this.onNotifications,
+    this.unreadNotificationsCount = 0,
     this.title = 'Dashboard',
   });
 
@@ -24,6 +25,8 @@ class DashboardHeader extends ConsumerStatefulWidget
   final VoidCallback? onToggleTheme;
   final VoidCallback? onNotifications;
   final String title;
+
+  final int unreadNotificationsCount;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -109,7 +112,35 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
         // Notifications
         IconButton(
           tooltip: 'Notifications',
-          icon: const Icon(Icons.notifications_none_rounded),
+          icon: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Icon(Icons.notifications_none_rounded),
+              if (widget.unreadNotificationsCount > 0)
+                Positioned(
+                  right: -2,
+                  top: -2,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.error,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints:
+                        const BoxConstraints(minWidth: 16, minHeight: 16),
+                    child: Text(
+                      widget.unreadNotificationsCount > 99
+                          ? '99+'
+                          : widget.unreadNotificationsCount.toString(),
+                      style: theme.textTheme.labelSmall
+                          ?.copyWith(color: theme.colorScheme.onError),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           onPressed: widget.onNotifications,
         ),
         const SizedBox(width: 4),

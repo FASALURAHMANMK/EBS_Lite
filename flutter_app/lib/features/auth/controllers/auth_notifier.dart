@@ -10,12 +10,14 @@ class AuthState {
   final bool isLoading;
   final User? user;
   final Company? company;
+  final List<String>? permissions;
   final String? error;
 
   const AuthState({
     this.isLoading = false,
     this.user,
     this.company,
+    this.permissions,
     this.error,
   });
 
@@ -23,12 +25,14 @@ class AuthState {
     bool? isLoading,
     User? user,
     Company? company,
+    List<String>? permissions,
     String? error,
   }) {
     return AuthState(
       isLoading: isLoading ?? this.isLoading,
       user: user ?? this.user,
       company: company ?? this.company,
+      permissions: permissions ?? this.permissions,
       error: error,
     );
   }
@@ -44,8 +48,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final res = await _repository.login(
           username: username, email: email, password: password);
+
+      // After login, fetch authoritative profile (permissions, company context)
+      final me = await _repository.me();
       state = state.copyWith(
-          isLoading: false, user: res.user, company: res.company);
+        isLoading: false,
+        user: me.user.toUser(),
+        company: me.company,
+        permissions: me.user.permissions ?? const [],
+      );
       return res;
     } on AuthException catch (ex) {
       state = state.copyWith(isLoading: false, error: ex.message);
@@ -102,7 +113,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final company = await _repository.createCompany(name: name, email: email);
-      state = state.copyWith(isLoading: false, company: company);
+      // Refresh /me to pick up updated company context and permissions
+      try {
+        final me = await _repository.me();
+        state = state.copyWith(
+          isLoading: false,
+          user: me.user.toUser(),
+          company: me.company,
+          permissions: me.user.permissions ?? const [],
+        );
+      } catch (_) {
+        state = state.copyWith(isLoading: false, company: company);
+      }
       return company;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: ErrorHandler.message(e));
@@ -110,8 +132,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  void setAuth({required User user, Company? company}) {
-    state = state.copyWith(user: user, company: company);
+  void setAuth(
+      {required User user, Company? company, List<String>? permissions}) {
+    state =
+        state.copyWith(user: user, company: company, permissions: permissions);
   }
 
   void resetAuth() {

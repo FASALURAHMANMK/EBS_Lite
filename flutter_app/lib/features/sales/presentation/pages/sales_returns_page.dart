@@ -88,6 +88,15 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
       return;
     }
 
+    final reason = _reasonCtrl.text.trim();
+    if (reason.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Reason is required')));
+      return;
+    }
+
     final customer = _customer;
     final sale = _linkedSale;
     try {
@@ -104,9 +113,7 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
         returnId = await ref.read(salesRepositoryProvider).createSaleReturn(
               saleId: sale.saleId,
               items: items,
-              reason: _reasonCtrl.text.trim().isEmpty
-                  ? null
-                  : _reasonCtrl.text.trim(),
+              reason: reason,
             );
       } else {
         if (sale != null) {
@@ -114,9 +121,7 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
           returnId = await ref.read(salesRepositoryProvider).createSaleReturn(
                 saleId: sale.saleId,
                 items: items,
-                reason: _reasonCtrl.text.trim().isEmpty
-                    ? null
-                    : _reasonCtrl.text.trim(),
+                reason: reason,
               );
         } else {
           // Customer selected, invoice optional – let backend locate a sale
@@ -125,9 +130,7 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
               .createSaleReturnByCustomer(
                 customerId: customer.customerId,
                 items: items,
-                reason: _reasonCtrl.text.trim().isEmpty
-                    ? null
-                    : _reasonCtrl.text.trim(),
+                reason: reason,
               );
         }
       }
@@ -190,7 +193,7 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
             TextField(
               controller: _reasonCtrl,
               decoration: const InputDecoration(
-                labelText: 'Reason (optional)',
+                labelText: 'Reason (required)',
                 prefixIcon: Icon(Icons.description_outlined),
               ),
             ),

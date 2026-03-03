@@ -23,6 +23,103 @@ func NewSalesService() *SalesService {
 	}
 }
 
+type sqlQueryer interface {
+	Query(query string, args ...any) (*sql.Rows, error)
+}
+
+type productMeta struct {
+	TaxID        *int
+	IsSerialized bool
+}
+
+func uniqueInts(in []int) []int {
+	if len(in) == 0 {
+		return nil
+	}
+	seen := make(map[int]struct{}, len(in))
+	out := make([]int, 0, len(in))
+	for _, v := range in {
+		if v == 0 {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
+}
+
+func fetchProductMeta(q sqlQueryer, companyID int, productIDs []int) (map[int]productMeta, error) {
+	ids := uniqueInts(productIDs)
+	if len(ids) == 0 {
+		return map[int]productMeta{}, nil
+	}
+	rows, err := q.Query(`
+		SELECT product_id, tax_id, is_serialized
+		FROM products
+		WHERE company_id = $1 AND is_deleted = FALSE AND product_id = ANY($2)
+	`, companyID, pq.Array(ids))
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch products: %w", err)
+	}
+	defer rows.Close()
+
+	out := make(map[int]productMeta, len(ids))
+	for rows.Next() {
+		var pid int
+		var taxID sql.NullInt64
+		var isSerialized bool
+		if err := rows.Scan(&pid, &taxID, &isSerialized); err != nil {
+			return nil, fmt.Errorf("failed to scan product: %w", err)
+		}
+		var tid *int
+		if taxID.Valid && taxID.Int64 > 0 {
+			v := int(taxID.Int64)
+			tid = &v
+		}
+		out[pid] = productMeta{TaxID: tid, IsSerialized: isSerialized}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read products: %w", err)
+	}
+	if len(out) != len(ids) {
+		return nil, fmt.Errorf("product not found")
+	}
+	return out, nil
+}
+
+func fetchTaxPercentages(q sqlQueryer, companyID int, taxIDs []int) (map[int]float64, error) {
+	ids := uniqueInts(taxIDs)
+	if len(ids) == 0 {
+		return map[int]float64{}, nil
+	}
+	rows, err := q.Query(`
+		SELECT tax_id, percentage
+		FROM taxes
+		WHERE company_id = $1 AND is_active = TRUE AND tax_id = ANY($2)
+	`, companyID, pq.Array(ids))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tax percentage: %w", err)
+	}
+	defer rows.Close()
+
+	out := make(map[int]float64, len(ids))
+	for rows.Next() {
+		var id int
+		var pct float64
+		if err := rows.Scan(&id, &pct); err != nil {
+			return nil, fmt.Errorf("failed to scan tax percentage: %w", err)
+		}
+		out[id] = pct
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read tax percentages: %w", err)
+	}
+	return out, nil
+}
+
 // CalculateTotals computes the subtotal, total tax, and final total for a sale
 // request. It is used by handlers for validation and internally by the service
 // before persisting a sale.
@@ -30,46 +127,66 @@ func (s *SalesService) CalculateTotals(companyID int, req *models.CreateSaleRequ
 	subtotal := float64(0)
 	totalTax := float64(0)
 
+	productIDs := make([]int, 0, len(req.Items))
+	for _, item := range req.Items {
+		if item.ProductID != nil {
+			productIDs = append(productIDs, *item.ProductID)
+		}
+	}
+	products, err := fetchProductMeta(s.db, companyID, productIDs)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	taxIDs := make([]int, 0, len(req.Items))
+	for _, item := range req.Items {
+		if item.TaxID != nil {
+			taxIDs = append(taxIDs, *item.TaxID)
+			continue
+		}
+		if item.ProductID == nil {
+			continue
+		}
+		meta, ok := products[*item.ProductID]
+		if !ok {
+			return 0, 0, 0, fmt.Errorf("product not found")
+		}
+		if meta.TaxID != nil {
+			taxIDs = append(taxIDs, *meta.TaxID)
+		}
+	}
+	taxPct, err := fetchTaxPercentages(s.db, companyID, taxIDs)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("failed to calculate tax: %w", err)
+	}
+
 	for _, item := range req.Items {
 		lineTotal := item.Quantity * item.UnitPrice
 		discountAmount := lineTotal * (item.DiscountPercent / 100)
 		lineTotal -= discountAmount
 		subtotal += lineTotal
 
-		// Resolve tax: prefer explicit tax_id, otherwise fallback to product's tax_id field
-		var productTaxID *int
-		if item.ProductID != nil {
-			var prodTaxID sql.NullInt64
-			err := s.db.QueryRow(`SELECT tax_id FROM products WHERE product_id=$1 AND company_id=$2 AND is_deleted=FALSE`, *item.ProductID, companyID).Scan(&prodTaxID)
-			if err == sql.ErrNoRows {
-				return 0, 0, 0, fmt.Errorf("product not found")
-			}
-			if err != nil {
-				return 0, 0, 0, fmt.Errorf("failed to resolve product tax: %w", err)
-			}
-			if prodTaxID.Valid && prodTaxID.Int64 > 0 {
-				id := int(prodTaxID.Int64)
-				productTaxID = &id
-			}
-		}
-
 		var effectiveTaxID *int
 		if item.TaxID != nil {
 			effectiveTaxID = item.TaxID
-		} else if productTaxID != nil {
-			effectiveTaxID = productTaxID
-		}
-		if effectiveTaxID != nil {
-			taxAmount, err := s.calculateTax(companyID, lineTotal, *effectiveTaxID)
-			if err != nil {
-				return 0, 0, 0, fmt.Errorf("failed to calculate tax: %w", err)
+		} else if item.ProductID != nil {
+			meta, ok := products[*item.ProductID]
+			if !ok {
+				return 0, 0, 0, fmt.Errorf("product not found")
 			}
-			totalTax += taxAmount
+			effectiveTaxID = meta.TaxID
+		}
+
+		if effectiveTaxID != nil {
+			pct, ok := taxPct[*effectiveTaxID]
+			if !ok {
+				return 0, 0, 0, fmt.Errorf("failed to calculate tax: %w", fmt.Errorf("failed to get tax percentage: %w", sql.ErrNoRows))
+			}
+			totalTax += lineTotal * (pct / 100)
 		}
 	}
 
 	totalAmount := subtotal + totalTax - req.DiscountAmount
-
 	return subtotal, totalTax, totalAmount, nil
 }
 
@@ -518,6 +635,38 @@ func (s *SalesService) CreateSaleWithOptions(
 	}
 
 	// Create sale items and update stock
+	productIDs := make([]int, 0, len(req.Items))
+	for _, item := range req.Items {
+		if item.ProductID != nil {
+			productIDs = append(productIDs, *item.ProductID)
+		}
+	}
+	productMetaByID, err := fetchProductMeta(tx, companyID, productIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	taxIDs := make([]int, 0, len(req.Items))
+	for _, item := range req.Items {
+		var effectiveTaxID *int
+		if item.TaxID != nil {
+			effectiveTaxID = item.TaxID
+		} else if item.ProductID != nil {
+			meta, ok := productMetaByID[*item.ProductID]
+			if !ok {
+				return nil, fmt.Errorf("product not found")
+			}
+			effectiveTaxID = meta.TaxID
+		}
+		if effectiveTaxID != nil {
+			taxIDs = append(taxIDs, *effectiveTaxID)
+		}
+	}
+	taxPctByID, err := fetchTaxPercentages(tx, companyID, taxIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate tax: %w", err)
+	}
+
 	for _, item := range req.Items {
 		// Calculate line total and tax
 		lineTotal := item.Quantity * item.UnitPrice
@@ -525,38 +674,31 @@ func (s *SalesService) CreateSaleWithOptions(
 		lineTotal -= discountAmount
 
 		var taxAmount float64
-		// Resolve tax: prefer explicit tax_id, otherwise fallback to product's tax_id field
 		var effectiveTaxID *int
 		if item.TaxID != nil {
 			effectiveTaxID = item.TaxID
 		} else if item.ProductID != nil {
-			var prodTaxID sql.NullInt64
-			q := `SELECT tax_id FROM products WHERE product_id=$1 AND company_id=$2 AND is_deleted=FALSE`
-			if err := tx.QueryRow(q, *item.ProductID, companyID).Scan(&prodTaxID); err == nil && prodTaxID.Valid && prodTaxID.Int64 > 0 {
-				id := int(prodTaxID.Int64)
-				effectiveTaxID = &id
-			} else if err != nil && err != sql.ErrNoRows {
-				return nil, fmt.Errorf("failed to resolve product tax: %w", err)
+			meta, ok := productMetaByID[*item.ProductID]
+			if !ok {
+				return nil, fmt.Errorf("product not found")
 			}
+			effectiveTaxID = meta.TaxID
 		}
 		if effectiveTaxID != nil {
-			taxAmount, err = s.calculateTax(companyID, lineTotal, *effectiveTaxID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to calculate tax: %w", err)
+			pct, ok := taxPctByID[*effectiveTaxID]
+			if !ok {
+				return nil, fmt.Errorf("failed to calculate tax: %w", fmt.Errorf("failed to get tax percentage: %w", sql.ErrNoRows))
 			}
+			taxAmount = lineTotal * (pct / 100)
 		}
 
 		// Validate serial numbers for serialized products
 		if item.ProductID != nil {
-			var isSerialized bool
-			err = tx.QueryRow("SELECT is_serialized FROM products WHERE product_id = $1 AND company_id = $2 AND is_deleted = FALSE", *item.ProductID, companyID).Scan(&isSerialized)
-			if err != nil {
-				if err == sql.ErrNoRows {
-					return nil, fmt.Errorf("product not found")
-				}
-				return nil, fmt.Errorf("failed to verify product: %w", err)
+			meta, ok := productMetaByID[*item.ProductID]
+			if !ok {
+				return nil, fmt.Errorf("product not found")
 			}
-			if isSerialized {
+			if meta.IsSerialized {
 				if item.Quantity != float64(int(item.Quantity)) {
 					return nil, fmt.Errorf("quantity must be a whole number for serialized products")
 				}
@@ -1237,39 +1379,60 @@ func (s *SalesService) CreateQuote(companyID, locationID, userID int, req *model
 	}
 	calcs := make([]itemCalc, 0, len(req.Items))
 
+	productIDs := make([]int, 0, len(req.Items))
+	for _, item := range req.Items {
+		if item.ProductID != nil {
+			productIDs = append(productIDs, *item.ProductID)
+		}
+	}
+	metaByID, err := fetchProductMeta(tx, companyID, productIDs)
+	if err != nil {
+		return nil, err
+	}
+	taxIDs := make([]int, 0, len(req.Items))
+	for _, item := range req.Items {
+		var tid *int
+		if item.TaxID != nil {
+			tid = item.TaxID
+		} else if item.ProductID != nil {
+			meta, ok := metaByID[*item.ProductID]
+			if !ok {
+				return nil, fmt.Errorf("product not found")
+			}
+			tid = meta.TaxID
+		}
+		if tid != nil {
+			taxIDs = append(taxIDs, *tid)
+		}
+	}
+	taxPctByID, err := fetchTaxPercentages(tx, companyID, taxIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate tax: %w", err)
+	}
+
 	for _, item := range req.Items {
 		lineTotal := item.Quantity * item.UnitPrice
 		discountAmount := lineTotal * (item.DiscountPercent / 100)
 		lineTotal -= discountAmount
 
-		var productTaxID *int
-		if item.ProductID != nil {
-			var prodTaxID sql.NullInt64
-			if err := tx.QueryRow(`SELECT tax_id FROM products WHERE product_id = $1 AND company_id = $2 AND is_deleted = FALSE`, *item.ProductID, companyID).Scan(&prodTaxID); err != nil {
-				if err == sql.ErrNoRows {
-					return nil, fmt.Errorf("product not found")
-				}
-				return nil, fmt.Errorf("failed to resolve product tax: %w", err)
-			}
-			if prodTaxID.Valid && prodTaxID.Int64 > 0 {
-				id := int(prodTaxID.Int64)
-				productTaxID = &id
-			}
-		}
-
 		var effectiveTaxID *int
 		if item.TaxID != nil {
 			effectiveTaxID = item.TaxID
-		} else if productTaxID != nil {
-			effectiveTaxID = productTaxID
+		} else if item.ProductID != nil {
+			meta, ok := metaByID[*item.ProductID]
+			if !ok {
+				return nil, fmt.Errorf("product not found")
+			}
+			effectiveTaxID = meta.TaxID
 		}
 
 		var taxAmount float64
 		if effectiveTaxID != nil {
-			taxAmount, err = s.calculateTax(companyID, lineTotal, *effectiveTaxID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to calculate tax: %w", err)
+			pct, ok := taxPctByID[*effectiveTaxID]
+			if !ok {
+				return nil, fmt.Errorf("failed to calculate tax: %w", fmt.Errorf("failed to get tax percentage: %w", sql.ErrNoRows))
 			}
+			taxAmount = lineTotal * (pct / 100)
 		}
 
 		subtotal += lineTotal
@@ -1372,39 +1535,60 @@ func (s *SalesService) UpdateQuote(quoteID, companyID, userID int, req *models.U
 			return fmt.Errorf("failed to clear quote items: %w", err)
 		}
 
+		productIDs := make([]int, 0, len(req.Items))
+		for _, item := range req.Items {
+			if item.ProductID != nil {
+				productIDs = append(productIDs, *item.ProductID)
+			}
+		}
+		metaByID, err := fetchProductMeta(tx, companyID, productIDs)
+		if err != nil {
+			return err
+		}
+		taxIDs := make([]int, 0, len(req.Items))
+		for _, item := range req.Items {
+			var tid *int
+			if item.TaxID != nil {
+				tid = item.TaxID
+			} else if item.ProductID != nil {
+				meta, ok := metaByID[*item.ProductID]
+				if !ok {
+					return fmt.Errorf("product not found")
+				}
+				tid = meta.TaxID
+			}
+			if tid != nil {
+				taxIDs = append(taxIDs, *tid)
+			}
+		}
+		taxPctByID, err := fetchTaxPercentages(tx, companyID, taxIDs)
+		if err != nil {
+			return fmt.Errorf("failed to calculate tax: %w", err)
+		}
+
 		for _, item := range req.Items {
 			lineTotal := item.Quantity * item.UnitPrice
 			discountAmt := lineTotal * (item.DiscountPercent / 100)
 			lineTotal -= discountAmt
 
-			var productTaxID *int
-			if item.ProductID != nil {
-				var prodTaxID sql.NullInt64
-				if err := tx.QueryRow(`SELECT tax_id FROM products WHERE product_id = $1 AND company_id = $2 AND is_deleted = FALSE`, *item.ProductID, companyID).Scan(&prodTaxID); err != nil {
-					if err == sql.ErrNoRows {
-						return fmt.Errorf("product not found")
-					}
-					return fmt.Errorf("failed to resolve product tax: %w", err)
-				}
-				if prodTaxID.Valid && prodTaxID.Int64 > 0 {
-					id := int(prodTaxID.Int64)
-					productTaxID = &id
-				}
-			}
-
 			var effectiveTaxID *int
 			if item.TaxID != nil {
 				effectiveTaxID = item.TaxID
-			} else if productTaxID != nil {
-				effectiveTaxID = productTaxID
+			} else if item.ProductID != nil {
+				meta, ok := metaByID[*item.ProductID]
+				if !ok {
+					return fmt.Errorf("product not found")
+				}
+				effectiveTaxID = meta.TaxID
 			}
 
 			var taxAmount float64
 			if effectiveTaxID != nil {
-				taxAmount, err = s.calculateTax(companyID, lineTotal, *effectiveTaxID)
-				if err != nil {
-					return fmt.Errorf("failed to calculate tax: %w", err)
+				pct, ok := taxPctByID[*effectiveTaxID]
+				if !ok {
+					return fmt.Errorf("failed to calculate tax: %w", fmt.Errorf("failed to get tax percentage: %w", sql.ErrNoRows))
 				}
+				taxAmount = lineTotal * (pct / 100)
 			}
 
 			subtotal += lineTotal

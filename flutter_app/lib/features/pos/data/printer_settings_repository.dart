@@ -18,6 +18,7 @@ class PrinterDevice {
   final int? usbVendorId; // usb
   final int? usbProductId; // usb
   final bool isDefault;
+  final bool cashDrawerKick; // ESC/POS pulse
 
   const PrinterDevice({
     required this.id,
@@ -31,6 +32,7 @@ class PrinterDevice {
     this.usbVendorId,
     this.usbProductId,
     this.isDefault = false,
+    this.cashDrawerKick = false,
   });
 
   PrinterDevice copyWith({
@@ -45,6 +47,7 @@ class PrinterDevice {
     int? usbVendorId,
     int? usbProductId,
     bool? isDefault,
+    bool? cashDrawerKick,
   }) =>
       PrinterDevice(
         id: id ?? this.id,
@@ -58,6 +61,7 @@ class PrinterDevice {
         usbVendorId: usbVendorId ?? this.usbVendorId,
         usbProductId: usbProductId ?? this.usbProductId,
         isDefault: isDefault ?? this.isDefault,
+        cashDrawerKick: cashDrawerKick ?? this.cashDrawerKick,
       );
 
   factory PrinterDevice.fromJson(Map<String, dynamic> json) => PrinterDevice(
@@ -72,6 +76,7 @@ class PrinterDevice {
         usbVendorId: (json['usb_vendor_id'] as num?)?.toInt(),
         usbProductId: (json['usb_product_id'] as num?)?.toInt(),
         isDefault: json['is_default'] as bool? ?? false,
+        cashDrawerKick: json['cash_drawer_kick'] as bool? ?? false,
       );
 
   Map<String, dynamic> toJson() => {
@@ -86,6 +91,7 @@ class PrinterDevice {
         if (usbVendorId != null) 'usb_vendor_id': usbVendorId,
         if (usbProductId != null) 'usb_product_id': usbProductId,
         'is_default': isDefault,
+        'cash_drawer_kick': cashDrawerKick,
       };
 }
 

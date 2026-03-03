@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"erp-backend/internal/models"
 	"erp-backend/internal/services"
@@ -38,7 +39,7 @@ func (h *ReturnsHandler) CreateSaleReturnByCustomer(c *gin.Context) {
 	var req struct {
 		CustomerID int                                  `json:"customer_id" validate:"required"`
 		Items      []models.CreateSaleReturnItemRequest `json:"items" validate:"required,min=1"`
-		Reason     *string                              `json:"reason,omitempty"`
+		Reason     string                               `json:"reason" validate:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
@@ -56,11 +57,17 @@ func (h *ReturnsHandler) CreateSaleReturnByCustomer(c *gin.Context) {
 		return
 	}
 
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		utils.ValidationErrorResponse(c, map[string]string{"reason": "Reason is required"})
+		return
+	}
+
 	// Delegate to standard creation against the identified sale
 	saleReturn, err := h.returnsService.CreateSaleReturn(companyID, userID, &models.CreateSaleReturnRequest{
 		SaleID: saleID,
 		Items:  req.Items,
-		Reason: req.Reason,
+		Reason: &reason,
 	})
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create sale return", err)
@@ -151,6 +158,10 @@ func (h *ReturnsHandler) CreateSaleReturn(c *gin.Context) {
 	if err := utils.ValidateStruct(&req); err != nil {
 		validationErrors := utils.GetValidationErrors(err)
 		utils.ValidationErrorResponse(c, validationErrors)
+		return
+	}
+	if req.Reason == nil || strings.TrimSpace(*req.Reason) == "" {
+		utils.ValidationErrorResponse(c, map[string]string{"reason": "Reason is required"})
 		return
 	}
 
@@ -349,7 +360,7 @@ func (h *ReturnsHandler) ProcessQuickReturn(c *gin.Context) {
 
 	var req struct {
 		Items  []models.CreateSaleReturnItemRequest `json:"items" validate:"required,min=1"`
-		Reason *string                              `json:"reason,omitempty"`
+		Reason string                               `json:"reason" validate:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -365,10 +376,15 @@ func (h *ReturnsHandler) ProcessQuickReturn(c *gin.Context) {
 	}
 
 	// Create return request
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		utils.ValidationErrorResponse(c, map[string]string{"reason": "Reason is required"})
+		return
+	}
 	returnReq := &models.CreateSaleReturnRequest{
 		SaleID: saleID,
 		Items:  req.Items,
-		Reason: req.Reason,
+		Reason: &reason,
 	}
 
 	saleReturn, err := h.returnsService.CreateSaleReturn(companyID, userID, returnReq)

@@ -198,6 +198,10 @@ func (s *ReturnsService) GetSaleReturnByID(returnID, companyID int) (*models.Sal
 }
 
 func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.CreateSaleReturnRequest) (*models.SaleReturn, error) {
+	if req.Reason == nil || strings.TrimSpace(*req.Reason) == "" {
+		return nil, fmt.Errorf("reason is required")
+	}
+
 	// Verify sale exists and belongs to company
 	err := s.verifySaleInCompany(req.SaleID, companyID)
 	if err != nil {
@@ -297,6 +301,19 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to update original sale: %w", err)
+		}
+	}
+
+	// Audit log (must be present for returns).
+	{
+		recordID := returnID
+		actorID := userID
+		changes := models.JSONB{
+			"sale_id": req.SaleID,
+			"reason":  strings.TrimSpace(*req.Reason),
+		}
+		if err := LogAudit(tx, "CREATE", "sale_returns", &recordID, &actorID, nil, nil, &changes, nil, nil); err != nil {
+			return nil, fmt.Errorf("failed to log audit: %w", err)
 		}
 	}
 

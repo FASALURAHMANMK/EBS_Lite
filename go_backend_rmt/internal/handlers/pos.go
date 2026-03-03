@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"erp-backend/internal/models"
 	"erp-backend/internal/services"
@@ -135,6 +137,25 @@ func (h *POSHandler) ProcessCheckout(c *gin.Context) {
 
 	sale, err := h.posService.ProcessCheckout(companyID, locationID, userID, &req, idemKey)
 	if err != nil {
+		var ov *services.OverrideRequiredError
+		if errors.As(err, &ov) {
+			utils.JSONResponse(c, http.StatusForbidden, false, ov.Error(), gin.H{
+				"code":                 "OVERRIDE_REQUIRED",
+				"required_permissions": ov.RequiredPermissions,
+				"reason_required":      ov.ReasonRequired,
+			}, nil)
+			return
+		}
+		var cl *services.CreditLimitExceededError
+		if errors.As(err, &cl) {
+			utils.JSONResponse(c, http.StatusBadRequest, false, "Credit limit exceeded", gin.H{
+				"code":             "CREDIT_LIMIT_EXCEEDED",
+				"credit_limit":     cl.CreditLimit,
+				"current_outstand": cl.CurrentBalance,
+				"attempted_new":    cl.AttemptedDelta,
+			}, nil)
+			return
+		}
 		if err.Error() == "customer not found" {
 			utils.NotFoundResponse(c, "Customer not found")
 			return
@@ -362,12 +383,62 @@ func (h *POSHandler) VoidSale(c *gin.Context) {
 		return
 	}
 
+	var body models.POSVoidRequest
+	if err := c.ShouldBindJSON(&body); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&body); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+	reason := strings.TrimSpace(body.Reason)
+	if reason == "" {
+		utils.ValidationErrorResponse(c, map[string]string{"reason": "Reason is required"})
+		return
+	}
+
 	idemKey := c.GetHeader("Idempotency-Key")
 	if idemKey == "" {
 		idemKey = c.GetHeader("X-Idempotency-Key")
 	}
 
-	voidSale, err := h.posService.VoidSale(companyID, locationID, userID, saleID, idemKey)
+	// Enforce void permission server-side; allow manager override token as approval.
+	permSvc := services.NewPermissionService()
+	hasVoid, err := permSvc.UserHasPermission(userID, "DELETE_SALES")
+	if err != nil {
+		utils.InternalServerErrorResponse(c, "Failed to check permissions", err)
+		return
+	}
+
+	var approverID *int
+	if !hasVoid {
+		token := ""
+		if body.ManagerOverrideToken != nil {
+			token = strings.TrimSpace(*body.ManagerOverrideToken)
+		}
+		if token == "" {
+			utils.JSONResponse(c, http.StatusForbidden, false, "Manager override required", gin.H{
+				"code":                 "OVERRIDE_REQUIRED",
+				"required_permissions": []string{"DELETE_SALES"},
+				"reason_required":      true,
+			}, nil)
+			return
+		}
+		ctx, err := services.ValidateOverrideToken(token, companyID, []string{"DELETE_SALES"})
+		if err != nil {
+			utils.ErrorResponse(c, http.StatusUnauthorized, "Invalid manager override", err)
+			return
+		}
+		approverID = &ctx.ApproverUserID
+	}
+
+	requestID := c.GetString("request_id")
+	if requestID == "" {
+		requestID = c.GetHeader("X-Request-ID")
+	}
+
+	voidSale, err := h.posService.VoidSale(companyID, locationID, userID, saleID, idemKey, reason, approverID, requestID)
 	if err != nil {
 		if err.Error() == "sale not found" {
 			utils.NotFoundResponse(c, "Sale not found")

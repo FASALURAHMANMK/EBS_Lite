@@ -7,7 +7,17 @@ import '../../features/auth/controllers/auth_notifier.dart';
 class ManagerOverrideResult {
   final int userId;
   final String username;
-  ManagerOverrideResult({required this.userId, required this.username});
+  final String overrideToken;
+  final int? expiresAtUnix;
+  final String? reason;
+
+  ManagerOverrideResult({
+    required this.userId,
+    required this.username,
+    required this.overrideToken,
+    this.expiresAtUnix,
+    this.reason,
+  });
 }
 
 Future<ManagerOverrideResult?> showManagerOverrideDialog(
@@ -15,9 +25,12 @@ Future<ManagerOverrideResult?> showManagerOverrideDialog(
   WidgetRef ref, {
   required String title,
   required List<String> requiredPermissions,
+  bool requireReason = false,
+  String reasonLabel = 'Reason',
 }) async {
   final usernameController = TextEditingController();
   final passwordController = TextEditingController();
+  final reasonController = TextEditingController();
 
   return showDialog<ManagerOverrideResult?>(
     context: context,
@@ -30,6 +43,16 @@ Future<ManagerOverrideResult?> showManagerOverrideDialog(
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (requireReason) ...[
+                TextField(
+                  controller: reasonController,
+                  decoration: InputDecoration(
+                    labelText: reasonLabel,
+                    prefixIcon: const Icon(Icons.description_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               TextField(
                 controller: usernameController,
                 decoration: const InputDecoration(
@@ -59,6 +82,15 @@ Future<ManagerOverrideResult?> showManagerOverrideDialog(
                   : () async {
                       setState(() => busy = true);
                       try {
+                        final reason = reasonController.text.trim();
+                        if (requireReason && reason.isEmpty) {
+                          if (!context.mounted) return;
+                          setState(() => busy = false);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('$reasonLabel is required')),
+                          );
+                          return;
+                        }
                         final ident = usernameController.text.trim();
                         final res = await ref
                             .read(authRepositoryProvider)
@@ -68,11 +100,18 @@ Future<ManagerOverrideResult?> showManagerOverrideDialog(
                               password: passwordController.text,
                               requiredPermissions: requiredPermissions,
                             );
+                        final token = res.overrideToken?.trim() ?? '';
+                        if (token.isEmpty) {
+                          throw Exception('Override token not returned');
+                        }
                         if (!context.mounted) return;
                         Navigator.of(context).pop(
                           ManagerOverrideResult(
                             userId: res.userId,
                             username: res.username,
+                            overrideToken: token,
+                            expiresAtUnix: res.expiresAtUnix,
+                            reason: requireReason ? reason : null,
                           ),
                         );
                       } catch (e) {

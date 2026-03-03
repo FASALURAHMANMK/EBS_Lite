@@ -111,7 +111,7 @@ type UpdateSaleRequest struct {
 type CreateSaleReturnRequest struct {
 	SaleID int                           `json:"sale_id" validate:"required"`
 	Items  []CreateSaleReturnItemRequest `json:"items" validate:"required,min=1"`
-	Reason *string                       `json:"reason,omitempty"`
+	Reason *string                       `json:"reason,omitempty" validate:"required"`
 }
 
 type CreateSaleReturnItemRequest struct {
@@ -125,19 +125,26 @@ type QuickSaleRequest struct {
 }
 
 type POSCheckoutRequest struct {
-	SaleID          *int                      `json:"sale_id,omitempty"`
-	CustomerID      *int                      `json:"customer_id,omitempty"`
-	Items           []CreateSaleDetailRequest `json:"items" validate:"required,min=1"`
-	PaymentMethodID *int                      `json:"payment_method_id,omitempty"`
-	DiscountAmount  float64                   `json:"discount_amount"`
-	PaidAmount      float64                   `json:"paid_amount" validate:"gte=0"`
-	Payments        []POSPaymentLine          `json:"payments,omitempty"`
-	RedeemPoints    *float64                  `json:"redeem_points,omitempty"`
+	SaleID               *int                      `json:"sale_id,omitempty"`
+	CustomerID           *int                      `json:"customer_id,omitempty"`
+	Items                []CreateSaleDetailRequest `json:"items" validate:"required,min=1"`
+	PaymentMethodID      *int                      `json:"payment_method_id,omitempty"`
+	DiscountAmount       float64                   `json:"discount_amount"`
+	PaidAmount           float64                   `json:"paid_amount" validate:"gte=0"`
+	Payments             []POSPaymentLine          `json:"payments,omitempty"`
+	RedeemPoints         *float64                  `json:"redeem_points,omitempty"`
+	ManagerOverrideToken *string                   `json:"manager_override_token,omitempty"`
+	OverrideReason       *string                   `json:"override_reason,omitempty"`
 }
 
 type POSPrintRequest struct {
 	InvoiceID  *int    `json:"invoice_id,omitempty"`
 	SaleNumber *string `json:"sale_number,omitempty"`
+}
+
+type POSVoidRequest struct {
+	Reason               string  `json:"reason" validate:"required"`
+	ManagerOverrideToken *string `json:"manager_override_token,omitempty"`
 }
 
 // POSPrintDataResponse is returned to client apps so they can render

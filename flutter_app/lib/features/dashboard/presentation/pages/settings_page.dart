@@ -10,6 +10,17 @@ import '../../controllers/ui_prefs_notifier.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import 'company_settings_page.dart';
 import 'sync_health_page.dart';
+import 'invoice_settings_page.dart';
+import 'payment_modes_page.dart';
+import 'printer_profiles_page.dart';
+import 'security_settings_page.dart';
+import 'tax_settings_page.dart';
+import 'theme_settings_page.dart';
+import 'package:ebs_lite/features/notifications/presentation/pages/notifications_page.dart';
+import 'package:ebs_lite/features/admin/presentation/pages/admin_page.dart';
+import 'package:ebs_lite/features/auth/controllers/auth_permissions_provider.dart';
+import 'package:ebs_lite/features/workflow/presentation/pages/workflow_requests_page.dart';
+import 'package:ebs_lite/features/bulk_io/presentation/pages/import_export_page.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -107,6 +118,10 @@ class SettingsPage extends ConsumerWidget {
     final theme = Theme.of(context);
     final showQuick = ref.watch(quickActionVisibilityProvider);
     final outbox = ref.watch(outboxNotifierProvider);
+    final perms = ref.watch(authPermissionsProvider);
+    final showAdmin =
+        perms.contains('VIEW_USERS') || perms.contains('VIEW_ROLES');
+    final showWorkflows = perms.contains('VIEW_WORKFLOWS');
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
@@ -119,6 +134,11 @@ class SettingsPage extends ConsumerWidget {
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: theme.colorScheme.surface,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ThemeSettingsPage()),
+              );
+            },
           ),
           const SizedBox(height: 12),
           SwitchListTile.adaptive(
@@ -141,6 +161,11 @@ class SettingsPage extends ConsumerWidget {
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: theme.colorScheme.surface,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotificationsPage()),
+              );
+            },
           ),
           const SizedBox(height: 12),
           ListTile(
@@ -158,14 +183,109 @@ class SettingsPage extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           ListTile(
+            leading: const Icon(Icons.percent_rounded),
+            title: const Text('Tax Settings'),
+            subtitle: const Text('Default tax name/percent'),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            tileColor: theme.colorScheme.surface,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const TaxSettingsPage()),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          ListTile(
+            leading: const Icon(Icons.receipt_long_rounded),
+            title: const Text('Invoice Settings'),
+            subtitle: const Text('Numbering + templates'),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            tileColor: theme.colorScheme.surface,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const InvoiceSettingsPage()),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          ListTile(
+            leading: const Icon(Icons.account_balance_wallet_rounded),
+            title: const Text('Payment methods'),
+            subtitle: const Text('Modes + allowed currencies'),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            tileColor: theme.colorScheme.surface,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PaymentModesPage()),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          ListTile(
+            leading: const Icon(Icons.print_rounded),
+            title: const Text('Printer profiles'),
+            subtitle: const Text('Server-side printer configurations'),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            tileColor: theme.colorScheme.surface,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PrinterProfilesPage()),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          ListTile(
             leading: const Icon(Icons.security_rounded),
             title: const Text('Security'),
             subtitle: const Text('Two-factor, sessions'),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: theme.colorScheme.surface,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SecuritySettingsPage()),
+              );
+            },
           ),
           const SizedBox(height: 12),
+          if (showAdmin)
+            ListTile(
+              leading: const Icon(Icons.admin_panel_settings_rounded),
+              title: const Text('Admin'),
+              subtitle: const Text('Users, roles, permissions'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              tileColor: theme.colorScheme.surface,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AdminPage()),
+                );
+              },
+            ),
+          if (showAdmin) const SizedBox(height: 12),
+          if (showWorkflows)
+            ListTile(
+              leading: const Icon(Icons.approval_rounded),
+              title: const Text('Approvals'),
+              subtitle: const Text('Pending workflow requests'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              tileColor: theme.colorScheme.surface,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const WorkflowRequestsPage(),
+                  ),
+                );
+              },
+            ),
+          if (showWorkflows) const SizedBox(height: 12),
           ListTile(
             leading: const Icon(Icons.sync_rounded),
             title: const Text('Sync health'),
@@ -192,6 +312,20 @@ class SettingsPage extends ConsumerWidget {
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: theme.colorScheme.surface,
             onTap: () => _generateSupportBundle(context, ref),
+          ),
+          const SizedBox(height: 12),
+          ListTile(
+            leading: const Icon(Icons.import_export_rounded),
+            title: const Text('Import / Export'),
+            subtitle: const Text('Customers, suppliers, inventory (Excel)'),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            tileColor: theme.colorScheme.surface,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ImportExportPage()),
+              );
+            },
           ),
         ],
       ),

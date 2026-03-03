@@ -71,7 +71,7 @@ func (h *ReportsHandler) GetSalesSummary(c *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(c, "Sales summary retrieved successfully", summary)
+	h.handleReportResponse(c, "Sales summary retrieved successfully", summary)
 }
 
 // GET /reports/stock-summary
@@ -102,7 +102,7 @@ func (h *ReportsHandler) GetStockSummary(c *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(c, "Stock summary retrieved successfully", summary)
+	h.handleReportResponse(c, "Stock summary retrieved successfully", summary)
 }
 
 // GET /reports/top-products
@@ -129,7 +129,7 @@ func (h *ReportsHandler) GetTopProducts(c *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(c, "Top products retrieved successfully", products)
+	h.handleReportResponse(c, "Top products retrieved successfully", products)
 }
 
 // GET /reports/customer-balances
@@ -146,7 +146,7 @@ func (h *ReportsHandler) GetCustomerBalances(c *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(c, "Customer balances retrieved successfully", balances)
+	h.handleReportResponse(c, "Customer balances retrieved successfully", balances)
 }
 
 // GET /reports/expenses-summary
@@ -165,7 +165,7 @@ func (h *ReportsHandler) GetExpensesSummary(c *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(c, "Expenses summary retrieved successfully", summary)
+	h.handleReportResponse(c, "Expenses summary retrieved successfully", summary)
 }
 
 // GET /reports/item-movement
@@ -350,7 +350,7 @@ func (h *ReportsHandler) GetTaxReport(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get tax report", err)
 		return
 	}
-	utils.SuccessResponse(c, "Tax report retrieved successfully", data)
+	h.handleReportResponse(c, "Tax report retrieved successfully", data)
 }
 
 // GET /reports/top-performers

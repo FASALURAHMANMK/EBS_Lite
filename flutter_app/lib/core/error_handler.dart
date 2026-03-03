@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import '../features/auth/data/models.dart';
@@ -79,6 +82,33 @@ class ErrorHandler {
           });
           if (parts.isNotEmpty) return parts.join('\n');
         } catch (_) {}
+      }
+    }
+    // Some endpoints (exports) use ResponseType.bytes; DioException.data may be bytes.
+    if (data is Uint8List || data is List<int> || data is String) {
+      try {
+        final bytes = data is Uint8List
+            ? data
+            : (data is List<int>)
+                ? Uint8List.fromList(data)
+                : Uint8List.fromList(utf8.encode(data));
+        final text = utf8.decode(bytes, allowMalformed: true).trim();
+        if (text.isEmpty) return null;
+        final decoded = jsonDecode(text);
+        if (decoded is Map<String, dynamic>) {
+          if (decoded['error'] is String &&
+              (decoded['error'] as String).isNotEmpty) {
+            return decoded['error'] as String;
+          }
+          if (decoded['message'] is String &&
+              (decoded['message'] as String).isNotEmpty) {
+            return decoded['message'] as String;
+          }
+        }
+        // Fallback: return raw response if it's short-ish and looks like an error.
+        return text.length > 400 ? null : text;
+      } catch (_) {
+        // ignore
       }
     }
     return null;

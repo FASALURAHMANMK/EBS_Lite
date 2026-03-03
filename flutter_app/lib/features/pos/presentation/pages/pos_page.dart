@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../controllers/pos_notifier.dart';
@@ -8,6 +9,7 @@ import '../../data/pos_repository.dart';
 import '../widgets/customer_selector_dialog.dart';
 import 'payment_page.dart';
 import '../../../../shared/widgets/manager_override_dialog.dart';
+import '../../../../core/error_handler.dart';
 
 class PosPage extends ConsumerWidget {
   const PosPage({super.key});
@@ -228,16 +230,6 @@ class _CartList extends ConsumerWidget {
                 ),
               );
               if (percent != null) {
-                if (percent >= 10) {
-                  if (!context.mounted) return;
-                  final approved = await showManagerOverrideDialog(
-                    context,
-                    ref,
-                    title: 'Manager override required (line discount)',
-                    requiredPermissions: const ['UPDATE_SALES'],
-                  );
-                  if (approved == null) return;
-                }
                 notifier.setItemDiscount(item, percent);
               }
             },
@@ -319,20 +311,6 @@ class _BottomBar extends ConsumerWidget {
                                 ),
                               );
                               if (value != null) {
-                                final pre = state.subtotal + state.tax;
-                                final pct = pre > 0 ? (value / pre * 100) : 0.0;
-                                if (pct >= 10) {
-                                  if (!context.mounted) return;
-                                  final approved =
-                                      await showManagerOverrideDialog(
-                                    context,
-                                    ref,
-                                    title:
-                                        'Manager override required (discount)',
-                                    requiredPermissions: const ['UPDATE_SALES'],
-                                  );
-                                  if (approved == null) return;
-                                }
                                 notifier.setDiscount(value);
                               }
                             },
@@ -653,16 +631,109 @@ class _HeldSalesDialogState extends ConsumerState<_HeldSalesDialog> {
                           ),
                           TextButton(
                             onPressed: () async {
-                              final approved = await showManagerOverrideDialog(
-                                context,
-                                ref,
-                                title: 'Manager override required (void)',
-                                requiredPermissions: const ['UPDATE_SALES'],
+                              final reason = await showDialog<String>(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (ctx) {
+                                  final ctrl = TextEditingController();
+                                  bool busy = false;
+                                  return StatefulBuilder(
+                                    builder: (ctx, setState) => AlertDialog(
+                                      title: const Text('Void Reason'),
+                                      content: TextField(
+                                        controller: ctrl,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Reason',
+                                          prefixIcon:
+                                              Icon(Icons.description_outlined),
+                                        ),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: busy
+                                              ? null
+                                              : () => Navigator.of(ctx).pop(),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        FilledButton(
+                                          onPressed: busy
+                                              ? null
+                                              : () {
+                                                  setState(() => busy = true);
+                                                  final v = ctrl.text.trim();
+                                                  if (v.isEmpty) {
+                                                    setState(
+                                                        () => busy = false);
+                                                    ScaffoldMessenger.of(ctx)
+                                                        .showSnackBar(
+                                                      const SnackBar(
+                                                          content: Text(
+                                                              'Reason is required')),
+                                                    );
+                                                    return;
+                                                  }
+                                                  Navigator.of(ctx).pop(v);
+                                                },
+                                          child: const Text('Continue'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
                               );
-                              if (approved == null) return;
-                              await ref
-                                  .read(posRepositoryProvider)
-                                  .voidSale(s.saleId);
+                              if (reason == null || reason.trim().isEmpty) {
+                                return;
+                              }
+
+                              final repo = ref.read(posRepositoryProvider);
+                              try {
+                                await repo.voidSaleWithReason(
+                                  s.saleId,
+                                  reason: reason,
+                                );
+                              } on DioException catch (e) {
+                                final data = e.response?.data;
+                                final maybe =
+                                    (data is Map && data['data'] is Map)
+                                        ? Map<String, dynamic>.from(
+                                            data['data'] as Map)
+                                        : null;
+                                if (e.response?.statusCode == 403 &&
+                                    maybe?['code'] == 'OVERRIDE_REQUIRED') {
+                                  if (!context.mounted) return;
+                                  final perms =
+                                      (maybe?['required_permissions'] as List?)
+                                              ?.map((x) => x.toString())
+                                              .toList() ??
+                                          const <String>[];
+                                  final approved =
+                                      await showManagerOverrideDialog(
+                                    context,
+                                    ref,
+                                    title: 'Manager override required (void)',
+                                    requiredPermissions: perms,
+                                  );
+                                  if (!context.mounted) return;
+                                  if (approved == null) return;
+                                  await repo.voidSaleWithReason(
+                                    s.saleId,
+                                    reason: reason,
+                                    managerOverrideToken:
+                                        approved.overrideToken,
+                                  );
+                                } else {
+                                  rethrow;
+                                }
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context)
+                                  ..hideCurrentSnackBar()
+                                  ..showSnackBar(
+                                    SnackBar(
+                                        content: Text(ErrorHandler.message(e))),
+                                  );
+                                return;
+                              }
                               // After voiding, refresh the receipt preview on POS
                               await ref
                                   .read(posNotifierProvider.notifier)

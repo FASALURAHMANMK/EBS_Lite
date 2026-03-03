@@ -85,20 +85,23 @@ func RequireAuth() gin.HandlerFunc {
 			}
 			if shouldUpdate {
 				db := database.GetDB()
+				sessionID := claims.SessionID
 				ipAddr := c.ClientIP()
 				ua := c.GetHeader("User-Agent")
-				var ipVal interface{}
-				if ipAddr != "" {
-					ipVal = ipAddr
-				}
-				var uaVal interface{}
-				if ua != "" {
-					uaVal = ua
-				}
-				_, err := db.Exec(`UPDATE device_sessions SET last_seen = NOW(), ip_address = COALESCE($2, ip_address), user_agent = COALESCE($3, user_agent) WHERE session_id = $1`, claims.SessionID, ipVal, uaVal)
-				if err != nil {
-					log.Printf("Failed to update device session %s: %v", claims.SessionID, err)
-				}
+				go func(sessionID, ipAddr, ua string) {
+					var ipVal interface{}
+					if ipAddr != "" {
+						ipVal = ipAddr
+					}
+					var uaVal interface{}
+					if ua != "" {
+						uaVal = ua
+					}
+					_, err := db.Exec(`UPDATE device_sessions SET last_seen = NOW(), ip_address = COALESCE($2, ip_address), user_agent = COALESCE($3, user_agent) WHERE session_id = $1`, sessionID, ipVal, uaVal)
+					if err != nil {
+						log.Printf("Failed to update device session %s: %v", sessionID, err)
+					}
+				}(sessionID, ipAddr, ua)
 			}
 		} else {
 			log.Println("No session ID in JWT claims")

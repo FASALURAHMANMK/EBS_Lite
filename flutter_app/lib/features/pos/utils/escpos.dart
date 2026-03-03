@@ -50,6 +50,12 @@ class EscPos {
     _bytes.addAll([0x1D, 0x56, 0x00]); // full cut
   }
 
+  void kickDrawer() {
+    // ESC p m t1 t2 (pulse to open cash drawer).
+    // m=0: pin 2, t1=25 (0x19), t2=250 (0xFA) are common defaults.
+    _bytes.addAll([0x1B, 0x70, 0x00, 0x19, 0xFA]);
+  }
+
   List<int> bytes() => List<int>.from(_bytes);
 }
 
@@ -60,7 +66,12 @@ Future<void> printThermalOverTcp({
   required String paperSize, // '58mm' or '80mm'
 }) async {
   final width = paperSize == '58mm' ? 32 : 48; // typical char widths
-  final p = _ticketFromSale(sale: sale, company: company, charsPerLine: width);
+  final p = _ticketFromSale(
+    sale: sale,
+    company: company,
+    charsPerLine: width,
+    kickDrawer: settings.cashDrawerKick,
+  );
 
   if (settings.connectionType == 'network' &&
       settings.host != null &&
@@ -81,8 +92,12 @@ Future<void> printThermalOverBluetooth({
   required String paperSize,
 }) async {
   final width = paperSize == '58mm' ? 32 : 48;
-  final ticket =
-      _ticketFromSale(sale: sale, company: company, charsPerLine: width);
+  final ticket = _ticketFromSale(
+    sale: sale,
+    company: company,
+    charsPerLine: width,
+    kickDrawer: settings.cashDrawerKick,
+  );
   final printerManager = PrinterManager.instance;
   final btName = settings.btName ?? '';
   final btAddr = settings.btAddress ?? '';
@@ -102,8 +117,12 @@ Future<void> printThermalOverUsb({
   required String paperSize,
 }) async {
   final width = paperSize == '58mm' ? 32 : 48;
-  final ticket =
-      _ticketFromSale(sale: sale, company: company, charsPerLine: width);
+  final ticket = _ticketFromSale(
+    sale: sale,
+    company: company,
+    charsPerLine: width,
+    kickDrawer: settings.cashDrawerKick,
+  );
   final printerManager = PrinterManager.instance;
   await printerManager.connect(
     type: PrinterType.usb,
@@ -121,6 +140,7 @@ EscPos _ticketFromSale({
   required Map<String, dynamic> sale,
   required Map<String, dynamic> company,
   required int charsPerLine,
+  required bool kickDrawer,
 }) {
   final p = EscPos(charsPerLine: charsPerLine)..init();
 
@@ -167,6 +187,9 @@ EscPos _ticketFromSale({
   p.setAlign(1);
   p.text('Thank you!');
   p.feed(3);
+  if (kickDrawer) {
+    p.kickDrawer();
+  }
   p.cut();
   return p;
 }
