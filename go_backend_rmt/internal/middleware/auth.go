@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"strings"
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
@@ -165,6 +166,40 @@ func RequireRole(roleName string) gin.HandlerFunc {
 	}
 }
 
+// RequireAnyRole middleware checks if user has any of the specified roles.
+func RequireAnyRole(roleNames ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		roleID := c.GetInt("role_id")
+		if roleID == 0 {
+			utils.ForbiddenResponse(c, "Role required")
+			c.Abort()
+			return
+		}
+		if len(roleNames) == 0 {
+			utils.InternalServerErrorResponse(c, "No roles configured", nil)
+			c.Abort()
+			return
+		}
+
+		roleName, err := getRoleNameByID(roleID)
+		if err != nil {
+			utils.InternalServerErrorResponse(c, "Failed to check role", err)
+			c.Abort()
+			return
+		}
+
+		for _, allowed := range roleNames {
+			if strings.EqualFold(roleName, allowed) {
+				c.Next()
+				return
+			}
+		}
+
+		utils.ForbiddenResponse(c, "Insufficient role permissions")
+		c.Abort()
+	}
+}
+
 // RequireCompanyAccess middleware ensures user can only access their company data
 // func RequireCompanyAccess() gin.HandlerFunc {
 // 	return func(c *gin.Context) {
@@ -245,16 +280,32 @@ func checkUserPermission(userID int, permission string) (bool, error) {
 	db := database.GetDB()
 
 	query := `
-		SELECT COUNT(*) 
-		FROM users u
-		JOIN role_permissions rp ON u.role_id = rp.role_id
-		JOIN permissions p ON rp.permission_id = p.permission_id
-		WHERE u.user_id = $1 AND p.name = $2 AND u.is_active = TRUE
+		SELECT (
+			EXISTS (
+				SELECT 1
+				FROM users u
+				JOIN roles r ON u.role_id = r.role_id
+				WHERE u.user_id = $1
+					AND u.is_active = TRUE
+					AND u.is_deleted = FALSE
+					AND r.name IN ('Super Admin', 'Admin')
+			)
+			OR EXISTS (
+				SELECT 1
+				FROM users u
+				JOIN role_permissions rp ON u.role_id = rp.role_id
+				JOIN permissions p ON rp.permission_id = p.permission_id
+				WHERE u.user_id = $1
+					AND u.is_active = TRUE
+					AND u.is_deleted = FALSE
+					AND p.name = $2
+			)
+		) AS has_permission
 	`
 
-	var count int
-	err := db.QueryRow(query, userID, permission).Scan(&count)
-	return count > 0, err
+	var has bool
+	err := db.QueryRow(query, userID, permission).Scan(&has)
+	return has, err
 }
 
 func checkUserRole(roleID int, roleName string) (bool, error) {
@@ -265,4 +316,11 @@ func checkUserRole(roleID int, roleName string) (bool, error) {
 	var count int
 	err := db.QueryRow(query, roleID, roleName).Scan(&count)
 	return count > 0, err
+}
+
+func getRoleNameByID(roleID int) (string, error) {
+	db := database.GetDB()
+	var name string
+	err := db.QueryRow(`SELECT name FROM roles WHERE role_id = $1`, roleID).Scan(&name)
+	return name, err
 }

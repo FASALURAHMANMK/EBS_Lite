@@ -127,7 +127,7 @@ func (s *NotificationsService) lowStockNotifications(companyID int, locationID *
         JOIN locations l ON st.location_id = l.location_id
         JOIN products p ON st.product_id = p.product_id
         WHERE l.company_id = $1
-          AND l.is_deleted = FALSE
+          AND l.is_active = TRUE
           AND p.is_deleted = FALSE
           AND p.is_active = TRUE
           AND COALESCE(p.reorder_level,0) > 0

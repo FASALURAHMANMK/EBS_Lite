@@ -48,8 +48,9 @@ The backend uses `pressly/goose` and expects migrations under `go_backend_rmt/mi
 Deployment expectation:
 - On a brand-new DB, start the server with `RUN_MIGRATIONS=true` so schema is created/upgraded automatically.
 - Ensure the release includes migrations:
-  - `go_backend_rmt/migrations/20260121_fix_missing_schema_columns.sql`
-  - `go_backend_rmt/migrations/20260302_add_idempotency_purchases_collections.sql`
+  - `go_backend_rmt/migrations/202601010000_init_schema.sql`
+  - `go_backend_rmt/migrations/202601210000_fix_missing_schema_columns.sql`
+  - `go_backend_rmt/migrations/202603020000_add_idempotency_purchases_collections.sql`
 
 ## Backups (minimal operator runbook)
 
@@ -85,4 +86,3 @@ Measured by query-count reduction (per request):
 - Sale totals + sale create: product meta and tax percentage lookups are batched (no per-line DB queries).
 - POS held sale + finalize: uses the same batched tax/product meta helpers.
 - Auth middleware: throttled `device_sessions.last_seen` update is best-effort and async (reduces request latency on hot routes).
-

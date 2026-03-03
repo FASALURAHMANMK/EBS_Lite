@@ -162,12 +162,28 @@ func (s *CompanyService) CreateCompany(req *models.CreateCompanyRequest, userID 
 	}
 
 	if userCompanyID == nil {
-		// User doesn't have company - assign this one and make them admin
+		// User doesn't have company - assign this one and make them Super Admin (by name, not ID).
+		var superAdminRoleID int
+		if err := tx.QueryRow(`SELECT role_id FROM roles WHERE name = 'Super Admin'`).Scan(&superAdminRoleID); err != nil {
+			if err == sql.ErrNoRows {
+				if err := tx.QueryRow(`
+					INSERT INTO roles (name, description, is_system_role)
+					VALUES ('Super Admin', 'Full system access', TRUE)
+					ON CONFLICT (name) DO UPDATE SET is_system_role = TRUE
+					RETURNING role_id
+				`).Scan(&superAdminRoleID); err != nil {
+					return nil, fmt.Errorf("failed to ensure Super Admin role: %w", err)
+				}
+			} else {
+				return nil, fmt.Errorf("failed to resolve Super Admin role: %w", err)
+			}
+		}
+
 		_, err = tx.Exec(`
 			UPDATE users 
-			SET company_id = $1, role_id = 1, updated_at = CURRENT_TIMESTAMP
-			WHERE user_id = $2
-		`, company.CompanyID, userID)
+			SET company_id = $1, role_id = $2, updated_at = CURRENT_TIMESTAMP
+			WHERE user_id = $3
+		`, company.CompanyID, superAdminRoleID, userID)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to assign company to user: %w", err)

@@ -22,7 +22,7 @@ The backend applies SQL migrations automatically on startup (using `pressly/goos
 To disable automatic migrations (not recommended for dev):
 - set `RUN_MIGRATIONS=false`
 
-Docker: `go_backend_rmt/docker-compose.yml` runs `postgres` + `erp-api`; on a clean DB the base schema is initialized from `Docs & Schema/PostgrSQL.sql` and then the API applies migrations on startup.
+Docker: `go_backend_rmt/docker-compose.yml` runs `postgres` + `erp-api`; on a clean DB the API applies Goose migrations (including the base schema migration) on startup.
 
 ## Backup / Restore (operator-friendly)
 

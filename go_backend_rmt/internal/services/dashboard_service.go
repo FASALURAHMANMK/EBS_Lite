@@ -24,10 +24,14 @@ func (s *DashboardService) GetMetrics(companyID int, locationID *int) (*models.D
 	metrics := &models.DashboardMetrics{}
 
 	// helper for location scoping
-	locFilter := ""
+	locClause := func(alias string) string {
+		if locationID == nil {
+			return ""
+		}
+		return fmt.Sprintf(" AND %s.location_id = $2", alias)
+	}
 	args := []interface{}{companyID}
 	if locationID != nil {
-		locFilter = " AND %s.location_id = $2"
 		args = append(args, *locationID)
 	}
 
@@ -37,7 +41,7 @@ func (s *DashboardService) GetMetrics(companyID int, locationID *int) (*models.D
             SELECT COALESCE(SUM(s.total_amount - s.paid_amount),0)
             FROM sales s
             JOIN locations l ON s.location_id = l.location_id
-            WHERE l.company_id = $1%s AND s.is_deleted = FALSE`, fmt.Sprintf(locFilter, "s"))
+            WHERE l.company_id = $1%s AND s.is_deleted = FALSE`, locClause("s"))
 		if err := s.db.QueryRow(q, args...).Scan(&metrics.CreditOutstanding); err != nil {
 			return nil, fmt.Errorf("failed to get credit outstanding: %w", err)
 		}
@@ -50,7 +54,7 @@ func (s *DashboardService) GetMetrics(companyID int, locationID *int) (*models.D
             FROM stock st
             JOIN locations l ON st.location_id = l.location_id
             JOIN products p ON st.product_id = p.product_id
-            WHERE l.company_id = $1%s`, fmt.Sprintf(locFilter, "st"))
+            WHERE l.company_id = $1%s`, locClause("st"))
 		if err := s.db.QueryRow(q, args...).Scan(&metrics.InventoryValue); err != nil {
 			return nil, fmt.Errorf("failed to get inventory value: %w", err)
 		}
@@ -62,7 +66,7 @@ func (s *DashboardService) GetMetrics(companyID int, locationID *int) (*models.D
             SELECT COALESCE(SUM(s.total_amount),0)
             FROM sales s
             JOIN locations l ON s.location_id = l.location_id
-            WHERE l.company_id = $1%s AND s.sale_date = CURRENT_DATE AND s.is_deleted = FALSE`, fmt.Sprintf(locFilter, "s"))
+            WHERE l.company_id = $1%s AND s.sale_date = CURRENT_DATE AND s.is_deleted = FALSE`, locClause("s"))
 		if err := s.db.QueryRow(q, args...).Scan(&metrics.TodaySales); err != nil {
 			return nil, fmt.Errorf("failed to get today's sales: %w", err)
 		}
@@ -74,7 +78,7 @@ func (s *DashboardService) GetMetrics(companyID int, locationID *int) (*models.D
             SELECT COALESCE(SUM(p.total_amount),0)
             FROM purchases p
             JOIN locations l ON p.location_id = l.location_id
-            WHERE l.company_id = $1%s AND p.purchase_date = CURRENT_DATE AND p.is_deleted = FALSE`, fmt.Sprintf(locFilter, "p"))
+            WHERE l.company_id = $1%s AND p.purchase_date = CURRENT_DATE AND p.is_deleted = FALSE`, locClause("p"))
 		if err := s.db.QueryRow(q, args...).Scan(&metrics.TodayPurchases); err != nil {
 			return nil, fmt.Errorf("failed to get today's purchases: %w", err)
 		}
@@ -89,7 +93,7 @@ func (s *DashboardService) GetMetrics(companyID int, locationID *int) (*models.D
             FROM sale_payments sp
             JOIN sales s ON sp.sale_id = s.sale_id
             JOIN locations l ON s.location_id = l.location_id
-            WHERE l.company_id = $1%s AND s.sale_date = CURRENT_DATE AND s.is_deleted = FALSE`, fmt.Sprintf(locFilter, "s"))
+            WHERE l.company_id = $1%s AND s.sale_date = CURRENT_DATE AND s.is_deleted = FALSE`, locClause("s"))
 		if err := s.db.QueryRow(q, args...).Scan(&salesPaid); err != nil {
 			return nil, fmt.Errorf("failed to get sales payments: %w", err)
 		}
@@ -153,7 +157,7 @@ func (s *DashboardService) GetMetrics(companyID int, locationID *int) (*models.D
             SELECT COALESCE(SUM(s.total_amount),0)
             FROM sales s
             JOIN locations l ON s.location_id = l.location_id
-            WHERE l.company_id = $1%s AND s.is_deleted = FALSE`, fmt.Sprintf(locFilter, "s"))
+            WHERE l.company_id = $1%s AND s.is_deleted = FALSE`, locClause("s"))
 		if err := s.db.QueryRow(q, args...).Scan(&metrics.TotalSales); err != nil {
 			return nil, fmt.Errorf("failed to get total sales: %w", err)
 		}
@@ -164,7 +168,7 @@ func (s *DashboardService) GetMetrics(companyID int, locationID *int) (*models.D
             SELECT COALESCE(SUM(p.total_amount),0)
             FROM purchases p
             JOIN locations l ON p.location_id = l.location_id
-            WHERE l.company_id = $1%s AND p.is_deleted = FALSE`, fmt.Sprintf(locFilter, "p"))
+            WHERE l.company_id = $1%s AND p.is_deleted = FALSE`, locClause("p"))
 		if err := s.db.QueryRow(q, args...).Scan(&metrics.TotalPurchases); err != nil {
 			return nil, fmt.Errorf("failed to get total purchases: %w", err)
 		}
@@ -177,7 +181,7 @@ func (s *DashboardService) GetMetrics(companyID int, locationID *int) (*models.D
             FROM sale_payments sp
             JOIN sales s ON sp.sale_id = s.sale_id
             JOIN locations l ON s.location_id = l.location_id
-            WHERE l.company_id = $1%s AND s.is_deleted = FALSE`, fmt.Sprintf(locFilter, "s"))
+            WHERE l.company_id = $1%s AND s.is_deleted = FALSE`, locClause("s"))
 		if err := s.db.QueryRow(q1, args...).Scan(&totalSalesPaid); err != nil {
 			return nil, fmt.Errorf("failed to get total sales payments: %w", err)
 		}
@@ -236,10 +240,14 @@ func (s *DashboardService) GetQuickActionCounts(companyID int, locationID *int) 
 	counts := &models.QuickActionCounts{}
 
 	// helper for location scoping
-	locFilter := ""
+	locClause := func(alias string) string {
+		if locationID == nil {
+			return ""
+		}
+		return fmt.Sprintf(" AND %s.location_id = $2", alias)
+	}
 	args := []interface{}{companyID}
 	if locationID != nil {
-		locFilter = " AND %s.location_id = $2"
 		args = append(args, *locationID)
 	}
 
@@ -249,7 +257,7 @@ func (s *DashboardService) GetQuickActionCounts(companyID int, locationID *int) 
             SELECT COUNT(*)
             FROM sales s
             JOIN locations l ON s.location_id = l.location_id
-            WHERE l.company_id = $1%s AND s.sale_date = CURRENT_DATE AND s.is_deleted = FALSE`, fmt.Sprintf(locFilter, "s"))
+            WHERE l.company_id = $1%s AND s.sale_date = CURRENT_DATE AND s.is_deleted = FALSE`, locClause("s"))
 		if err := s.db.QueryRow(q, args...).Scan(&counts.SalesToday); err != nil {
 			return nil, fmt.Errorf("failed to get sales count: %w", err)
 		}
@@ -261,7 +269,7 @@ func (s *DashboardService) GetQuickActionCounts(companyID int, locationID *int) 
             SELECT COUNT(*)
             FROM purchases p
             JOIN locations l ON p.location_id = l.location_id
-            WHERE l.company_id = $1%s AND p.purchase_date = CURRENT_DATE AND p.is_deleted = FALSE`, fmt.Sprintf(locFilter, "p"))
+            WHERE l.company_id = $1%s AND p.purchase_date = CURRENT_DATE AND p.is_deleted = FALSE`, locClause("p"))
 		if err := s.db.QueryRow(q, args...).Scan(&counts.PurchasesToday); err != nil {
 			return nil, fmt.Errorf("failed to get purchases count: %w", err)
 		}
@@ -344,7 +352,12 @@ func (s *DashboardService) GetQuickActionCounts(companyID int, locationID *int) 
             FROM stock st
             JOIN locations l ON st.location_id = l.location_id
             JOIN products p ON st.product_id = p.product_id
-            WHERE l.company_id = $1%s AND st.quantity <= p.reorder_level`, fmt.Sprintf(locFilter, "st"))
+            WHERE l.company_id = $1%s
+              AND l.is_active = TRUE
+              AND p.is_deleted = FALSE
+              AND p.is_active = TRUE
+              AND COALESCE(p.reorder_level,0) > 0
+              AND COALESCE(st.quantity,0) <= COALESCE(p.reorder_level,0)`, locClause("st"))
 		if err := s.db.QueryRow(q, args...).Scan(&counts.LowStockItems); err != nil {
 			return nil, fmt.Errorf("failed to get low stock count: %w", err)
 		}

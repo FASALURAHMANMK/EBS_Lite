@@ -23,7 +23,9 @@ import (
 
 func main() {
 	// Load environment variables
-	if err := godotenv.Load(); err != nil {
+	// Overload so local `.env` takes precedence over any pre-set shell env vars
+	// (common source of confusion when PORT is already set).
+	if err := godotenv.Overload(); err != nil {
 		log.Println("No .env file found, using system environment variables")
 	}
 

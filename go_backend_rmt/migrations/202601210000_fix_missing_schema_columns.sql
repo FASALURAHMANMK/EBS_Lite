@@ -25,15 +25,20 @@ ALTER TABLE IF EXISTS leaves
 	ADD COLUMN IF NOT EXISTS status VARCHAR(50);
 
 -- Backfill IDs when leave_id was newly added.
+-- +goose StatementBegin
 DO $$
 DECLARE
 	seq text;
 BEGIN
-	SELECT pg_get_serial_sequence('leaves', 'leave_id') INTO seq;
-	IF seq IS NOT NULL THEN
-		EXECUTE format('UPDATE leaves SET leave_id = nextval(%L) WHERE leave_id IS NULL', seq);
+	IF to_regclass('public.leaves') IS NOT NULL THEN
+		SELECT pg_get_serial_sequence('leaves', 'leave_id') INTO seq;
+		IF seq IS NOT NULL THEN
+			EXECUTE format('UPDATE leaves SET leave_id = nextval(%L) WHERE leave_id IS NULL', seq);
+		END IF;
 	END IF;
-END $$;
+END;
+$$;
+-- +goose StatementEnd
 
 -- holidays
 ALTER TABLE IF EXISTS holidays
@@ -49,11 +54,19 @@ ALTER TABLE IF EXISTS vouchers
 	ADD COLUMN IF NOT EXISTS account_id INTEGER;
 
 -- Best-effort backfill company_id from chart_of_accounts when possible.
-UPDATE vouchers v
-SET company_id = coa.company_id
-FROM chart_of_accounts coa
-WHERE v.company_id IS NULL
-	AND v.account_id = coa.account_id;
+-- +goose StatementBegin
+DO $$
+BEGIN
+	IF to_regclass('public.vouchers') IS NOT NULL AND to_regclass('public.chart_of_accounts') IS NOT NULL THEN
+		UPDATE vouchers v
+		SET company_id = coa.company_id
+		FROM chart_of_accounts coa
+		WHERE v.company_id IS NULL
+			AND v.account_id = coa.account_id;
+	END IF;
+END;
+$$;
+-- +goose StatementEnd
 
 -- ledger_entries
 ALTER TABLE IF EXISTS ledger_entries
@@ -61,11 +74,19 @@ ALTER TABLE IF EXISTS ledger_entries
 	ADD COLUMN IF NOT EXISTS reference VARCHAR(100);
 
 -- Best-effort backfill company_id from chart_of_accounts when possible.
-UPDATE ledger_entries le
-SET company_id = coa.company_id
-FROM chart_of_accounts coa
-WHERE le.company_id IS NULL
-	AND le.account_id = coa.account_id;
+-- +goose StatementBegin
+DO $$
+BEGIN
+	IF to_regclass('public.ledger_entries') IS NOT NULL AND to_regclass('public.chart_of_accounts') IS NOT NULL THEN
+		UPDATE ledger_entries le
+		SET company_id = coa.company_id
+		FROM chart_of_accounts coa
+		WHERE le.company_id IS NULL
+			AND le.account_id = coa.account_id;
+	END IF;
+END;
+$$;
+-- +goose StatementEnd
 
 -- promotions
 ALTER TABLE IF EXISTS promotions
@@ -81,22 +102,35 @@ ALTER TABLE IF EXISTS customer_credit_transactions
 	ADD COLUMN IF NOT EXISTS created_by INTEGER;
 
 -- Backfill IDs when transaction_id was newly added.
+-- +goose StatementBegin
 DO $$
 DECLARE
 	seq text;
 BEGIN
-	SELECT pg_get_serial_sequence('customer_credit_transactions', 'transaction_id') INTO seq;
-	IF seq IS NOT NULL THEN
-		EXECUTE format('UPDATE customer_credit_transactions SET transaction_id = nextval(%L) WHERE transaction_id IS NULL', seq);
+	IF to_regclass('public.customer_credit_transactions') IS NOT NULL THEN
+		SELECT pg_get_serial_sequence('customer_credit_transactions', 'transaction_id') INTO seq;
+		IF seq IS NOT NULL THEN
+			EXECUTE format('UPDATE customer_credit_transactions SET transaction_id = nextval(%L) WHERE transaction_id IS NULL', seq);
+		END IF;
 	END IF;
-END $$;
+END;
+$$;
+-- +goose StatementEnd
 
 -- Best-effort backfill company_id from customers when possible.
-UPDATE customer_credit_transactions cct
-SET company_id = c.company_id
-FROM customers c
-WHERE cct.company_id IS NULL
-	AND cct.customer_id = c.customer_id;
+-- +goose StatementBegin
+DO $$
+BEGIN
+	IF to_regclass('public.customer_credit_transactions') IS NOT NULL AND to_regclass('public.customers') IS NOT NULL THEN
+		UPDATE customer_credit_transactions cct
+		SET company_id = c.company_id
+		FROM customers c
+		WHERE cct.company_id IS NULL
+			AND cct.customer_id = c.customer_id;
+	END IF;
+END;
+$$;
+-- +goose StatementEnd
 
 -- password_reset_tokens
 ALTER TABLE IF EXISTS password_reset_tokens

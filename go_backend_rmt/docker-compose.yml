@@ -13,7 +13,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - "./Docs & Schema/PostgrSQL.sql:/docker-entrypoint-initdb.d/00_schema.sql:ro"
     networks:
       - erp_network
     healthcheck:

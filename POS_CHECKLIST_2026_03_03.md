@@ -45,7 +45,7 @@ This checklist focuses on the POS items explicitly called out in `ebs_lite_win/R
 
 ### Role-based discount limits + manager override (server-enforced)
 - Backend:
-  - Migration: `go_backend_rmt/migrations/20260303_pos_controls.sql` (role limits + `OVERRIDE_DISCOUNTS`)
+  - Migration: `go_backend_rmt/migrations/202603030000_pos_controls.sql` (role limits + `OVERRIDE_DISCOUNTS`)
   - Enforcement: `go_backend_rmt/internal/services/pos_service.go` (`enforceDiscountLimits`)
   - Manager override token: `go_backend_rmt/internal/utils/override_token.go`, `go_backend_rmt/internal/handlers/auth.go` (`/auth/verify`)
 - Flutter:
@@ -59,4 +59,3 @@ This checklist focuses on the POS items explicitly called out in `ebs_lite_win/R
   - Earn: backend `go_backend_rmt/internal/services/sales_service.go` (`AwardPoints` async)
 - Follow-up:
   - Ensure printed receipts/invoices display loyalty earned/redeemed amounts consistently (ESC/POS ticket + A4 PDF templates currently do not show points).
-
