@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ebs_lite/shared/widgets/feature_grid.dart';
+import 'package:ebs_lite/shared/widgets/feature_menu.dart';
 import 'stock_adjustments_page.dart';
 import 'inventory_management_page.dart';
 import 'inventory_view_page.dart';
@@ -65,6 +65,6 @@ class InventoryPage extends StatelessWidget {
       ),
     ];
 
-    return FeatureGrid(items: items);
+    return FeatureMenu(items: items, title: 'Inventory');
   }
 }

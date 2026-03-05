@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ebs_lite/shared/widgets/feature_grid.dart';
+import 'package:ebs_lite/shared/widgets/feature_menu.dart';
 import 'loyalty_management_page.dart';
 import 'customer_management_page.dart';
 
@@ -25,6 +25,6 @@ class CustomersPage extends StatelessWidget {
       ),
     ];
 
-    return FeatureGrid(items: items);
+    return FeatureMenu(items: items, title: 'Customers');
   }
 }

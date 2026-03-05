@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/offline_cache/master_data_sync_notifier.dart';
+import '../../../core/layout/app_breakpoints.dart';
 import '../../../core/outbox/outbox_notifier.dart';
 import '../../../core/theme_notifier.dart';
 import 'widgets/dashboard_content.dart';
+import 'widgets/dashboard_desktop_sidebar.dart';
 import 'widgets/dashboard_header.dart';
 import 'widgets/dashboard_sidebar.dart';
 import 'widgets/quick_action_button.dart';
@@ -31,6 +33,9 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   bool _promptedLocation = false;
+  bool _desktopSidebarExpanded = true;
+  final GlobalKey<NavigatorState> _wideNavigatorKey =
+      GlobalKey<NavigatorState>();
 
   @override
   void initState() {
@@ -47,17 +52,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   ];
 
   // Secondary items kept in sidebar/rail
-  static const _secondaryItems = <_NavItem>[
-    _NavItem('Reports', Icons.bar_chart_rounded),
-    _NavItem('Accounting', Icons.account_balance_wallet_rounded),
-    _NavItem('HR', Icons.groups_2_rounded),
-    _NavItem('Settings', Icons.settings_rounded),
-  ];
-
   int _bottomIndex = 0;
 
   @override
   Widget build(BuildContext context) {
+    final isTabletOrDesktop = AppBreakpoints.isTabletOrDesktop(context);
+
     // Reload dashboard data when selected location changes
     ref.listen<LocationState>(locationNotifierProvider, (prev, next) {
       final prevId = prev?.selected?.locationId;
@@ -99,14 +99,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       });
     }
     final themeNotifier = ref.read(themeNotifierProvider.notifier);
-    final media = MediaQuery.of(context);
-    final width = media.size.width;
 
     final dashboardState = ref.watch(dashboardNotifierProvider);
     final quickCounts = dashboardState.quickActions;
-
-    final isWide = width >= 1000; // rail for desktop/tablet, drawer for phones
-    final railExtended = width >= 1300;
 
     final theme = Theme.of(context);
     final outboxState = ref.watch(outboxNotifierProvider);
@@ -136,109 +131,130 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ? null
         : dashboardActionForId(customization.quickActionId!);
 
-    return Scaffold(
-      appBar: DashboardHeader(
-        onToggleTheme: () => themeNotifier.toggle(),
-        isOnline: outboxState.isOnline,
-        isChecking: outboxState.isChecking,
-        queuedCount: outboxState.queuedCount,
-        isSyncing: outboxState.isSyncing,
-        unreadNotificationsCount: unreadNotifications,
-        onRetry: outboxState.queuedCount > 0
-            ? () => outboxNotifier.retryNow()
+    if (!isTabletOrDesktop) {
+      return Scaffold(
+        appBar: DashboardHeader(
+          onToggleTheme: () => themeNotifier.toggle(),
+          isOnline: outboxState.isOnline,
+          isChecking: outboxState.isChecking,
+          queuedCount: outboxState.queuedCount,
+          isSyncing: outboxState.isSyncing,
+          unreadNotificationsCount: unreadNotifications,
+          onRetry: outboxState.queuedCount > 0
+              ? () => outboxNotifier.retryNow()
+              : null,
+          title: currentTitle,
+          onNotifications: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const NotificationsPage()),
+            );
+          },
+        ),
+        drawer: DashboardSidebar(
+          onSelect: (label) {
+            Navigator.of(context).maybePop();
+            DashboardNavigation.pushForLabel(context, label);
+          },
+        ),
+        body: IndexedStack(
+          index: _bottomIndex,
+          children: pages,
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _bottomIndex,
+          onDestinationSelected: (i) => setState(() => _bottomIndex = i),
+          height: 68,
+          elevation: 0,
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          // No chip/indicator around the icon
+          indicatorColor: Colors.transparent,
+          // Only show label for the selected tab
+          labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+          destinations: _primaryTabs
+              .map((e) =>
+                  NavigationDestination(icon: Icon(e.icon), label: e.label))
+              .toList(),
+        ),
+        floatingActionButton: showQuick
+            ? (quickDef == null
+                ? null
+                : QuickActionButton(
+                    heroTag: 'dashboard_quick_action',
+                    useExtendedLabelsOnWide: false,
+                    actions: [
+                      QuickAction(
+                        icon: quickDef.icon,
+                        label: _quickLabel(quickDef.id, quickCounts),
+                        onTap: () =>
+                            runDashboardAction(context, ref, quickDef.id),
+                      ),
+                    ],
+                  ))
             : null,
-        title: currentTitle,
-        onNotifications: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const NotificationsPage()),
-          );
-        },
-      ),
-      drawer: isWide
-          ? null
-          : DashboardSidebar(
-              onSelect: (label) {
-                Navigator.of(context).maybePop();
-                DashboardNavigation.pushForLabel(context, label);
-              },
-            ),
-      body: Row(
-        children: [
-          if (isWide)
-            NavigationRail(
-              extended: railExtended,
-              groupAlignment: -0.9,
-              minWidth: 72,
-              leading: Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Tooltip(
-                  message: 'Toggle theme',
-                  child: IconButton(
-                    onPressed: () => themeNotifier.toggle(),
-                    icon: Icon(
-                      Theme.of(context).brightness == Brightness.dark
-                          ? Icons.dark_mode_rounded
-                          : Icons.light_mode_rounded,
+      );
+    }
+
+    void openWide(Widget page) {
+      _wideNavigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => page),
+      );
+    }
+
+    void goWideHome() {
+      _wideNavigatorKey.currentState?.popUntil((r) => r.isFirst);
+    }
+
+    void toggleDesktopSidebar() {
+      setState(() => _desktopSidebarExpanded = !_desktopSidebarExpanded);
+    }
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        final nav = _wideNavigatorKey.currentState;
+        if (nav != null && nav.canPop()) {
+          nav.pop();
+          return;
+        }
+        Navigator.of(context).pop();
+      },
+      child: Scaffold(
+        body: Row(
+          children: [
+            SizedBox(
+              width: _desktopSidebarExpanded ? 320 : 56,
+              child: _desktopSidebarExpanded
+                  ? DashboardDesktopSidebar(
+                      onHome: goWideHome,
+                      onOpen: openWide,
+                    )
+                  : _CollapsedSidebar(
+                      onExpand: toggleDesktopSidebar,
                     ),
+            ),
+            if (_desktopSidebarExpanded)
+              VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: theme.colorScheme.outlineVariant,
+              ),
+            Expanded(
+              child: Navigator(
+                key: _wideNavigatorKey,
+                onGenerateRoute: (settings) => MaterialPageRoute(
+                  settings: settings,
+                  builder: (_) => _DashboardWideHome(
+                    onOpen: openWide,
+                    isSidebarExpanded: _desktopSidebarExpanded,
+                    onToggleSidebar: toggleDesktopSidebar,
                   ),
                 ),
               ),
-              destinations: _secondaryItems
-                  .map(
-                    (e) => NavigationRailDestination(
-                      icon: Icon(e.icon,
-                          color: theme.colorScheme.onSurfaceVariant),
-                      selectedIcon:
-                          Icon(e.icon, color: theme.colorScheme.primary),
-                      label: Text(e.label),
-                    ),
-                  )
-                  .toList(),
-              onDestinationSelected: (i) => DashboardNavigation.pushForLabel(
-                context,
-                _secondaryItems[i].label,
-              ),
-              selectedIndex: null,
             ),
-          Expanded(
-            child: IndexedStack(
-              index: _bottomIndex,
-              children: pages,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _bottomIndex,
-        onDestinationSelected: (i) => setState(() => _bottomIndex = i),
-        height: 68,
-        elevation: 0,
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        // No chip/indicator around the icon
-        indicatorColor: Colors.transparent,
-        // Only show label for the selected tab
-        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
-        destinations: _primaryTabs
-            .map((e) =>
-                NavigationDestination(icon: Icon(e.icon), label: e.label))
-            .toList(),
-      ),
-      floatingActionButton: showQuick
-          ? (quickDef == null
-              ? null
-              : QuickActionButton(
-                  heroTag: 'dashboard_quick_action',
-                  useExtendedLabelsOnWide: false,
-                  actions: [
-                    QuickAction(
-                      icon: quickDef.icon,
-                      label: _quickLabel(quickDef.id, quickCounts),
-                      onTap: () =>
-                          runDashboardAction(context, ref, quickDef.id),
-                    ),
-                  ],
-                ))
-          : null,
     );
   }
 
@@ -302,4 +318,73 @@ class _NavItem {
   final String label;
   final IconData icon;
   const _NavItem(this.label, this.icon);
+}
+
+class _DashboardWideHome extends ConsumerWidget {
+  const _DashboardWideHome({
+    required this.onOpen,
+    required this.isSidebarExpanded,
+    required this.onToggleSidebar,
+  });
+
+  final ValueChanged<Widget> onOpen;
+  final bool isSidebarExpanded;
+  final VoidCallback onToggleSidebar;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeNotifier = ref.read(themeNotifierProvider.notifier);
+    final outboxState = ref.watch(outboxNotifierProvider);
+    final outboxNotifier = ref.read(outboxNotifierProvider.notifier);
+    final unreadNotifications =
+        ref.watch(notificationsUnreadCountProvider).maybeWhen(
+              data: (v) => v,
+              orElse: () => 0,
+            );
+
+    return Scaffold(
+      appBar: DashboardHeader(
+        showSidebarToggle: true,
+        isSidebarExpanded: isSidebarExpanded,
+        onSidebarToggle: onToggleSidebar,
+        onToggleTheme: () => themeNotifier.toggle(),
+        isOnline: outboxState.isOnline,
+        isChecking: outboxState.isChecking,
+        queuedCount: outboxState.queuedCount,
+        isSyncing: outboxState.isSyncing,
+        unreadNotificationsCount: unreadNotifications,
+        onRetry: outboxState.queuedCount > 0
+            ? () => outboxNotifier.retryNow()
+            : null,
+        title: 'Dashboard',
+        onNotifications: () => onOpen(const NotificationsPage()),
+      ),
+      body: const DashboardContent(),
+    );
+  }
+}
+
+class _CollapsedSidebar extends StatelessWidget {
+  const _CollapsedSidebar({required this.onExpand});
+
+  final VoidCallback onExpand;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surface,
+      child: SafeArea(
+        child: Column(
+          children: [
+            IconButton(
+              tooltip: 'Show sidebar',
+              icon: const Icon(Icons.menu_rounded),
+              onPressed: onExpand,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

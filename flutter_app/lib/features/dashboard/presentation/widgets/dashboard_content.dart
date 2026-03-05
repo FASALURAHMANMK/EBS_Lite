@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../controllers/dashboard_notifier.dart';
 import '../../controllers/dashboard_customization_notifier.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
+import '../../../../core/layout/app_breakpoints.dart';
 import '../../../../shared/widgets/app_message_view.dart';
 import '../../../../shared/widgets/no_network_view.dart';
 import 'stat_card.dart';
@@ -37,6 +38,7 @@ class DashboardContent extends ConsumerWidget {
     final metrics = state.metrics;
     final size = MediaQuery.of(context).size;
     final shortest = size.shortestSide;
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
 
     // Loading and error states so we don't show zeros by default
     if (state.isLoading) {
@@ -77,7 +79,7 @@ class DashboardContent extends ConsumerWidget {
 
     // Pure GridView experience as requested (no Slivers)
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: AppBreakpoints.pagePadding(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -152,33 +154,76 @@ class DashboardContent extends ConsumerWidget {
                         ),
                         const SizedBox(height: 8),
                         Expanded(
-                          child: FeatureGrid(
-                            padding: EdgeInsets.zero,
-                            items: [
-                              ...shownShortcuts.map(
-                                (a) => FeatureItem(
-                                  icon: a.icon,
-                                  label: a.label,
-                                  onTap: () => runDashboardAction(
-                                    context,
-                                    ref,
-                                    a.id,
-                                  ),
-                                ),
-                              ),
-                              if (showCustomize)
-                                FeatureItem(
-                                  icon: Icons.tune_rounded,
-                                  label: 'Customize',
-                                  onTap: () => Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          const DashboardCustomizationPage(),
+                          child: isWide
+                              ? ListView.separated(
+                                  padding: EdgeInsets.zero,
+                                  itemCount: shownShortcuts.length +
+                                      (showCustomize ? 1 : 0),
+                                  separatorBuilder: (_, __) =>
+                                      const Divider(height: 1),
+                                  itemBuilder: (context, index) {
+                                    if (showCustomize &&
+                                        index == shownShortcuts.length) {
+                                      return ListTile(
+                                        dense: true,
+                                        visualDensity: VisualDensity.compact,
+                                        contentPadding: EdgeInsets.zero,
+                                        leading: const Icon(Icons.tune_rounded),
+                                        title: const Text('Customize'),
+                                        trailing: const Icon(
+                                            Icons.chevron_right_rounded),
+                                        onTap: () => Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const DashboardCustomizationPage(),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    final a = shownShortcuts[index];
+                                    return ListTile(
+                                      dense: true,
+                                      visualDensity: VisualDensity.compact,
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: Icon(a.icon),
+                                      title: Text(a.label),
+                                      trailing: const Icon(
+                                          Icons.chevron_right_rounded),
+                                      onTap: () => runDashboardAction(
+                                        context,
+                                        ref,
+                                        a.id,
+                                      ),
+                                    );
+                                  },
+                                )
+                              : FeatureGrid(
+                                  padding: EdgeInsets.zero,
+                                  items: [
+                                    ...shownShortcuts.map(
+                                      (a) => FeatureItem(
+                                        icon: a.icon,
+                                        label: a.label,
+                                        onTap: () => runDashboardAction(
+                                          context,
+                                          ref,
+                                          a.id,
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                    if (showCustomize)
+                                      FeatureItem(
+                                        icon: Icons.tune_rounded,
+                                        label: 'Customize',
+                                        onTap: () => Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const DashboardCustomizationPage(),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                            ],
-                          ),
                         ),
                       ],
                     ),

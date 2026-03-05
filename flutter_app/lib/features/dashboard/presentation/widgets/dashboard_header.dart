@@ -5,6 +5,9 @@ class DashboardHeader extends ConsumerStatefulWidget
     implements PreferredSizeWidget {
   const DashboardHeader({
     super.key,
+    this.showSidebarToggle = false,
+    this.isSidebarExpanded = true,
+    this.onSidebarToggle,
     this.isOnline = true,
     this.isChecking = false,
     this.queuedCount = 0,
@@ -15,6 +18,11 @@ class DashboardHeader extends ConsumerStatefulWidget
     this.unreadNotificationsCount = 0,
     this.title = 'Dashboard',
   });
+
+  /// Desktop sidebar toggle
+  final bool showSidebarToggle;
+  final bool isSidebarExpanded;
+  final VoidCallback? onSidebarToggle;
 
   /// Realtime/Sync status
   final bool isOnline;
@@ -54,7 +62,19 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
     return AppBar(
       elevation: 0,
       centerTitle: false,
-      automaticallyImplyLeading: true,
+      automaticallyImplyLeading: !widget.showSidebarToggle,
+      leading: widget.showSidebarToggle
+          ? IconButton(
+              tooltip:
+                  widget.isSidebarExpanded ? 'Hide sidebar' : 'Show sidebar',
+              icon: Icon(
+                widget.isSidebarExpanded
+                    ? Icons.menu_open_rounded
+                    : Icons.menu_rounded,
+              ),
+              onPressed: widget.onSidebarToggle,
+            )
+          : null,
       title: Text(widget.title,
           style: const TextStyle(fontWeight: FontWeight.w600)),
       actions: [

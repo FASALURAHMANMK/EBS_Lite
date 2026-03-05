@@ -102,6 +102,7 @@ class PosPage extends ConsumerWidget {
     );
   }
 }
+
 class _SearchBar extends ConsumerStatefulWidget {
   const _SearchBar();
 

@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../auth/controllers/auth_notifier.dart';
 import '../../../auth/controllers/auth_permissions_provider.dart';
-import '../../../../core/api_client.dart';
 import '../../controllers/location_notifier.dart';
 import '../../data/models.dart';
+import 'company_logo.dart';
 
 class DashboardSidebar extends ConsumerStatefulWidget {
   const DashboardSidebar({super.key, this.onSelect});
@@ -244,27 +244,6 @@ class _CompanyLogo extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final authState = ref.watch(authNotifierProvider);
-    final logo = authState.company?.logo;
-    ImageProvider? provider;
-    if (logo != null && logo.isNotEmpty) {
-      final dio = ref.read(dioProvider);
-      var base = dio.options.baseUrl;
-      if (base.endsWith('/')) base = base.substring(0, base.length - 1);
-      if (base.endsWith('/api/v1')) {
-        base = base.substring(0, base.length - '/api/v1'.length);
-      }
-      final url = logo.startsWith('http') ? logo : (base + logo);
-      provider = NetworkImage(url);
-    }
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: theme.colorScheme.onPrimary.withValues(alpha: 0.1),
-      backgroundImage: provider,
-      child: provider == null
-          ? const Icon(Icons.business, color: Colors.white, size: 28)
-          : null,
-    );
+    return CompanyLogo(radius: radius);
   }
 }
