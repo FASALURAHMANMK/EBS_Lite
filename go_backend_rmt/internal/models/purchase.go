@@ -92,6 +92,8 @@ type CreatePurchaseRequest struct {
 	LocationID      *int                          `json:"location_id,omitempty"`
 	PurchaseDate    *time.Time                    `json:"purchase_date,omitempty"`
 	ReferenceNumber *string                       `json:"reference_number,omitempty"`
+	PaymentMethodID *int                          `json:"payment_method_id,omitempty"`
+	PaidAmount      *float64                      `json:"paid_amount,omitempty" validate:"omitempty,gte=0"`
 	PaymentTerms    *int                          `json:"payment_terms,omitempty"`
 	Notes           *string                       `json:"notes,omitempty"`
 	Items           []CreatePurchaseDetailRequest `json:"items" validate:"required,min=1"`

@@ -5,6 +5,9 @@ import '../../controllers/inventory_notifier.dart';
 import '../../data/models.dart';
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../../dashboard/data/models.dart';
+import '../../../../core/outbox/outbox_notifier.dart';
+import '../../../../shared/widgets/app_message_view.dart';
+import '../../../../shared/widgets/no_network_view.dart';
 import 'product_transactions_page.dart';
 
 class InventoryViewPage extends ConsumerStatefulWidget {
@@ -217,6 +220,14 @@ class _InventoryViewPageState extends ConsumerState<InventoryViewPage> {
       }
     });
 
+    // If stock-changing operations sync, refresh stock list so cards don't stay stale.
+    ref.listen(outboxNotifierProvider, (prev, next) async {
+      if (!next.isOnline) return;
+      if (next.lastSyncAt != prev?.lastSyncAt) {
+        await ref.read(inventoryNotifierProvider.notifier).refreshList();
+      }
+    });
+
     if (!_promptedLocation &&
         locState.selected == null &&
         locState.locations.isNotEmpty) {
@@ -313,11 +324,30 @@ class _InventoryViewPageState extends ConsumerState<InventoryViewPage> {
             ),
           ),
           if (state.isLoading) const LinearProgressIndicator(minHeight: 2),
-          if (state.error != null)
+          if (state.error != null && state.items.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(state.error!,
-                  style: TextStyle(color: theme.colorScheme.error)),
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded,
+                      size: 18, color: theme.colorScheme.error),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      state.error!,
+                      style: TextStyle(color: theme.colorScheme.error),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () =>
+                        ref.read(inventoryNotifierProvider.notifier).load(),
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
             ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
@@ -394,9 +424,19 @@ class _InventoryViewPageState extends ConsumerState<InventoryViewPage> {
       BuildContext context, List<InventoryListItem> items) {
     final state = ref.watch(inventoryNotifierProvider);
     if (items.isEmpty) {
-      return const Center(
-        child: Text('No products available'),
-      );
+      if (state.error != null) {
+        final outbox = ref.watch(outboxNotifierProvider);
+        void onRetry() => ref.read(inventoryNotifierProvider.notifier).load();
+        return outbox.isOnline
+            ? AppMessageView(
+                icon: Icons.error_outline_rounded,
+                title: 'Unable to load products',
+                message: state.error!,
+                onRetry: onRetry,
+              )
+            : NoNetworkView(onRetry: onRetry);
+      }
+      return const Center(child: Text('No products available'));
     }
     return state.viewMode == InventoryViewMode.grid
         ? _GridList(items: items)

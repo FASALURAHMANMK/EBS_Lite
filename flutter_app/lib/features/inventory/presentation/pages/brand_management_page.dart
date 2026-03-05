@@ -5,6 +5,9 @@ import '../../controllers/category_brand_notifiers.dart';
 import '../../data/inventory_repository.dart';
 import '../../controllers/inventory_notifier.dart';
 import '../../data/models.dart';
+import '../../../../core/outbox/outbox_notifier.dart';
+import '../../../../shared/widgets/app_message_view.dart';
+import '../../../../shared/widgets/no_network_view.dart';
 
 class BrandManagementPage extends ConsumerWidget {
   const BrandManagementPage({super.key});
@@ -14,6 +17,7 @@ class BrandManagementPage extends ConsumerWidget {
     final state = ref.watch(brandManagementProvider);
     final notifier = ref.read(brandManagementProvider.notifier);
     final theme = Theme.of(context);
+    final outbox = ref.watch(outboxNotifierProvider);
 
     final filtered = state.items
         .where((b) => b.name.toLowerCase().contains(state.query.toLowerCase()))
@@ -69,19 +73,46 @@ class BrandManagementPage extends ConsumerWidget {
             ),
           ),
           if (state.isLoading) const LinearProgressIndicator(minHeight: 2),
-          if (state.error != null)
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(state.error!,
-                  style: TextStyle(color: theme.colorScheme.error)),
-            ),
           Expanded(
-            child: filtered.isEmpty
-                ? const _EmptyState(message: 'No brands found')
-                : (state.viewMode == InventoryViewMode.grid
-                    ? _BrandGrid(items: filtered)
-                    : _BrandList(items: filtered)),
+            child: (state.error != null && state.items.isEmpty)
+                ? (outbox.isOnline
+                    ? AppMessageView(
+                        icon: Icons.error_outline_rounded,
+                        title: 'Unable to load brands',
+                        message: state.error!,
+                        onRetry: notifier.load,
+                      )
+                    : NoNetworkView(onRetry: notifier.load))
+                : (filtered.isEmpty
+                    ? const _EmptyState(message: 'No brands found')
+                    : (state.viewMode == InventoryViewMode.grid
+                        ? _BrandGrid(items: filtered)
+                        : _BrandList(items: filtered))),
           ),
+          if (state.error != null && state.items.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded,
+                      size: 18, color: theme.colorScheme.error),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      state.error!,
+                      style: TextStyle(color: theme.colorScheme.error),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: notifier.load,
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

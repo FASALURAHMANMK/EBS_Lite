@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 import 'stock_transfer_form_page.dart';
 import 'stock_transfer_view_page.dart';
 
@@ -56,7 +57,6 @@ class _StockTransfersPageState extends ConsumerState<StockTransfersPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Stock Transfers'),
@@ -136,12 +136,16 @@ class _StockTransfersPageState extends ConsumerState<StockTransfersPage> {
                     return const LinearProgressIndicator(minHeight: 2);
                   }
                   if (snapshot.hasError) {
-                    return Center(
-                        child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text('Failed to load transfers: ${snapshot.error}',
-                          style: TextStyle(color: theme.colorScheme.error)),
-                    ));
+                    return ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        const SizedBox(height: 64),
+                        AppErrorView(
+                          error: snapshot.error!,
+                          onRetry: _refresh,
+                        ),
+                      ],
+                    );
                   }
                   final items = snapshot.data ?? const [];
                   if (items.isEmpty) {

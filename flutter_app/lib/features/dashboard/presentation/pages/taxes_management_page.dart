@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/error_handler.dart';
 import '../../data/taxes_repository.dart';
 
 class TaxesManagementPage extends ConsumerStatefulWidget {
@@ -98,8 +99,8 @@ class _TaxesManagementPageState extends ConsumerState<TaxesManagementPage> {
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context)
                                   ..hideCurrentSnackBar()
-                                  ..showSnackBar(
-                                      SnackBar(content: Text('Failed: $e')));
+                                  ..showSnackBar(SnackBar(
+                                      content: Text(ErrorHandler.message(e))));
                               }
                             },
                           ),
@@ -189,7 +190,7 @@ class _TaxesManagementPageState extends ConsumerState<TaxesManagementPage> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Failed: $e')));
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     }
   }
 }

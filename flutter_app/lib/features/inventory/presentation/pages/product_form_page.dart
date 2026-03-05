@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/error_handler.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
 import '../../../suppliers/data/supplier_repository.dart';
@@ -202,7 +203,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Failed: $e')));
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

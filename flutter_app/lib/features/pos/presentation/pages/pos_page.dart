@@ -10,6 +10,7 @@ import '../widgets/customer_selector_dialog.dart';
 import 'payment_page.dart';
 import '../../../../shared/widgets/manager_override_dialog.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 
 class PosPage extends ConsumerWidget {
   const PosPage({super.key});
@@ -571,7 +572,7 @@ class _HeldSalesDialog extends ConsumerStatefulWidget {
 class _HeldSalesDialogState extends ConsumerState<_HeldSalesDialog> {
   bool _loading = true;
   List<HeldSaleDto> _items = const [];
-  String? _error;
+  Object? _error;
 
   @override
   void initState() {
@@ -592,7 +593,7 @@ class _HeldSalesDialogState extends ConsumerState<_HeldSalesDialog> {
       });
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = e;
         _loading = false;
       });
     }
@@ -608,7 +609,7 @@ class _HeldSalesDialogState extends ConsumerState<_HeldSalesDialog> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Text(_error!))
+                ? AppErrorView(error: _error!, onRetry: _load)
                 : ListView.separated(
                     itemCount: _items.length,
                     separatorBuilder: (_, __) => const Divider(height: 1),

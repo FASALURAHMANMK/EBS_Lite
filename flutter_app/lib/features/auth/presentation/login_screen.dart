@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../controllers/auth_notifier.dart';
+import '../../../core/outbox/outbox_notifier.dart';
+import '../../../shared/widgets/no_network_view.dart';
 import '../../dashboard/controllers/location_notifier.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
@@ -64,6 +66,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     FocusScope.of(context).unfocus();
 
+    // Refresh online status right before attempting login so we correctly handle
+    // cases like "Wi‑Fi connected but no internet".
+    await ref.read(outboxNotifierProvider.notifier).recheckOnline();
+    final online = ref.read(outboxNotifierProvider).isOnline;
+    if (!online) return;
+
     final identifier = _emailController.text.trim();
     final isEmail = identifier.contains('@');
 
@@ -106,6 +114,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final theme = Theme.of(context);
     final media = MediaQuery.of(context);
     final shortest = media.size.shortestSide;
+    final outbox = ref.watch(outboxNotifierProvider);
 
     final maxWidth = shortest < 600 ? double.infinity : 520.0;
     final padH = shortest < 600 ? 16.0 : 24.0;
@@ -131,166 +140,207 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ],
         ),
         body: SafeArea(
-          child: Align(
-            alignment: Alignment.center,
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                  padH, padV, padH, media.viewPadding.bottom + 24),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxWidth),
-                child: Card(
-                  elevation: 0,
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
+          child: outbox.isChecking
+              ? const Center(
                   child: Padding(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: padH, vertical: padV),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const SizedBox(height: 8),
-                          Text(
-                            'Welcome back',
-                            style: theme.textTheme.headlineSmall
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Sign in to continue to your workspace.',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 24),
-                          TextFormField(
-                            controller: _emailController,
-                            focusNode: _emailFocus,
-                            textInputAction: TextInputAction.next,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: InputDecoration(
-                              hintText: 'Email or Username',
-                              prefixIcon: const Icon(Icons.person_rounded),
-                            ),
-                            validator: _validateIdentifier,
-                            onFieldSubmitted: (_) =>
-                                _passwordFocus.requestFocus(),
-                            autofocus: true,
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _passwordController,
-                            focusNode: _passwordFocus,
-                            textInputAction: TextInputAction.done,
-                            obscureText: _obscure,
-                            decoration: InputDecoration(
-                              hintText: 'Password',
-                              prefixIcon: const Icon(Icons.lock_rounded),
-                              suffixIcon: IconButton(
-                                tooltip: _obscure
-                                    ? 'Show password'
-                                    : 'Hide password',
-                                onPressed: () =>
-                                    setState(() => _obscure = !_obscure),
-                                icon: Icon(
-                                  _obscure
-                                      ? PhosphorIconsBold.eye
-                                      : PhosphorIconsBold.eyeSlash,
+                    padding: EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 12),
+                        Text('Checking connection…'),
+                      ],
+                    ),
+                  ),
+                )
+              : !outbox.isOnline
+                  ? NoNetworkView(
+                      onRetry: () => ref
+                          .read(outboxNotifierProvider.notifier)
+                          .recheckOnline(),
+                      title: 'No internet connection',
+                      message: 'Connect to the internet to sign in.',
+                    )
+                  : Align(
+                      alignment: Alignment.center,
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.fromLTRB(
+                            padH, padV, padH, media.viewPadding.bottom + 24),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: maxWidth),
+                          child: Card(
+                            elevation: 0,
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16)),
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: padH, vertical: padV),
+                              child: Form(
+                                key: _formKey,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Welcome back',
+                                      style: theme.textTheme.headlineSmall
+                                          ?.copyWith(
+                                              fontWeight: FontWeight.w700),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Sign in to continue to your workspace.',
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                              color: theme.colorScheme
+                                                  .onSurfaceVariant),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 24),
+                                    TextFormField(
+                                      controller: _emailController,
+                                      focusNode: _emailFocus,
+                                      textInputAction: TextInputAction.next,
+                                      keyboardType: TextInputType.emailAddress,
+                                      decoration: InputDecoration(
+                                        hintText: 'Email or Username',
+                                        prefixIcon:
+                                            const Icon(Icons.person_rounded),
+                                      ),
+                                      validator: _validateIdentifier,
+                                      onFieldSubmitted: (_) =>
+                                          _passwordFocus.requestFocus(),
+                                      autofocus: true,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    TextFormField(
+                                      controller: _passwordController,
+                                      focusNode: _passwordFocus,
+                                      textInputAction: TextInputAction.done,
+                                      obscureText: _obscure,
+                                      decoration: InputDecoration(
+                                        hintText: 'Password',
+                                        prefixIcon:
+                                            const Icon(Icons.lock_rounded),
+                                        suffixIcon: IconButton(
+                                          tooltip: _obscure
+                                              ? 'Show password'
+                                              : 'Hide password',
+                                          onPressed: () => setState(
+                                              () => _obscure = !_obscure),
+                                          icon: Icon(
+                                            _obscure
+                                                ? PhosphorIconsBold.eye
+                                                : PhosphorIconsBold.eyeSlash,
+                                          ),
+                                        ),
+                                      ),
+                                      validator: _validatePassword,
+                                      onFieldSubmitted: (_) => _submit(),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: TextButton(
+                                        onPressed: () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                                builder: (_) =>
+                                                    const ForgotPasswordScreen()),
+                                          );
+                                        },
+                                        child: const Text('Forgot password?'),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      height: 52,
+                                      child: FilledButton(
+                                        onPressed:
+                                            state.isLoading ? null : _submit,
+                                        style: FilledButton.styleFrom(
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(14)),
+                                          textStyle: theme.textTheme.titleMedium
+                                              ?.copyWith(
+                                                  fontWeight: FontWeight.w700),
+                                        ),
+                                        child: AnimatedSwitcher(
+                                          duration:
+                                              const Duration(milliseconds: 250),
+                                          switchInCurve: Curves.easeOut,
+                                          switchOutCurve: Curves.easeIn,
+                                          child: state.isLoading
+                                              ? Row(
+                                                  key:
+                                                      const ValueKey('loading'),
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    SizedBox(
+                                                      height: 20,
+                                                      width: 20,
+                                                      child:
+                                                          CircularProgressIndicator
+                                                              .adaptive(
+                                                        strokeWidth: 2.4,
+                                                        valueColor:
+                                                            AlwaysStoppedAnimation<
+                                                                    Color>(
+                                                                theme
+                                                                    .colorScheme
+                                                                    .onPrimary),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    const Text('Signing in…'),
+                                                  ],
+                                                )
+                                              : const Text(
+                                                  'Sign in',
+                                                  key: ValueKey('label'),
+                                                ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          'New here? ',
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                                  color: theme.colorScheme
+                                                      .onSurfaceVariant),
+                                        ),
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      const RegisterScreen()),
+                                            );
+                                          },
+                                          child:
+                                              const Text('Create an account'),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                            validator: _validatePassword,
-                            onFieldSubmitted: (_) => _submit(),
                           ),
-                          const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                      builder: (_) =>
-                                          const ForgotPasswordScreen()),
-                                );
-                              },
-                              child: const Text('Forgot password?'),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            height: 52,
-                            child: FilledButton(
-                              onPressed: state.isLoading ? null : _submit,
-                              style: FilledButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14)),
-                                textStyle: theme.textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w700),
-                              ),
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 250),
-                                switchInCurve: Curves.easeOut,
-                                switchOutCurve: Curves.easeIn,
-                                child: state.isLoading
-                                    ? Row(
-                                        key: const ValueKey('loading'),
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          SizedBox(
-                                            height: 20,
-                                            width: 20,
-                                            child: CircularProgressIndicator
-                                                .adaptive(
-                                              strokeWidth: 2.4,
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(
-                                                      theme.colorScheme
-                                                          .onPrimary),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          const Text('Signing in…'),
-                                        ],
-                                      )
-                                    : const Text(
-                                        'Sign in',
-                                        key: ValueKey('label'),
-                                      ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'New here? ',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                        builder: (_) => const RegisterScreen()),
-                                  );
-                                },
-                                child: const Text('Create an account'),
-                              ),
-                            ],
-                          ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ),
-            ),
-          ),
         ),
       ),
     );

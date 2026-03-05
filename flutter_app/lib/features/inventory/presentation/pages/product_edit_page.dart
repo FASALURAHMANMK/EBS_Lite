@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/error_handler.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
 import '../../../suppliers/data/supplier_repository.dart';
@@ -184,7 +185,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Failed to load: $e')));
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -260,7 +261,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Save failed: $e')));
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -296,7 +297,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     }
   }
 

@@ -6,6 +6,7 @@ class DashboardHeader extends ConsumerStatefulWidget
   const DashboardHeader({
     super.key,
     this.isOnline = true,
+    this.isChecking = false,
     this.queuedCount = 0,
     this.isSyncing = false,
     this.onRetry,
@@ -17,6 +18,7 @@ class DashboardHeader extends ConsumerStatefulWidget
 
   /// Realtime/Sync status
   final bool isOnline;
+  final bool isChecking;
   final int queuedCount;
   final bool isSyncing;
   final VoidCallback? onRetry;
@@ -40,10 +42,14 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final statusColor =
-        widget.isOnline ? Colors.green : theme.colorScheme.error;
-    final statusIcon =
-        widget.isOnline ? Icons.cloud_done_rounded : Icons.cloud_off_rounded;
+    final statusColor = widget.isChecking
+        ? theme.colorScheme.onSurfaceVariant
+        : (widget.isOnline ? Colors.green : theme.colorScheme.error);
+    final statusIcon = widget.isChecking
+        ? Icons.cloud_sync_rounded
+        : (widget.isOnline
+            ? Icons.cloud_done_rounded
+            : Icons.cloud_off_rounded);
 
     return AppBar(
       elevation: 0,
@@ -56,9 +62,11 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Tooltip(
-            message: widget.isOnline
-                ? 'All changes are synced'
-                : 'Offline — changes will sync later',
+            message: widget.isChecking
+                ? 'Checking connection…'
+                : (widget.isOnline
+                    ? 'All changes are synced'
+                    : 'Offline — changes will sync later'),
             child: Icon(statusIcon, color: statusColor),
           ),
         ),

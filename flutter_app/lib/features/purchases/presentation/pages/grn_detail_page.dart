@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/error_handler.dart';
 import '../../data/grn_repository.dart';
 import '../../data/models.dart';
 
@@ -35,7 +36,7 @@ class _GoodsReceiptDetailPageState
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Failed to load GRN: $e')));
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

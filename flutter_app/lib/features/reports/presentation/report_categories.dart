@@ -36,14 +36,6 @@ const salesReports = <ReportConfig>[
 
 const purchaseReports = <ReportConfig>[
   ReportConfig(
-    title: 'Expenses Summary',
-    endpoint: '/reports/expenses-summary',
-    description: 'Expenses grouped by category or period.',
-    supportsExpensesGroupBy: true,
-    supportsDateRange: false,
-    supportsLocation: false,
-  ),
-  ReportConfig(
     title: 'Purchase vs Returns',
     endpoint: '/reports/purchase-vs-returns',
     description: 'Compare purchases against returns.',
@@ -62,6 +54,14 @@ const accountsReports = <ReportConfig>[
     title: 'Daily Cash',
     endpoint: '/reports/daily-cash',
     description: 'Daily cash activity overview.',
+  ),
+  ReportConfig(
+    title: 'Expenses Summary',
+    endpoint: '/reports/expenses-summary',
+    description: 'Expenses grouped by category or period.',
+    supportsExpensesGroupBy: true,
+    supportsDateRange: false,
+    supportsLocation: false,
   ),
   ReportConfig(
     title: 'Income vs Expense',

@@ -251,7 +251,13 @@ func (s *SettingsService) ensureSettingsPermissions() error {
 
 // Payment methods CRUD
 func (s *SettingsService) GetPaymentMethods(companyID int) ([]models.PaymentMethod, error) {
-	rows, err := s.db.Query(`SELECT method_id, company_id, name, type, external_integration, is_active FROM payment_methods WHERE company_id=$1`, companyID)
+	rows, err := s.db.Query(`
+        SELECT DISTINCT ON (LOWER(name), type)
+               method_id, company_id, name, type, external_integration, is_active
+        FROM payment_methods
+        WHERE company_id = $1
+        ORDER BY LOWER(name), type, is_active DESC, method_id DESC
+    `, companyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get payment methods: %w", err)
 	}

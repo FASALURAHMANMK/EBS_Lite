@@ -11,6 +11,7 @@ import 'payment_modes_page.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../auth/controllers/auth_notifier.dart';
 import '../../../../core/api_client.dart';
+import '../../../../core/error_handler.dart';
 import '../../../../core/locale_preferences.dart';
 import 'locations_management_page.dart';
 import 'printer_settings_page.dart';
@@ -147,7 +148,7 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Failed to save: $e')));
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -440,7 +441,7 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Logo upload failed: $e')));
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

@@ -1,4 +1,5 @@
 import 'package:ebs_lite/features/inventory/data/models.dart';
+import 'package:ebs_lite/core/error_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -184,7 +185,7 @@ class _PoFormPageState extends ConsumerState<PoFormPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Failed: $e')));
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

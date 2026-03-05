@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../data/accounts_repository.dart';
 import '../../data/models.dart';
-import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 
 class LedgerEntriesPage extends ConsumerStatefulWidget {
   const LedgerEntriesPage({super.key, required this.accountId});
@@ -18,7 +18,7 @@ class LedgerEntriesPage extends ConsumerStatefulWidget {
 class _LedgerEntriesPageState extends ConsumerState<LedgerEntriesPage> {
   bool _loading = true;
   bool _loadingMore = false;
-  String? _error;
+  Object? _error;
   List<LedgerEntryDto> _entries = const [];
 
   int _page = 1;
@@ -64,7 +64,7 @@ class _LedgerEntriesPageState extends ConsumerState<LedgerEntriesPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = ErrorHandler.message(e));
+      setState(() => _error = e);
     } finally {
       if (mounted) {
         setState(() {
@@ -114,7 +114,8 @@ class _LedgerEntriesPageState extends ConsumerState<LedgerEntriesPage> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Text(_error!))
+                ? AppErrorView(
+                    error: _error!, onRetry: () => _load(reset: true))
                 : Column(
                     children: [
                       Padding(

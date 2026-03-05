@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/offline_cache/offline_cache_providers.dart';
+import '../../../core/outbox/outbox_notifier.dart';
 import '../../dashboard/controllers/location_notifier.dart';
 
 class SalesRepository {
@@ -32,6 +34,20 @@ class SalesRepository {
     int? productId,
     String? saleNumber,
   }) async {
+    final loc = _locationId;
+    final outbox = _ref.read(outboxNotifierProvider.notifier);
+    final store = _ref.read(cacheStoreProvider);
+
+    if (!outbox.isOnline && loc != null) {
+      final q = (saleNumber ?? '').trim();
+      return (await store.listSalesHistory(
+        locationId: loc,
+        query: q.isEmpty ? null : q,
+        limit: 150,
+      ))
+          .cast<Map<String, dynamic>>();
+    }
+
     final qp = <String, dynamic>{};
     if (dateFrom != null && dateFrom.isNotEmpty) qp['date_from'] = dateFrom;
     if (dateTo != null && dateTo.isNotEmpty) qp['date_to'] = dateTo;
@@ -43,8 +59,12 @@ class SalesRepository {
     }
     final res = await _dio.get('/sales/history',
         queryParameters: qp.isEmpty ? null : qp);
-    final data = _extractList(res);
-    return data.cast<Map<String, dynamic>>();
+    final data = _extractList(res).cast<Map<String, dynamic>>();
+    if (loc != null) {
+      // ignore: unawaited_futures
+      store.upsertSalesHistory(locationId: loc, items: data);
+    }
+    return data;
   }
 
   Future<List<Map<String, dynamic>>> getSaleReturns({
@@ -164,6 +184,10 @@ class SalesRepository {
     String? notes,
     required List<Map<String, dynamic>> items,
   }) async {
+    final loc = _locationId;
+    if (loc == null) {
+      throw Exception('Select a location first');
+    }
     final payload = <String, dynamic>{
       if (customerId != null) 'customer_id': customerId,
       if (validUntil != null) 'valid_until': validUntil.toIso8601String(),
@@ -171,7 +195,11 @@ class SalesRepository {
       'discount_amount': discountAmount,
       'items': items,
     };
-    final res = await _dio.post('/sales/quotes', data: payload);
+    final res = await _dio.post(
+      '/sales/quotes',
+      queryParameters: {'location_id': loc},
+      data: payload,
+    );
     final body = res.data is Map && (res.data['data'] != null)
         ? res.data['data'] as Map<String, dynamic>
         : res.data as Map<String, dynamic>;
@@ -204,8 +232,28 @@ class SalesRepository {
     await _dio.post('/sales/quotes/$id/print');
   }
 
+  Future<Map<String, dynamic>> getQuotePrintData(int id) async {
+    final res = await _dio.post('/sales/quotes/$id/print-data');
+    final body = (res.data is Map<String, dynamic> && res.data['data'] != null)
+        ? res.data['data'] as Map<String, dynamic>
+        : res.data as Map<String, dynamic>;
+    return body;
+  }
+
+  Future<int> convertQuoteToSale(int id) async {
+    final res = await _dio.post('/sales/quotes/$id/convert');
+    final body = (res.data is Map<String, dynamic> && res.data['data'] != null)
+        ? res.data['data'] as Map<String, dynamic>
+        : res.data as Map<String, dynamic>;
+    return (body['sale_id'] as int?) ?? 0;
+  }
+
   Future<void> shareQuote(int id, String email) async {
     await _dio.post('/sales/quotes/$id/share', data: {'email': email});
+  }
+
+  Future<void> markQuoteShared(int id) async {
+    await _dio.post('/sales/quotes/$id/share');
   }
 }
 

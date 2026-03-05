@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/error_handler.dart';
 import '../../controllers/location_notifier.dart';
 import '../../data/location_repository.dart';
 import '../../data/models.dart';
@@ -106,7 +107,8 @@ class _LocationsManagementPageState
                 if (!mounted) return;
                 ScaffoldMessenger.of(context)
                   ..hideCurrentSnackBar()
-                  ..showSnackBar(SnackBar(content: Text('Failed to save: $e')));
+                  ..showSnackBar(
+                      SnackBar(content: Text(ErrorHandler.message(e))));
               }
             },
             child: const Text('Save'),
@@ -144,7 +146,7 @@ class _LocationsManagementPageState
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

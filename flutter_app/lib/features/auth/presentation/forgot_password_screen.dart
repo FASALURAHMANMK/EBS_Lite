@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../controllers/auth_notifier.dart';
+import '../../../core/outbox/outbox_notifier.dart';
+import '../../../shared/widgets/network_required_gate.dart';
 import 'reset_password_screen.dart';
 import '../../../core/theme_notifier.dart';
 
@@ -56,11 +58,17 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     final state = ref.read(authNotifierProvider);
     if (state.isLoading) return;
 
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     final form = _formKey.currentState;
     if (form == null) return;
     if (!form.validate()) return;
 
     FocusScope.of(context).unfocus();
+
+    await ref.read(outboxNotifierProvider.notifier).recheckOnline();
+    if (!ref.read(outboxNotifierProvider).isOnline) return;
 
     final ok = await ref.read(authNotifierProvider.notifier).forgotPassword(
           _emailController.text.trim(),
@@ -69,7 +77,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     if (!mounted) return;
 
     if (ok) {
-      ScaffoldMessenger.of(context)
+      messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
@@ -78,7 +86,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           ),
         );
 
-      Navigator.of(context).push(
+      navigator.push(
         MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
       );
     }
@@ -87,6 +95,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(authNotifierProvider);
+    final outbox = ref.watch(outboxNotifierProvider);
     final theme = Theme.of(context);
     final media = MediaQuery.of(context);
     final shortest = media.size.shortestSide;
@@ -115,138 +124,146 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           ],
         ),
         body: SafeArea(
-          child: Align(
-            alignment: Alignment.center,
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                  padH, padV, padH, media.viewPadding.bottom + 24),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxWidth),
-                child: Card(
-                  elevation: 0,
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                  child: Padding(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: padH, vertical: padV),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const SizedBox(height: 8),
-                          Text(
-                            'Reset your password',
-                            style: theme.textTheme.headlineSmall
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Enter the email associated with your account. We’ll send you a secure link to reset your password.',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 24),
-                          TextFormField(
-                            controller: _emailController,
-                            focusNode: _emailFocus,
-                            autofocus: true,
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.done,
-                            decoration: InputDecoration(
-                              hintText: 'Email',
-                              prefixIcon:
-                                  const Icon(Icons.alternate_email_rounded),
+          child: NetworkRequiredGate(
+            outbox: outbox,
+            onRetry: () =>
+                ref.read(outboxNotifierProvider.notifier).recheckOnline(),
+            offlineMessage:
+                'Connect to the internet to request a password reset.',
+            child: Align(
+              alignment: Alignment.center,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                    padH, padV, padH, media.viewPadding.bottom + 24),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxWidth),
+                  child: Card(
+                    elevation: 0,
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: padH, vertical: padV),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const SizedBox(height: 8),
+                            Text(
+                              'Reset your password',
+                              style: theme.textTheme.headlineSmall
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                              textAlign: TextAlign.center,
                             ),
-                            validator: _validateEmail,
-                            onFieldSubmitted: (_) => _submit(),
-                          ),
-                          const SizedBox(height: 24),
-                          if (state.error != null) ...[
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.errorContainer,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.error_outline_rounded,
-                                      color:
-                                          theme.colorScheme.onErrorContainer),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      state.error!,
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                              color: theme.colorScheme
-                                                  .onErrorContainer),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                          SizedBox(
-                            height: 52,
-                            child: FilledButton(
-                              onPressed: state.isLoading ? null : _submit,
-                              style: FilledButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14)),
-                                textStyle: theme.textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w700),
-                              ),
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 250),
-                                switchInCurve: Curves.easeOut,
-                                switchOutCurve: Curves.easeIn,
-                                child: state.isLoading
-                                    ? Row(
-                                        key: const ValueKey('loading'),
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          SizedBox(
-                                            height: 20,
-                                            width: 20,
-                                            child: CircularProgressIndicator
-                                                .adaptive(
-                                              strokeWidth: 2.4,
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(
-                                                      theme.colorScheme
-                                                          .onPrimary),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          const Text('Sending…'),
-                                        ],
-                                      )
-                                    : const Text(
-                                        'Send reset link',
-                                        key: ValueKey('label'),
-                                      ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.center,
-                            child: Text(
-                              'If you don’t see the email within a minute, check your spam folder.',
-                              style: theme.textTheme.bodySmall?.copyWith(
+                            const SizedBox(height: 8),
+                            Text(
+                              'Enter the email associated with your account. We’ll send you a secure link to reset your password.',
+                              style: theme.textTheme.bodyMedium?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant),
                               textAlign: TextAlign.center,
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                        ],
+                            const SizedBox(height: 24),
+                            TextFormField(
+                              controller: _emailController,
+                              focusNode: _emailFocus,
+                              autofocus: true,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.done,
+                              decoration: InputDecoration(
+                                hintText: 'Email',
+                                prefixIcon:
+                                    const Icon(Icons.alternate_email_rounded),
+                              ),
+                              validator: _validateEmail,
+                              onFieldSubmitted: (_) => _submit(),
+                            ),
+                            const SizedBox(height: 24),
+                            if (state.error != null) ...[
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.errorContainer,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.error_outline_rounded,
+                                        color:
+                                            theme.colorScheme.onErrorContainer),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        state.error!,
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                                color: theme.colorScheme
+                                                    .onErrorContainer),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            SizedBox(
+                              height: 52,
+                              child: FilledButton(
+                                onPressed: state.isLoading ? null : _submit,
+                                style: FilledButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14)),
+                                  textStyle: theme.textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 250),
+                                  switchInCurve: Curves.easeOut,
+                                  switchOutCurve: Curves.easeIn,
+                                  child: state.isLoading
+                                      ? Row(
+                                          key: const ValueKey('loading'),
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            SizedBox(
+                                              height: 20,
+                                              width: 20,
+                                              child: CircularProgressIndicator
+                                                  .adaptive(
+                                                strokeWidth: 2.4,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                            Color>(
+                                                        theme.colorScheme
+                                                            .onPrimary),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            const Text('Sending…'),
+                                          ],
+                                        )
+                                      : const Text(
+                                          'Send reset link',
+                                          key: ValueKey('label'),
+                                        ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.center,
+                              child: Text(
+                                'If you don’t see the email within a minute, check your spam folder.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                        ),
                       ),
                     ),
                   ),

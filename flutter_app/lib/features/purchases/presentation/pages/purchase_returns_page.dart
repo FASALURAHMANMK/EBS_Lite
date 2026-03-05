@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/error_handler.dart';
 import '../../data/purchase_returns_repository.dart';
 import '../../data/purchases_repository.dart';
 import 'purchase_return_detail_page.dart';
@@ -315,7 +316,7 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Failed: $e')));
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     }
   }
 

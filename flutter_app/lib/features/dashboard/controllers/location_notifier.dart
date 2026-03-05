@@ -2,6 +2,7 @@ import 'package:ebs_lite/features/auth/data/auth_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 import '../data/location_repository.dart';
 import '../data/models.dart';
@@ -42,6 +43,7 @@ class LocationNotifier extends StateNotifier<LocationState> {
       : super(const LocationState());
 
   static const selectedLocationKey = AuthRepository.selectedLocationKey;
+  static const _cachedLocationsKey = AuthRepository.cachedLocationsKey;
 
   final LocationRepository _repository;
   final SharedPreferences _prefs;
@@ -51,6 +53,15 @@ class LocationNotifier extends StateNotifier<LocationState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final list = await _repository.fetchLocations(companyId);
+      await _prefs.setString(
+        _cachedLocationsKey,
+        jsonEncode({
+          'company_id': companyId,
+          'locations': list
+              .map((l) => {'location_id': l.locationId, 'name': l.name})
+              .toList(),
+        }),
+      );
       Location? selected;
       final stored = _prefs.getInt(selectedLocationKey);
       if (stored != null) {
@@ -72,6 +83,53 @@ class LocationNotifier extends StateNotifier<LocationState> {
         } catch (_) {}
         _ref.read(authNotifierProvider.notifier).state = const AuthState();
         return;
+      }
+      if (ErrorHandler.isNetworkError(e)) {
+        final cached = _prefs.getString(_cachedLocationsKey);
+        if (cached != null && cached.trim().isNotEmpty) {
+          try {
+            final decoded = jsonDecode(cached);
+            if (decoded is Map &&
+                decoded['company_id'] == companyId &&
+                decoded['locations'] is List) {
+              final raw = (decoded['locations'] as List).cast<dynamic>();
+              final list = raw
+                  .whereType<Map>()
+                  .map((m) => Location.fromJson(Map<String, dynamic>.from(m)))
+                  .toList();
+              Location? selected;
+              final stored = _prefs.getInt(selectedLocationKey);
+              if (stored != null) {
+                try {
+                  selected = list.firstWhere((l) => l.locationId == stored);
+                } catch (_) {
+                  selected = null;
+                }
+              }
+              state = state.copyWith(
+                isLoading: false,
+                locations: list,
+                selected: selected ?? (list.isNotEmpty ? list.first : null),
+                error: 'Offline: using cached locations.',
+              );
+              return;
+            }
+          } catch (_) {
+            // fall-through to normal error
+          }
+        }
+
+        // Last-resort: preserve stored selected location id so offline outbox flows can continue.
+        final stored = _prefs.getInt(selectedLocationKey);
+        if (stored != null && stored > 0) {
+          state = state.copyWith(
+            isLoading: false,
+            selected: Location(locationId: stored, name: 'Location #$stored'),
+            locations: const [],
+            error: 'Offline: location list unavailable.',
+          );
+          return;
+        }
       }
       state = state.copyWith(
         isLoading: false,

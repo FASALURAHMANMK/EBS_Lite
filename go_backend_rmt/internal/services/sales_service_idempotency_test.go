@@ -50,6 +50,10 @@ func TestSalesService_CreateSale_IdempotencyUniqueViolationReturnsExisting(t *te
 
 	mock.ExpectBegin()
 
+	mock.ExpectExec(regexp.QuoteMeta("SELECT pg_advisory_xact_lock($1)")).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
 	mock.ExpectQuery("(?s)SELECT sequence_id, prefix, sequence_length, current_number.*FROM numbering_sequences.*FOR UPDATE").
 		WithArgs("sale", companyID, locationID).
 		WillReturnRows(sqlmock.NewRows([]string{"sequence_id", "prefix", "sequence_length", "current_number"}).

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/accounts_repository.dart';
 import '../../data/models.dart';
-import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 import 'ledger_entries_page.dart';
 
 class LedgersPage extends ConsumerStatefulWidget {
@@ -15,7 +15,7 @@ class LedgersPage extends ConsumerStatefulWidget {
 
 class _LedgersPageState extends ConsumerState<LedgersPage> {
   bool _loading = true;
-  String? _error;
+  Object? _error;
   List<LedgerBalanceDto> _balances = const [];
   final TextEditingController _search = TextEditingController();
 
@@ -43,7 +43,7 @@ class _LedgersPageState extends ConsumerState<LedgersPage> {
       setState(() => _balances = list);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = ErrorHandler.message(e));
+      setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -73,7 +73,7 @@ class _LedgersPageState extends ConsumerState<LedgersPage> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Text(_error!))
+                ? AppErrorView(error: _error!, onRetry: _load)
                 : Column(
                     children: [
                       Padding(

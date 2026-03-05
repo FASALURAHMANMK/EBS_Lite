@@ -166,7 +166,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				companies.GET("", middleware.RequirePermission("VIEW_COMPANIES"), companyHandler.GetCompanies)
 				companies.POST("", companyHandler.CreateCompany) // No admin requirement for CREATE only
 				companies.PUT("/:id", middleware.RequirePermission("MANAGE_SETTINGS"), companyHandler.UpdateCompany)
-				companies.DELETE("/:id", middleware.RequireRole("Admin"), companyHandler.DeleteCompany)
+				companies.DELETE("/:id", middleware.RequireAnyRole("Admin", "Super Admin"), companyHandler.DeleteCompany)
 				companies.POST("/:id/logo", middleware.RequirePermission("MANAGE_SETTINGS"), companyHandler.UploadCompanyLogo)
 			}
 
@@ -182,7 +182,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 
 			// Role and permission management routes
 			roles := protected.Group("/roles")
-			roles.Use(middleware.RequireRole("Admin")) // Only admins can manage roles
+			roles.Use(middleware.RequireAnyRole("Admin", "Super Admin")) // Only admins can manage roles
 			{
 				roles.GET("", roleHandler.GetRoles)
 				roles.POST("", roleHandler.CreateRole)
@@ -194,7 +194,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 
 			// Permissions routes (read-only for role management)
 			permissions := protected.Group("/permissions")
-			permissions.Use(middleware.RequireRole("Admin"))
+			permissions.Use(middleware.RequireAnyRole("Admin", "Super Admin"))
 			{
 				permissions.GET("", roleHandler.GetPermissions)
 			}
@@ -235,7 +235,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			units := protected.Group("/units")
 			{
 				units.GET("", productHandler.GetUnits)
-				units.POST("", middleware.RequireRole("Admin"), productHandler.CreateUnit)
+				units.POST("", middleware.RequireAnyRole("Admin", "Super Admin"), productHandler.CreateUnit)
 			}
 
 			// Product attribute definition management routes
@@ -297,7 +297,9 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 					quotes.PUT("/:id", middleware.RequirePermission("UPDATE_SALES"), salesHandler.UpdateQuote)
 					quotes.DELETE("/:id", middleware.RequirePermission("DELETE_SALES"), salesHandler.DeleteQuote)
 					quotes.POST("/:id/print", middleware.RequirePermission("PRINT_INVOICES"), salesHandler.PrintQuote)
+					quotes.POST("/:id/print-data", middleware.RequirePermission("VIEW_SALES"), salesHandler.GetQuotePrintData)
 					quotes.POST("/:id/share", middleware.RequirePermission("VIEW_SALES"), salesHandler.ShareQuote)
+					quotes.POST("/:id/convert", middleware.RequirePermission("CREATE_SALES"), salesHandler.ConvertQuoteToSale)
 				}
 			}
 
@@ -307,6 +309,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			{
 				pos.GET("/products", middleware.RequirePermission("VIEW_PRODUCTS"), posHandler.GetPOSProducts)
 				pos.GET("/customers", middleware.RequirePermission("VIEW_CUSTOMERS"), posHandler.GetPOSCustomers)
+				pos.POST("/numbering/reserve", middleware.RequirePermission("CREATE_SALES"), posHandler.ReserveNumberBlock)
 				pos.POST("/checkout", middleware.RequirePermission("CREATE_SALES"), posHandler.ProcessCheckout)
 				pos.POST("/calculate", middleware.RequirePermission("CREATE_SALES"), posHandler.CalculateTotals)
 				pos.POST("/hold", middleware.RequirePermission("CREATE_SALES"), posHandler.HoldSale)
@@ -314,6 +317,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				pos.POST("/print", middleware.RequirePermission("PRINT_INVOICES"), posHandler.PrintInvoice)
 				pos.GET("/held-sales", middleware.RequirePermission("VIEW_SALES"), posHandler.GetHeldSales)
 				pos.GET("/payment-methods", middleware.RequirePermission("VIEW_SALES"), posHandler.GetPaymentMethods)
+				pos.GET("/payment-methods/currencies", middleware.RequirePermission("VIEW_SALES"), posHandler.GetPaymentMethodCurrencies)
 				pos.GET("/sales-summary", middleware.RequirePermission("VIEW_REPORTS"), posHandler.GetSalesSummary)
 				pos.GET("/receipt/:id", middleware.RequirePermission("VIEW_SALES"), posHandler.GetReceiptData)
 			}
@@ -654,7 +658,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 
 			// Language routes
 			languages := protected.Group("/languages")
-			languages.Use(middleware.RequireRole("Admin"))
+			languages.Use(middleware.RequireAnyRole("Admin", "Super Admin"))
 			{
 				languages.PUT("/:code", languageHandler.UpdateLanguageStatus)
 			}

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/error_handler.dart';
 import '../../data/models.dart';
 import '../../data/promotions_repository.dart';
 
@@ -311,7 +312,7 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                           } catch (e) {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Save failed: $e')),
+                              SnackBar(content: Text(ErrorHandler.message(e))),
                             );
                           } finally {
                             if (context.mounted) {
@@ -367,7 +368,7 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
       await _load();
     } catch (e) {
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+      messenger.showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     }
   }
 
@@ -453,7 +454,7 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
                                             content:
-                                                Text('Update failed: $e')));
+                                                Text(ErrorHandler.message(e))));
                                   }
                                 } else if (v == 'delete') {
                                   await _deletePromotion(p);

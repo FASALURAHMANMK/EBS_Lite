@@ -1,7 +1,7 @@
 # API Parity Report (Flutter <-> OpenAPI)
 
-- Flutter unique paths: **159**
-- OpenAPI unique paths: **200**
+- Flutter unique paths: **164**
+- OpenAPI unique paths: **204**
 
 ## Flutter paths missing from OpenAPI
 - None
@@ -20,7 +20,6 @@
 - `/customers/{}/credit`
 - `/employees`
 - `/employees/{}`
-- `/expenses/categories/{}`
 - `/expenses/{}`
 - `/health`
 - `/inventory/barcode`

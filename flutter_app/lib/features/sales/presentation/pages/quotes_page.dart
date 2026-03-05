@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../shared/widgets/app_error_view.dart';
 import '../../data/sales_repository.dart';
 import 'quote_detail_page.dart';
 import 'quote_form_page.dart';
@@ -14,7 +15,7 @@ class QuotesPage extends ConsumerStatefulWidget {
 
 class _QuotesPageState extends ConsumerState<QuotesPage> {
   bool _loading = true;
-  String? _error;
+  Object? _error;
   List<Map<String, dynamic>> _quotes = const [];
   String _statusFilter = 'ALL';
 
@@ -38,7 +39,7 @@ class _QuotesPageState extends ConsumerState<QuotesPage> {
       setState(() => _quotes = list);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -91,6 +92,8 @@ class _QuotesPageState extends ConsumerState<QuotesPage> {
                       DropdownMenuItem(value: 'SENT', child: Text('Sent')),
                       DropdownMenuItem(
                           value: 'ACCEPTED', child: Text('Accepted')),
+                      DropdownMenuItem(
+                          value: 'CONVERTED', child: Text('Converted')),
                     ],
                     onChanged: (value) async {
                       if (value == null) return;
@@ -103,7 +106,7 @@ class _QuotesPageState extends ConsumerState<QuotesPage> {
             ),
             Expanded(
               child: _error != null
-                  ? Center(child: Text(_error!))
+                  ? AppErrorView(error: _error!, onRetry: _load)
                   : _quotes.isEmpty
                       ? const Center(child: Text('No quotes'))
                       : ListView.separated(

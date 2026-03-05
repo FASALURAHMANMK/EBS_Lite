@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../data/hr_repository.dart';
 import '../../data/models.dart';
-import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 
 class PayslipPage extends ConsumerStatefulWidget {
   const PayslipPage({super.key, required this.payrollId});
@@ -17,7 +17,7 @@ class PayslipPage extends ConsumerStatefulWidget {
 
 class _PayslipPageState extends ConsumerState<PayslipPage> {
   bool _loading = true;
-  String? _error;
+  Object? _error;
   PayslipDto? _payslip;
 
   @override
@@ -38,7 +38,7 @@ class _PayslipPageState extends ConsumerState<PayslipPage> {
       setState(() => _payslip = data);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = ErrorHandler.message(e));
+      setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -62,7 +62,7 @@ class _PayslipPageState extends ConsumerState<PayslipPage> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Text(_error!))
+                ? AppErrorView(error: _error!, onRetry: _load)
                 : _payslip == null
                     ? const Center(child: Text('Payslip not available'))
                     : ListView(

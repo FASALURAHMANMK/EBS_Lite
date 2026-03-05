@@ -1438,7 +1438,23 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreatePurchaseRequest'
+  /sales/quotes/{id}/print-data:
+    post:
+      summary: POST /api/v1/sales/quotes/{id}/print-data
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
   /sales/quotes/{id}/share:
     post:
       summary: POST /api/v1/sales/quotes/{id}/share
@@ -1459,7 +1475,23 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreatePurchaseRequest'
+  /sales/quotes/{id}/convert:
+    post:
+      summary: POST /api/v1/sales/quotes/{id}/convert
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
   /pos/products:
     get:
       summary: GET /api/v1/pos/products
@@ -1480,6 +1512,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
+  /pos/numbering/reserve:
+    post:
+      summary: POST /api/v1/pos/numbering/reserve
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReserveNumberBlockRequest'
   /pos/checkout:
     post:
       summary: POST /api/v1/pos/checkout
@@ -1574,6 +1621,16 @@ paths:
   /pos/payment-methods:
     get:
       summary: GET /api/v1/pos/payment-methods
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /pos/payment-methods/currencies:
+    get:
+      summary: GET /api/v1/pos/payment-methods/currencies
       responses:
         '200':
           description: Successful response
@@ -2914,6 +2971,17 @@ paths:
                 $ref: '#/components/schemas/APIResponse'
     post:
       summary: POST /api/v1/expenses
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+      - name: X-Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
       responses:
         '200':
           description: Successful response
@@ -4390,6 +4458,79 @@ components:
     GenericObject:
       type: object
       additionalProperties: true
+    CreatePurchaseRequest:
+      type: object
+      required:
+        - supplier_id
+        - items
+      properties:
+        supplier_id:
+          type: integer
+        location_id:
+          type: integer
+          nullable: true
+        purchase_date:
+          type: string
+          format: date
+          nullable: true
+        reference_number:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        payment_method_id:
+          type: integer
+          nullable: true
+        paid_amount:
+          type: number
+          format: float
+          nullable: true
+        payment_terms:
+          type: integer
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreatePurchaseItemRequest'
+    CreatePurchaseItemRequest:
+      type: object
+      required:
+        - product_id
+        - quantity
+        - unit_price
+      properties:
+        product_id:
+          type: integer
+        quantity:
+          type: number
+          format: float
+        unit_price:
+          type: number
+          format: float
+        discount_percentage:
+          type: number
+          format: float
+          nullable: true
+        discount_amount:
+          type: number
+          format: float
+          nullable: true
+        tax_id:
+          type: integer
+          nullable: true
+        serial_numbers:
+          type: array
+          nullable: true
+          items:
+            type: string
+        expiry_date:
+          type: string
+          format: date
+          nullable: true
+        batch_number:
+          type: string
+          nullable: true
     LoginRequest:
       type: object
       properties:
@@ -4534,6 +4675,9 @@ components:
         sale_id:
           type: integer
           nullable: true
+        sale_number:
+          type: string
+          nullable: true
         customer_id:
           type: integer
           nullable: true
@@ -4560,6 +4704,15 @@ components:
           nullable: true
         override_reason:
           type: string
+          nullable: true
+    ReserveNumberBlockRequest:
+      type: object
+      properties:
+        sequence_name:
+          type: string
+          nullable: true
+        block_size:
+          type: integer
           nullable: true
     POSVoidRequest:
       type: object

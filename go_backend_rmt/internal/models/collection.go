@@ -38,13 +38,16 @@ type CollectionInvoice struct {
 // ReceivedDate maps to collection_date in the database
 
 type CreateCollectionRequest struct {
-	CustomerID      int                        `json:"customer_id" validate:"required"`
-	Amount          float64                    `json:"amount" validate:"required,gt=0"`
-	PaymentMethodID *int                       `json:"payment_method_id,omitempty"`
-	ReceivedDate    *string                    `json:"received_date,omitempty"`
-	ReferenceNumber *string                    `json:"reference,omitempty"`
-	Notes           *string                    `json:"notes,omitempty"`
-	Invoices        []CollectionInvoiceRequest `json:"invoices,omitempty"`
+	// CollectionNumber is optional. When provided (e.g. offline-first), the server
+	// will persist it instead of allocating from numbering sequences.
+	CollectionNumber *string                    `json:"collection_number,omitempty"`
+	CustomerID       int                        `json:"customer_id" validate:"required"`
+	Amount           float64                    `json:"amount" validate:"required,gt=0"`
+	PaymentMethodID  *int                       `json:"payment_method_id,omitempty"`
+	ReceivedDate     *string                    `json:"received_date,omitempty"`
+	ReferenceNumber  *string                    `json:"reference,omitempty"`
+	Notes            *string                    `json:"notes,omitempty"`
+	Invoices         []CollectionInvoiceRequest `json:"invoices,omitempty"`
 	// When true, do not auto-allocate the amount to invoices when no explicit invoices are provided.
 	SkipAllocation *bool `json:"skip_allocation,omitempty"`
 }

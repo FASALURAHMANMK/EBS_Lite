@@ -3,22 +3,25 @@ package models
 import "time"
 
 type Quote struct {
-	QuoteID        int         `json:"quote_id" db:"quote_id"`
-	QuoteNumber    string      `json:"quote_number" db:"quote_number"`
-	LocationID     int         `json:"location_id" db:"location_id"`
-	CustomerID     *int        `json:"customer_id,omitempty" db:"customer_id"`
-	QuoteDate      time.Time   `json:"quote_date" db:"quote_date"`
-	ValidUntil     *time.Time  `json:"valid_until,omitempty" db:"valid_until"`
-	Subtotal       float64     `json:"subtotal" db:"subtotal"`
-	TaxAmount      float64     `json:"tax_amount" db:"tax_amount"`
-	DiscountAmount float64     `json:"discount_amount" db:"discount_amount"`
-	TotalAmount    float64     `json:"total_amount" db:"total_amount"`
-	Status         string      `json:"status" db:"status"`
-	Notes          *string     `json:"notes,omitempty" db:"notes"`
-	CreatedBy      int         `json:"created_by" db:"created_by"`
-	UpdatedBy      *int        `json:"updated_by,omitempty" db:"updated_by"`
-	Items          []QuoteItem `json:"items,omitempty"`
-	Customer       *Customer   `json:"customer,omitempty"`
+	QuoteID         int         `json:"quote_id" db:"quote_id"`
+	QuoteNumber     string      `json:"quote_number" db:"quote_number"`
+	LocationID      int         `json:"location_id" db:"location_id"`
+	CustomerID      *int        `json:"customer_id,omitempty" db:"customer_id"`
+	QuoteDate       time.Time   `json:"quote_date" db:"quote_date"`
+	ValidUntil      *time.Time  `json:"valid_until,omitempty" db:"valid_until"`
+	Subtotal        float64     `json:"subtotal" db:"subtotal"`
+	TaxAmount       float64     `json:"tax_amount" db:"tax_amount"`
+	DiscountAmount  float64     `json:"discount_amount" db:"discount_amount"`
+	TotalAmount     float64     `json:"total_amount" db:"total_amount"`
+	Status          string      `json:"status" db:"status"`
+	Notes           *string     `json:"notes,omitempty" db:"notes"`
+	ConvertedSaleID *int        `json:"converted_sale_id,omitempty" db:"converted_sale_id"`
+	ConvertedAt     *time.Time  `json:"converted_at,omitempty" db:"converted_at"`
+	ConvertedBy     *int        `json:"converted_by,omitempty" db:"converted_by"`
+	CreatedBy       int         `json:"created_by" db:"created_by"`
+	UpdatedBy       *int        `json:"updated_by,omitempty" db:"updated_by"`
+	Items           []QuoteItem `json:"items,omitempty"`
+	Customer        *Customer   `json:"customer,omitempty"`
 	SyncModel
 }
 
@@ -80,5 +83,14 @@ type UpdateQuoteRequest struct {
 }
 
 type ShareQuoteRequest struct {
-	Email string `json:"email" validate:"required,email"`
+	// Email is optional. The Flutter client shares via share sheets and may not
+	// provide an email address.
+	Email *string `json:"email,omitempty" validate:"omitempty,email"`
+}
+
+// QuotePrintDataResponse is returned to client apps so they can render
+// and print/share quotes locally.
+type QuotePrintDataResponse struct {
+	Quote   Quote   `json:"quote"`
+	Company Company `json:"company"`
 }

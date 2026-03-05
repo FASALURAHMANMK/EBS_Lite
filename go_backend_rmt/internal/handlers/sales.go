@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"errors"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -467,6 +469,18 @@ func (h *SalesHandler) CreateQuote(c *gin.Context) {
 		return
 	}
 
+	if locationID == 0 {
+		if val := c.Query("location_id"); val != "" {
+			if id, err := strconv.Atoi(val); err == nil {
+				locationID = id
+			}
+		}
+	}
+	if locationID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Location access required", nil)
+		return
+	}
+
 	var req models.CreateQuoteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
@@ -595,14 +609,16 @@ func (h *SalesHandler) ShareQuote(c *gin.Context) {
 
 	var req models.ShareQuoteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
-		return
-	}
-
-	if err := utils.ValidateStruct(&req); err != nil {
-		validationErrors := utils.GetValidationErrors(err)
-		utils.ValidationErrorResponse(c, validationErrors)
-		return
+		if !errors.Is(err, io.EOF) {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+			return
+		}
+	} else {
+		if err := utils.ValidateStruct(&req); err != nil {
+			validationErrors := utils.GetValidationErrors(err)
+			utils.ValidationErrorResponse(c, validationErrors)
+			return
+		}
 	}
 
 	if err := h.salesService.ShareQuote(quoteID, companyID, &req); err != nil {
@@ -615,6 +631,66 @@ func (h *SalesHandler) ShareQuote(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, "Quote shared successfully", nil)
+}
+
+// POST /sales/quotes/:id/print-data
+func (h *SalesHandler) GetQuotePrintData(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	quoteID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid quote ID", err)
+		return
+	}
+
+	data, err := h.salesService.GetQuotePrintData(quoteID, companyID)
+	if err != nil {
+		if err.Error() == "quote not found" {
+			utils.NotFoundResponse(c, "Quote not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get quote print data", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Quote print data retrieved successfully", data)
+}
+
+// POST /sales/quotes/:id/convert
+func (h *SalesHandler) ConvertQuoteToSale(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	quoteID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid quote ID", err)
+		return
+	}
+
+	sale, err := h.salesService.ConvertQuoteToSale(quoteID, companyID, userID)
+	if err != nil {
+		switch err.Error() {
+		case "quote not found":
+			utils.NotFoundResponse(c, "Quote not found")
+			return
+		case "quote must be ACCEPTED before conversion", "quote has no items":
+			utils.ErrorResponse(c, http.StatusBadRequest, "Failed to convert quote to sale", err)
+			return
+		default:
+			utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to convert quote to sale", err)
+			return
+		}
+	}
+
+	utils.CreatedResponse(c, "Sale created from quote successfully", sale)
 }
 
 // GET /sales/quotes/export

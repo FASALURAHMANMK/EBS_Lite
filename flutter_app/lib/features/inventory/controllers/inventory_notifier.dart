@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:ebs_lite/features/dashboard/controllers/location_notifier.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/error_handler.dart';
+import '../../../core/outbox/outbox_notifier.dart';
 import '../data/inventory_repository.dart';
 import '../data/models.dart';
 
@@ -53,11 +55,21 @@ class InventoryState {
 }
 
 class InventoryNotifier extends StateNotifier<InventoryState> {
-  InventoryNotifier(this._repo, this._ref) : super(const InventoryState());
+  InventoryNotifier(this._repo, this._ref) : super(const InventoryState()) {
+    _timer = Timer.periodic(const Duration(seconds: 60), (_) async {
+      final outbox = _ref.read(outboxNotifierProvider);
+      if (!outbox.isOnline) return;
+      if (state.isLoading) return;
+      // Don't disrupt an active search; refresh the default stock list only.
+      if (state.query.trim().isNotEmpty) return;
+      await refreshList();
+    });
+  }
 
   final InventoryRepository _repo;
   final Ref _ref;
   Timer? _debounce;
+  Timer? _timer;
 
   Future<void> load() async {
     // Ensure a location is selected before hitting location-bound endpoints
@@ -77,7 +89,7 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
         items: items,
       );
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: ErrorHandler.message(e));
     }
   }
 
@@ -124,8 +136,15 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
       final items = await _repo.searchProducts(q);
       state = state.copyWith(isLoading: false, items: items);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: ErrorHandler.message(e));
     }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _timer?.cancel();
+    super.dispose();
   }
 }
 

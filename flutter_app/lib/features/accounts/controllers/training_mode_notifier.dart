@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/controllers/auth_notifier.dart';
 import '../../dashboard/controllers/location_notifier.dart';
 import '../data/accounts_repository.dart';
+import '../../../core/error_handler.dart';
 
 class TrainingModeState {
   const TrainingModeState({
@@ -92,7 +93,7 @@ class TrainingModeNotifier extends StateNotifier<TrainingModeState> {
         enabled: false,
         registerId: null,
         loading: false,
-        error: e.toString(),
+        error: ErrorHandler.message(e),
       );
     }
   }

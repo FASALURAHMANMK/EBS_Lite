@@ -231,6 +231,31 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 			return nil, err
 		}
 		if existing != nil {
+			// Best-effort: if caller included an immediate payment, ensure cash register reflects
+			// the cash portion (idempotent by request id).
+			if req != nil && req.PaidAmount != nil && *req.PaidAmount > 0 && req.PaymentMethodID != nil {
+				var t string
+				if err := s.db.QueryRow(
+					`SELECT type FROM payment_methods WHERE method_id = $1 AND is_active = TRUE AND (company_id = $2 OR company_id IS NULL)`,
+					*req.PaymentMethodID,
+					companyID,
+				).Scan(&t); err == nil && strings.EqualFold(strings.TrimSpace(t), "CASH") {
+					note := fmt.Sprintf("purchase_id=%d purchase_number=%s", existing.PurchaseID, existing.PurchaseNumber)
+					_ = (&CashRegisterService{db: s.db}).RecordCashTransactionTx(
+						nil,
+						companyID,
+						locationID,
+						userID,
+						"OUT",
+						*req.PaidAmount,
+						"PURCHASE",
+						fmt.Sprintf("purchase:%d", existing.PurchaseID),
+						&note,
+						"",
+						idemKey,
+					)
+				}
+			}
 			return existing, nil
 		}
 	}
@@ -255,6 +280,19 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 	purchaseDate := time.Now()
 	if req.PurchaseDate != nil {
 		purchaseDate = *req.PurchaseDate
+	} else {
+		// Default to the OPEN cash register's business date (important when
+		// a register stays open past midnight).
+		var d time.Time
+		if err := tx.QueryRow(`
+            SELECT cr.date
+            FROM cash_register cr
+            JOIN locations l ON cr.location_id = l.location_id
+            WHERE cr.location_id = $1 AND l.company_id = $2 AND cr.status = 'OPEN'
+            LIMIT 1
+        `, locationID, companyID).Scan(&d); err == nil {
+			purchaseDate = d
+		}
 	}
 
 	// Calculate totals
@@ -306,6 +344,28 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 
 	totalAmount := subtotal
 
+	paidAmount := 0.0
+	var paymentMethodType string
+	if req.PaidAmount != nil && *req.PaidAmount > 0 {
+		paidAmount = *req.PaidAmount
+		if paidAmount > totalAmount {
+			return nil, fmt.Errorf("paid amount cannot exceed total amount")
+		}
+		if req.PaymentMethodID == nil {
+			return nil, fmt.Errorf("payment method required when paid amount is provided")
+		}
+		if err := tx.QueryRow(
+			`SELECT type FROM payment_methods WHERE method_id = $1 AND is_active = TRUE AND (company_id = $2 OR company_id IS NULL)`,
+			*req.PaymentMethodID,
+			companyID,
+		).Scan(&paymentMethodType); err != nil {
+			if err == sql.ErrNoRows {
+				return nil, fmt.Errorf("payment method not found")
+			}
+			return nil, fmt.Errorf("failed to verify payment method: %w", err)
+		}
+	}
+
 	// Set due date based on payment terms
 	var dueDate *time.Time
 	paymentTerms := 0
@@ -330,7 +390,7 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 	idemVal := sql.NullString{String: idemKey, Valid: idemKey != ""}
 	err = tx.QueryRow(insertQuery,
 		purchaseNumber, locationID, req.SupplierID, purchaseDate,
-		subtotal, totalTax, totalDiscount, totalAmount, 0,
+		subtotal, totalTax, totalDiscount, totalAmount, paidAmount,
 		paymentTerms, dueDate, "PENDING", req.ReferenceNumber, req.Notes, userID, idemVal,
 	).Scan(&purchase.PurchaseID, &purchase.CreatedAt)
 	if err != nil {
@@ -419,6 +479,24 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 		}
 	}
 
+	// Best-effort: update cash register for purchases when immediately paid by CASH.
+	if paidAmount > 0 && strings.EqualFold(strings.TrimSpace(paymentMethodType), "CASH") {
+		note := fmt.Sprintf("purchase_id=%d purchase_number=%s", purchase.PurchaseID, purchaseNumber)
+		_ = (&CashRegisterService{db: s.db}).RecordCashTransactionTx(
+			tx,
+			companyID,
+			locationID,
+			userID,
+			"OUT",
+			paidAmount,
+			"PURCHASE",
+			fmt.Sprintf("purchase:%d", purchase.PurchaseID),
+			&note,
+			"",
+			idemKey,
+		)
+	}
+
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
@@ -436,7 +514,7 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 	purchase.TaxAmount = totalTax
 	purchase.DiscountAmount = totalDiscount
 	purchase.TotalAmount = totalAmount
-	purchase.PaidAmount = 0
+	purchase.PaidAmount = paidAmount
 	purchase.PaymentTerms = paymentTerms
 	purchase.DueDate = dueDate
 	purchase.Status = "PENDING"

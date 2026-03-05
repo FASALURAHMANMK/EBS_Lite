@@ -83,6 +83,9 @@ type PaymentMethod struct {
 
 // Request/Response Models
 type CreateSaleRequest struct {
+	// SaleNumber is optional. When provided (e.g. offline-first POS), the server
+	// will persist it as-is instead of allocating from numbering sequences.
+	SaleNumber      *string                   `json:"sale_number,omitempty"`
 	CustomerID      *int                      `json:"customer_id,omitempty"`
 	Items           []CreateSaleDetailRequest `json:"items" validate:"required,min=1"`
 	PaymentMethodID *int                      `json:"payment_method_id,omitempty"`
@@ -125,7 +128,10 @@ type QuickSaleRequest struct {
 }
 
 type POSCheckoutRequest struct {
-	SaleID               *int                      `json:"sale_id,omitempty"`
+	SaleID *int `json:"sale_id,omitempty"`
+	// SaleNumber is optional. When provided (e.g. offline checkout), the server
+	// will persist it instead of allocating a new number.
+	SaleNumber           *string                   `json:"sale_number,omitempty"`
 	CustomerID           *int                      `json:"customer_id,omitempty"`
 	Items                []CreateSaleDetailRequest `json:"items" validate:"required,min=1"`
 	PaymentMethodID      *int                      `json:"payment_method_id,omitempty"`

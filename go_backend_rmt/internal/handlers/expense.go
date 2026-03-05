@@ -3,6 +3,8 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"erp-backend/internal/models"
 	"erp-backend/internal/services"
@@ -79,12 +81,42 @@ func (h *ExpenseHandler) CreateExpense(c *gin.Context) {
 		return
 	}
 
-	id, err := h.service.CreateExpense(companyID, locationID, userID, &req)
+	// Allow date-only "YYYY-MM-DD" (Flutter default) as well as RFC3339.
+	if req.ExpenseDateRaw != nil {
+		raw := strings.TrimSpace(*req.ExpenseDateRaw)
+		if raw != "" {
+			parsed, err := parseFlexibleDate(raw)
+			if err != nil {
+				utils.ValidationErrorResponse(c, map[string]string{
+					"expense_date": "invalid date. Use YYYY-MM-DD",
+				})
+				return
+			}
+			req.ExpenseDate = parsed
+		}
+	}
+
+	idemKey := c.GetHeader("Idempotency-Key")
+	if idemKey == "" {
+		idemKey = c.GetHeader("X-Idempotency-Key")
+	}
+
+	id, err := h.service.CreateExpense(companyID, locationID, userID, &req, idemKey)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to create expense", err)
 		return
 	}
 	utils.CreatedResponse(c, "Expense recorded successfully", gin.H{"expense_id": id})
+}
+
+func parseFlexibleDate(raw string) (time.Time, error) {
+	if t, err := time.Parse("2006-01-02", raw); err == nil {
+		return t, nil
+	}
+	if t, err := time.Parse(time.RFC3339, raw); err == nil {
+		return t, nil
+	}
+	return time.Parse(time.RFC3339Nano, raw)
 }
 
 // GET /expenses/categories

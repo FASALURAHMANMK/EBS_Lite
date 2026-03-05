@@ -6,6 +6,7 @@ import '../../../dashboard/controllers/location_notifier.dart';
 import '../../../dashboard/data/models.dart';
 import '../../data/reports_repository.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 import 'report_category_page.dart';
 
 class ReportViewerPage extends ConsumerStatefulWidget {
@@ -19,7 +20,7 @@ class ReportViewerPage extends ConsumerStatefulWidget {
 
 class _ReportViewerPageState extends ConsumerState<ReportViewerPage> {
   bool _loading = true;
-  String? _error;
+  Object? _error;
   dynamic _data;
 
   DateTime? _fromDate;
@@ -114,7 +115,7 @@ class _ReportViewerPageState extends ConsumerState<ReportViewerPage> {
       setState(() => _data = data);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = ErrorHandler.message(e));
+      setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -184,7 +185,7 @@ class _ReportViewerPageState extends ConsumerState<ReportViewerPage> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                      ? Center(child: Text(_error!))
+                      ? AppErrorView(error: _error!, onRetry: _load)
                       : _ReportDataView(data: _data),
             ),
           ],

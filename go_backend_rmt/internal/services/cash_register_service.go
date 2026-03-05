@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"erp-backend/internal/database"
@@ -140,7 +141,7 @@ func (s *CashRegisterService) OpenCashRegister(
 ) (int, error) {
 	// Verify location belongs to company (no tx needed).
 	var count int
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM locations WHERE location_id = $1 AND company_id = $2 AND is_deleted = FALSE`, locationID, companyID).Scan(&count)
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM locations WHERE location_id = $1 AND company_id = $2 AND is_active = TRUE`, locationID, companyID).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to verify location: %w", err)
 	}
@@ -712,6 +713,127 @@ func (s *CashRegisterService) insertCashRegisterEvent(
 		return 0, fmt.Errorf("failed to insert cash register event: %w", err)
 	}
 	return eventID, nil
+}
+
+// RecordCashTransactionTx records a cash-impacting transaction (sale/collection/expense/etc)
+// against the currently OPEN cash register for the location.
+//
+// This is best-effort:
+// - If there is no open cash register, it returns nil (doesn't block operations).
+// - If requestID+reasonCode was already recorded, it is idempotent.
+func (s *CashRegisterService) RecordCashTransactionTx(
+	tx *sql.Tx,
+	companyID, locationID, userID int,
+	direction string,
+	amount float64,
+	eventType string,
+	reasonCode string,
+	notes *string,
+	sessionID string,
+	requestID string,
+) error {
+	if amount <= 0 {
+		return nil
+	}
+
+	ownTx := false
+	if tx == nil {
+		var err error
+		tx, err = s.db.Begin()
+		if err != nil {
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+		ownTx = true
+		defer tx.Rollback()
+	}
+
+	var registerID int
+	err := tx.QueryRow(`
+        SELECT cr.register_id
+        FROM cash_register cr
+        JOIN locations l ON cr.location_id = l.location_id
+        WHERE cr.location_id = $1 AND l.company_id = $2 AND cr.status = 'OPEN'
+        LIMIT 1
+        FOR UPDATE
+    `, locationID, companyID).Scan(&registerID)
+	if err == sql.ErrNoRows {
+		if ownTx {
+			return tx.Commit()
+		}
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get open cash register: %w", err)
+	}
+
+	if strings.TrimSpace(requestID) != "" && strings.TrimSpace(reasonCode) != "" {
+		var exists bool
+		if err := tx.QueryRow(`
+            SELECT EXISTS(
+                SELECT 1 FROM cash_register_events
+                WHERE register_id = $1 AND request_id = $2 AND reason_code = $3
+            )
+        `, registerID, requestID, reasonCode).Scan(&exists); err == nil && exists {
+			if ownTx {
+				return tx.Commit()
+			}
+			return nil
+		}
+	}
+
+	switch strings.ToUpper(strings.TrimSpace(direction)) {
+	case "IN":
+		if _, err := tx.Exec(`
+            UPDATE cash_register
+            SET cash_in = cash_in + $1,
+                expected_balance = expected_balance + $1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE register_id = $2
+        `, amount, registerID); err != nil {
+			return fmt.Errorf("failed to update cash register cash_in: %w", err)
+		}
+		direction = "IN"
+	case "OUT":
+		if _, err := tx.Exec(`
+            UPDATE cash_register
+            SET cash_out = cash_out + $1,
+                expected_balance = expected_balance - $1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE register_id = $2
+        `, amount, registerID); err != nil {
+			return fmt.Errorf("failed to update cash register cash_out: %w", err)
+		}
+		direction = "OUT"
+	default:
+		return fmt.Errorf("invalid cash register direction")
+	}
+
+	_, err = s.insertCashRegisterEvent(
+		tx,
+		registerID,
+		locationID,
+		&models.CashRegisterMovementRequest{
+			Direction:  direction,
+			Amount:     amount,
+			ReasonCode: reasonCode,
+			Notes:      notes,
+		},
+		userID,
+		sessionID,
+		requestID,
+		eventType,
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+
+	if ownTx {
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("failed to commit cash register transaction: %w", err)
+		}
+	}
+	return nil
 }
 
 func uuidOrNil(raw string) interface{} {

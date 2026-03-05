@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../controllers/ui_prefs_notifier.dart';
+import '../../../../core/error_handler.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import 'company_settings_page.dart';
 import 'sync_health_page.dart';
@@ -107,7 +108,7 @@ class SettingsPage extends ConsumerWidget {
       if (context.mounted) {
         Navigator.of(context).pop();
         messenger.showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          SnackBar(content: Text(ErrorHandler.message(e))),
         );
       }
     }

@@ -6,6 +6,8 @@ import '../../accounts/presentation/pages/cash_register_page.dart';
 import '../../accounts/presentation/pages/day_end_flow_page.dart';
 import '../../accounts/presentation/pages/ledgers_page.dart';
 import '../../accounts/presentation/pages/vouchers_page.dart';
+import '../../expenses/presentation/pages/expense_categories_page.dart';
+import '../../expenses/presentation/pages/expenses_page.dart';
 import '../../hr/presentation/pages/attendance_page.dart';
 import '../../hr/presentation/pages/hr_page.dart';
 import '../../hr/presentation/pages/payroll_page.dart';
@@ -51,6 +53,10 @@ class DashboardNavigation {
         return const CashRegisterPage();
       case 'Day Open/Close':
         return const DayEndFlowPage();
+      case 'Expenses':
+        return const ExpensesPage();
+      case 'Expense Categories':
+        return const ExpenseCategoriesPage();
       case 'Vouchers':
         return const VouchersPage();
       case 'Ledgers':

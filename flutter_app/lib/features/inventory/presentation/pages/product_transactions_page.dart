@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 import '../../../purchases/presentation/pages/grn_detail_page.dart';
 import '../../../purchases/presentation/pages/purchase_return_detail_page.dart';
 import 'stock_transfer_view_page.dart';
@@ -111,7 +112,6 @@ class _ProductTransactionsPageState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Transactions'),
@@ -125,14 +125,15 @@ class _ProductTransactionsPageState
               return const LinearProgressIndicator(minHeight: 2);
             }
             if (snapshot.hasError) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    'Failed to load: ${snapshot.error}',
-                    style: TextStyle(color: theme.colorScheme.error),
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  const SizedBox(height: 64),
+                  AppErrorView(
+                    error: snapshot.error!,
+                    onRetry: _refresh,
                   ),
-                ),
+                ],
               );
             }
             final data = snapshot.data;

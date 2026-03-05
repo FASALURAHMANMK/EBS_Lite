@@ -145,12 +145,12 @@ func (s *CompanyService) CreateCompany(req *models.CreateCompanyRequest, userID 
 	}
 
 	// Create default location
-	_, err = tx.Exec(`
+	var defaultLocationID int
+	if err := tx.QueryRow(`
 		INSERT INTO locations (company_id, name, address, is_active)
 		VALUES ($1, 'Main Office', $2, TRUE)
-	`, company.CompanyID, req.Address)
-
-	if err != nil {
+		RETURNING location_id
+	`, company.CompanyID, req.Address).Scan(&defaultLocationID); err != nil {
 		return nil, fmt.Errorf("failed to create default location: %w", err)
 	}
 
@@ -181,9 +181,9 @@ func (s *CompanyService) CreateCompany(req *models.CreateCompanyRequest, userID 
 
 		_, err = tx.Exec(`
 			UPDATE users 
-			SET company_id = $1, role_id = $2, updated_at = CURRENT_TIMESTAMP
-			WHERE user_id = $3
-		`, company.CompanyID, superAdminRoleID, userID)
+			SET company_id = $1, role_id = $2, location_id = $3, updated_at = CURRENT_TIMESTAMP
+			WHERE user_id = $4
+		`, company.CompanyID, superAdminRoleID, defaultLocationID, userID)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to assign company to user: %w", err)

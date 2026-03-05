@@ -30,10 +30,13 @@ type ExpenseCategory struct {
 }
 
 type CreateExpenseRequest struct {
-	CategoryID  int       `json:"category_id" validate:"required"`
-	Amount      float64   `json:"amount" validate:"required,gt=0"`
-	Notes       *string   `json:"notes,omitempty"`
-	ExpenseDate time.Time `json:"expense_date"`
+	CategoryID int     `json:"category_id" validate:"required"`
+	Amount     float64 `json:"amount" validate:"required,gt=0"`
+	Notes      *string `json:"notes,omitempty"`
+	// Accept "YYYY-MM-DD" (Flutter default) or RFC3339 via ExpenseDateRaw.
+	// Handler parses and populates ExpenseDate for DB insert.
+	ExpenseDateRaw *string   `json:"expense_date,omitempty"`
+	ExpenseDate    time.Time `json:"-"`
 }
 
 type CreateExpenseCategoryRequest struct {

@@ -1,10 +1,13 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
+
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/dashboard_repository.dart';
 import '../data/models.dart';
 import '../../auth/controllers/auth_notifier.dart';
 import '../../../core/error_handler.dart';
+import '../../../core/outbox/outbox_notifier.dart';
 import 'location_notifier.dart';
 
 class DashboardState {
@@ -37,13 +40,25 @@ class DashboardState {
 
 class DashboardNotifier extends StateNotifier<DashboardState> {
   DashboardNotifier(this._repository, this._ref)
-      : super(const DashboardState());
+      : super(const DashboardState()) {
+    _timer = Timer.periodic(const Duration(seconds: 45), (_) {
+      // ignore: unawaited_futures
+      _silentRefresh();
+    });
+  }
 
   final DashboardRepository _repository;
   final Ref _ref;
+  Timer? _timer;
+  bool _refreshing = false;
 
-  Future<void> load() async {
-    state = state.copyWith(isLoading: true, error: null);
+  Future<void> load({bool showLoading = true}) async {
+    if (state.isLoading) return;
+    if (showLoading) {
+      state = state.copyWith(isLoading: true, error: null);
+    } else {
+      state = state.copyWith(error: null);
+    }
     try {
       // Use selected location if available; some endpoints require it.
       final locState = _ref.read(locationNotifierProvider);
@@ -66,11 +81,34 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
         _ref.read(authNotifierProvider.notifier).state = const AuthState();
         return;
       }
-      state = state.copyWith(
-        isLoading: false,
-        error: ErrorHandler.message(e),
-      );
+      // Avoid wiping the dashboard when background refresh fails.
+      if (showLoading || state.metrics == null) {
+        state = state.copyWith(
+          isLoading: false,
+          error: ErrorHandler.message(e),
+        );
+      } else {
+        state = state.copyWith(isLoading: false, error: null);
+      }
     }
+  }
+
+  Future<void> _silentRefresh() async {
+    if (_refreshing) return;
+    final outbox = _ref.read(outboxNotifierProvider);
+    if (!outbox.isOnline) return;
+    _refreshing = true;
+    try {
+      await load(showLoading: false);
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/error_handler.dart';
 import '../../data/grn_repository.dart';
 import '../../data/purchases_repository.dart';
 import '../../data/models.dart';
@@ -378,7 +379,7 @@ class _ReceiveAgainstPoPageState extends ConsumerState<_ReceiveAgainstPoPage> {
     } catch (e) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Failed: $e')));
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     }
   }
 }

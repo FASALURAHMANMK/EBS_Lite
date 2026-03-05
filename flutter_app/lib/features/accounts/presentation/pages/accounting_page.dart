@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
+import 'package:ebs_lite/features/expenses/presentation/pages/expense_categories_page.dart';
+import 'package:ebs_lite/features/expenses/presentation/pages/expenses_page.dart';
 import 'audit_logs_page.dart';
 import 'cash_register_page.dart';
+import 'day_end_flow_page.dart';
 import 'ledgers_page.dart';
 import 'vouchers_page.dart';
 
@@ -16,6 +19,27 @@ class AccountingPage extends StatelessWidget {
         label: 'Cash Register',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const CashRegisterPage()),
+        ),
+      ),
+      FeatureItem(
+        icon: Icons.event_available_rounded,
+        label: 'Day Open/Close',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const DayEndFlowPage()),
+        ),
+      ),
+      FeatureItem(
+        icon: Icons.payments_outlined,
+        label: 'Expenses',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ExpensesPage()),
+        ),
+      ),
+      FeatureItem(
+        icon: Icons.category_outlined,
+        label: 'Expense Categories',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ExpenseCategoriesPage()),
         ),
       ),
       FeatureItem(

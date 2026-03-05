@@ -1,14 +1,48 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 
 import '../features/auth/data/models.dart';
+import 'offline_cache/offline_exception.dart';
 
 class ErrorHandler {
+  static bool isNetworkError(Object error) {
+    if (error is OfflineException) return true;
+    if (error is DioException) {
+      switch (error.type) {
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.sendTimeout:
+        case DioExceptionType.receiveTimeout:
+        case DioExceptionType.connectionError:
+          return true;
+        case DioExceptionType.unknown:
+          return error.error is SocketException;
+        case DioExceptionType.badResponse:
+        case DioExceptionType.badCertificate:
+        case DioExceptionType.cancel:
+          return false;
+      }
+    }
+    return error is SocketException;
+  }
+
   static String message(Object error) {
     if (error is AuthException) {
       return error.message;
+    }
+    if (error is OfflineException) {
+      final msg = error.message.trim();
+      return msg.isNotEmpty ? msg : 'You appear to be offline.';
+    }
+    if (error is StateError) {
+      final msg = error.message.trim();
+      return msg.isNotEmpty ? msg : 'Invalid state. Please try again.';
+    }
+    if (error is FormatException) {
+      final msg = error.message.trim();
+      return msg.isNotEmpty ? msg : 'Invalid format.';
     }
     if (error is DioException) {
       // Prefer explicit message from backend if present
@@ -58,6 +92,17 @@ class ErrorHandler {
           }
           return 'Something went wrong. Please try again.';
       }
+    }
+
+    // Preserve intentional, user-facing messages from thrown Exceptions.
+    final raw = error.toString();
+    if (raw.startsWith('Exception: ')) {
+      final msg = raw.substring('Exception: '.length).trim();
+      if (msg.isNotEmpty) return msg;
+    }
+    if (raw.startsWith('StateError: ')) {
+      final msg = raw.substring('StateError: '.length).trim();
+      if (msg.isNotEmpty) return msg;
     }
     return 'Something went wrong. Please try again.';
   }

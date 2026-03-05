@@ -143,7 +143,7 @@ func (s *ReportsService) GetTopProducts(companyID int, fromDate, toDate string, 
 		idx++
 	}
 
-	query += " GROUP BY sd.product_id, product_name ORDER BY revenue DESC LIMIT $" + fmt.Sprint(idx)
+	query += " GROUP BY sd.product_id, COALESCE(p.name, sd.product_name) ORDER BY revenue DESC LIMIT $" + fmt.Sprint(idx)
 	args = append(args, limit)
 
 	rows, err := s.db.Query(query, args...)
@@ -295,66 +295,560 @@ func (s *ReportsService) GetTaxReport(companyID int, fromDate, toDate string) ([
 	return reports, nil
 }
 
-// The following report methods are placeholders for future implementation.
-// They currently return a not implemented error and will be expanded to
-// query the appropriate tables and support data export in future iterations.
+// The following report methods use simplified aggregations intended for MVP reporting.
 
 // GetItemMovement returns stock movement details for products
-func (s *ReportsService) GetItemMovement(companyID int) ([]map[string]interface{}, error) {
-	return nil, fmt.Errorf("not implemented")
+func (s *ReportsService) GetItemMovement(companyID int, locationID *int, fromDate, toDate string) ([]map[string]interface{}, error) {
+	query := `
+		SELECT p.product_id,
+		       p.name AS product_name,
+		       COALESCE(pu.purchased_qty,0)::float8 AS purchased_qty,
+		       COALESCE(pr.purchase_return_qty,0)::float8 AS purchase_return_qty,
+		       COALESCE(sa.sold_qty,0)::float8 AS sold_qty,
+		       COALESCE(sr.sale_return_qty,0)::float8 AS sale_return_qty,
+		       COALESCE(adj.adjustment_qty,0)::float8 AS adjustment_qty,
+		       (
+		         COALESCE(pu.purchased_qty,0)
+		         - COALESCE(pr.purchase_return_qty,0)
+		         - COALESCE(sa.sold_qty,0)
+		         + COALESCE(sr.sale_return_qty,0)
+		         + COALESCE(adj.adjustment_qty,0)
+		       )::float8 AS net_movement
+		FROM products p
+		LEFT JOIN (
+			SELECT pd.product_id, COALESCE(SUM(pd.quantity),0)::float8 AS purchased_qty
+			FROM purchase_details pd
+			JOIN purchases pur ON pur.purchase_id = pd.purchase_id AND pur.is_deleted = FALSE
+			JOIN locations l ON l.location_id = pur.location_id
+			WHERE l.company_id = $1
+			  AND ($2::int IS NULL OR pur.location_id = $2)
+			  AND ($3::date IS NULL OR pur.purchase_date >= $3)
+			  AND ($4::date IS NULL OR pur.purchase_date <= $4)
+			GROUP BY pd.product_id
+		) pu ON pu.product_id = p.product_id
+		LEFT JOIN (
+			SELECT prd.product_id, COALESCE(SUM(prd.quantity),0)::float8 AS purchase_return_qty
+			FROM purchase_return_details prd
+			JOIN purchase_returns pr ON pr.return_id = prd.return_id AND pr.is_deleted = FALSE
+			JOIN locations l ON l.location_id = pr.location_id
+			WHERE l.company_id = $1
+			  AND ($2::int IS NULL OR pr.location_id = $2)
+			  AND ($3::date IS NULL OR pr.return_date >= $3)
+			  AND ($4::date IS NULL OR pr.return_date <= $4)
+			GROUP BY prd.product_id
+		) pr ON pr.product_id = p.product_id
+		LEFT JOIN (
+			SELECT sd.product_id, COALESCE(SUM(sd.quantity),0)::float8 AS sold_qty
+			FROM sale_details sd
+			JOIN sales s ON s.sale_id = sd.sale_id AND s.is_deleted = FALSE AND COALESCE(s.is_training, FALSE) = FALSE
+			JOIN locations l ON l.location_id = s.location_id
+			WHERE l.company_id = $1
+			  AND ($2::int IS NULL OR s.location_id = $2)
+			  AND ($3::date IS NULL OR s.sale_date >= $3)
+			  AND ($4::date IS NULL OR s.sale_date <= $4)
+			GROUP BY sd.product_id
+		) sa ON sa.product_id = p.product_id
+		LEFT JOIN (
+			SELECT srd.product_id, COALESCE(SUM(srd.quantity),0)::float8 AS sale_return_qty
+			FROM sale_return_details srd
+			JOIN sale_returns sr ON sr.return_id = srd.return_id AND sr.is_deleted = FALSE
+			JOIN locations l ON l.location_id = sr.location_id
+			WHERE l.company_id = $1
+			  AND ($2::int IS NULL OR sr.location_id = $2)
+			  AND ($3::date IS NULL OR sr.return_date >= $3)
+			  AND ($4::date IS NULL OR sr.return_date <= $4)
+			GROUP BY srd.product_id
+		) sr ON sr.product_id = p.product_id
+		LEFT JOIN (
+			SELECT sa.product_id, COALESCE(SUM(sa.adjustment),0)::float8 AS adjustment_qty
+			FROM stock_adjustments sa
+			JOIN locations l ON l.location_id = sa.location_id
+			WHERE l.company_id = $1
+			  AND ($2::int IS NULL OR sa.location_id = $2)
+			  AND ($3::date IS NULL OR sa.created_at::date >= $3)
+			  AND ($4::date IS NULL OR sa.created_at::date <= $4)
+			GROUP BY sa.product_id
+		) adj ON adj.product_id = p.product_id
+		WHERE p.company_id = $1 AND p.is_deleted = FALSE
+		  AND (
+		    COALESCE(pu.purchased_qty,0) <> 0 OR COALESCE(pr.purchase_return_qty,0) <> 0 OR
+		    COALESCE(sa.sold_qty,0) <> 0 OR COALESCE(sr.sale_return_qty,0) <> 0 OR
+		    COALESCE(adj.adjustment_qty,0) <> 0
+		  )
+		ORDER BY net_movement DESC, product_name
+	`
+
+	var locArg interface{}
+	if locationID != nil {
+		locArg = *locationID
+	}
+	var fromArg interface{}
+	if fromDate != "" {
+		fromArg = fromDate
+	}
+	var toArg interface{}
+	if toDate != "" {
+		toArg = toDate
+	}
+
+	return queryToMaps(s.db, query, companyID, locArg, fromArg, toArg)
 }
 
 // GetValuationReport returns inventory valuation information
-func (s *ReportsService) GetValuationReport(companyID int) ([]map[string]interface{}, error) {
-	return nil, fmt.Errorf("not implemented")
+func (s *ReportsService) GetValuationReport(companyID int, locationID *int) ([]map[string]interface{}, error) {
+	query := `
+		SELECT p.product_id,
+		       p.name AS product_name,
+		       COALESCE(SUM(st.quantity),0)::float8 AS quantity,
+		       COALESCE(SUM(st.quantity * COALESCE(p.cost_price,0)),0)::float8 AS stock_value
+		FROM products p
+		LEFT JOIN stock st ON st.product_id = p.product_id
+		LEFT JOIN locations l ON l.location_id = st.location_id
+		WHERE p.company_id = $1 AND p.is_deleted = FALSE
+		  AND ($2::int IS NULL OR st.location_id = $2)
+		GROUP BY p.product_id, p.name
+		ORDER BY stock_value DESC, product_name
+	`
+	var locArg interface{}
+	if locationID != nil {
+		locArg = *locationID
+	}
+	return queryToMaps(s.db, query, companyID, locArg)
 }
 
 // GetPurchaseVsReturns compares purchases against returns
-func (s *ReportsService) GetPurchaseVsReturns(companyID int) ([]map[string]interface{}, error) {
-	return nil, fmt.Errorf("not implemented")
+func (s *ReportsService) GetPurchaseVsReturns(companyID int, locationID *int, fromDate, toDate string) ([]map[string]interface{}, error) {
+	query := `
+		WITH purchases AS (
+			SELECT
+				COALESCE(SUM(p.total_amount),0)::float8 AS purchases_total,
+				COALESCE(SUM(p.total_amount - p.paid_amount),0)::float8 AS purchases_outstanding
+			FROM purchases p
+			JOIN locations l ON l.location_id = p.location_id
+			WHERE l.company_id = $1 AND p.is_deleted = FALSE
+			  AND ($2::int IS NULL OR p.location_id = $2)
+			  AND ($3::date IS NULL OR p.purchase_date >= $3)
+			  AND ($4::date IS NULL OR p.purchase_date <= $4)
+		),
+		returns AS (
+			SELECT
+				COALESCE(SUM(pr.total_amount),0)::float8 AS returns_total
+			FROM purchase_returns pr
+			JOIN locations l ON l.location_id = pr.location_id
+			WHERE l.company_id = $1 AND pr.is_deleted = FALSE
+			  AND ($2::int IS NULL OR pr.location_id = $2)
+			  AND ($3::date IS NULL OR pr.return_date >= $3)
+			  AND ($4::date IS NULL OR pr.return_date <= $4)
+		)
+		SELECT
+			purchases.purchases_total,
+			returns.returns_total,
+			(purchases.purchases_total - returns.returns_total)::float8 AS net_purchases,
+			purchases.purchases_outstanding
+		FROM purchases, returns
+	`
+	var locArg interface{}
+	if locationID != nil {
+		locArg = *locationID
+	}
+	var fromArg interface{}
+	if fromDate != "" {
+		fromArg = fromDate
+	}
+	var toArg interface{}
+	if toDate != "" {
+		toArg = toDate
+	}
+	return queryToMaps(s.db, query, companyID, locArg, fromArg, toArg)
 }
 
 // GetSupplierReport aggregates supplier performance metrics
-func (s *ReportsService) GetSupplierReport(companyID int) ([]map[string]interface{}, error) {
-	return nil, fmt.Errorf("not implemented")
+func (s *ReportsService) GetSupplierReport(companyID int, locationID *int, fromDate, toDate string) ([]map[string]interface{}, error) {
+	query := `
+		WITH purchases_by_supplier AS (
+			SELECT p.supplier_id,
+			       COALESCE(SUM(p.total_amount),0)::float8 AS purchases_total,
+			       COALESCE(SUM(p.paid_amount),0)::float8 AS purchases_paid,
+			       COALESCE(SUM(p.total_amount - p.paid_amount),0)::float8 AS purchases_outstanding
+			FROM purchases p
+			JOIN locations l ON l.location_id = p.location_id
+			WHERE l.company_id = $1 AND p.is_deleted = FALSE
+			  AND ($2::int IS NULL OR p.location_id = $2)
+			  AND ($3::date IS NULL OR p.purchase_date >= $3)
+			  AND ($4::date IS NULL OR p.purchase_date <= $4)
+			GROUP BY p.supplier_id
+		),
+		returns_by_supplier AS (
+			SELECT pr.supplier_id,
+			       COALESCE(SUM(pr.total_amount),0)::float8 AS returns_total
+			FROM purchase_returns pr
+			JOIN locations l ON l.location_id = pr.location_id
+			WHERE l.company_id = $1 AND pr.is_deleted = FALSE
+			  AND ($2::int IS NULL OR pr.location_id = $2)
+			  AND ($3::date IS NULL OR pr.return_date >= $3)
+			  AND ($4::date IS NULL OR pr.return_date <= $4)
+			GROUP BY pr.supplier_id
+		)
+		SELECT s.supplier_id,
+		       s.name AS supplier_name,
+		       COALESCE(p.purchases_total,0)::float8 AS purchases_total,
+		       COALESCE(p.purchases_paid,0)::float8 AS purchases_paid,
+		       COALESCE(p.purchases_outstanding,0)::float8 AS purchases_outstanding,
+		       COALESCE(r.returns_total,0)::float8 AS returns_total
+		FROM suppliers s
+		LEFT JOIN purchases_by_supplier p ON p.supplier_id = s.supplier_id
+		LEFT JOIN returns_by_supplier r ON r.supplier_id = s.supplier_id
+		WHERE s.company_id = $1
+		ORDER BY purchases_total DESC, supplier_name
+	`
+	var locArg interface{}
+	if locationID != nil {
+		locArg = *locationID
+	}
+	var fromArg interface{}
+	if fromDate != "" {
+		fromArg = fromDate
+	}
+	var toArg interface{}
+	if toDate != "" {
+		toArg = toDate
+	}
+	return queryToMaps(s.db, query, companyID, locArg, fromArg, toArg)
 }
 
 // GetDailyCashReport summarizes daily cash activity
-func (s *ReportsService) GetDailyCashReport(companyID int) ([]map[string]interface{}, error) {
-	return nil, fmt.Errorf("not implemented")
+func (s *ReportsService) GetDailyCashReport(companyID int, locationID *int, fromDate, toDate string) ([]map[string]interface{}, error) {
+	query := `
+		SELECT cr.date,
+		       cr.location_id,
+		       cr.opening_balance::float8 AS opening_balance,
+		       cr.cash_in::float8 AS cash_in,
+		       cr.cash_out::float8 AS cash_out,
+		       cr.expected_balance::float8 AS expected_balance,
+		       cr.closing_balance::float8 AS closing_balance,
+		       cr.variance::float8 AS variance,
+		       cr.status
+		FROM cash_register cr
+		JOIN locations l ON l.location_id = cr.location_id
+		WHERE l.company_id = $1
+		  AND ($2::int IS NULL OR cr.location_id = $2)
+		  AND ($3::date IS NULL OR cr.date >= $3)
+		  AND ($4::date IS NULL OR cr.date <= $4)
+		ORDER BY cr.date DESC, cr.location_id
+	`
+	var locArg interface{}
+	if locationID != nil {
+		locArg = *locationID
+	}
+	var fromArg interface{}
+	if fromDate != "" {
+		fromArg = fromDate
+	}
+	var toArg interface{}
+	if toDate != "" {
+		toArg = toDate
+	}
+	return queryToMaps(s.db, query, companyID, locArg, fromArg, toArg)
 }
 
 // GetIncomeExpenseReport returns income vs expense details
-func (s *ReportsService) GetIncomeExpenseReport(companyID int) ([]map[string]interface{}, error) {
-	return nil, fmt.Errorf("not implemented")
+func (s *ReportsService) GetIncomeExpenseReport(companyID int, locationID *int, fromDate, toDate string) ([]map[string]interface{}, error) {
+	query := `
+		WITH sales_by_day AS (
+			SELECT s.sale_date AS day, COALESCE(SUM(s.total_amount),0)::float8 AS sales_total
+			FROM sales s
+			JOIN locations l ON l.location_id = s.location_id
+			WHERE l.company_id = $1 AND s.is_deleted = FALSE AND COALESCE(s.is_training, FALSE) = FALSE
+			  AND ($2::int IS NULL OR s.location_id = $2)
+			  AND ($3::date IS NULL OR s.sale_date >= $3)
+			  AND ($4::date IS NULL OR s.sale_date <= $4)
+			GROUP BY s.sale_date
+		),
+		expenses_by_day AS (
+			SELECT e.expense_date AS day, COALESCE(SUM(e.amount),0)::float8 AS expenses_total
+			FROM expenses e
+			JOIN locations l ON l.location_id = e.location_id
+			WHERE l.company_id = $1 AND e.is_deleted = FALSE
+			  AND ($2::int IS NULL OR e.location_id = $2)
+			  AND ($3::date IS NULL OR e.expense_date >= $3)
+			  AND ($4::date IS NULL OR e.expense_date <= $4)
+			GROUP BY e.expense_date
+		)
+		SELECT COALESCE(s.day, e.day) AS day,
+		       COALESCE(s.sales_total, 0)::float8 AS sales_total,
+		       COALESCE(e.expenses_total, 0)::float8 AS expenses_total,
+		       (COALESCE(s.sales_total, 0) - COALESCE(e.expenses_total, 0))::float8 AS net_income
+		FROM sales_by_day s
+		FULL OUTER JOIN expenses_by_day e ON e.day = s.day
+		ORDER BY day DESC
+	`
+	var locArg interface{}
+	if locationID != nil {
+		locArg = *locationID
+	}
+	var fromArg interface{}
+	if fromDate != "" {
+		fromArg = fromDate
+	}
+	var toArg interface{}
+	if toDate != "" {
+		toArg = toDate
+	}
+	return queryToMaps(s.db, query, companyID, locArg, fromArg, toArg)
 }
 
 // GetGeneralLedger returns general ledger entries
-func (s *ReportsService) GetGeneralLedger(companyID int) ([]map[string]interface{}, error) {
-	return nil, fmt.Errorf("not implemented")
+func (s *ReportsService) GetGeneralLedger(companyID int, fromDate, toDate string, limit int) ([]map[string]interface{}, error) {
+	if limit <= 0 || limit > 5000 {
+		limit = 500
+	}
+	query := `
+		SELECT le.entry_id,
+		       le.date,
+		       le.account_id,
+		       coa.account_code,
+		       coa.name AS account_name,
+		       COALESCE(le.debit,0)::float8 AS debit,
+		       COALESCE(le.credit,0)::float8 AS credit,
+		       le.description,
+		       le.reference,
+		       le.voucher_id,
+		       le.transaction_type,
+		       le.transaction_id
+		FROM ledger_entries le
+		JOIN chart_of_accounts coa ON le.account_id = coa.account_id
+		WHERE le.company_id = $1
+		  AND ($2::date IS NULL OR le.date >= $2)
+		  AND ($3::date IS NULL OR le.date <= $3)
+		ORDER BY le.date DESC, le.entry_id DESC
+		LIMIT $4
+	`
+	var fromArg interface{}
+	if fromDate != "" {
+		fromArg = fromDate
+	}
+	var toArg interface{}
+	if toDate != "" {
+		toArg = toDate
+	}
+	return queryToMaps(s.db, query, companyID, fromArg, toArg, limit)
 }
 
 // GetTrialBalance returns the trial balance
-func (s *ReportsService) GetTrialBalance(companyID int) ([]map[string]interface{}, error) {
-	return nil, fmt.Errorf("not implemented")
+func (s *ReportsService) GetTrialBalance(companyID int, fromDate, toDate string) ([]map[string]interface{}, error) {
+	query := `
+		SELECT coa.account_id,
+		       coa.account_code,
+		       coa.name AS account_name,
+		       coa.type AS account_type,
+		       COALESCE(SUM(le.debit),0)::float8 AS total_debit,
+		       COALESCE(SUM(le.credit),0)::float8 AS total_credit,
+		       (COALESCE(SUM(le.debit),0) - COALESCE(SUM(le.credit),0))::float8 AS balance
+		FROM chart_of_accounts coa
+		LEFT JOIN ledger_entries le
+		       ON le.company_id = $1 AND le.account_id = coa.account_id
+		      AND ($2::date IS NULL OR le.date >= $2)
+		      AND ($3::date IS NULL OR le.date <= $3)
+		WHERE coa.company_id = $1
+		GROUP BY coa.account_id, coa.account_code, coa.name, coa.type
+		ORDER BY coa.account_code, coa.name
+	`
+	var fromArg interface{}
+	if fromDate != "" {
+		fromArg = fromDate
+	}
+	var toArg interface{}
+	if toDate != "" {
+		toArg = toDate
+	}
+	return queryToMaps(s.db, query, companyID, fromArg, toArg)
 }
 
 // GetProfitLoss returns profit and loss information
-func (s *ReportsService) GetProfitLoss(companyID int) ([]map[string]interface{}, error) {
-	return nil, fmt.Errorf("not implemented")
+func (s *ReportsService) GetProfitLoss(companyID int, fromDate, toDate string) ([]map[string]interface{}, error) {
+	query := `
+		WITH pl AS (
+			SELECT coa.type AS section,
+			       coa.account_code,
+			       coa.name AS account_name,
+			       CASE
+			         WHEN coa.type = 'REVENUE' THEN COALESCE(SUM(le.credit - le.debit),0)
+			         WHEN coa.type = 'EXPENSE' THEN COALESCE(SUM(le.debit - le.credit),0)
+			         ELSE 0
+			       END::float8 AS amount
+			FROM chart_of_accounts coa
+			LEFT JOIN ledger_entries le
+			       ON le.company_id = $1 AND le.account_id = coa.account_id
+			      AND ($2::date IS NULL OR le.date >= $2)
+			      AND ($3::date IS NULL OR le.date <= $3)
+			WHERE coa.company_id = $1 AND coa.type IN ('REVENUE','EXPENSE')
+			GROUP BY coa.type, coa.account_code, coa.name
+		),
+		totals AS (
+			SELECT
+				COALESCE(SUM(CASE WHEN section = 'REVENUE' THEN amount ELSE 0 END),0)::float8 AS total_revenue,
+				COALESCE(SUM(CASE WHEN section = 'EXPENSE' THEN amount ELSE 0 END),0)::float8 AS total_expense
+			FROM pl
+		)
+		SELECT section, account_code, account_name, amount
+		FROM pl
+		UNION ALL
+		SELECT 'TOTAL_REVENUE'::text, NULL::text, NULL::text, totals.total_revenue FROM totals
+		UNION ALL
+		SELECT 'TOTAL_EXPENSE'::text, NULL::text, NULL::text, totals.total_expense FROM totals
+		UNION ALL
+		SELECT 'NET_PROFIT'::text, NULL::text, NULL::text, (totals.total_revenue - totals.total_expense)::float8 FROM totals
+		ORDER BY section, account_code NULLS LAST
+	`
+	var fromArg interface{}
+	if fromDate != "" {
+		fromArg = fromDate
+	}
+	var toArg interface{}
+	if toDate != "" {
+		toArg = toDate
+	}
+	return queryToMaps(s.db, query, companyID, fromArg, toArg)
 }
 
 // GetBalanceSheet returns balance sheet data
-func (s *ReportsService) GetBalanceSheet(companyID int) ([]map[string]interface{}, error) {
-	return nil, fmt.Errorf("not implemented")
+func (s *ReportsService) GetBalanceSheet(companyID int, asOfDate string) ([]map[string]interface{}, error) {
+	query := `
+		WITH bs AS (
+			SELECT coa.type AS section,
+			       coa.account_code,
+			       coa.name AS account_name,
+			       CASE
+			         WHEN coa.type = 'ASSET' THEN COALESCE(SUM(le.debit - le.credit),0)
+			         WHEN coa.type IN ('LIABILITY','EQUITY') THEN COALESCE(SUM(le.credit - le.debit),0)
+			         ELSE 0
+			       END::float8 AS amount
+			FROM chart_of_accounts coa
+			LEFT JOIN ledger_entries le
+			       ON le.company_id = $1 AND le.account_id = coa.account_id
+			      AND ($2::date IS NULL OR le.date <= $2)
+			WHERE coa.company_id = $1 AND coa.type IN ('ASSET','LIABILITY','EQUITY')
+			GROUP BY coa.type, coa.account_code, coa.name
+		),
+		totals AS (
+			SELECT
+				COALESCE(SUM(CASE WHEN section = 'ASSET' THEN amount ELSE 0 END),0)::float8 AS total_assets,
+				COALESCE(SUM(CASE WHEN section = 'LIABILITY' THEN amount ELSE 0 END),0)::float8 AS total_liabilities,
+				COALESCE(SUM(CASE WHEN section = 'EQUITY' THEN amount ELSE 0 END),0)::float8 AS total_equity
+			FROM bs
+		)
+		SELECT section, account_code, account_name, amount FROM bs
+		UNION ALL
+		SELECT 'TOTAL_ASSETS'::text, NULL::text, NULL::text, totals.total_assets FROM totals
+		UNION ALL
+		SELECT 'TOTAL_LIABILITIES'::text, NULL::text, NULL::text, totals.total_liabilities FROM totals
+		UNION ALL
+		SELECT 'TOTAL_EQUITY'::text, NULL::text, NULL::text, totals.total_equity FROM totals
+		UNION ALL
+		SELECT 'ASSETS_MINUS_LIABILITIES_EQUITY'::text, NULL::text, NULL::text, (totals.total_assets - (totals.total_liabilities + totals.total_equity))::float8 FROM totals
+		ORDER BY section, account_code NULLS LAST
+	`
+	var asOfArg interface{}
+	if asOfDate != "" {
+		asOfArg = asOfDate
+	}
+	return queryToMaps(s.db, query, companyID, asOfArg)
 }
 
 // GetOutstandingReport returns outstanding invoices or payments
-func (s *ReportsService) GetOutstandingReport(companyID int) ([]map[string]interface{}, error) {
-	return nil, fmt.Errorf("not implemented")
+func (s *ReportsService) GetOutstandingReport(companyID int, locationID *int) ([]map[string]interface{}, error) {
+	query := `
+		WITH sales_outstanding AS (
+			SELECT COALESCE(SUM(s.total_amount - s.paid_amount),0)::float8 AS amount
+			FROM sales s
+			JOIN locations l ON l.location_id = s.location_id
+			WHERE l.company_id = $1 AND s.is_deleted = FALSE AND COALESCE(s.is_training, FALSE) = FALSE
+			  AND ($2::int IS NULL OR s.location_id = $2)
+		),
+		purchase_outstanding AS (
+			SELECT COALESCE(SUM(p.total_amount - p.paid_amount),0)::float8 AS amount
+			FROM purchases p
+			JOIN locations l ON l.location_id = p.location_id
+			WHERE l.company_id = $1 AND p.is_deleted = FALSE
+			  AND ($2::int IS NULL OR p.location_id = $2)
+		)
+		SELECT 'sales'::text AS type, sales_outstanding.amount
+		FROM sales_outstanding
+		UNION ALL
+		SELECT 'purchases'::text AS type, purchase_outstanding.amount
+		FROM purchase_outstanding
+	`
+	var locArg interface{}
+	if locationID != nil {
+		locArg = *locationID
+	}
+	return queryToMaps(s.db, query, companyID, locArg)
 }
 
 // GetTopPerformers returns top performing employees or products
-func (s *ReportsService) GetTopPerformers(companyID int) ([]map[string]interface{}, error) {
-	return nil, fmt.Errorf("not implemented")
+func (s *ReportsService) GetTopPerformers(companyID int, fromDate, toDate string, limit int) ([]map[string]interface{}, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 10
+	}
+	query := `
+		SELECT u.user_id,
+		       COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.username) AS name,
+		       COUNT(*)::int AS transactions,
+		       COALESCE(SUM(s.total_amount),0)::float8 AS total_sales
+		FROM sales s
+		JOIN locations l ON l.location_id = s.location_id
+		JOIN users u ON u.user_id = s.created_by
+		WHERE l.company_id = $1 AND s.is_deleted = FALSE AND COALESCE(s.is_training, FALSE) = FALSE
+		  AND ($2::date IS NULL OR s.sale_date >= $2)
+		  AND ($3::date IS NULL OR s.sale_date <= $3)
+		GROUP BY u.user_id, name
+		ORDER BY total_sales DESC
+		LIMIT $4
+	`
+	var fromArg interface{}
+	if fromDate != "" {
+		fromArg = fromDate
+	}
+	var toArg interface{}
+	if toDate != "" {
+		toArg = toDate
+	}
+	return queryToMaps(s.db, query, companyID, fromArg, toArg, limit)
+}
+
+func queryToMaps(db *sql.DB, query string, args ...interface{}) ([]map[string]interface{}, error) {
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	out := []map[string]interface{}{}
+	for rows.Next() {
+		vals := make([]interface{}, len(cols))
+		valPtrs := make([]interface{}, len(cols))
+		for i := range vals {
+			valPtrs[i] = &vals[i]
+		}
+		if err := rows.Scan(valPtrs...); err != nil {
+			return nil, err
+		}
+
+		row := map[string]interface{}{}
+		for i, col := range cols {
+			switch v := vals[i].(type) {
+			case []byte:
+				row[col] = string(v)
+			default:
+				row[col] = v
+			}
+		}
+		out = append(out, row)
+	}
+	return out, nil
 }

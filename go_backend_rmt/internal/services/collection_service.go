@@ -113,15 +113,53 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 			return nil, err
 		}
 		if existing != nil {
+			// Best-effort: ensure cash register reflects the cash portion (idempotent by request id).
+			{
+				isCash := true
+				if existing.PaymentMethodID != nil {
+					var t string
+					if err := s.db.QueryRow(`SELECT type FROM payment_methods WHERE method_id = $1`, *existing.PaymentMethodID).Scan(&t); err == nil {
+						isCash = strings.EqualFold(strings.TrimSpace(t), "CASH")
+					}
+				}
+				if isCash && existing.Amount > 0 {
+					note := fmt.Sprintf("collection_id=%d collection_number=%s", existing.CollectionID, existing.CollectionNumber)
+					_ = (&CashRegisterService{db: s.db}).RecordCashTransactionTx(
+						nil,
+						companyID,
+						locationID,
+						userID,
+						"IN",
+						existing.Amount,
+						"COLLECTION",
+						fmt.Sprintf("collection:%d", existing.CollectionID),
+						&note,
+						"",
+						idemKey,
+					)
+				}
+			}
 			return existing, nil
 		}
 	}
 
-	// Generate collection number using numbering sequence
-	ns := NewNumberingSequenceService()
-	number, err := ns.NextNumber(tx, "collection", companyID, &locationID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate collection number: %w", err)
+	// Use client-provided collection number when present (offline-first).
+	// Otherwise, allocate via numbering sequences.
+	number := ""
+	if req.CollectionNumber != nil {
+		number = strings.TrimSpace(*req.CollectionNumber)
+	}
+	if number != "" {
+		if len(number) > 100 {
+			return nil, fmt.Errorf("collection number too long")
+		}
+	} else {
+		ns := NewNumberingSequenceService()
+		var err error
+		number, err = ns.NextNumber(tx, "collection", companyID, &locationID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate collection number: %w", err)
+		}
 	}
 
 	// Parse date
@@ -129,6 +167,19 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 	if req.ReceivedDate != nil {
 		if t, err := time.Parse("2006-01-02", *req.ReceivedDate); err == nil {
 			collectionDate = t
+		}
+	} else {
+		// Default to the OPEN cash register's business date (important when
+		// a register stays open past midnight).
+		var d time.Time
+		if err := tx.QueryRow(`
+            SELECT cr.date
+            FROM cash_register cr
+            JOIN locations l ON cr.location_id = l.location_id
+            WHERE cr.location_id = $1 AND l.company_id = $2 AND cr.status = 'OPEN'
+            LIMIT 1
+        `, locationID, companyID).Scan(&d); err == nil {
+			collectionDate = d
 		}
 	}
 
@@ -222,28 +273,70 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 			if err != nil {
 				return nil, fmt.Errorf("failed to fetch outstanding invoices: %w", err)
 			}
-			defer rows.Close()
+
+			// IMPORTANT: drain result rows before running any other queries on this tx/connection.
+			// Calling applyToSale (which does tx.QueryRow/tx.Exec) while iterating `rows` can
+			// corrupt the wire protocol (lib/pq errors like: "unexpected Parse response 'D'").
+			type outRow struct {
+				saleID      int
+				outstanding float64
+			}
+			var outList []outRow
 			for rows.Next() {
 				var saleID int
 				var out float64
 				if err := rows.Scan(&saleID, &out); err != nil {
+					rows.Close()
 					return nil, fmt.Errorf("failed to scan outstanding invoice: %w", err)
 				}
+				outList = append(outList, outRow{saleID: saleID, outstanding: out})
+			}
+			if err := rows.Err(); err != nil {
+				rows.Close()
+				return nil, fmt.Errorf("failed to iterate outstanding invoices: %w", err)
+			}
+			rows.Close()
+
+			for _, r := range outList {
 				if remaining <= 0 {
 					break
 				}
 				alloc := remaining
-				if alloc > out {
-					alloc = out
+				if alloc > r.outstanding {
+					alloc = r.outstanding
 				}
-				if err := applyToSale(saleID, alloc); err != nil {
+				if err := applyToSale(r.saleID, alloc); err != nil {
 					return nil, err
 				}
 				remaining -= alloc
 			}
-			if err := rows.Err(); err != nil {
-				return nil, fmt.Errorf("failed to iterate outstanding invoices: %w", err)
+		}
+	}
+
+	// Best-effort: update cash register for cash collections.
+	{
+		isCash := true
+		if req.PaymentMethodID != nil {
+			var t string
+			if err := tx.QueryRow(`SELECT type FROM payment_methods WHERE method_id = $1`, *req.PaymentMethodID).Scan(&t); err == nil {
+				isCash = strings.EqualFold(strings.TrimSpace(t), "CASH")
 			}
+		}
+		if isCash && req.Amount > 0 {
+			note := fmt.Sprintf("collection_id=%d collection_number=%s", col.CollectionID, col.CollectionNumber)
+			_ = (&CashRegisterService{db: s.db}).RecordCashTransactionTx(
+				tx,
+				companyID,
+				locationID,
+				userID,
+				"IN",
+				req.Amount,
+				"COLLECTION",
+				fmt.Sprintf("collection:%d", col.CollectionID),
+				&note,
+				"",
+				idemKey,
+			)
 		}
 	}
 

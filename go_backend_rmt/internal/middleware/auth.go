@@ -55,18 +55,18 @@ func RequireAuth() gin.HandlerFunc {
 			return
 		}
 
-		// Set user context - handle NULL values
-		c.Set("user_id", claims.UserID)
-		if claims.CompanyID != nil {
-			c.Set("company_id", *claims.CompanyID)
+		// Set user context from DB (authoritative; avoids stale JWT role/company/location IDs)
+		c.Set("user_id", user.UserID)
+		if user.CompanyID != nil {
+			c.Set("company_id", *user.CompanyID)
 		} else {
-			c.Set("company_id", 0) // Set 0 for NULL company
+			c.Set("company_id", 0)
 		}
-		if claims.LocationID != nil {
-			c.Set("location_id", *claims.LocationID)
+		if user.LocationID != nil {
+			c.Set("location_id", *user.LocationID)
 		}
-		if claims.RoleID != nil {
-			c.Set("role_id", *claims.RoleID)
+		if user.RoleID != nil {
+			c.Set("role_id", *user.RoleID)
 		}
 		c.Set("user", user)
 
@@ -288,7 +288,7 @@ func checkUserPermission(userID int, permission string) (bool, error) {
 				WHERE u.user_id = $1
 					AND u.is_active = TRUE
 					AND u.is_deleted = FALSE
-					AND r.name IN ('Super Admin', 'Admin')
+					AND LOWER(r.name) IN ('super admin', 'admin')
 			)
 			OR EXISTS (
 				SELECT 1
@@ -311,7 +311,7 @@ func checkUserPermission(userID int, permission string) (bool, error) {
 func checkUserRole(roleID int, roleName string) (bool, error) {
 	db := database.GetDB()
 
-	query := `SELECT COUNT(*) FROM roles WHERE role_id = $1 AND name = $2`
+	query := `SELECT COUNT(*) FROM roles WHERE role_id = $1 AND LOWER(name) = LOWER($2)`
 
 	var count int
 	err := db.QueryRow(query, roleID, roleName).Scan(&count)

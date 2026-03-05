@@ -50,6 +50,10 @@ func TestPurchaseService_CreatePurchase_IdempotencyUniqueViolationReturnsExistin
 		WithArgs(locationID, companyID).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
+	mock.ExpectExec(regexp.QuoteMeta("SELECT pg_advisory_xact_lock($1)")).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
 	mock.ExpectQuery("(?s)SELECT sequence_id, prefix, sequence_length, current_number.*FROM numbering_sequences.*FOR UPDATE").
 		WithArgs("purchase", companyID, locationID).
 		WillReturnRows(sqlmock.NewRows([]string{"sequence_id", "prefix", "sequence_length", "current_number"}).
@@ -58,6 +62,10 @@ func TestPurchaseService_CreatePurchase_IdempotencyUniqueViolationReturnsExistin
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE numbering_sequences SET current_number = $1, updated_at = CURRENT_TIMESTAMP WHERE sequence_id = $2")).
 		WithArgs(42, 1).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	mock.ExpectQuery("(?s)SELECT cr\\.date\\s+FROM cash_register cr.*WHERE cr\\.location_id = \\$1.*cr\\.status = 'OPEN'.*").
+		WithArgs(locationID, companyID).
+		WillReturnError(sql.ErrNoRows)
 
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT company_id FROM products WHERE product_id = $1 AND is_deleted = FALSE")).
 		WithArgs(1).

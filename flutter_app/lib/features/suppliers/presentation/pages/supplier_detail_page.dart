@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/error_handler.dart';
 import '../../data/models.dart';
 import '../../data/supplier_repository.dart';
 import 'supplier_edit_page.dart';
@@ -234,7 +235,7 @@ class _SimpleRow {
 void _showError(BuildContext context, Object e) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(e.toString())));
+    ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
 }
 
 void _showInfo(BuildContext context, String m) {

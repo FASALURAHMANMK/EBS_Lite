@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 import '../../data/customer_repository.dart';
 import '../../data/models.dart';
 
@@ -26,7 +27,7 @@ class _QuickCollectionSheet extends ConsumerStatefulWidget {
 class _QuickCollectionSheetState extends ConsumerState<_QuickCollectionSheet> {
   bool _loading = true;
   bool _saving = false;
-  String? _error;
+  Object? _error;
 
   List<CustomerDto> _customers = const [];
   List<Map<String, dynamic>> _paymentMethods = const [];
@@ -72,7 +73,7 @@ class _QuickCollectionSheetState extends ConsumerState<_QuickCollectionSheet> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = ErrorHandler.message(e));
+      setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -148,19 +149,7 @@ class _QuickCollectionSheetState extends ConsumerState<_QuickCollectionSheet> {
               child: Center(child: CircularProgressIndicator()),
             )
           : (_error != null)
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(height: 12),
-                    Text(_error!, style: theme.textTheme.bodyMedium),
-                    const SizedBox(height: 12),
-                    FilledButton.icon(
-                      onPressed: _load,
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('Retry'),
-                    ),
-                  ],
-                )
+              ? AppErrorView(error: _error!, onRetry: _load)
               : Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [

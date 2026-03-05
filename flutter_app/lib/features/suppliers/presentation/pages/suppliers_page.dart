@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models.dart';
 import '../../data/supplier_repository.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 import 'supplier_detail_page.dart';
 import 'supplier_create_page.dart';
 
@@ -38,7 +39,6 @@ class _SuppliersPageState extends ConsumerState<SuppliersPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Suppliers'),
@@ -81,12 +81,16 @@ class _SuppliersPageState extends ConsumerState<SuppliersPage> {
                     return const LinearProgressIndicator(minHeight: 2);
                   }
                   if (snapshot.hasError) {
-                    return Center(
-                        child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text('Failed to load: ${snapshot.error}',
-                          style: TextStyle(color: theme.colorScheme.error)),
-                    ));
+                    return ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        const SizedBox(height: 64),
+                        AppErrorView(
+                          error: snapshot.error!,
+                          onRetry: _refresh,
+                        ),
+                      ],
+                    );
                   }
                   final items = snapshot.data ?? const [];
                   if (items.isEmpty) {

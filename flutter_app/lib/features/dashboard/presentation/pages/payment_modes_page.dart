@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/error_handler.dart';
 import '../../data/payment_methods_repository.dart';
 import '../../data/currency_repository.dart';
 
@@ -39,6 +40,16 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
         _currencies = results[1] as List<CurrencyDto>;
         _methodCurrencies = results[2] as Map<int, List<Map<String, dynamic>>>;
       });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _methods = const [];
+        _currencies = const [];
+        _methodCurrencies = {};
+      });
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -114,8 +125,8 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context)
                                 ..hideCurrentSnackBar()
-                                ..showSnackBar(
-                                    SnackBar(content: Text('Failed: $e')));
+                                ..showSnackBar(SnackBar(
+                                    content: Text(ErrorHandler.message(e))));
                             }
                           },
                         ),
@@ -196,7 +207,7 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Failed: $e')));
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     }
   }
 
@@ -300,7 +311,7 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Failed: $e')));
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     }
   }
 }

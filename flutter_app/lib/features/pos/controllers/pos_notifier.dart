@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/error_handler.dart';
 import '../../../core/outbox/outbox_notifier.dart';
 import '../data/models.dart';
 import '../data/pos_repository.dart';
@@ -101,7 +102,7 @@ class PosNotifier extends StateNotifier<PosState> {
       );
       await _recalculateTotals();
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: ErrorHandler.message(e));
     }
   }
 
@@ -144,7 +145,7 @@ class PosNotifier extends StateNotifier<PosState> {
       final list = await _repo.searchProducts(q);
       state = state.copyWith(suggestions: list);
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      state = state.copyWith(error: ErrorHandler.message(e));
     }
   }
 
@@ -217,7 +218,7 @@ class PosNotifier extends StateNotifier<PosState> {
         clearCommittedReceipt: true,
         clearActiveSaleId: true,
         clearCustomer: true,
-        receiptPreview: nextPreview,
+        receiptPreview: nextPreview ?? state.receiptPreview,
         cart: const [],
         suggestions: const [],
         discount: 0.0,
@@ -231,7 +232,7 @@ class PosNotifier extends StateNotifier<PosState> {
         clearCommittedReceipt: true,
         clearActiveSaleId: true,
         clearCustomer: true,
-        receiptPreview: nextPreview,
+        receiptPreview: nextPreview ?? state.receiptPreview,
         cart: const [],
         suggestions: const [],
         discount: 0.0,
@@ -262,7 +263,7 @@ class PosNotifier extends StateNotifier<PosState> {
         suggestions: const [],
         discount: 0.0,
         tax: 0.0,
-        receiptPreview: preview,
+        receiptPreview: preview ?? state.receiptPreview,
       );
     } catch (_) {
       rethrow;

@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../data/inventory_repository.dart';
-import '../../../../core/error_handler.dart';
 import '../../data/models.dart';
+import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../core/error_handler.dart';
 
 class StockTransferViewPage extends ConsumerStatefulWidget {
   const StockTransferViewPage({super.key, required this.transferId});
@@ -48,12 +49,16 @@ class _StockTransferViewPageState extends ConsumerState<StockTransferViewPage> {
               return const LinearProgressIndicator(minHeight: 2);
             }
             if (snapshot.hasError) {
-              return Center(
-                  child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text('Failed to load: ${snapshot.error}',
-                    style: TextStyle(color: theme.colorScheme.error)),
-              ));
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  const SizedBox(height: 64),
+                  AppErrorView(
+                    error: snapshot.error!,
+                    onRetry: _refresh,
+                  ),
+                ],
+              );
             }
             final t = snapshot.data!;
             return ListView(

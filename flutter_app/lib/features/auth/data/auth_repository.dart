@@ -20,6 +20,8 @@ class AuthRepository {
   static const companyKey = 'company';
   static const userKey = 'user';
   static const selectedLocationKey = 'selected_location_id';
+  static const sessionValidatedAtKey = 'session_validated_at_ms';
+  static const cachedLocationsKey = 'cached_locations_json';
 
   static Future<void> purgeLocalSession(
     SharedPreferences prefs,
@@ -31,6 +33,8 @@ class AuthRepository {
     await prefs.remove(companyKey);
     await prefs.remove(userKey);
     await prefs.remove(selectedLocationKey);
+    await prefs.remove(sessionValidatedAtKey);
+    await prefs.remove(cachedLocationsKey);
   }
 
   Future<String> _getDeviceId() async {
@@ -66,6 +70,14 @@ class AuthRepository {
       await _secureStorage.write(
           key: refreshTokenKey, value: data.refreshToken);
       await _secureStorage.write(key: sessionIdKey, value: data.sessionId);
+      await _prefs.setString(
+        userKey,
+        jsonEncode({
+          'user_id': data.user.userId,
+          'username': data.user.username,
+          'email': data.user.email,
+        }),
+      );
       if (data.company != null) {
         await _prefs.setString(
           companyKey,
@@ -152,6 +164,15 @@ class AuthRepository {
     final response = await _dio.get('/auth/me');
     final data =
         AuthMeResponse.fromJson(response.data['data'] as Map<String, dynamic>);
+    await _prefs.setString(
+      userKey,
+      jsonEncode({
+        'user_id': data.user.userId,
+        'username': data.user.username,
+        'email': data.user.email,
+        'permissions': data.user.permissions ?? const [],
+      }),
+    );
     if (data.company != null) {
       await _prefs.setString(
         companyKey,
@@ -163,6 +184,10 @@ class AuthRepository {
     } else {
       await _prefs.remove(companyKey);
     }
+    await _prefs.setInt(
+      sessionValidatedAtKey,
+      DateTime.now().toUtc().millisecondsSinceEpoch,
+    );
     return data;
   }
 

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../data/hr_repository.dart';
 import '../../data/models.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 import 'payslip_page.dart';
 
 class PayrollPage extends ConsumerStatefulWidget {
@@ -16,7 +17,7 @@ class PayrollPage extends ConsumerStatefulWidget {
 
 class _PayrollPageState extends ConsumerState<PayrollPage> {
   bool _loading = true;
-  String? _error;
+  Object? _error;
   List<PayrollDto> _payrolls = const [];
 
   final TextEditingController _employeeIdCtrl = TextEditingController();
@@ -49,7 +50,7 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
       setState(() => _payrolls = list);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = ErrorHandler.message(e));
+      setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -223,16 +224,16 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _createPayrollDialog,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Generate'),
-      ),
+      floatingActionButton: FloatingActionButton(
+  onPressed: _createPayrollDialog,
+  tooltip: 'Generate Payroll',
+  child: const Icon(Icons.add_rounded),
+),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Text(_error!))
+                ? AppErrorView(error: _error!, onRetry: _load)
                 : Column(
                     children: [
                       Padding(

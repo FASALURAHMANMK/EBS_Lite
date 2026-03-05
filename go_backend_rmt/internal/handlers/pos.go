@@ -15,12 +15,14 @@ import (
 )
 
 type POSHandler struct {
-	posService *services.POSService
+	posService      *services.POSService
+	settingsService *services.SettingsService
 }
 
 func NewPOSHandler() *POSHandler {
 	return &POSHandler{
-		posService: services.NewPOSService(),
+		posService:      services.NewPOSService(),
+		settingsService: services.NewSettingsService(),
 	}
 }
 
@@ -178,6 +180,50 @@ func (h *POSHandler) ProcessCheckout(c *gin.Context) {
 	})
 }
 
+// POST /pos/numbering/reserve
+func (h *POSHandler) ReserveNumberBlock(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	// Use location from context or query parameter
+	if locationParam := c.Query("location_id"); locationParam != "" {
+		if id, err := strconv.Atoi(locationParam); err == nil {
+			locationID = id
+		}
+	}
+
+	if locationID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+		return
+	}
+
+	var req models.ReserveNumberBlockRequest
+	// Accept empty body; defaults will apply.
+	_ = c.ShouldBindJSON(&req)
+
+	sequence := strings.TrimSpace(req.SequenceName)
+	if sequence == "" {
+		sequence = "sale"
+	}
+	if sequence != "sale" && sequence != "sale_training" {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Unsupported sequence for POS numbering reservation", nil)
+		return
+	}
+
+	ns := services.NewNumberingSequenceService()
+	resp, err := ns.ReserveNumberBlock(sequence, companyID, &locationID, req.BlockSize)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to reserve numbering block", err)
+		return
+	}
+	utils.SuccessResponse(c, "Numbering block reserved", resp)
+}
+
 // POST /pos/print
 func (h *POSHandler) PrintInvoice(c *gin.Context) {
 	companyID := c.GetInt("company_id")
@@ -273,6 +319,23 @@ func (h *POSHandler) GetPaymentMethods(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, "Payment methods retrieved successfully", methods)
+}
+
+// GET /pos/payment-methods/currencies
+func (h *POSHandler) GetPaymentMethodCurrencies(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	mappings, err := h.settingsService.GetPaymentMethodCurrencies(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get payment method currencies", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Payment method currencies retrieved successfully", mappings)
 }
 
 // GET /pos/sales-summary

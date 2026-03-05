@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../data/accounts_repository.dart';
 import '../../data/models.dart';
-import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 
 class AuditLogsPage extends ConsumerStatefulWidget {
   const AuditLogsPage({super.key});
@@ -17,7 +17,7 @@ class AuditLogsPage extends ConsumerStatefulWidget {
 
 class _AuditLogsPageState extends ConsumerState<AuditLogsPage> {
   bool _loading = true;
-  String? _error;
+  Object? _error;
   List<AuditLogDto> _logs = const [];
 
   final TextEditingController _action = TextEditingController();
@@ -56,7 +56,7 @@ class _AuditLogsPageState extends ConsumerState<AuditLogsPage> {
       setState(() => _logs = list);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = ErrorHandler.message(e));
+      setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -165,7 +165,7 @@ class _AuditLogsPageState extends ConsumerState<AuditLogsPage> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Text(_error!))
+                ? AppErrorView(error: _error!, onRetry: _load)
                 : Column(
                     children: [
                       Padding(

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/lib/pq"
 
@@ -133,6 +134,10 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 			return nil, err
 		}
 		if existing != nil {
+			// Best-effort: ensure cash register reflects the cash portion (idempotent by request id).
+			if !trainingEnabled {
+				s.recordCashRegisterForSale(companyID, locationID, userID, existing.SaleID, existing.SaleNumber, req, idemKey)
+			}
 			return existing, nil
 		}
 	}
@@ -163,6 +168,7 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 
 	// Normal flow: create a fresh sale
 	saleReq := &models.CreateSaleRequest{
+		SaleNumber:      req.SaleNumber,
 		CustomerID:      req.CustomerID,
 		Items:           req.Items,
 		PaymentMethodID: req.PaymentMethodID,
@@ -226,6 +232,12 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 		return nil, fmt.Errorf("failed to process checkout: %w", err)
 	}
 
+	// Align document date to the OPEN cash register's business date (important when
+	// a register stays open past midnight).
+	if !trainingEnabled && sale != nil {
+		s.applyBusinessDateToSale(companyID, locationID, sale.SaleID)
+	}
+
 	// After sale is created, persist redemption and reduce points
 	if !trainingEnabled && sale != nil && req.CustomerID != nil && plannedRedeemPoints > 0 {
 		loyalty := NewLoyaltyService()
@@ -240,6 +252,11 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 		if err := s.recordSalePayments(nil, sale.SaleID, req.Payments); err != nil {
 			log.Printf("warning: failed to record sale payments for sale %d: %v", sale.SaleID, err)
 		}
+	}
+
+	// Best-effort: update cash register totals for cash payments (do not block checkout).
+	if !trainingEnabled {
+		s.recordCashRegisterForSale(companyID, locationID, userID, sale.SaleID, sale.SaleNumber, req, idemKey)
 	}
 
 	// Best-effort audit log when a manager override was used (do not fail the sale).
@@ -260,6 +277,139 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 	}
 
 	return sale, nil
+}
+
+func (s *POSService) recordCashRegisterForSale(
+	companyID, locationID, userID int,
+	saleID int,
+	saleNumber string,
+	req *models.POSCheckoutRequest,
+	idempotencyKey string,
+) {
+	cashIn, err := s.cashInBaseFromPOSRequest(req)
+	if err != nil {
+		log.Printf("warning: failed to compute cash-in for sale %d: %v", saleID, err)
+		return
+	}
+	if cashIn <= 0 {
+		return
+	}
+	note := fmt.Sprintf("sale_id=%d sale_number=%s", saleID, saleNumber)
+	cr := &CashRegisterService{db: s.db}
+	if err := cr.RecordCashTransactionTx(
+		nil,
+		companyID,
+		locationID,
+		userID,
+		"IN",
+		cashIn,
+		"SALE",
+		fmt.Sprintf("sale:%d", saleID),
+		&note,
+		"",
+		strings.TrimSpace(idempotencyKey),
+	); err != nil {
+		log.Printf("warning: failed to record cash register sale event (sale_id=%d): %v", saleID, err)
+	}
+}
+
+func (s *POSService) cashInBaseFromPOSRequest(req *models.POSCheckoutRequest) (float64, error) {
+	if req == nil {
+		return 0, nil
+	}
+
+	// If detailed payments are provided, sum CASH-method lines in base currency.
+	if len(req.Payments) > 0 {
+		methodIDs := make([]int, 0, len(req.Payments))
+		seen := make(map[int]struct{}, len(req.Payments))
+		for _, p := range req.Payments {
+			if p.MethodID <= 0 {
+				continue
+			}
+			if _, ok := seen[p.MethodID]; ok {
+				continue
+			}
+			seen[p.MethodID] = struct{}{}
+			methodIDs = append(methodIDs, p.MethodID)
+		}
+
+		methodTypes := map[int]string{}
+		if len(methodIDs) > 0 {
+			rows, err := s.db.Query(`SELECT method_id, type FROM payment_methods WHERE method_id = ANY($1)`, pq.Array(methodIDs))
+			if err != nil {
+				return 0, fmt.Errorf("failed to load payment method types: %w", err)
+			}
+			for rows.Next() {
+				var id int
+				var t string
+				if err := rows.Scan(&id, &t); err == nil {
+					methodTypes[id] = t
+				}
+			}
+			rows.Close()
+		}
+
+		sum := float64(0)
+		for _, p := range req.Payments {
+			t := methodTypes[p.MethodID]
+			if !strings.EqualFold(strings.TrimSpace(t), "CASH") {
+				continue
+			}
+			rate := float64(1)
+			if p.CurrencyID != nil {
+				err := s.db.QueryRow(`
+                    SELECT COALESCE(pmc.exchange_rate, c.exchange_rate, 1.0)
+                    FROM currencies c
+                    LEFT JOIN payment_method_currencies pmc ON pmc.currency_id = c.currency_id AND pmc.method_id = $1
+                    WHERE c.currency_id = $2
+                `, p.MethodID, *p.CurrencyID).Scan(&rate)
+				if err != nil && err != sql.ErrNoRows {
+					return 0, fmt.Errorf("failed to resolve exchange rate: %w", err)
+				}
+				if err == sql.ErrNoRows {
+					rate = 1.0
+				}
+			}
+			sum += p.Amount * rate
+		}
+		return sum, nil
+	}
+
+	// Legacy/simple payment fields.
+	if req.PaymentMethodID != nil && req.PaidAmount > 0 {
+		var t string
+		if err := s.db.QueryRow(`SELECT type FROM payment_methods WHERE method_id = $1`, *req.PaymentMethodID).Scan(&t); err != nil {
+			if err == sql.ErrNoRows {
+				return 0, nil
+			}
+			return 0, fmt.Errorf("failed to load payment method type: %w", err)
+		}
+		if strings.EqualFold(strings.TrimSpace(t), "CASH") {
+			return req.PaidAmount, nil
+		}
+	}
+
+	return 0, nil
+}
+
+func (s *POSService) applyBusinessDateToSale(companyID, locationID, saleID int) {
+	var d time.Time
+	err := s.db.QueryRow(`
+        SELECT cr.date
+        FROM cash_register cr
+        JOIN locations l ON cr.location_id = l.location_id
+        WHERE cr.location_id = $1 AND l.company_id = $2 AND cr.status = 'OPEN'
+        LIMIT 1
+    `, locationID, companyID).Scan(&d)
+	if err != nil {
+		return
+	}
+	_, _ = s.db.Exec(`
+        UPDATE sales s
+        SET sale_date = $1, updated_at = CURRENT_TIMESTAMP
+        FROM locations l
+        WHERE s.sale_id = $2 AND s.location_id = l.location_id AND l.company_id = $3
+    `, d, saleID, companyID)
 }
 
 func (s *POSService) PrintInvoice(invoiceID, companyID int) error {
@@ -387,10 +537,12 @@ func (s *POSService) SearchCustomers(companyID int, searchTerm string) ([]models
 
 func (s *POSService) GetPaymentMethods(companyID int) ([]models.PaymentMethod, error) {
 	query := `
-		SELECT method_id, company_id, name, type, external_integration, is_active
+		SELECT DISTINCT ON (LOWER(name), type)
+		       method_id, company_id, name, type, external_integration, is_active
 		FROM payment_methods
 		WHERE (company_id = $1 OR company_id IS NULL) AND is_active = TRUE
-		ORDER BY name
+		-- Prefer company-specific rows over global defaults when names/types overlap.
+		ORDER BY LOWER(name), type, (company_id IS NULL) ASC, method_id ASC
 	`
 
 	rows, err := s.db.Query(query, companyID)
@@ -954,15 +1106,26 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 	}
 	defer tx.Rollback()
 
-	// Generate sale number using numbering sequences
-	ns := NewNumberingSequenceService()
-	sequenceName := "sale"
-	if isTraining {
-		sequenceName = "sale_training"
+	// Use client-provided sale number when present (offline-first). Otherwise,
+	// allocate via numbering sequences.
+	saleNumber := ""
+	if req.SaleNumber != nil {
+		saleNumber = strings.TrimSpace(*req.SaleNumber)
 	}
-	saleNumber, err := ns.NextNumber(tx, sequenceName, companyID, &locationID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate sale number: %w", err)
+	if saleNumber != "" {
+		if len(saleNumber) > 100 {
+			return nil, fmt.Errorf("sale number too long")
+		}
+	} else {
+		ns := NewNumberingSequenceService()
+		sequenceName := "sale"
+		if isTraining {
+			sequenceName = "sale_training"
+		}
+		saleNumber, err = ns.NextNumber(tx, sequenceName, companyID, &locationID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate sale number: %w", err)
+		}
 	}
 
 	// Calculate totals and per-line taxes
@@ -1087,6 +1250,10 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit held sale: %w", err)
+	}
+
+	if !isTraining {
+		s.applyBusinessDateToSale(companyID, locationID, saleID)
 	}
 
 	return s.salesService.GetSaleByID(saleID, companyID)

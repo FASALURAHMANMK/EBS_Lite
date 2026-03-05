@@ -12,6 +12,7 @@ import '../../../pos/data/printer_settings_repository.dart';
 import '../../../pos/utils/escpos.dart';
 import '../../../pos/utils/invoice_pdf.dart';
 import '../../../../core/api_client.dart';
+import '../../../../core/error_handler.dart';
 
 class InvoiceActions {
   InvoiceActions({required this.ref, required this.context});
@@ -69,7 +70,7 @@ class InvoiceActions {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed to share: $e')));
+            .showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
       }
     }
   }
@@ -200,7 +201,7 @@ class InvoiceActions {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Print failed: $e')));
+            .showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
       }
     }
   }

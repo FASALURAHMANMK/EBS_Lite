@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models.dart';
 import '../../data/customer_repository.dart';
+import '../../../../core/outbox/outbox_notifier.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 import 'customer_detail_page.dart';
 import 'customer_create_page.dart';
 
@@ -40,7 +42,18 @@ class _CustomerManagementPageState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    // When queued transactions sync (or we regain online), refresh so
+    // list cards (credit balances etc) don't stay stale.
+    ref.listen(outboxNotifierProvider, (prev, next) {
+      if (next.isOnline && next.lastSyncAt != prev?.lastSyncAt) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          // ignore: unawaited_futures
+          _refresh();
+        });
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Customers'),
@@ -83,14 +96,15 @@ class _CustomerManagementPageState
                     return const LinearProgressIndicator(minHeight: 2);
                   }
                   if (snapshot.hasError) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Text(
-                          'Failed to load: ${snapshot.error}',
-                          style: TextStyle(color: theme.colorScheme.error),
+                    return ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        const SizedBox(height: 64),
+                        AppErrorView(
+                          error: snapshot.error!,
+                          onRetry: _refresh,
                         ),
-                      ),
+                      ],
                     );
                   }
                   final items = snapshot.data ?? const [];
@@ -101,36 +115,39 @@ class _CustomerManagementPageState
                     padding: const EdgeInsets.all(12),
                     itemCount: items.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, i) => _CustomerTile(item: items[i]),
+                    itemBuilder: (context, i) {
+                      final item = items[i];
+                      final theme = Theme.of(context);
+                      return ListTile(
+                        tileColor: theme.colorScheme.surfaceContainerHighest,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        title: Text(
+                          item.name,
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text(
+                            'Credit Bal: ${item.creditBalance.toStringAsFixed(2)} • Limit: ${item.creditLimit.toStringAsFixed(2)}'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => CustomerDetailPage(
+                                  customerId: item.customerId),
+                            ),
+                          );
+                          if (!mounted) return;
+                          await _refresh();
+                        },
+                      );
+                    },
                   );
                 },
               ),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CustomerTile extends StatelessWidget {
-  const _CustomerTile({required this.item});
-  final CustomerDto item;
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return ListTile(
-      tileColor: theme.colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      title: Text(item.name,
-          style: theme.textTheme.titleMedium
-              ?.copyWith(fontWeight: FontWeight.w700)),
-      subtitle: Text(
-          'Credit Bal: ${item.creditBalance.toStringAsFixed(2)} • Limit: ${item.creditLimit.toStringAsFixed(2)}'),
-      trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-            builder: (_) => CustomerDetailPage(customerId: item.customerId)),
       ),
     );
   }

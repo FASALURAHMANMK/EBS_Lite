@@ -3,9 +3,13 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"strings"
+	"time"
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
+
+	"github.com/lib/pq"
 )
 
 type ExpenseService struct {
@@ -16,17 +20,157 @@ func NewExpenseService() *ExpenseService {
 	return &ExpenseService{db: database.GetDB()}
 }
 
-func (s *ExpenseService) CreateExpense(companyID, locationID, userID int, req *models.CreateExpenseRequest) (int, error) {
-	var id int
-	err := s.db.QueryRow(`INSERT INTO expenses (category_id, location_id, amount, notes, expense_date, created_by, updated_by)
-                VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING expense_id`,
-		req.CategoryID, locationID, req.Amount, req.Notes, req.ExpenseDate, userID, userID).Scan(&id)
+func (s *ExpenseService) CreateExpense(companyID, locationID, userID int, req *models.CreateExpenseRequest, idempotencyKey string) (int, error) {
+	idemKey := strings.TrimSpace(idempotencyKey)
+
+	// Default document date to the OPEN cash register's business date when not provided.
+	if req != nil && req.ExpenseDate.IsZero() {
+		var d time.Time
+		if err := s.db.QueryRow(`
+            SELECT cr.date
+            FROM cash_register cr
+            JOIN locations l ON cr.location_id = l.location_id
+            WHERE cr.location_id = $1 AND l.company_id = $2 AND cr.status = 'OPEN'
+            LIMIT 1
+        `, locationID, companyID).Scan(&d); err == nil {
+			req.ExpenseDate = d
+		} else {
+			req.ExpenseDate = time.Now()
+		}
+	}
+
+	if idemKey != "" {
+		// If this item was already created (e.g., outbox retry), return the existing record id.
+		existingID, err := s.lookupExpenseIdempotencyKey(companyID, locationID, idemKey)
+		if err == nil {
+			_ = s.ensureLedgerExpense(companyID, existingID, req.Amount, userID)
+			// Best-effort: ensure cash register reflects the cash-out (idempotent by request id).
+			note := fmt.Sprintf("expense_id=%d", existingID)
+			_ = (&CashRegisterService{db: s.db}).RecordCashTransactionTx(
+				nil,
+				companyID,
+				locationID,
+				userID,
+				"OUT",
+				req.Amount,
+				"EXPENSE",
+				fmt.Sprintf("expense:%d", existingID),
+				&note,
+				"",
+				idemKey,
+			)
+			return existingID, nil
+		}
+		if err != sql.ErrNoRows {
+			return 0, fmt.Errorf("failed to lookup expense idempotency key: %w", err)
+		}
+	}
+
+	tx, err := s.db.Begin()
 	if err != nil {
+		return 0, fmt.Errorf("failed to start transaction: %w", err)
+	}
+	rolledBack := false
+	rollback := func() {
+		if rolledBack {
+			return
+		}
+		rolledBack = true
+		_ = tx.Rollback()
+	}
+	defer rollback()
+
+	// Generate expense number using numbering sequence.
+	ns := &NumberingSequenceService{db: s.db}
+	expenseNumber, err := ns.NextNumber(tx, "expense", companyID, &locationID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to generate expense number: %w", err)
+	}
+
+	var id int
+	err = tx.QueryRow(`
+		INSERT INTO expenses (expense_number, category_id, location_id, amount, notes, expense_date, created_by, updated_by, idempotency_key)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8, NULLIF($9,''))
+		RETURNING expense_id`,
+		expenseNumber, req.CategoryID, locationID, req.Amount, req.Notes, req.ExpenseDate, userID, userID, idemKey,
+	).Scan(&id)
+	if err != nil {
+		if idemKey != "" {
+			// Unique violation => return the existing expense for this idempotency key
+			if pqErr, ok := err.(*pq.Error); ok && string(pqErr.Code) == "23505" {
+				rollback()
+				existingID, lerr := s.lookupExpenseIdempotencyKey(companyID, locationID, idemKey)
+				if lerr == nil {
+					_ = s.ensureLedgerExpense(companyID, existingID, req.Amount, userID)
+					// Best-effort: ensure cash register reflects the cash-out (idempotent by request id).
+					note := fmt.Sprintf("expense_id=%d", existingID)
+					_ = (&CashRegisterService{db: s.db}).RecordCashTransactionTx(
+						nil,
+						companyID,
+						locationID,
+						userID,
+						"OUT",
+						req.Amount,
+						"EXPENSE",
+						fmt.Sprintf("expense:%d", existingID),
+						&note,
+						"",
+						idemKey,
+					)
+					return existingID, nil
+				}
+			}
+		}
 		return 0, fmt.Errorf("failed to create expense: %w", err)
 	}
-	ledger := NewLedgerService()
-	_ = ledger.RecordExpense(companyID, id, req.Amount, userID)
+
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("failed to commit expense create: %w", err)
+	}
+	rolledBack = true
+
+	_ = s.ensureLedgerExpense(companyID, id, req.Amount, userID)
+	// Best-effort: update cash register for expenses (treated as cash-out).
+	note := fmt.Sprintf("expense_id=%d", id)
+	_ = (&CashRegisterService{db: s.db}).RecordCashTransactionTx(
+		nil,
+		companyID,
+		locationID,
+		userID,
+		"OUT",
+		req.Amount,
+		"EXPENSE",
+		fmt.Sprintf("expense:%d", id),
+		&note,
+		"",
+		idemKey,
+	)
 	return id, nil
+}
+
+func (s *ExpenseService) lookupExpenseIdempotencyKey(companyID, locationID int, idemKey string) (int, error) {
+	var id int
+	err := s.db.QueryRow(`
+		SELECT e.expense_id
+		FROM expenses e
+		JOIN expense_categories c ON e.category_id = c.category_id
+		WHERE e.idempotency_key = $1 AND e.location_id = $2 AND c.company_id = $3 AND e.is_deleted = FALSE
+		LIMIT 1
+	`, idemKey, locationID, companyID).Scan(&id)
+	return id, err
+}
+
+func (s *ExpenseService) ensureLedgerExpense(companyID, expenseID int, amount float64, userID int) error {
+	ref := fmt.Sprintf("%d", expenseID)
+	_, err := s.db.Exec(`
+		INSERT INTO ledger_entries (company_id, reference, debit, created_by, updated_by)
+		SELECT $1,$2,$3,$4,$4
+		WHERE NOT EXISTS (
+			SELECT 1 FROM ledger_entries
+			WHERE company_id = $1 AND reference = $2 AND debit = $3 AND COALESCE(credit, 0) = 0
+		)
+	`, companyID, ref, amount, userID)
+	return err
 }
 
 func (s *ExpenseService) GetCategories(companyID int) ([]models.ExpenseCategory, error) {
@@ -38,8 +182,13 @@ func (s *ExpenseService) GetCategories(companyID int) ([]models.ExpenseCategory,
 	var cats []models.ExpenseCategory
 	for rows.Next() {
 		var c models.ExpenseCategory
-		if err := rows.Scan(&c.CategoryID, &c.Name, &c.CreatedBy, &c.UpdatedBy); err != nil {
+		var updatedBy sql.NullInt64
+		if err := rows.Scan(&c.CategoryID, &c.Name, &c.CreatedBy, &updatedBy); err != nil {
 			return nil, fmt.Errorf("failed to scan category: %w", err)
+		}
+		if updatedBy.Valid {
+			v := int(updatedBy.Int64)
+			c.UpdatedBy = &v
 		}
 		cats = append(cats, c)
 	}

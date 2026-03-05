@@ -112,6 +112,8 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                       'Accounts', const [
                     'Cash Register',
                     'Day Open/Close',
+                    'Expenses',
+                    'Expense Categories',
                     'Vouchers',
                     'Ledgers',
                     'Audit'

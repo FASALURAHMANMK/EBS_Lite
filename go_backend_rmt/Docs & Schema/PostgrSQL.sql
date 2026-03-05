@@ -624,7 +624,7 @@ CREATE TABLE quotes (
     tax_amount NUMERIC(12,2) DEFAULT 0,
     discount_amount NUMERIC(12,2) DEFAULT 0,
     total_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
-    status VARCHAR(50) DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','SENT','ACCEPTED')),
+    status VARCHAR(50) DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','SENT','ACCEPTED','CONVERTED')),
     notes TEXT,
     created_by INTEGER NOT NULL REFERENCES users(user_id),
     updated_by INTEGER REFERENCES users(user_id),

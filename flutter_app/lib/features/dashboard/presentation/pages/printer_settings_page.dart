@@ -6,6 +6,7 @@ import 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platfor
     hide PrinterDevice;
 import 'dart:io';
 
+import '../../../../core/error_handler.dart';
 import '../../../pos/data/printer_settings_repository.dart';
 import '../../../pos/utils/escpos.dart';
 
@@ -101,7 +102,7 @@ class _PrinterSettingsPageState extends ConsumerState<PrinterSettingsPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Test failed: $e')));
+            .showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
       }
     }
   }

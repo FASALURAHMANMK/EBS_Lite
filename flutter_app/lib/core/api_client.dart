@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -86,11 +88,44 @@ class ApiClient {
       // refresh token and session id unchanged.
       await _secureStorage.write(
           key: AuthRepository.accessTokenKey, value: newAccess);
-    } catch (e) {
-      await _purgeTokens();
-      // Notify app to reset auth state and navigate out
-      AuthEvents.instance.broadcastLogout();
+    } on DioException catch (e) {
+      // Important for offline-first:
+      // - If refresh fails due to *network issues* or transient server errors,
+      //   do NOT purge tokens or force logout. Let the original request fail
+      //   and allow the app to continue in offline mode.
+      // - Only purge+logout when the refresh token is actually invalid.
+      final code = e.response?.statusCode;
+      final invalidRefresh = code == 400 || code == 401 || code == 403;
+      final isNetwork = _isNetworkError(e);
+
+      if (invalidRefresh) {
+        await _purgeTokens();
+        AuthEvents.instance.broadcastLogout();
+      } else if (!isNetwork && code != null && code >= 500) {
+        // Keep session; server is reachable but unstable.
+      } else if (!isNetwork && code == null) {
+        // Unknown failure; keep tokens to avoid breaking offline mode.
+      }
       rethrow;
+    } catch (_) {
+      // Any unexpected error: keep tokens so the UI can continue offline.
+      rethrow;
+    }
+  }
+
+  bool _isNetworkError(DioException e) {
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+      case DioExceptionType.connectionError:
+        return true;
+      case DioExceptionType.unknown:
+        return e.error is SocketException;
+      case DioExceptionType.badResponse:
+      case DioExceptionType.badCertificate:
+      case DioExceptionType.cancel:
+        return false;
     }
   }
 

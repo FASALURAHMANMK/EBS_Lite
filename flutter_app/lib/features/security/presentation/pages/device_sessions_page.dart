@@ -1,4 +1,5 @@
 import 'package:ebs_lite/core/secure_storage.dart';
+import 'package:ebs_lite/core/error_handler.dart';
 import 'package:ebs_lite/features/auth/data/auth_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -40,7 +41,7 @@ class _DeviceSessionsPageState extends ConsumerState<DeviceSessionsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Failed to load: $e')));
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -82,7 +83,7 @@ class _DeviceSessionsPageState extends ConsumerState<DeviceSessionsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Revoke failed: $e')));
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     }
   }
 

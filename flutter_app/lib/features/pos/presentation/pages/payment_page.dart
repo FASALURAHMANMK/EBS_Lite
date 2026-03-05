@@ -13,6 +13,7 @@ import '../../../../core/error_handler.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/widgets/manager_override_dialog.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 
 import '../../../dashboard/data/payment_methods_repository.dart';
 import '../../controllers/pos_notifier.dart';
@@ -31,6 +32,7 @@ class PaymentPage extends ConsumerStatefulWidget {
 
 class _PaymentPageState extends ConsumerState<PaymentPage> {
   bool _loading = true;
+  Object? _error;
   bool _submitting = false;
 
   // Company-defined payment methods and their allowed currencies
@@ -57,39 +59,46 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   }
 
   Future<void> _bootstrap() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     final repo = ref.read(posRepositoryProvider);
-    final methodRepo = ref.read(paymentMethodsRepositoryProvider);
     final posState = ref.read(posNotifierProvider);
+    final outbox = ref.read(outboxNotifierProvider);
     try {
-      final results = await Future.wait([
-        methodRepo.getMethods(),
-        methodRepo.getMethodCurrencies(),
-        repo.getCurrencies(),
-        // Loyalty settings
-        ref.read(loyaltyRepositoryProvider).getSettings(),
-        // Customer info for points if selected
-        if (posState.customer != null)
-          ref
+      _methods = await repo.getPaymentMethods();
+      _methodCurrencies = await repo.getPaymentMethodCurrencies();
+      _currencies = await repo.getCurrencies();
+
+      // Loyalty is optional; keep payment flow usable offline.
+      LoyaltySettingsDto? settings;
+      if (outbox.isOnline) {
+        try {
+          settings = await ref.read(loyaltyRepositoryProvider).getSettings();
+        } catch (_) {
+          settings = null;
+        }
+      }
+      _minRedemption = settings?.minRedemptionPoints.toDouble() ?? 0.0;
+      _minReserve = settings?.minPointsReserve.toDouble() ?? 0.0;
+      _pointValue = settings?.pointValue ?? 0.01;
+
+      CustomerSummaryDto? summary;
+      CustomerDto? customer;
+      if (outbox.isOnline && posState.customer != null) {
+        try {
+          summary = await ref
               .read(customerRepositoryProvider)
-              .getCustomerSummary(posState.customer!.customerId)
-        else
-          Future.value(null),
-        if (posState.customer != null)
-          ref
+              .getCustomerSummary(posState.customer!.customerId);
+          customer = await ref
               .read(customerRepositoryProvider)
-              .getCustomer(posState.customer!.customerId)
-        else
-          Future.value(null),
-      ]);
-      _methods = results[0] as List<PaymentMethodDto>;
-      _methodCurrencies = results[1] as Map<int, List<Map<String, dynamic>>>;
-      _currencies = results[2] as List<CurrencyDto>;
-      final settings = results[3] as LoyaltySettingsDto;
-      _minRedemption = settings.minRedemptionPoints.toDouble();
-      _minReserve = settings.minPointsReserve.toDouble();
-      _pointValue = settings.pointValue;
-      final summary = results[4] as CustomerSummaryDto?;
-      final customer = results[5] as CustomerDto?;
+              .getCustomer(posState.customer!.customerId);
+        } catch (_) {
+          summary = null;
+          customer = null;
+        }
+      }
       if (summary != null && customer != null && customer.isLoyalty) {
         // Compute available points = max(0, current - reserve)
         final current = summary.loyaltyPoints;
@@ -125,6 +134,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       );
       _ensureAllowedCurrencyForLine(first);
       _lines.add(first);
+    } catch (e) {
+      _error = e;
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -150,26 +161,67 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       appBar: AppBar(title: const Text('Payment')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_availablePoints > 0) ...[
-                      Row(children: [
-                        Checkbox(
-                            value: _useLoyalty,
-                            onChanged: (v) => setState(() {
-                                  _useLoyalty = (v ?? false);
+          : _error != null
+              ? AppErrorView(
+                  error: _error!,
+                  title: 'Unable to load payment details',
+                  onRetry: _bootstrap,
+                )
+              : SafeArea(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_availablePoints > 0) ...[
+                          Row(children: [
+                            Checkbox(
+                                value: _useLoyalty,
+                                onChanged: (v) => setState(() {
+                                      _useLoyalty = (v ?? false);
+                                      if (_lines.isNotEmpty) {
+                                        final newTotal = (state.total -
+                                                ((_useLoyalty
+                                                            ? (double.tryParse(
+                                                                    _redeemCtrl
+                                                                        .text
+                                                                        .trim()) ??
+                                                                0.0)
+                                                            : 0.0)
+                                                        .clamp(0.0,
+                                                            _availablePoints) *
+                                                    _pointValue))
+                                            .clamp(0.0, double.infinity);
+                                        _lines.first.controller.text =
+                                            newTotal.toStringAsFixed(2);
+                                      }
+                                    })),
+                            const Text('Redeem loyalty points'),
+                          ]),
+                          Row(children: [
+                            Chip(
+                                label: Text(
+                                    'Avail: ${_availablePoints.toStringAsFixed(0)} pts')),
+                            const SizedBox(width: 8),
+                            Chip(
+                                label: Text(
+                                    'Value/pt: ${_pointValue.toStringAsFixed(2)}')),
+                          ]),
+                          Row(children: [
+                            SizedBox(
+                              width: 180,
+                              child: TextField(
+                                controller: _redeemCtrl,
+                                enabled: _useLoyalty,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                    labelText: 'Points to redeem'),
+                                onChanged: (_) => setState(() {
                                   if (_lines.isNotEmpty) {
                                     final newTotal = (state.total -
-                                            ((_useLoyalty
-                                                        ? (double.tryParse(
-                                                                _redeemCtrl.text
-                                                                    .trim()) ??
-                                                            0.0)
-                                                        : 0.0)
+                                            ((double.tryParse(_redeemCtrl.text
+                                                            .trim()) ??
+                                                        0.0)
                                                     .clamp(
                                                         0.0, _availablePoints) *
                                                 _pointValue))
@@ -177,395 +229,378 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                     _lines.first.controller.text =
                                         newTotal.toStringAsFixed(2);
                                   }
-                                })),
-                        const Text('Redeem loyalty points'),
-                      ]),
-                      Row(children: [
-                        Chip(
-                            label: Text(
-                                'Avail: ${_availablePoints.toStringAsFixed(0)} pts')),
-                        const SizedBox(width: 8),
-                        Chip(
-                            label: Text(
-                                'Value/pt: ${_pointValue.toStringAsFixed(2)}')),
-                      ]),
-                      Row(children: [
-                        SizedBox(
-                          width: 180,
-                          child: TextField(
-                            controller: _redeemCtrl,
-                            enabled: _useLoyalty,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                                labelText: 'Points to redeem'),
-                            onChanged: (_) => setState(() {
-                              if (_lines.isNotEmpty) {
-                                final newTotal = (state.total -
-                                        ((double.tryParse(_redeemCtrl.text
-                                                        .trim()) ??
-                                                    0.0)
-                                                .clamp(0.0, _availablePoints) *
-                                            _pointValue))
-                                    .clamp(0.0, double.infinity);
-                                _lines.first.controller.text =
-                                    newTotal.toStringAsFixed(2);
-                              }
-                            }),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text('= ${redeemValue.toStringAsFixed(2)}'),
-                      ]),
-                      Row(children: [
-                        TextButton(
-                          onPressed: !_useLoyalty
-                              ? null
-                              : () {
-                                  final needed = (_pointValue > 0)
-                                      ? (state.total / _pointValue)
-                                      : 0.0;
-                                  final clamped =
-                                      needed.clamp(0.0, _availablePoints);
-                                  setState(() => _redeemCtrl.text =
-                                      clamped.toStringAsFixed(0));
-                                },
-                          child: const Text('Full bill'),
-                        ),
-                        const SizedBox(width: 8),
-                        TextButton(
-                          onPressed: !_useLoyalty
-                              ? null
-                              : () {
-                                  setState(() => _redeemCtrl.text =
-                                      _availablePoints.toStringAsFixed(0));
-                                },
-                          child: const Text('Full available'),
-                        ),
-                      ]),
-                      if (_useLoyalty) ...[
-                        Slider(
-                          value:
-                              (double.tryParse(_redeemCtrl.text.trim()) ?? 0.0)
-                                  .clamp(0.0, _availablePoints),
-                          min: 0.0,
-                          max: _availablePoints > 0 ? _availablePoints : 0.0,
-                          divisions: _availablePoints > 0
-                              ? _availablePoints.toInt().clamp(1, 1000)
-                              : 1,
-                          label: _redeemCtrl.text,
-                          onChanged: (v) => setState(() {
-                            _redeemCtrl.text = v.toStringAsFixed(0);
-                            if (_lines.isNotEmpty) {
-                              final newTotal = (state.total -
-                                      (v.clamp(0.0, _availablePoints) *
-                                          _pointValue))
-                                  .clamp(0.0, double.infinity);
-                              _lines.first.controller.text =
-                                  newTotal.toStringAsFixed(2);
-                            }
-                          }),
-                        ),
-                      ],
-                      const Divider(height: 24),
-                    ],
-
-                    // Payments header + Add button
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Payments',
-                            style: Theme.of(context).textTheme.titleSmall),
-                        TextButton.icon(
-                          onPressed: () => setState(() {
-                            final l = _PaymentLine(
-                              methodId: _methods.isNotEmpty
-                                  ? _methods.first.methodId
-                                  : null,
-                              currencyId: _baseCurrency?.currencyId,
-                              controller: TextEditingController(text: '0.00'),
-                            );
-                            _ensureAllowedCurrencyForLine(l);
-                            _lines.add(l);
-                          }),
-                          icon: const Icon(Icons.add_rounded),
-                          label: const Text('Add Payment'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    // Render each payment block
-                    ..._lines.asMap().entries.map((e) {
-                      final idx = e.key;
-                      final line = e.value;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: _methods
-                                    .map((m) => Padding(
-                                          padding: const EdgeInsets.only(
-                                              right: 16.0),
-                                          child: InkWell(
-                                            onTap: () => setState(() {
-                                              line.methodId = m.methodId;
-                                              _ensureAllowedCurrencyForLine(
-                                                  line);
-                                            }),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(
-                                                  line.methodId == m.methodId
-                                                      ? Icons
-                                                          .radio_button_checked
-                                                      : Icons
-                                                          .radio_button_unchecked,
-                                                  size: 20,
-                                                ),
-                                                Text(m.name),
-                                              ],
-                                            ),
-                                          ),
-                                        ))
-                                    .toList(),
+                                }),
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: line.controller,
-                                    keyboardType:
-                                        const TextInputType.numberWithOptions(
-                                            decimal: true),
-                                    decoration: InputDecoration(
-                                      labelText: 'Amount',
-                                      prefixIcon: InkWell(
-                                        onTap: () async {
-                                          final picked = await _pickCurrencyFor(
-                                              context, line.methodId);
-                                          if (picked != null) {
-                                            setState(
-                                                () => line.currencyId = picked);
-                                          }
-                                        },
-                                        child: Container(
-                                          alignment: Alignment.center,
-                                          width: 80,
-                                          child: Text(
-                                            _codeFor(line.currencyId),
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .titleMedium,
-                                          ),
-                                        ),
-                                      ),
-                                      suffixIcon: IconButton(
-                                        tooltip: 'Clear',
-                                        icon: const Icon(Icons.clear_rounded),
-                                        onPressed: () => setState(() =>
-                                            line.controller.text = '0.00'),
-                                      ),
-                                    ),
-                                    onChanged: (_) => setState(() {}),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                IconButton(
-                                  tooltip: 'Remove',
-                                  onPressed: _lines.length == 1
-                                      ? null
-                                      : () =>
-                                          setState(() => _lines.removeAt(idx)),
-                                  icon: const Icon(
-                                      Icons.remove_circle_outline_rounded),
-                                )
-                              ],
+                            const SizedBox(width: 12),
+                            Text('= ${redeemValue.toStringAsFixed(2)}'),
+                          ]),
+                          Row(children: [
+                            TextButton(
+                              onPressed: !_useLoyalty
+                                  ? null
+                                  : () {
+                                      final needed = (_pointValue > 0)
+                                          ? (state.total / _pointValue)
+                                          : 0.0;
+                                      final clamped =
+                                          needed.clamp(0.0, _availablePoints);
+                                      setState(() => _redeemCtrl.text =
+                                          clamped.toStringAsFixed(0));
+                                    },
+                              child: const Text('Full bill'),
+                            ),
+                            const SizedBox(width: 8),
+                            TextButton(
+                              onPressed: !_useLoyalty
+                                  ? null
+                                  : () {
+                                      setState(() => _redeemCtrl.text =
+                                          _availablePoints.toStringAsFixed(0));
+                                    },
+                              child: const Text('Full available'),
+                            ),
+                          ]),
+                          if (_useLoyalty) ...[
+                            Slider(
+                              value:
+                                  (double.tryParse(_redeemCtrl.text.trim()) ??
+                                          0.0)
+                                      .clamp(0.0, _availablePoints),
+                              min: 0.0,
+                              max:
+                                  _availablePoints > 0 ? _availablePoints : 0.0,
+                              divisions: _availablePoints > 0
+                                  ? _availablePoints.toInt().clamp(1, 1000)
+                                  : 1,
+                              label: _redeemCtrl.text,
+                              onChanged: (v) => setState(() {
+                                _redeemCtrl.text = v.toStringAsFixed(0);
+                                if (_lines.isNotEmpty) {
+                                  final newTotal = (state.total -
+                                          (v.clamp(0.0, _availablePoints) *
+                                              _pointValue))
+                                      .clamp(0.0, double.infinity);
+                                  _lines.first.controller.text =
+                                      newTotal.toStringAsFixed(2);
+                                }
+                              }),
+                            ),
+                          ],
+                          const Divider(height: 24),
+                        ],
+
+                        // Payments header + Add button
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Payments',
+                                style: Theme.of(context).textTheme.titleSmall),
+                            TextButton.icon(
+                              onPressed: () => setState(() {
+                                final l = _PaymentLine(
+                                  methodId: _methods.isNotEmpty
+                                      ? _methods.first.methodId
+                                      : null,
+                                  currencyId: _baseCurrency?.currencyId,
+                                  controller:
+                                      TextEditingController(text: '0.00'),
+                                );
+                                _ensureAllowedCurrencyForLine(l);
+                                _lines.add(l);
+                              }),
+                              icon: const Icon(Icons.add_rounded),
+                              label: const Text('Add Payment'),
                             ),
                           ],
                         ),
-                      );
-                    }),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Total Paid',
-                            style: Theme.of(context).textTheme.titleMedium),
-                        Text(_sumPaidInBase().toStringAsFixed(2),
-                            style: Theme.of(context).textTheme.titleMedium),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(isChange ? 'Change' : 'Due',
-                            style: Theme.of(context).textTheme.titleSmall),
-                        Text(displayBalance.toStringAsFixed(2),
-                            style: Theme.of(context).textTheme.titleSmall),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Wrap(spacing: 12, children: [
-                        TextButton(
-                          onPressed: _submitting
-                              ? null
-                              : () => Navigator.of(context).pop(),
-                          child: const Text('Cancel'),
-                        ),
-                        FilledButton.icon(
-                          onPressed: _submitting
-                              ? null
-                              : () async {
-                                  setState(() => _submitting = true);
-                                  try {
-                                    final primaryMethod =
-                                        _primaryMethodIdFromLines();
-                                    final paid = _sumPaidInBase();
-                                    // Clamp redeem points
-                                    double? redeemPoints;
-                                    if (_useLoyalty && _availablePoints > 0) {
-                                      final want = double.tryParse(
-                                              _redeemCtrl.text.trim()) ??
-                                          0.0;
-                                      final clamped =
-                                          want.clamp(0.0, _availablePoints);
-                                      redeemPoints =
-                                          clamped > 0 ? clamped : null;
-                                    }
-                                    final payments = _lines
-                                        .where((l) => l.methodId != null)
-                                        .map((l) => PosPaymentLineDto(
-                                              methodId: l.methodId!,
-                                              currencyId: l.currencyId,
-                                              amount: double.tryParse(l
-                                                      .controller.text
-                                                      .trim()) ??
-                                                  0.0,
+                        const SizedBox(height: 8),
+                        // Render each payment block
+                        ..._lines.asMap().entries.map((e) {
+                          final idx = e.key;
+                          final line = e.value;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: _methods
+                                        .map((m) => Padding(
+                                              padding: const EdgeInsets.only(
+                                                  right: 16.0),
+                                              child: InkWell(
+                                                onTap: () => setState(() {
+                                                  line.methodId = m.methodId;
+                                                  _ensureAllowedCurrencyForLine(
+                                                      line);
+                                                }),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      line.methodId ==
+                                                              m.methodId
+                                                          ? Icons
+                                                              .radio_button_checked
+                                                          : Icons
+                                                              .radio_button_unchecked,
+                                                      size: 20,
+                                                    ),
+                                                    Text(m.name),
+                                                  ],
+                                                ),
+                                              ),
                                             ))
-                                        .toList();
+                                        .toList(),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: line.controller,
+                                        keyboardType: const TextInputType
+                                            .numberWithOptions(decimal: true),
+                                        decoration: InputDecoration(
+                                          labelText: 'Amount',
+                                          prefixIcon: InkWell(
+                                            onTap: () async {
+                                              final picked =
+                                                  await _pickCurrencyFor(
+                                                      context, line.methodId);
+                                              if (picked != null) {
+                                                setState(() =>
+                                                    line.currencyId = picked);
+                                              }
+                                            },
+                                            child: Container(
+                                              alignment: Alignment.center,
+                                              width: 80,
+                                              child: Text(
+                                                _codeFor(line.currencyId),
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .titleMedium,
+                                              ),
+                                            ),
+                                          ),
+                                          suffixIcon: IconButton(
+                                            tooltip: 'Clear',
+                                            icon:
+                                                const Icon(Icons.clear_rounded),
+                                            onPressed: () => setState(() =>
+                                                line.controller.text = '0.00'),
+                                          ),
+                                        ),
+                                        onChanged: (_) => setState(() {}),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      tooltip: 'Remove',
+                                      onPressed: _lines.length == 1
+                                          ? null
+                                          : () => setState(
+                                              () => _lines.removeAt(idx)),
+                                      icon: const Icon(
+                                          Icons.remove_circle_outline_rounded),
+                                    )
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Total Paid',
+                                style: Theme.of(context).textTheme.titleMedium),
+                            Text(_sumPaidInBase().toStringAsFixed(2),
+                                style: Theme.of(context).textTheme.titleMedium),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(isChange ? 'Change' : 'Due',
+                                style: Theme.of(context).textTheme.titleSmall),
+                            Text(displayBalance.toStringAsFixed(2),
+                                style: Theme.of(context).textTheme.titleSmall),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Wrap(spacing: 12, children: [
+                            TextButton(
+                              onPressed: _submitting
+                                  ? null
+                                  : () => Navigator.of(context).pop(),
+                              child: const Text('Cancel'),
+                            ),
+                            FilledButton.icon(
+                              onPressed: _submitting
+                                  ? null
+                                  : () async {
+                                      setState(() => _submitting = true);
+                                      try {
+                                        final primaryMethod =
+                                            _primaryMethodIdFromLines();
+                                        final paid = _sumPaidInBase();
+                                        // Clamp redeem points
+                                        double? redeemPoints;
+                                        if (_useLoyalty &&
+                                            _availablePoints > 0) {
+                                          final want = double.tryParse(
+                                                  _redeemCtrl.text.trim()) ??
+                                              0.0;
+                                          final clamped =
+                                              want.clamp(0.0, _availablePoints);
+                                          redeemPoints =
+                                              clamped > 0 ? clamped : null;
+                                        }
+                                        final payments = _lines
+                                            .where((l) => l.methodId != null)
+                                            .map((l) => PosPaymentLineDto(
+                                                  methodId: l.methodId!,
+                                                  currencyId: l.currencyId,
+                                                  amount: double.tryParse(l
+                                                          .controller.text
+                                                          .trim()) ??
+                                                      0.0,
+                                                ))
+                                            .toList();
 
-                                    Future<PosCheckoutResult> runCheckout({
-                                      String? overrideToken,
-                                      String? overrideReason,
-                                    }) {
-                                      return ref
-                                          .read(posNotifierProvider.notifier)
-                                          .processCheckout(
-                                            paymentMethodId: primaryMethod,
-                                            paidAmount: paid,
-                                            payments: payments,
-                                            redeemPoints: redeemPoints,
-                                            managerOverrideToken: overrideToken,
-                                            overrideReason: overrideReason,
-                                          );
-                                    }
+                                        Future<PosCheckoutResult> runCheckout({
+                                          String? overrideToken,
+                                          String? overrideReason,
+                                        }) {
+                                          return ref
+                                              .read(
+                                                  posNotifierProvider.notifier)
+                                              .processCheckout(
+                                                paymentMethodId: primaryMethod,
+                                                paidAmount: paid,
+                                                payments: payments,
+                                                redeemPoints: redeemPoints,
+                                                managerOverrideToken:
+                                                    overrideToken,
+                                                overrideReason: overrideReason,
+                                              );
+                                        }
 
-                                    PosCheckoutResult result;
-                                    try {
-                                      result = await runCheckout();
-                                    } on DioException catch (e) {
-                                      final data = e.response?.data;
-                                      final maybe =
-                                          (data is Map && data['data'] is Map)
+                                        PosCheckoutResult result;
+                                        try {
+                                          result = await runCheckout();
+                                        } on DioException catch (e) {
+                                          final data = e.response?.data;
+                                          final maybe = (data is Map &&
+                                                  data['data'] is Map)
                                               ? Map<String, dynamic>.from(
                                                   data['data'] as Map)
                                               : null;
-                                      if (e.response?.statusCode == 403 &&
-                                          maybe?['code'] ==
-                                              'OVERRIDE_REQUIRED') {
-                                        if (!context.mounted) return;
-                                        final perms =
-                                            (maybe?['required_permissions']
-                                                        as List?)
-                                                    ?.map((x) => x.toString())
-                                                    .toList() ??
-                                                const <String>[];
-                                        final needReason =
-                                            maybe?['reason_required'] == true;
-                                        final approved =
-                                            await showManagerOverrideDialog(
-                                          context,
-                                          ref,
-                                          title: 'Manager override required',
-                                          requiredPermissions: perms,
-                                          requireReason: needReason,
-                                          reasonLabel: 'Reason',
-                                        );
-                                        if (!context.mounted) return;
-                                        if (approved == null) {
-                                          if (!context.mounted) return;
-                                          setState(() => _submitting = false);
-                                          return;
+                                          if (e.response?.statusCode == 403 &&
+                                              maybe?['code'] ==
+                                                  'OVERRIDE_REQUIRED') {
+                                            if (!context.mounted) return;
+                                            final perms =
+                                                (maybe?['required_permissions']
+                                                            as List?)
+                                                        ?.map(
+                                                            (x) => x.toString())
+                                                        .toList() ??
+                                                    const <String>[];
+                                            final needReason =
+                                                maybe?['reason_required'] ==
+                                                    true;
+                                            final approved =
+                                                await showManagerOverrideDialog(
+                                              context,
+                                              ref,
+                                              title:
+                                                  'Manager override required',
+                                              requiredPermissions: perms,
+                                              requireReason: needReason,
+                                              reasonLabel: 'Reason',
+                                            );
+                                            if (!context.mounted) return;
+                                            if (approved == null) {
+                                              if (!context.mounted) return;
+                                              setState(
+                                                  () => _submitting = false);
+                                              return;
+                                            }
+                                            result = await runCheckout(
+                                              overrideToken:
+                                                  approved.overrideToken,
+                                              overrideReason: approved.reason,
+                                            );
+                                          } else {
+                                            rethrow;
+                                          }
                                         }
-                                        result = await runCheckout(
-                                          overrideToken: approved.overrideToken,
-                                          overrideReason: approved.reason,
-                                        );
-                                      } else {
-                                        rethrow;
-                                      }
-                                    }
-                                    if (!mounted) return;
-                                    setState(() => _submitting = false);
+                                        if (!mounted) return;
+                                        setState(() => _submitting = false);
 
-                                    await _showSuccessDialog(result);
+                                        await _showSuccessDialog(result);
 
-                                    if (!context.mounted) return;
-                                    Navigator.of(context)
-                                        .pop(); // back to POS for next sale
-                                  } on OutboxQueuedException catch (e) {
-                                    if (!context.mounted) return;
-                                    setState(() => _submitting = false);
-                                    await showDialog<void>(
-                                      context: context,
-                                      builder: (ctx) => AlertDialog(
-                                        title: const Text('Queued for Sync'),
-                                        content: Text(e.message),
-                                        actions: [
-                                          FilledButton(
-                                            onPressed: () =>
-                                                Navigator.of(ctx).pop(),
-                                            child: const Text('OK'),
+                                        if (!context.mounted) return;
+                                        Navigator.of(context)
+                                            .pop(); // back to POS for next sale
+                                      } on OutboxQueuedException catch (e) {
+                                        if (!context.mounted) return;
+                                        setState(() => _submitting = false);
+                                        await showDialog<void>(
+                                          context: context,
+                                          builder: (ctx) => AlertDialog(
+                                            title:
+                                                const Text('Queued for Sync'),
+                                            content: Text(e.message),
+                                            actions: [
+                                              FilledButton(
+                                                onPressed: () =>
+                                                    Navigator.of(ctx).pop(),
+                                                child: const Text('OK'),
+                                              ),
+                                            ],
                                           ),
-                                        ],
-                                      ),
-                                    );
-                                    if (!context.mounted) return;
-                                    Navigator.of(context).pop();
-                                  } catch (e) {
-                                    if (!context.mounted) return;
-                                    setState(() => _submitting = false);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                          content:
-                                              Text(ErrorHandler.message(e))),
-                                    );
-                                  }
-                                },
-                          icon: _submitting
-                              ? const SizedBox(
-                                  height: 16,
-                                  width: 16,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2))
-                              : const Icon(Icons.check_circle_rounded),
-                          label: const Text('Finalize'),
+                                        );
+                                        if (!context.mounted) return;
+                                        Navigator.of(context).pop();
+                                      } catch (e) {
+                                        if (!context.mounted) return;
+                                        setState(() => _submitting = false);
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                              content: Text(
+                                                  ErrorHandler.message(e))),
+                                        );
+                                      }
+                                    },
+                              icon: _submitting
+                                  ? const SizedBox(
+                                      height: 16,
+                                      width: 16,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2))
+                                  : const Icon(Icons.check_circle_rounded),
+                              label: const Text('Finalize'),
+                            ),
+                          ]),
                         ),
-                      ]),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
     );
   }
 
@@ -612,7 +647,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to share: $e')),
+                      SnackBar(content: Text(ErrorHandler.message(e))),
                     );
                   }
                 }
@@ -767,7 +802,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Print failed: $e')));
+            .showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
       }
     }
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/error_handler.dart';
 import '../../data/models.dart';
 import '../../data/pos_repository.dart';
 
@@ -36,7 +37,7 @@ class _CustomerSelectorDialogState
       });
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = ErrorHandler.message(e);
         _loading = false;
       });
     }
@@ -58,7 +59,7 @@ class _CustomerSelectorDialogState
     } catch (e) {
       setState(() => _adding = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to add: $e')),
+        SnackBar(content: Text(ErrorHandler.message(e))),
       );
     }
   }

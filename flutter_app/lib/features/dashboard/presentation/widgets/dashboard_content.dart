@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../controllers/dashboard_notifier.dart';
+import '../../../../core/outbox/outbox_notifier.dart';
+import '../../../../shared/widgets/app_message_view.dart';
+import '../../../../shared/widgets/no_network_view.dart';
 import 'stat_card.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
 
@@ -26,6 +29,7 @@ class DashboardContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(dashboardNotifierProvider);
+    final outbox = ref.watch(outboxNotifierProvider);
     final metrics = state.metrics;
     final size = MediaQuery.of(context).size;
     final shortest = size.shortestSide;
@@ -35,19 +39,15 @@ class DashboardContent extends ConsumerWidget {
       return const Center(child: CircularProgressIndicator());
     }
     if (state.error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            state.error!,
-            textAlign: TextAlign.center,
-            style: Theme.of(context)
-                .textTheme
-                .bodyLarge
-                ?.copyWith(color: Colors.redAccent),
-          ),
-        ),
-      );
+      void onRetry() => ref.read(dashboardNotifierProvider.notifier).load();
+      return outbox.isOnline
+          ? AppMessageView(
+              icon: Icons.error_outline_rounded,
+              title: 'Unable to load dashboard',
+              message: state.error!,
+              onRetry: onRetry,
+            )
+          : NoNetworkView(onRetry: onRetry);
     }
 
     // Responsive grid columns

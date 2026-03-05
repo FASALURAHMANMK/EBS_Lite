@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/offline_cache/offline_cache_providers.dart';
 import '../../../core/outbox/outbox_item.dart';
 import '../../../core/outbox/outbox_notifier.dart';
 import '../../dashboard/controllers/location_notifier.dart';
@@ -28,6 +29,17 @@ class CustomerRepository {
   }
 
   Future<List<CustomerDto>> getCustomers({String? search}) async {
+    final outbox = _ref.read(outboxNotifierProvider.notifier);
+    final store = _ref.read(cacheStoreProvider);
+    final q = (search ?? '').trim();
+
+    if (!outbox.isOnline) {
+      final cached = q.isEmpty
+          ? await store.listCustomers(limit: 300)
+          : await store.searchCustomers(query: q, limit: 300);
+      return cached.map(CustomerDto.fromJson).toList();
+    }
+
     final qp = <String, dynamic>{};
     if (search != null && search.trim().isNotEmpty) {
       qp['search'] = search.trim();
@@ -35,6 +47,8 @@ class CustomerRepository {
     final res =
         await _dio.get('/customers', queryParameters: qp.isEmpty ? null : qp);
     final data = _extractList(res);
+    // ignore: unawaited_futures
+    store.upsertCustomers(data.cast<Map<String, dynamic>>());
     return data
         .map((e) => CustomerDto.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -89,10 +103,19 @@ class CustomerRepository {
   }
 
   Future<List<Map<String, dynamic>>> getPaymentMethods() async {
+    final outbox = _ref.read(outboxNotifierProvider.notifier);
+    final store = _ref.read(cacheStoreProvider);
+
+    if (!outbox.isOnline) {
+      return (await store.listPaymentMethods()).cast<Map<String, dynamic>>();
+    }
+
     // Use company-defined payment methods
     final res = await _dio.get('/settings/payment-methods');
-    final data = _extractList(res);
-    return data.cast<Map<String, dynamic>>();
+    final data = _extractList(res).cast<Map<String, dynamic>>();
+    // ignore: unawaited_futures
+    store.upsertPaymentMethods(data);
+    return data;
   }
 
   Future<int> createCollection({

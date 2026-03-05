@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"hash/fnv"
 	"strings"
 
 	"erp-backend/internal/database"
@@ -181,62 +182,203 @@ func (s *NumberingSequenceService) checkLocationBelongsToCompany(companyID, loca
 	return count > 0, nil
 }
 
+type lockedSequence struct {
+	seqID   int
+	prefix  sql.NullString
+	seqLen  int
+	current int
+}
+
+func advisoryLockKey(companyID int, locationID *int, sequenceName string) int64 {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(sequenceName))
+	_, _ = h.Write([]byte{0})
+	_, _ = h.Write([]byte(fmt.Sprintf("%d", companyID)))
+	_, _ = h.Write([]byte{0})
+	if locationID != nil {
+		_, _ = h.Write([]byte(fmt.Sprintf("%d", *locationID)))
+	}
+	return int64(h.Sum64())
+}
+
+func (s *NumberingSequenceService) lockOrCreateSequence(tx *sql.Tx, sequenceName string, companyID int, locationID *int) (*lockedSequence, error) {
+	// Serialize first-use provisioning of this sequence to avoid duplicate rows when the sequence doesn't exist yet.
+	if _, err := tx.Exec(`SELECT pg_advisory_xact_lock($1)`, advisoryLockKey(companyID, locationID, sequenceName)); err != nil {
+		return nil, fmt.Errorf("failed to lock sequence allocation: %w", err)
+	}
+
+	selectSeq := func(q string, args ...interface{}) (*lockedSequence, error) {
+		var ls lockedSequence
+		if err := tx.QueryRow(q, args...).Scan(&ls.seqID, &ls.prefix, &ls.seqLen, &ls.current); err != nil {
+			return nil, err
+		}
+		return &ls, nil
+	}
+
+	// Prefer a location-specific sequence when location is known; fall back to global (NULL location_id).
+	if locationID != nil {
+		ls, err := selectSeq(
+			`SELECT sequence_id, prefix, sequence_length, current_number
+			   FROM numbering_sequences
+			  WHERE name = $1 AND company_id = $2 AND location_id = $3
+			  ORDER BY sequence_id DESC
+			  FOR UPDATE`,
+			sequenceName, companyID, *locationID,
+		)
+		if err == nil {
+			return ls, nil
+		}
+		if err != sql.ErrNoRows {
+			return nil, fmt.Errorf("failed to get numbering sequence: %w", err)
+		}
+
+		ls, err = selectSeq(
+			`SELECT sequence_id, prefix, sequence_length, current_number
+			   FROM numbering_sequences
+			  WHERE name = $1 AND company_id = $2 AND location_id IS NULL
+			  ORDER BY sequence_id DESC
+			  FOR UPDATE`,
+			sequenceName, companyID,
+		)
+		if err == nil {
+			return ls, nil
+		}
+		if err != sql.ErrNoRows {
+			return nil, fmt.Errorf("failed to get numbering sequence: %w", err)
+		}
+	} else {
+		ls, err := selectSeq(
+			`SELECT sequence_id, prefix, sequence_length, current_number
+			   FROM numbering_sequences
+			  WHERE name = $1 AND company_id = $2 AND location_id IS NULL
+			  ORDER BY sequence_id DESC
+			  FOR UPDATE`,
+			sequenceName, companyID,
+		)
+		if err == nil {
+			return ls, nil
+		}
+		if err != sql.ErrNoRows {
+			return nil, fmt.Errorf("failed to get numbering sequence: %w", err)
+		}
+	}
+
+	// Auto-provision a default sequence if none exists for this company/location.
+	defPrefix := defaultPrefixFor(sequenceName)
+	var locArg interface{}
+	if locationID != nil {
+		locArg = *locationID
+	} else {
+		locArg = nil
+	}
+	if _, insErr := tx.Exec(
+		`INSERT INTO numbering_sequences (company_id, location_id, name, prefix, sequence_length, current_number)
+		 VALUES ($1, $2, $3, $4, $5, $6)`,
+		companyID, locArg, sequenceName, defPrefix, 6, 0,
+	); insErr != nil {
+		return nil, fmt.Errorf("failed to create default numbering sequence: %w", insErr)
+	}
+
+	// Re-fetch with lock after create.
+	if locationID != nil {
+		ls, err := selectSeq(
+			`SELECT sequence_id, prefix, sequence_length, current_number
+			   FROM numbering_sequences
+			  WHERE name = $1 AND company_id = $2 AND location_id = $3
+			  ORDER BY sequence_id DESC
+			  FOR UPDATE`,
+			sequenceName, companyID, *locationID,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get numbering sequence after create: %w", err)
+		}
+		return ls, nil
+	}
+	ls, err := selectSeq(
+		`SELECT sequence_id, prefix, sequence_length, current_number
+		   FROM numbering_sequences
+		  WHERE name = $1 AND company_id = $2 AND location_id IS NULL
+		  ORDER BY sequence_id DESC
+		  FOR UPDATE`,
+		sequenceName, companyID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get numbering sequence after create: %w", err)
+	}
+	return ls, nil
+}
+
 // NextNumber retrieves the next formatted number for the given sequence and
 // persists the incremented value within the provided transaction. It locks the
 // sequence row using FOR UPDATE to ensure atomicity across concurrent calls.
 func (s *NumberingSequenceService) NextNumber(tx *sql.Tx, sequenceName string, companyID int, locationID *int) (string, error) {
-	// Build query to fetch sequence with row-level lock
-	query := `SELECT sequence_id, prefix, sequence_length, current_number
-                 FROM numbering_sequences
-                 WHERE name = $1 AND company_id = $2`
-	args := []interface{}{sequenceName, companyID}
-	if locationID != nil {
-		query += " AND (location_id = $3 OR location_id IS NULL)"
-		args = append(args, *locationID)
-	}
-	query += " FOR UPDATE"
-
-	var seqID, seqLen, current int
-	var prefix sql.NullString
-	if err := tx.QueryRow(query, args...).Scan(&seqID, &prefix, &seqLen, &current); err != nil {
-		if err == sql.ErrNoRows {
-			// Auto-provision a default sequence if none exists for this company/location
-			// to prevent hard failures on first use.
-			defPrefix := defaultPrefixFor(sequenceName)
-			var locArg interface{}
-			if locationID != nil {
-				locArg = *locationID
-			} else {
-				locArg = nil
-			}
-			// Create with sensible defaults: length=6, start from 0
-			if _, insErr := tx.Exec(
-				`INSERT INTO numbering_sequences (company_id, location_id, name, prefix, sequence_length, current_number)
-                 VALUES ($1, $2, $3, $4, $5, $6)`,
-				companyID, locArg, sequenceName, defPrefix, 6, 0,
-			); insErr != nil {
-				return "", fmt.Errorf("failed to create default numbering sequence: %w", insErr)
-			}
-			// Re-run the locked select now that a sequence exists
-			if err := tx.QueryRow(query, args...).Scan(&seqID, &prefix, &seqLen, &current); err != nil {
-				return "", fmt.Errorf("failed to get numbering sequence after create: %w", err)
-			}
-		} else {
-			return "", fmt.Errorf("failed to get numbering sequence: %w", err)
-		}
+	ls, err := s.lockOrCreateSequence(tx, sequenceName, companyID, locationID)
+	if err != nil {
+		return "", err
 	}
 
-	current++
-	if _, err := tx.Exec(`UPDATE numbering_sequences SET current_number = $1, updated_at = CURRENT_TIMESTAMP WHERE sequence_id = $2`, current, seqID); err != nil {
+	ls.current++
+	if _, err := tx.Exec(`UPDATE numbering_sequences SET current_number = $1, updated_at = CURRENT_TIMESTAMP WHERE sequence_id = $2`, ls.current, ls.seqID); err != nil {
 		return "", fmt.Errorf("failed to update numbering sequence: %w", err)
 	}
 
 	prefixStr := ""
-	if prefix.Valid {
-		prefixStr = prefix.String
+	if ls.prefix.Valid {
+		prefixStr = ls.prefix.String
 	}
 
-	return fmt.Sprintf("%s%0*d", prefixStr, seqLen, current), nil
+	return fmt.Sprintf("%s%0*d", prefixStr, ls.seqLen, ls.current), nil
+}
+
+// ReserveNumberBlock atomically reserves a contiguous range of numbers for offline use.
+// The range is inclusive: [start, end].
+func (s *NumberingSequenceService) ReserveNumberBlock(sequenceName string, companyID int, locationID *int, blockSize int) (*models.ReserveNumberBlockResponse, error) {
+	sequenceName = strings.TrimSpace(sequenceName)
+	if sequenceName == "" {
+		return nil, fmt.Errorf("sequence name is required")
+	}
+	if blockSize <= 0 {
+		blockSize = 50
+	}
+	if blockSize > 500 {
+		blockSize = 500
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	ls, err := s.lockOrCreateSequence(tx, sequenceName, companyID, locationID)
+	if err != nil {
+		return nil, err
+	}
+
+	start := ls.current + 1
+	end := ls.current + blockSize
+
+	if _, err := tx.Exec(`UPDATE numbering_sequences SET current_number = $1, updated_at = CURRENT_TIMESTAMP WHERE sequence_id = $2`, end, ls.seqID); err != nil {
+		return nil, fmt.Errorf("failed to update numbering sequence: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit reservation: %w", err)
+	}
+
+	prefixStr := ""
+	if ls.prefix.Valid {
+		prefixStr = ls.prefix.String
+	}
+
+	return &models.ReserveNumberBlockResponse{
+		SequenceName:    sequenceName,
+		Prefix:          prefixStr,
+		SequenceLength:  ls.seqLen,
+		StartNumber:     start,
+		EndNumber:       end,
+		CurrentNumberDB: end,
+	}, nil
 }
 
 // defaultPrefixFor returns a sane default prefix for a given sequence name.

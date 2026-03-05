@@ -18,6 +18,7 @@ import 'core/locale_preferences.dart';
 
 import 'features/auth/controllers/auth_notifier.dart';
 import 'features/auth/data/auth_repository.dart';
+import 'features/auth/data/models.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/presentation/splash_screen.dart';
 import 'features/auth/presentation/create_company_screen.dart';
@@ -117,16 +118,6 @@ class _MyAppState extends ConsumerState<MyApp> {
       final user = res.user.toUser();
       final company = res.company;
 
-      // Persist *fresh* minimal user payload only after validation succeeds
-      await prefs.setString(
-        AuthRepository.userKey,
-        jsonEncode({
-          'user_id': user.userId,
-          'username': user.username,
-          'email': user.email,
-        }),
-      );
-
       // Update app state
       ref.read(authNotifierProvider.notifier).setAuth(
             user: user,
@@ -144,20 +135,69 @@ class _MyAppState extends ConsumerState<MyApp> {
       if (e.response?.statusCode == 401) {
         await _purgeAllAuthPrefs(prefs, secureStorage);
         ref.read(authNotifierProvider.notifier).resetAuth();
-      } else {
-        // Non-auth errors shouldn't keep a stale session around.
-        // Be safe: treat as logged out if we cannot confirm.
+        return;
+      }
+
+      // If we can't validate now (offline/server unreachable), try to restore last known good session.
+      final restored = await _restoreCachedSession(prefs);
+      if (!restored) {
         debugPrint('authRepo.me error: $e');
-        await _purgeAllAuthPrefs(prefs, secureStorage);
+        // Keep tokens but show login when we have no cached session snapshot.
         ref.read(authNotifierProvider.notifier).resetAuth();
       }
     } catch (e) {
-      // Any unexpected error -> safe fallback: logged out
-      debugPrint('authRepo.me error: $e');
-      await _purgeAllAuthPrefs(prefs, secureStorage);
-      ref.read(authNotifierProvider.notifier).resetAuth();
+      final restored = await _restoreCachedSession(prefs);
+      if (!restored) {
+        // Any unexpected error -> safe fallback: logged out UI (tokens remain).
+        debugPrint('authRepo.me error: $e');
+        ref.read(authNotifierProvider.notifier).resetAuth();
+      }
     } finally {
       if (mounted) setState(() => _validating = false);
+    }
+  }
+
+  Future<bool> _restoreCachedSession(SharedPreferences prefs) async {
+    try {
+      final userRaw = prefs.getString(AuthRepository.userKey);
+      final companyRaw = prefs.getString(AuthRepository.companyKey);
+      if (userRaw == null || userRaw.trim().isEmpty) return false;
+      if (companyRaw == null || companyRaw.trim().isEmpty) return false;
+
+      final userJson = jsonDecode(userRaw);
+      final companyJson = jsonDecode(companyRaw);
+      if (userJson is! Map || companyJson is! Map) return false;
+
+      final u = Map<String, dynamic>.from(userJson);
+      final c = Map<String, dynamic>.from(companyJson);
+
+      final user = User(
+        userId: (u['user_id'] as num?)?.toInt() ?? 0,
+        username: (u['username'] ?? '').toString(),
+        email: (u['email'] ?? '').toString(),
+      );
+      final company = Company(
+        companyId: (c['company_id'] as num?)?.toInt() ?? 0,
+        name: (c['name'] ?? '').toString(),
+      );
+
+      if (user.userId <= 0 || company.companyId <= 0) return false;
+
+      final perms =
+          (u['permissions'] as List?)?.map((x) => x.toString()).toList() ??
+              const <String>[];
+
+      ref.read(authNotifierProvider.notifier).setAuth(
+            user: user,
+            company: company,
+            permissions: perms,
+          );
+
+      // Attempt to load locations; if offline, LocationNotifier falls back to cached values.
+      await ref.read(locationNotifierProvider.notifier).load(company.companyId);
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 

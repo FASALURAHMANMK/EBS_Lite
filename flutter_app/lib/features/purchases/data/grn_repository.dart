@@ -58,6 +58,8 @@ class GrnRepository {
     String? invoiceNumber,
     String? notes,
     String? invoiceFilePath, // local file path to upload
+    double? paidAmount,
+    int? paymentMethodId,
   }) async {
     // 1) Create purchase
     final itemMaps = [
@@ -78,6 +80,8 @@ class GrnRepository {
       if (invoiceNumber != null && invoiceNumber.isNotEmpty)
         'reference_number': invoiceNumber,
       if (notes != null && notes.isNotEmpty) 'notes': notes,
+      if (paidAmount != null) 'paid_amount': paidAmount,
+      if (paymentMethodId != null) 'payment_method_id': paymentMethodId,
       'items': itemMaps,
     };
     final outbox = _ref.read(outboxNotifierProvider.notifier);

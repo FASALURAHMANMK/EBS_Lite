@@ -6,6 +6,7 @@ import '../../../dashboard/data/models.dart';
 import '../../data/accounts_repository.dart';
 import '../../data/models.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 import '../../../reports/presentation/pages/report_category_page.dart';
 import '../../../reports/presentation/pages/report_viewer_page.dart';
 
@@ -20,7 +21,7 @@ enum _Step { count, review, zreport }
 
 class _DayEndFlowPageState extends ConsumerState<DayEndFlowPage> {
   bool _loading = true;
-  String? _error;
+  Object? _error;
   CashRegisterDto? _openRegister;
   _Step _step = _Step.count;
 
@@ -74,7 +75,7 @@ class _DayEndFlowPageState extends ConsumerState<DayEndFlowPage> {
         _openRegister = open.isEmpty ? null : open.first;
       });
     } catch (e) {
-      setState(() => _error = ErrorHandler.message(e));
+      setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -144,7 +145,7 @@ class _DayEndFlowPageState extends ConsumerState<DayEndFlowPage> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Text(_error!))
+                ? AppErrorView(error: _error!, onRetry: _load)
                 : reg == null
                     ? ListView(
                         padding: const EdgeInsets.all(16),

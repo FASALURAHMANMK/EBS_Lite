@@ -1,7 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/offline_cache/offline_cache_providers.dart';
+import '../../../core/offline_cache/offline_exception.dart';
+import '../../../core/offline_cache/offline_numbering.dart';
 import '../../../core/outbox/outbox_item.dart';
 import '../../../core/outbox/outbox_notifier.dart';
 import '../../accounts/controllers/training_mode_notifier.dart';
@@ -30,8 +34,24 @@ class PosRepository {
   Future<String?> getNextReceiptPreview() async {
     final loc = _ref.read(locationNotifierProvider).selected;
     if (loc == null) return null;
-    final res = await _dio.get('/numbering-sequences',
-        queryParameters: {'location_id': loc.locationId});
+
+    final outbox = _ref.read(outboxNotifierProvider.notifier);
+
+    // Prefer local reserved block preview so the UI matches what this device will use.
+    final offlineNum = _ref.read(offlineNumberingServiceProvider);
+    final localPreview = offlineNum.peekNextSaleNumber(training: false);
+    if (localPreview != null && localPreview.isNotEmpty) return localPreview;
+
+    // Receipt previews are a convenience; don't block offline operation.
+    if (!outbox.isOnline) return null;
+    Response res;
+    try {
+      res = await _dio.get('/numbering-sequences',
+          queryParameters: {'location_id': loc.locationId});
+    } on DioException catch (e) {
+      if (outbox.isNetworkError(e)) return null;
+      rethrow;
+    }
     final list = _asList(res).cast<Map<String, dynamic>>();
     Map<String, dynamic>? chosen;
     // Prefer location-specific sequence over global fallback
@@ -61,30 +81,70 @@ class PosRepository {
   Future<List<PosProductDto>> searchProducts(String query) async {
     final loc = _ref.read(locationNotifierProvider).selected;
     if (loc == null) return const [];
+
+    final outbox = _ref.read(outboxNotifierProvider.notifier);
+    final store = _ref.read(cacheStoreProvider);
+
+    if (!outbox.isOnline) {
+      final cached = await store.searchProducts(
+        locationId: loc.locationId,
+        query: query,
+        limit: 80,
+      );
+      if (cached.isEmpty) {
+        final total = await store.countProducts(locationId: loc.locationId);
+        if (total == 0) {
+          throw OfflineException(
+              'Offline product catalog not available yet. Connect to internet once to sync master data.');
+        }
+      }
+      return cached.map(PosProductDto.fromJson).toList();
+    }
+
     final res = await _dio.get('/pos/products', queryParameters: {
       'search': query,
       'location_id': loc.locationId,
     });
-    final list = _asList(res);
-    return list
-        .map((e) => PosProductDto.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final list = _asList(res).cast<Map<String, dynamic>>();
+    // ignore: unawaited_futures
+    store.upsertProducts(locationId: loc.locationId, items: list);
+    return list.map(PosProductDto.fromJson).toList();
   }
 
   Future<List<PosCustomerDto>> searchCustomers(String query) async {
+    final outbox = _ref.read(outboxNotifierProvider.notifier);
+    final store = _ref.read(cacheStoreProvider);
+
+    if (!outbox.isOnline) {
+      final cached = await store.searchCustomers(query: query, limit: 80);
+      if (cached.isEmpty) {
+        final total = await store.countCustomers();
+        if (total == 0) {
+          throw OfflineException(
+              'Offline customer list not available yet. Connect to internet once to sync master data.');
+        }
+      }
+      return cached.map(PosCustomerDto.fromJson).toList();
+    }
+
     final res = await _dio.get('/pos/customers', queryParameters: {
       'search': query,
     });
-    final list = _asList(res);
-    return list
-        .map((e) => PosCustomerDto.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final list = _asList(res).cast<Map<String, dynamic>>();
+    // ignore: unawaited_futures
+    store.upsertCustomers(list);
+    return list.map(PosCustomerDto.fromJson).toList();
   }
 
   Future<PosCustomerDto> quickAddCustomer({
     required String name,
     String? phone,
   }) async {
+    final outbox = _ref.read(outboxNotifierProvider.notifier);
+    if (!outbox.isOnline) {
+      throw OfflineException(
+          'Adding a customer requires an online connection.');
+    }
     final res = await _dio.post('/customers', data: {
       'name': name,
       if (phone != null && phone.isNotEmpty) 'phone': phone,
@@ -94,11 +154,76 @@ class PosRepository {
   }
 
   Future<List<PaymentMethodDto>> getPaymentMethods() async {
+    final outbox = _ref.read(outboxNotifierProvider.notifier);
+    final store = _ref.read(cacheStoreProvider);
+
+    if (!outbox.isOnline) {
+      final cached = await store.listPaymentMethods();
+      if (cached.isEmpty) {
+        final total = await store.countPaymentMethods();
+        if (total == 0) {
+          throw OfflineException(
+              'Offline payment methods not available yet. Connect to internet once to sync master data.');
+        }
+      }
+      return cached.map(PaymentMethodDto.fromJson).toList();
+    }
+
     final res = await _dio.get('/pos/payment-methods');
-    final list = _asList(res);
-    return list
-        .map((e) => PaymentMethodDto.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final list = _asList(res).cast<Map<String, dynamic>>();
+    // ignore: unawaited_futures
+    store.upsertPaymentMethods(list);
+    return list.map(PaymentMethodDto.fromJson).toList();
+  }
+
+  Future<Map<int, List<Map<String, dynamic>>>>
+      getPaymentMethodCurrencies() async {
+    final outbox = _ref.read(outboxNotifierProvider.notifier);
+    final store = _ref.read(cacheStoreProvider);
+
+    if (!outbox.isOnline) {
+      return store.listPaymentMethodCurrenciesGrouped();
+    }
+
+    Response res;
+    try {
+      try {
+        res = await _dio.get('/pos/payment-methods/currencies');
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 404) {
+          // Backward compatibility for older backends.
+          res = await _dio.get('/settings/payment-methods/currencies');
+        } else {
+          rethrow;
+        }
+      }
+    } on DioException catch (e) {
+      if (outbox.isNetworkError(e)) {
+        return store.listPaymentMethodCurrenciesGrouped();
+      }
+      // If user doesn't have settings permissions, treat as "no mapping".
+      if (e.response?.statusCode == 403) return const {};
+      rethrow;
+    }
+
+    final list = _asList(res).cast<Map<String, dynamic>>();
+    // ignore: unawaited_futures
+    store.upsertPaymentMethodCurrencies(list);
+
+    final grouped = <int, List<Map<String, dynamic>>>{};
+    for (final row in list) {
+      final mid = (row['method_id'] as num?)?.toInt();
+      final cid = (row['currency_id'] as num?)?.toInt();
+      final rate = (row['exchange_rate'] as num?)?.toDouble();
+      if (mid == null || cid == null) continue;
+      grouped.putIfAbsent(mid, () => []);
+      grouped[mid]!.add({
+        'currency_id': cid,
+        'rate': rate ?? 1.0,
+        'exchange_rate': rate ?? 1.0,
+      });
+    }
+    return grouped;
   }
 
   Future<PosCheckoutResult> checkout({
@@ -118,8 +243,26 @@ class PosRepository {
     if (loc == null) {
       throw Exception('Select a location first');
     }
+
+    final outbox = _ref.read(outboxNotifierProvider.notifier);
+    final trainingEnabled = _ref.read(trainingModeNotifierProvider).enabled;
+    final idem = (idempotencyKey ?? '').trim().isEmpty
+        ? const Uuid().v4()
+        : idempotencyKey!.trim();
+
+    // Offline-first: allocate the receipt number on the device so the same flow
+    // works online/offline and numbers never collide across devices.
+    String? saleNumber;
+    if (!trainingEnabled && saleId == null) {
+      saleNumber = await _ref
+          .read(offlineNumberingServiceProvider)
+          .nextSaleNumber(training: false);
+    }
+
     final payload = {
       if (saleId != null) 'sale_id': saleId,
+      if (saleNumber != null && saleNumber.isNotEmpty)
+        'sale_number': saleNumber,
       if (customerId != null) 'customer_id': customerId,
       'items': items
           .map((i) => {
@@ -143,15 +286,16 @@ class PosRepository {
         'override_reason': overrideReason.trim(),
     };
     final headers = <String, dynamic>{
-      if ((idempotencyKey ?? '').isNotEmpty) 'Idempotency-Key': idempotencyKey,
-      if ((idempotencyKey ?? '').isNotEmpty)
-        'X-Idempotency-Key': idempotencyKey,
+      'Idempotency-Key': idem,
+      'X-Idempotency-Key': idem,
     };
-    final outbox = _ref.read(outboxNotifierProvider.notifier);
-    final trainingEnabled = _ref.read(trainingModeNotifierProvider).enabled;
     if (!outbox.isOnline) {
       if (trainingEnabled) {
         throw Exception('Training mode checkout requires an online connection');
+      }
+      if (saleNumber == null || saleNumber.isEmpty) {
+        throw Exception(
+            'No reserved receipt numbers available. Connect to internet once and sync.');
       }
       await outbox.enqueue(
         OutboxItem(
@@ -161,10 +305,10 @@ class PosRepository {
           queryParams: {'location_id': loc.locationId},
           headers: headers,
           body: payload,
-          idempotencyKey: idempotencyKey,
+          idempotencyKey: idem,
         ),
       );
-      throw OutboxQueuedException('Checkout queued for sync');
+      throw OutboxQueuedException('Checkout queued for sync ($saleNumber)');
     }
     Response res;
     try {
@@ -185,10 +329,10 @@ class PosRepository {
             queryParams: {'location_id': loc.locationId},
             headers: headers,
             body: payload,
-            idempotencyKey: idempotencyKey,
+            idempotencyKey: idem,
           ),
         );
-        throw OutboxQueuedException('Checkout queued for sync');
+        throw OutboxQueuedException('Checkout queued for sync ($saleNumber)');
       }
       rethrow;
     }
@@ -321,11 +465,35 @@ class PosRepository {
   }
 
   Future<List<CurrencyDto>> getCurrencies() async {
-    final res = await _dio.get('/currencies');
-    final list = _asList(res);
-    return list
-        .map((e) => CurrencyDto.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final outbox = _ref.read(outboxNotifierProvider.notifier);
+    final store = _ref.read(cacheStoreProvider);
+
+    if (!outbox.isOnline) {
+      final cached = await store.listCurrencies();
+      if (cached.isEmpty) {
+        throw OfflineException(
+            'Offline currencies not available yet. Connect to internet once to sync master data.');
+      }
+      return cached.map(CurrencyDto.fromJson).toList();
+    }
+
+    Response res;
+    try {
+      res = await _dio.get('/currencies');
+    } on DioException catch (e) {
+      if (outbox.isNetworkError(e)) {
+        final cached = await store.listCurrencies();
+        if (cached.isNotEmpty) {
+          return cached.map(CurrencyDto.fromJson).toList();
+        }
+      }
+      rethrow;
+    }
+
+    final list = _asList(res).cast<Map<String, dynamic>>();
+    // ignore: unawaited_futures
+    store.upsertCurrencies(list);
+    return list.map(CurrencyDto.fromJson).toList();
   }
 
   Future<Map<String, dynamic>> getPrintData(

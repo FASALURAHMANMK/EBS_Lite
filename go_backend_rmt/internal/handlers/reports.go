@@ -176,9 +176,18 @@ func (h *ReportsHandler) GetItemMovement(c *gin.Context) {
 		return
 	}
 
-	data, err := h.reportsService.GetItemMovement(companyID)
+	var locationID *int
+	if val := c.Query("location_id"); val != "" {
+		if id, err := strconv.Atoi(val); err == nil {
+			locationID = &id
+		}
+	}
+	fromDate := c.Query("from_date")
+	toDate := c.Query("to_date")
+
+	data, err := h.reportsService.GetItemMovement(companyID, locationID, fromDate, toDate)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusNotImplemented, "Item movement report not implemented", err)
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get item movement report", err)
 		return
 	}
 	h.handleReportResponse(c, "Item movement retrieved successfully", data)
@@ -191,9 +200,15 @@ func (h *ReportsHandler) GetValuationReport(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
-	data, err := h.reportsService.GetValuationReport(companyID)
+	var locationID *int
+	if val := c.Query("location_id"); val != "" {
+		if id, err := strconv.Atoi(val); err == nil {
+			locationID = &id
+		}
+	}
+	data, err := h.reportsService.GetValuationReport(companyID, locationID)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusNotImplemented, "Valuation report not implemented", err)
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get valuation report", err)
 		return
 	}
 	h.handleReportResponse(c, "Valuation report retrieved successfully", data)
@@ -206,9 +221,19 @@ func (h *ReportsHandler) GetPurchaseVsReturns(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
-	data, err := h.reportsService.GetPurchaseVsReturns(companyID)
+
+	var locationID *int
+	if val := c.Query("location_id"); val != "" {
+		if id, err := strconv.Atoi(val); err == nil {
+			locationID = &id
+		}
+	}
+	fromDate := c.Query("from_date")
+	toDate := c.Query("to_date")
+
+	data, err := h.reportsService.GetPurchaseVsReturns(companyID, locationID, fromDate, toDate)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusNotImplemented, "Purchase vs returns report not implemented", err)
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get purchase vs returns report", err)
 		return
 	}
 	h.handleReportResponse(c, "Purchase vs returns retrieved successfully", data)
@@ -221,9 +246,18 @@ func (h *ReportsHandler) GetSupplierReport(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
-	data, err := h.reportsService.GetSupplierReport(companyID)
+	var locationID *int
+	if val := c.Query("location_id"); val != "" {
+		if id, err := strconv.Atoi(val); err == nil {
+			locationID = &id
+		}
+	}
+	fromDate := c.Query("from_date")
+	toDate := c.Query("to_date")
+
+	data, err := h.reportsService.GetSupplierReport(companyID, locationID, fromDate, toDate)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusNotImplemented, "Supplier report not implemented", err)
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get supplier report", err)
 		return
 	}
 	h.handleReportResponse(c, "Supplier report retrieved successfully", data)
@@ -236,9 +270,18 @@ func (h *ReportsHandler) GetDailyCashReport(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
-	data, err := h.reportsService.GetDailyCashReport(companyID)
+	var locationID *int
+	if val := c.Query("location_id"); val != "" {
+		if id, err := strconv.Atoi(val); err == nil {
+			locationID = &id
+		}
+	}
+	fromDate := c.Query("from_date")
+	toDate := c.Query("to_date")
+
+	data, err := h.reportsService.GetDailyCashReport(companyID, locationID, fromDate, toDate)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusNotImplemented, "Daily cash report not implemented", err)
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get daily cash report", err)
 		return
 	}
 	h.handleReportResponse(c, "Daily cash report retrieved successfully", data)
@@ -251,9 +294,18 @@ func (h *ReportsHandler) GetIncomeExpenseReport(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
-	data, err := h.reportsService.GetIncomeExpenseReport(companyID)
+	var locationID *int
+	if val := c.Query("location_id"); val != "" {
+		if id, err := strconv.Atoi(val); err == nil {
+			locationID = &id
+		}
+	}
+	fromDate := c.Query("from_date")
+	toDate := c.Query("to_date")
+
+	data, err := h.reportsService.GetIncomeExpenseReport(companyID, locationID, fromDate, toDate)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusNotImplemented, "Income vs expense report not implemented", err)
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get income vs expense report", err)
 		return
 	}
 	h.handleReportResponse(c, "Income vs expense report retrieved successfully", data)
@@ -266,9 +318,18 @@ func (h *ReportsHandler) GetGeneralLedger(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
-	data, err := h.reportsService.GetGeneralLedger(companyID)
+	fromDate := c.Query("from_date")
+	toDate := c.Query("to_date")
+	limit := 500
+	if val := c.Query("limit"); val != "" {
+		if l, err := strconv.Atoi(val); err == nil {
+			limit = l
+		}
+	}
+
+	data, err := h.reportsService.GetGeneralLedger(companyID, fromDate, toDate, limit)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusNotImplemented, "General ledger report not implemented", err)
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get general ledger report", err)
 		return
 	}
 	h.handleReportResponse(c, "General ledger retrieved successfully", data)
@@ -281,9 +342,12 @@ func (h *ReportsHandler) GetTrialBalance(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
-	data, err := h.reportsService.GetTrialBalance(companyID)
+	fromDate := c.Query("from_date")
+	toDate := c.Query("to_date")
+
+	data, err := h.reportsService.GetTrialBalance(companyID, fromDate, toDate)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusNotImplemented, "Trial balance report not implemented", err)
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get trial balance report", err)
 		return
 	}
 	h.handleReportResponse(c, "Trial balance retrieved successfully", data)
@@ -296,9 +360,12 @@ func (h *ReportsHandler) GetProfitLoss(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
-	data, err := h.reportsService.GetProfitLoss(companyID)
+	fromDate := c.Query("from_date")
+	toDate := c.Query("to_date")
+
+	data, err := h.reportsService.GetProfitLoss(companyID, fromDate, toDate)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusNotImplemented, "Profit and loss report not implemented", err)
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get profit and loss report", err)
 		return
 	}
 	h.handleReportResponse(c, "Profit and loss report retrieved successfully", data)
@@ -311,9 +378,14 @@ func (h *ReportsHandler) GetBalanceSheet(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
-	data, err := h.reportsService.GetBalanceSheet(companyID)
+	asOfDate := c.Query("as_of_date")
+	if asOfDate == "" {
+		asOfDate = c.Query("to_date")
+	}
+
+	data, err := h.reportsService.GetBalanceSheet(companyID, asOfDate)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusNotImplemented, "Balance sheet report not implemented", err)
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get balance sheet report", err)
 		return
 	}
 	h.handleReportResponse(c, "Balance sheet report retrieved successfully", data)
@@ -326,9 +398,16 @@ func (h *ReportsHandler) GetOutstandingReport(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
-	data, err := h.reportsService.GetOutstandingReport(companyID)
+	var locationID *int
+	if val := c.Query("location_id"); val != "" {
+		if id, err := strconv.Atoi(val); err == nil {
+			locationID = &id
+		}
+	}
+
+	data, err := h.reportsService.GetOutstandingReport(companyID, locationID)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusNotImplemented, "Outstanding report not implemented", err)
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get outstanding report", err)
 		return
 	}
 	h.handleReportResponse(c, "Outstanding report retrieved successfully", data)
@@ -360,9 +439,18 @@ func (h *ReportsHandler) GetTopPerformers(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
-	data, err := h.reportsService.GetTopPerformers(companyID)
+	fromDate := c.Query("from_date")
+	toDate := c.Query("to_date")
+	limit := 10
+	if val := c.Query("limit"); val != "" {
+		if l, err := strconv.Atoi(val); err == nil {
+			limit = l
+		}
+	}
+
+	data, err := h.reportsService.GetTopPerformers(companyID, fromDate, toDate, limit)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusNotImplemented, "Top performers report not implemented", err)
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get top performers report", err)
 		return
 	}
 	h.handleReportResponse(c, "Top performers report retrieved successfully", data)

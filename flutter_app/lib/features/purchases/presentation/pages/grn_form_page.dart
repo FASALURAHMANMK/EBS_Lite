@@ -3,12 +3,15 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:ebs_lite/core/error_handler.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import '../../../suppliers/data/supplier_repository.dart';
 import '../../../suppliers/data/models.dart';
 import '../../../inventory/data/inventory_repository.dart';
 import '../../data/grn_repository.dart';
 import '../../data/models.dart';
+import '../../../pos/data/pos_repository.dart';
+import '../../../dashboard/data/payment_methods_repository.dart';
 
 class GrnFormPage extends ConsumerStatefulWidget {
   const GrnFormPage({super.key});
@@ -24,6 +27,13 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
   final _notes = TextEditingController();
   String? _invoiceFilePath;
 
+  bool _paidNow = false;
+  final _paidAmount = TextEditingController();
+  List<PaymentMethodDto> _paymentMethods = const [];
+  int? _paymentMethodId;
+  bool _loadingPaymentMethods = false;
+  Object? _paymentMethodsError;
+
   final List<_GrnLine> _lines = [
     _GrnLine(),
   ];
@@ -33,6 +43,7 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
   void dispose() {
     _invoiceNumber.dispose();
     _notes.dispose();
+    _paidAmount.dispose();
     for (final l in _lines) {
       l.dispose();
     }
@@ -95,6 +106,8 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
               ),
             ),
             const SizedBox(height: 12),
+            _buildPaymentCard(theme),
+            const SizedBox(height: 12),
             Text('Items', style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             ..._buildLines(theme),
@@ -124,6 +137,148 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildPaymentCard(ThemeData theme) {
+    final total = _computeTotal();
+    return Card(
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Payment', style: theme.textTheme.titleMedium),
+                ),
+                Switch.adaptive(
+                  value: _paidNow,
+                  onChanged: _saving
+                      ? null
+                      : (v) async {
+                          setState(() {
+                            _paidNow = v;
+                            _paymentMethodsError = null;
+                          });
+                          if (!v) return;
+                          if (_paidAmount.text.trim().isEmpty ||
+                              (double.tryParse(_paidAmount.text.trim()) ?? 0) <=
+                                  0) {
+                            _paidAmount.text = total.toStringAsFixed(2);
+                          }
+                          await _loadPaymentMethodsIfNeeded();
+                        },
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Total: ${total.toStringAsFixed(2)}',
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            if (_paidNow) ...[
+              const SizedBox(height: 12),
+              InputDecorator(
+                decoration: InputDecoration(
+                  labelText: 'Payment Method',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: _loadingPaymentMethods
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : const Icon(Icons.payments_outlined),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    isExpanded: true,
+                    value: _paymentMethodId,
+                    items: _paymentMethods
+                        .where((m) => m.isActive)
+                        .map(
+                          (m) => DropdownMenuItem<int>(
+                            value: m.methodId,
+                            child: Text(m.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _saving || _loadingPaymentMethods
+                        ? null
+                        : (v) => setState(() => _paymentMethodId = v),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _paidAmount,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Paid Amount',
+                  prefixIcon: Icon(Icons.currency_exchange_rounded),
+                ),
+              ),
+              if (_paymentMethodsError != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  ErrorHandler.message(_paymentMethodsError!),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+              ],
+            ] else ...[
+              const SizedBox(height: 8),
+              Text(
+                'Leave this off to record the purchase on credit.',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  double _computeTotal() {
+    double total = 0;
+    for (final l in _lines) {
+      final qty = double.tryParse(l.qty.text.trim()) ?? 0;
+      final price = double.tryParse(l.price.text.trim()) ?? 0;
+      if (l.product == null || qty <= 0 || price < 0) continue;
+      total += qty * price;
+    }
+    return total;
+  }
+
+  Future<void> _loadPaymentMethodsIfNeeded() async {
+    if (_paymentMethods.isNotEmpty || _loadingPaymentMethods) return;
+    setState(() {
+      _loadingPaymentMethods = true;
+      _paymentMethodsError = null;
+    });
+    try {
+      final repo = ref.read(posRepositoryProvider);
+      final list = await repo.getPaymentMethods();
+      if (!mounted) return;
+      setState(() {
+        _paymentMethods = list;
+        _paymentMethodId = list.isNotEmpty ? list.first.methodId : null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _paymentMethodsError = e);
+    } finally {
+      if (mounted) setState(() => _loadingPaymentMethods = false);
+    }
   }
 
   List<Widget> _buildLines(ThemeData theme) {
@@ -213,6 +368,22 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
     }
     setState(() => _saving = true);
     try {
+      final total = _computeTotal();
+      double? paidAmount;
+      int? methodId;
+      if (_paidNow) {
+        paidAmount = double.tryParse(_paidAmount.text.trim()) ?? 0;
+        methodId = _paymentMethodId;
+        if (paidAmount <= 0) {
+          throw StateError('Enter a valid paid amount');
+        }
+        if (paidAmount > total) {
+          throw StateError('Paid amount cannot exceed total');
+        }
+        if (methodId == null) {
+          throw StateError('Select a payment method');
+        }
+      }
       final repo = ref.read(grnRepositoryProvider);
       final items = [
         for (final l in validLines)
@@ -230,6 +401,8 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
             : _invoiceNumber.text.trim(),
         notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
         invoiceFilePath: _invoiceFilePath,
+        paidAmount: paidAmount,
+        paymentMethodId: methodId,
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -243,7 +416,7 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Failed: $e')));
+        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

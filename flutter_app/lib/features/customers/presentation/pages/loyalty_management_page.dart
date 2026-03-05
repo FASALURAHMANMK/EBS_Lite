@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../loyalty/data/loyalty_repository.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 
 class LoyaltyManagementPage extends ConsumerStatefulWidget {
   const LoyaltyManagementPage({super.key});
@@ -142,13 +143,14 @@ class _LoyaltyManagementPageState extends ConsumerState<LoyaltyManagementPage> {
               future: _settingsFuture,
               builder: (context, snap) {
                 if (snap.hasError) {
-                  return Column(children: [
-                    Text('Failed to load settings: ${snap.error}'),
-                    const SizedBox(height: 8),
-                    FilledButton(
-                        onPressed: () => setState(_reload),
-                        child: const Text('Retry')),
-                  ]);
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: AppErrorView(
+                      error: snap.error!,
+                      onRetry: () => setState(_reload),
+                      title: 'Failed to load loyalty settings',
+                    ),
+                  );
                 }
                 if (!snap.hasData) {
                   return const LinearProgressIndicator(minHeight: 2);
@@ -275,13 +277,14 @@ class _LoyaltyManagementPageState extends ConsumerState<LoyaltyManagementPage> {
               future: _tiersFuture,
               builder: (context, snap) {
                 if (snap.hasError) {
-                  return Column(children: [
-                    Text('Failed to load tiers: ${snap.error}'),
-                    const SizedBox(height: 8),
-                    FilledButton(
-                        onPressed: () => setState(_reload),
-                        child: const Text('Retry')),
-                  ]);
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: AppErrorView(
+                      error: snap.error!,
+                      onRetry: () => setState(_reload),
+                      title: 'Failed to load loyalty tiers',
+                    ),
+                  );
                 }
                 if (!snap.hasData) {
                   return const LinearProgressIndicator(minHeight: 2);

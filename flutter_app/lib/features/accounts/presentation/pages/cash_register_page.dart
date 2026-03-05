@@ -7,6 +7,7 @@ import '../../../dashboard/data/models.dart';
 import '../../../accounts/data/accounts_repository.dart';
 import '../../../accounts/data/models.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 import '../../../../shared/widgets/manager_override_dialog.dart';
 import '../../controllers/training_mode_notifier.dart';
 import 'day_end_flow_page.dart';
@@ -21,7 +22,7 @@ class CashRegisterPage extends ConsumerStatefulWidget {
 class _CashRegisterPageState extends ConsumerState<CashRegisterPage> {
   bool _loading = true;
   bool _actionBusy = false;
-  String? _error;
+  Object? _error;
   int? _lastLocationId;
   List<CashRegisterDto> _registers = const [];
 
@@ -55,7 +56,7 @@ class _CashRegisterPageState extends ConsumerState<CashRegisterPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = ErrorHandler.message(e);
+        _error = e;
       });
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -482,7 +483,7 @@ class _CashRegisterPageState extends ConsumerState<CashRegisterPage> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Text(_error!))
+                ? AppErrorView(error: _error!, onRetry: _load)
                 : ListView(
                     padding: const EdgeInsets.all(16),
                     children: [

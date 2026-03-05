@@ -3,6 +3,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/offline_cache/offline_cache_providers.dart';
+import '../../../core/outbox/outbox_notifier.dart';
 import '../../dashboard/controllers/location_notifier.dart';
 import 'models.dart';
 
@@ -76,6 +78,18 @@ class InventoryRepository {
 
   Future<List<InventoryListItem>> searchProducts(String term) async {
     final loc = _requireLocation();
+    final outbox = _ref.read(outboxNotifierProvider.notifier);
+    final store = _ref.read(cacheStoreProvider);
+
+    if (!outbox.isOnline) {
+      final cached = await store.searchProducts(
+        locationId: loc,
+        query: term,
+        limit: 120,
+      );
+      return cached.map(InventoryListItem.fromPOSJson).toList();
+    }
+
     final res = await _dio.get(
       '/pos/products',
       queryParameters: {
@@ -83,10 +97,10 @@ class InventoryRepository {
         'location_id': loc,
       },
     );
-    final data = _extractList(res);
-    return data
-        .map((e) => InventoryListItem.fromPOSJson(e as Map<String, dynamic>))
-        .toList();
+    final data = _extractList(res).cast<Map<String, dynamic>>();
+    // ignore: unawaited_futures
+    store.upsertProducts(locationId: loc, items: data);
+    return data.map((e) => InventoryListItem.fromPOSJson(e)).toList();
   }
 
   Future<List<CategoryDto>> getCategories() async {

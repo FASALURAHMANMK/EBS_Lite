@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/offline_cache/master_data_sync_notifier.dart';
 import '../../../core/outbox/outbox_notifier.dart';
 import '../../../core/theme_notifier.dart';
 import 'widgets/dashboard_content.dart';
@@ -113,6 +114,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         // fire-and-forget
         // ignore: unawaited_futures
         ref.read(dashboardNotifierProvider.notifier).load();
+        // Preload/refresh offline master data for the new location.
+        // ignore: unawaited_futures
+        ref.read(masterDataSyncNotifierProvider.notifier).syncNow(force: true);
+      }
+    });
+
+    // When we regain online status, refresh cached masters and reserve offline numbering blocks.
+    ref.listen(outboxNotifierProvider, (prev, next) {
+      if (next.isOnline && (prev?.isOnline != true)) {
+        // ignore: unawaited_futures
+        ref.read(masterDataSyncNotifierProvider.notifier).syncNow(force: true);
+        // ignore: unawaited_futures
+        ref.read(dashboardNotifierProvider.notifier).load(showLoading: false);
+      }
+      // When queued transactions sync, refresh dashboard KPIs.
+      if (next.isOnline && next.lastSyncAt != prev?.lastSyncAt) {
+        // ignore: unawaited_futures
+        ref.read(dashboardNotifierProvider.notifier).load(showLoading: false);
       }
     });
 
@@ -140,6 +159,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final theme = Theme.of(context);
     final outboxState = ref.watch(outboxNotifierProvider);
     final outboxNotifier = ref.read(outboxNotifierProvider.notifier);
+    // Keep master-data sync alive while the dashboard is active.
+    ref.watch(masterDataSyncNotifierProvider);
     final unreadNotifications =
         ref.watch(notificationsUnreadCountProvider).maybeWhen(
               data: (v) => v,
@@ -163,6 +184,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       appBar: DashboardHeader(
         onToggleTheme: () => themeNotifier.toggle(),
         isOnline: outboxState.isOnline,
+        isChecking: outboxState.isChecking,
         queuedCount: outboxState.queuedCount,
         isSyncing: outboxState.isSyncing,
         unreadNotificationsCount: unreadNotifications,

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../../core/error_handler.dart';
 import '../../../../core/outbox/outbox_item.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 
@@ -75,7 +76,7 @@ class _SyncHealthPageState extends ConsumerState<SyncHealthPage> {
         text: 'Sync health debug bundle attached.',
       );
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.toString())));
+      messenger.showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     }
   }
 

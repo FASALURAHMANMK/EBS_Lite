@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 import '../../../dashboard/presentation/pages/sync_health_page.dart';
 import '../../controllers/notifications_providers.dart';
 import '../../data/models.dart';
@@ -17,7 +18,7 @@ class NotificationsPage extends ConsumerStatefulWidget {
 
 class _NotificationsPageState extends ConsumerState<NotificationsPage> {
   bool _loading = true;
-  String? _error;
+  Object? _error;
   List<NotificationDto> _items = const [];
 
   @override
@@ -38,7 +39,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
       setState(() => _items = list);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = ErrorHandler.message(e));
+      setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -147,8 +148,8 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
             const SizedBox(height: 8),
             if (_error != null)
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(_error!),
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: AppErrorView(error: _error!, onRetry: _load),
               )
             else if (!_loading && _items.isEmpty)
               const Padding(

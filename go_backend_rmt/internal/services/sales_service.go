@@ -599,15 +599,23 @@ func (s *SalesService) CreateSaleWithOptions(
 	}
 	defer tx.Rollback()
 
-	// Generate sale number using numbering sequence service
-	ns := NewNumberingSequenceService()
-	sequenceName := "sale"
-	if opts.IsTraining {
-		sequenceName = "sale_training"
-	}
-	saleNumber, err := ns.NextNumber(tx, sequenceName, companyID, &locationID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate sale number: %w", err)
+	// Use client-provided sale number when present (offline-first). Otherwise,
+	// allocate via numbering sequences.
+	saleNumber := strings.TrimSpace(ptrString(req.SaleNumber))
+	if saleNumber != "" {
+		if len(saleNumber) > 100 {
+			return nil, fmt.Errorf("sale number too long")
+		}
+	} else {
+		ns := NewNumberingSequenceService()
+		sequenceName := "sale"
+		if opts.IsTraining {
+			sequenceName = "sale_training"
+		}
+		saleNumber, err = ns.NextNumber(tx, sequenceName, companyID, &locationID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate sale number: %w", err)
+		}
 	}
 
 	// Create sale
@@ -843,6 +851,13 @@ func nullIfEmpty(value string) *string {
 	}
 	v := value
 	return &v
+}
+
+func ptrString(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return *v
 }
 
 func (s *SalesService) UpdateSale(saleID, companyID, userID int, req *models.UpdateSaleRequest) error {
@@ -1243,6 +1258,7 @@ func (s *SalesService) GetQuotes(companyID int, filters map[string]string) ([]mo
 	query := `
 		SELECT q.quote_id, q.quote_number, q.location_id, q.customer_id, q.quote_date, q.valid_until,
 			   q.subtotal, q.tax_amount, q.discount_amount, q.total_amount, q.status, q.notes,
+			   q.converted_sale_id, q.converted_at, q.converted_by,
 			   q.created_by, q.updated_by, q.sync_status, q.created_at, q.updated_at,
 			   c.name as customer_name
 		FROM quotes q
@@ -1292,6 +1308,7 @@ func (s *SalesService) GetQuotes(companyID int, filters map[string]string) ([]mo
 		if err := rows.Scan(
 			&q.QuoteID, &q.QuoteNumber, &q.LocationID, &q.CustomerID, &q.QuoteDate, &q.ValidUntil,
 			&q.Subtotal, &q.TaxAmount, &q.DiscountAmount, &q.TotalAmount, &q.Status, &q.Notes,
+			&q.ConvertedSaleID, &q.ConvertedAt, &q.ConvertedBy,
 			&q.CreatedBy, &q.UpdatedBy, &q.SyncStatus, &q.CreatedAt, &q.UpdatedAt,
 			&customerName,
 		); err != nil {
@@ -1311,6 +1328,7 @@ func (s *SalesService) GetQuoteByID(quoteID, companyID int) (*models.Quote, erro
 	query := `
 		SELECT q.quote_id, q.quote_number, q.location_id, q.customer_id, q.quote_date, q.valid_until,
 			   q.subtotal, q.tax_amount, q.discount_amount, q.total_amount, q.status, q.notes,
+			   q.converted_sale_id, q.converted_at, q.converted_by,
 			   q.created_by, q.updated_by, q.sync_status, q.created_at, q.updated_at,
 			   c.name as customer_name
 		FROM quotes q
@@ -1324,6 +1342,7 @@ func (s *SalesService) GetQuoteByID(quoteID, companyID int) (*models.Quote, erro
 	if err := s.db.QueryRow(query, quoteID, companyID).Scan(
 		&quote.QuoteID, &quote.QuoteNumber, &quote.LocationID, &quote.CustomerID, &quote.QuoteDate, &quote.ValidUntil,
 		&quote.Subtotal, &quote.TaxAmount, &quote.DiscountAmount, &quote.TotalAmount, &quote.Status, &quote.Notes,
+		&quote.ConvertedSaleID, &quote.ConvertedAt, &quote.ConvertedBy,
 		&quote.CreatedBy, &quote.UpdatedBy, &quote.SyncStatus, &quote.CreatedAt, &quote.UpdatedAt,
 		&customerName,
 	); err != nil {
@@ -1490,6 +1509,23 @@ func (s *SalesService) CreateQuote(companyID, locationID, userID int, req *model
 
 // UpdateQuote updates an existing quote, including items if provided.
 func (s *SalesService) UpdateQuote(quoteID, companyID, userID int, req *models.UpdateQuoteRequest) error {
+	// Quotes are immutable after conversion.
+	var convertedSaleID sql.NullInt64
+	if err := s.db.QueryRow(`
+		SELECT q.converted_sale_id
+		FROM quotes q
+		JOIN locations l ON q.location_id = l.location_id
+		WHERE q.quote_id = $1 AND l.company_id = $2 AND q.is_deleted = FALSE
+	`, quoteID, companyID).Scan(&convertedSaleID); err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("quote not found")
+		}
+		return fmt.Errorf("failed to check quote conversion: %w", err)
+	}
+	if convertedSaleID.Valid {
+		return fmt.Errorf("quote already converted")
+	}
+
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
@@ -1689,6 +1725,23 @@ func (s *SalesService) UpdateQuote(quoteID, companyID, userID int, req *models.U
 
 // DeleteQuote deletes a quote.
 func (s *SalesService) DeleteQuote(quoteID, companyID int) error {
+	// Prevent deleting quotes that were already converted to sales.
+	var convertedSaleID sql.NullInt64
+	if err := s.db.QueryRow(`
+		SELECT q.converted_sale_id
+		FROM quotes q
+		JOIN locations l ON q.location_id = l.location_id
+		WHERE q.quote_id = $1 AND l.company_id = $2 AND q.is_deleted = FALSE
+	`, quoteID, companyID).Scan(&convertedSaleID); err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("quote not found")
+		}
+		return fmt.Errorf("failed to check quote conversion: %w", err)
+	}
+	if convertedSaleID.Valid {
+		return fmt.Errorf("quote already converted")
+	}
+
 	res, err := s.db.Exec(`
 		UPDATE quotes q SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP
 		FROM locations l WHERE q.quote_id = $1 AND q.location_id = l.location_id AND l.company_id = $2
@@ -1725,6 +1778,120 @@ func (s *SalesService) ShareQuote(quoteID, companyID int, req *models.ShareQuote
 	}
 	log.Printf("sales_service: share requested for quote %d", quoteID)
 	return nil
+}
+
+func (s *SalesService) GetQuotePrintData(quoteID, companyID int) (*models.QuotePrintDataResponse, error) {
+	quote, err := s.GetQuoteByID(quoteID, companyID)
+	if err != nil {
+		return nil, err
+	}
+
+	companySvc := NewCompanyService()
+	company, err := companySvc.GetCompanyByID(companyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get company: %w", err)
+	}
+
+	return &models.QuotePrintDataResponse{
+		Quote:   *quote,
+		Company: *company,
+	}, nil
+}
+
+func (s *SalesService) ConvertQuoteToSale(quoteID, companyID, userID int) (*models.Sale, error) {
+	var (
+		locationID     int
+		quoteNumber    string
+		customerID     *int
+		discountAmount float64
+		status         string
+		notes          sql.NullString
+		convertedSale  sql.NullInt64
+	)
+
+	err := s.db.QueryRow(`
+		SELECT q.location_id, q.quote_number, q.customer_id, q.discount_amount, q.status, q.notes, q.converted_sale_id
+		FROM quotes q
+		JOIN locations l ON q.location_id = l.location_id
+		WHERE q.quote_id = $1 AND l.company_id = $2 AND q.is_deleted = FALSE
+	`, quoteID, companyID).Scan(&locationID, &quoteNumber, &customerID, &discountAmount, &status, &notes, &convertedSale)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("quote not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get quote: %w", err)
+	}
+
+	if convertedSale.Valid {
+		return s.GetSaleByID(int(convertedSale.Int64), companyID)
+	}
+
+	if status != "ACCEPTED" {
+		return nil, fmt.Errorf("quote must be ACCEPTED before conversion")
+	}
+
+	items, err := s.getQuoteItems(quoteID, companyID)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return nil, fmt.Errorf("quote has no items")
+	}
+
+	saleItems := make([]models.CreateSaleDetailRequest, 0, len(items))
+	for _, it := range items {
+		saleItems = append(saleItems, models.CreateSaleDetailRequest{
+			ProductID:       it.ProductID,
+			ProductName:     it.ProductName,
+			Quantity:        it.Quantity,
+			UnitPrice:       it.UnitPrice,
+			DiscountPercent: it.DiscountPercent,
+			TaxID:           it.TaxID,
+			SerialNumbers:   it.SerialNumbers,
+			Notes:           it.Notes,
+		})
+	}
+
+	combinedNotes := strings.TrimSpace(notes.String)
+	origin := strings.TrimSpace(fmt.Sprintf("Converted from Quote %s", strings.TrimSpace(quoteNumber)))
+	if combinedNotes == "" {
+		combinedNotes = origin
+	} else {
+		combinedNotes = combinedNotes + "\n" + origin
+	}
+	finalNotes := combinedNotes
+
+	req := &models.CreateSaleRequest{
+		CustomerID:     customerID,
+		Items:          saleItems,
+		PaidAmount:     0,
+		DiscountAmount: discountAmount,
+		Notes:          &finalNotes,
+	}
+
+	idemKey := fmt.Sprintf("quote:%d", quoteID)
+	sale, err := s.CreateSale(companyID, locationID, userID, req, &idemKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Mark quote as converted and make it immutable.
+	_, err = s.db.Exec(`
+		UPDATE quotes q
+		SET status = 'CONVERTED',
+		    converted_sale_id = $1,
+		    converted_at = CURRENT_TIMESTAMP,
+		    converted_by = $2,
+		    updated_by = $2,
+		    updated_at = CURRENT_TIMESTAMP
+		FROM locations l
+		WHERE q.quote_id = $3 AND q.location_id = l.location_id AND l.company_id = $4 AND q.is_deleted = FALSE
+	`, sale.SaleID, userID, quoteID, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to mark quote converted: %w", err)
+	}
+
+	return sale, nil
 }
 
 func (s *SalesService) getQuoteItems(quoteID, companyID int) ([]models.QuoteItem, error) {

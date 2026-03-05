@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../data/accounts_repository.dart';
 import '../../data/models.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_error_view.dart';
 
 class VouchersPage extends ConsumerStatefulWidget {
   const VouchersPage({super.key});
@@ -16,7 +17,7 @@ class VouchersPage extends ConsumerStatefulWidget {
 class _VouchersPageState extends ConsumerState<VouchersPage> {
   bool _loading = true;
   bool _loadingMore = false;
-  String? _error;
+  Object? _error;
   List<VoucherDto> _vouchers = const [];
 
   int _page = 1;
@@ -63,7 +64,7 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = ErrorHandler.message(e));
+      setState(() => _error = e);
     } finally {
       if (mounted) {
         setState(() {
@@ -223,16 +224,16 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openCreateDialog,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('New'),
-      ),
+      floatingActionButton: FloatingActionButton(
+  onPressed: _openCreateDialog,
+  child: const Icon(Icons.add_rounded),
+),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Text(_error!))
+                ? AppErrorView(
+                    error: _error!, onRetry: () => _load(reset: true))
                 : Column(
                     children: [
                       Padding(

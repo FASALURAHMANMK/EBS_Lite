@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/error_handler.dart';
 import '../data/inventory_repository.dart';
 import '../data/models.dart';
 import 'inventory_notifier.dart' show InventoryViewMode;
@@ -49,7 +50,7 @@ class CategoryManagementNotifier extends StateNotifier<CategoryState> {
       final cats = await _repo.getCategories();
       state = state.copyWith(isLoading: false, items: cats);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: ErrorHandler.message(e));
     }
   }
 
@@ -115,7 +116,7 @@ class BrandManagementNotifier extends StateNotifier<BrandState> {
       final brands = await _repo.getBrands();
       state = state.copyWith(isLoading: false, items: brands);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: ErrorHandler.message(e));
     }
   }
 
@@ -180,7 +181,7 @@ class AttributeManagementNotifier extends StateNotifier<AttributeState> {
       final defs = await _repo.getAttributeDefinitions();
       state = state.copyWith(isLoading: false, items: defs);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: ErrorHandler.message(e));
     }
   }
 

@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api_client.dart';
+import '../error_handler.dart';
 import 'outbox_db.dart';
 import 'outbox_item.dart';
 import 'outbox_state.dart';
@@ -25,10 +26,18 @@ class OutboxNotifier extends StateNotifier<OutboxState> {
     _init();
   }
 
+  static const int _onlineProbeIntervalSeconds = 15;
+
   final Ref _ref;
   final OutboxStore _store;
   StreamSubscription<dynamic>? _connSub;
+  Timer? _probeTimer;
+  bool _probing = false;
+  bool _everProbed = false;
+  int _probeIntervalSeconds = 3;
+  int _probeCountdownSeconds = 0;
   bool _ready = false;
+  bool _hasConnectivity = true;
 
   bool get isOnline => state.isOnline;
 
@@ -38,24 +47,20 @@ class OutboxNotifier extends StateNotifier<OutboxState> {
     });
     final conn = Connectivity();
     final current = await conn.checkConnectivity();
-    _setOnline(_isConnected(current));
     _connSub = conn.onConnectivityChanged.listen((res) {
-      _setOnline(_isConnected(res));
-      if (state.isOnline) {
-        // ignore: unawaited_futures
-        processQueue();
-      }
+      _onConnectivity(res);
     });
     _ready = true;
-    if (state.isOnline) {
-      // ignore: unawaited_futures
-      processQueue();
-    }
+    _onConnectivity(current);
   }
 
   void _setOnline(bool online) {
     if (state.isOnline == online) return;
     state = state.copyWith(isOnline: online);
+    if (online) {
+      // ignore: unawaited_futures
+      processQueue();
+    }
   }
 
   bool _isConnected(dynamic res) {
@@ -66,6 +71,117 @@ class OutboxNotifier extends StateNotifier<OutboxState> {
       return res.any((r) => r != ConnectivityResult.none);
     }
     return false;
+  }
+
+  void _onConnectivity(dynamic res) {
+    _hasConnectivity = _isConnected(res);
+    if (!_hasConnectivity) {
+      _stopProbe();
+      state = state.copyWith(
+        hasConnectivity: false,
+        isChecking: false,
+      );
+      _setOnline(false);
+      return;
+    }
+    state = state.copyWith(hasConnectivity: true);
+    // Connectivity exists; probe server reachability and, if online, resume sync.
+    _startProbeIfNeeded();
+    // Probe immediately on connectivity changes to detect "Wi‑Fi w/o internet".
+    // ignore: unawaited_futures
+    _probeServerOnce(setChecking: !_everProbed);
+  }
+
+  void _startProbeIfNeeded() {
+    if (!_ready) return;
+    if (!_hasConnectivity) return;
+    if (_probeTimer != null) return;
+    _probeIntervalSeconds =
+        state.isOnline ? _onlineProbeIntervalSeconds : _probeIntervalSeconds;
+    _probeCountdownSeconds = 0;
+    _probeTimer = Timer.periodic(const Duration(seconds: 1), (t) async {
+      if (_probeCountdownSeconds > 0) {
+        _probeCountdownSeconds--;
+        return;
+      }
+      await _probeServerOnce();
+      if (state.isOnline) {
+        _probeIntervalSeconds = _onlineProbeIntervalSeconds;
+      } else {
+        // Increase backoff up to 30s if still offline
+        _probeIntervalSeconds = (_probeIntervalSeconds + 3).clamp(3, 30);
+      }
+      _probeCountdownSeconds = _probeIntervalSeconds;
+    });
+  }
+
+  void _stopProbe() {
+    _probeTimer?.cancel();
+    _probeTimer = null;
+  }
+
+  String _healthUrlFromBaseUrl(String baseUrl) {
+    Uri uri;
+    try {
+      uri = Uri.parse(baseUrl);
+    } catch (_) {
+      return '$baseUrl/health';
+    }
+    var path = uri.path.replaceAll(RegExp(r'/+$'), '');
+    if (path.endsWith('/api/v1')) {
+      path = path.substring(0, path.length - '/api/v1'.length);
+    }
+    final root =
+        uri.replace(path: path, query: null, fragment: null).toString();
+    return root.endsWith('/') ? '${root}health' : '$root/health';
+  }
+
+  Future<void> _probeServerOnce({bool setChecking = false}) async {
+    if (!_hasConnectivity) {
+      _setOnline(false);
+      return;
+    }
+    if (_probing) return;
+    _probing = true;
+    if (setChecking) {
+      state = state.copyWith(isChecking: true);
+    }
+    final base = _ref.read(dioProvider).options.baseUrl;
+    final healthUrl = _healthUrlFromBaseUrl(base);
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: '',
+        connectTimeout: const Duration(seconds: 2),
+        sendTimeout: const Duration(seconds: 2),
+        receiveTimeout: const Duration(seconds: 2),
+      ),
+    );
+    try {
+      await dio.get(healthUrl);
+      if (!state.isOnline) _setOnline(true);
+    } on DioException catch (e) {
+      // If we received a response, the server is reachable even if /health is not 200.
+      if (e.type == DioExceptionType.badResponse &&
+          e.response?.statusCode != null) {
+        if (!state.isOnline) _setOnline(true);
+        return;
+      }
+      // stay offline on actual connectivity errors
+      if (isNetworkError(e)) {
+        _setOnline(false);
+      }
+    } catch (_) {
+      // keep offline
+    } finally {
+      _probing = false;
+      _everProbed = true;
+      if (setChecking && state.isChecking) {
+        state = state.copyWith(isChecking: false);
+      } else if (!setChecking && state.isChecking) {
+        // Safety: avoid getting stuck in "checking" if a probe ran from a timer.
+        state = state.copyWith(isChecking: false);
+      }
+    }
   }
 
   Future<int> enqueue(OutboxItem item) async {
@@ -81,6 +197,27 @@ class OutboxNotifier extends StateNotifier<OutboxState> {
 
   Future<void> retryNow() async {
     await processQueue();
+  }
+
+  Future<void> recheckOnline() async {
+    final conn = Connectivity();
+    final current = await conn.checkConnectivity();
+    _hasConnectivity = _isConnected(current);
+    if (!_hasConnectivity) {
+      _stopProbe();
+      state = state.copyWith(
+        hasConnectivity: false,
+        isChecking: false,
+      );
+      _setOnline(false);
+      return;
+    }
+
+    state = state.copyWith(hasConnectivity: true);
+    _probeIntervalSeconds = 3;
+    _probeCountdownSeconds = 0;
+    _startProbeIfNeeded();
+    await _probeServerOnce(setChecking: true);
   }
 
   Future<List<OutboxItem>> listFailed({int limit = 50}) {
@@ -199,11 +336,18 @@ class OutboxNotifier extends StateNotifier<OutboxState> {
       }
     } catch (e) {
       if (isNetworkError(e)) {
-        state = state.copyWith(isOnline: false, lastError: e.toString());
+        state = state.copyWith(
+          isOnline: false,
+          lastError: ErrorHandler.message(e),
+        );
+        _probeIntervalSeconds = 3;
+        _probeCountdownSeconds = 0;
+        _startProbeIfNeeded();
         return false;
       }
-      await _store.markFailed(item.id!, e.toString());
-      state = state.copyWith(lastError: e.toString());
+      final msg = ErrorHandler.message(e);
+      await _store.markFailed(item.id!, msg);
+      state = state.copyWith(lastError: msg);
       return true;
     }
   }
@@ -298,6 +442,7 @@ class OutboxNotifier extends StateNotifier<OutboxState> {
   @override
   void dispose() {
     _connSub?.cancel();
+    _stopProbe();
     super.dispose();
   }
 }

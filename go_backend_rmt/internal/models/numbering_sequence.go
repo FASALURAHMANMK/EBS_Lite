@@ -29,3 +29,23 @@ type UpdateNumberingSequenceRequest struct {
 	Prefix         *string `json:"prefix,omitempty" validate:"omitempty"`
 	SequenceLength *int    `json:"sequence_length,omitempty" validate:"omitempty"`
 }
+
+// ReserveNumberBlockRequest asks the server to atomically reserve a block of
+// numbers for offline-first document creation on a device.
+type ReserveNumberBlockRequest struct {
+	// SequenceName is the numbering sequence name, e.g. "sale".
+	SequenceName string `json:"sequence_name,omitempty"`
+	// BlockSize is how many numbers to reserve. Server may clamp.
+	BlockSize int `json:"block_size,omitempty"`
+}
+
+// ReserveNumberBlockResponse returns a contiguous reserved range.
+// The range is inclusive: [StartNumber, EndNumber].
+type ReserveNumberBlockResponse struct {
+	SequenceName    string `json:"sequence_name"`
+	Prefix          string `json:"prefix"`
+	SequenceLength  int    `json:"sequence_length"`
+	StartNumber     int    `json:"start_number"`
+	EndNumber       int    `json:"end_number"`
+	CurrentNumberDB int    `json:"current_number_db"`
+}

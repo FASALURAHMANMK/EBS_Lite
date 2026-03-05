@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/error_handler.dart';
 import '../../../pos/data/models.dart';
 import '../../../pos/data/pos_repository.dart';
+import '../../../dashboard/controllers/location_notifier.dart';
 import '../../data/sales_repository.dart';
+import 'sale_detail_page.dart';
 
 class QuoteFormPage extends ConsumerStatefulWidget {
   const QuoteFormPage({super.key, this.quoteId});
@@ -21,6 +24,9 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
   List<PosCartItem> _items = const [];
   bool _loading = false;
   String? _error;
+  String? _info;
+  bool _readOnly = false;
+  int? _convertedSaleId;
 
   bool get _isEdit => widget.quoteId != null;
 
@@ -43,10 +49,20 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
     setState(() {
       _loading = true;
       _error = null;
+      _info = null;
     });
     try {
       final repo = ref.read(salesRepositoryProvider);
       final quote = await repo.getQuote(widget.quoteId!);
+      final status = quote['status']?.toString() ?? 'DRAFT';
+      final convertedSaleId = quote['converted_sale_id'] as int?;
+      _readOnly = convertedSaleId != null || status == 'CONVERTED';
+      _convertedSaleId = convertedSaleId;
+      if (_readOnly) {
+        _info = convertedSaleId == null
+            ? 'This quote has been converted to a sale and is now read-only.'
+            : 'This quote has been converted to sale #$convertedSaleId and is now read-only.';
+      }
       final discount = (quote['discount_amount'] as num?)?.toDouble() ?? 0.0;
       _discountCtrl.text = discount.toStringAsFixed(2);
       _notesCtrl.text = quote['notes']?.toString() ?? '';
@@ -83,7 +99,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       }).toList();
       _items = items;
     } catch (e) {
-      _error = e.toString();
+      _error = ErrorHandler.message(e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -349,6 +365,15 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
   }
 
   Future<void> _submit() async {
+    if (_readOnly) {
+      setState(() => _error = 'This quote is read-only (already converted).');
+      return;
+    }
+    final loc = ref.read(locationNotifierProvider).selected;
+    if (!_isEdit && loc == null) {
+      setState(() => _error = 'Select a location first');
+      return;
+    }
     final discount = double.tryParse(_discountCtrl.text.trim()) ?? 0.0;
     if (_items.isEmpty) {
       setState(() => _error = 'Add at least one item');
@@ -390,7 +415,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.toString());
+      setState(() => _error = ErrorHandler.message(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -404,12 +429,14 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
     final total = (subtotal - discount).clamp(0.0, double.infinity);
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEdit ? 'Edit Quote' : 'New Quote'),
+        title: Text(_isEdit
+            ? (_readOnly ? 'Quote (Read-only)' : 'Edit Quote')
+            : 'New Quote'),
         actions: [
           IconButton(
             tooltip: 'Add Item',
             icon: const Icon(Icons.add_circle_outline_rounded),
-            onPressed: _pickProduct,
+            onPressed: (_loading || _readOnly) ? null : _pickProduct,
           ),
         ],
       ),
@@ -424,6 +451,33 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                 child: Text(_error!,
                     style: TextStyle(color: theme.colorScheme.error)),
               ),
+            if (_info != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Card(
+                  elevation: 0,
+                  color: theme.colorScheme.secondaryContainer,
+                  child: ListTile(
+                    leading: const Icon(Icons.lock_rounded),
+                    title: const Text('Converted to Sale'),
+                    subtitle: Text(_info!),
+                    trailing: _convertedSaleId == null
+                        ? null
+                        : TextButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => SaleDetailPage(
+                                    saleId: _convertedSaleId!,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Text('Open sale'),
+                          ),
+                  ),
+                ),
+              ),
             const SizedBox(height: 8),
             Card(
               elevation: 0,
@@ -436,7 +490,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                         ? 'No customer selected'
                         : 'Customer'),
                     trailing: TextButton(
-                      onPressed: _pickCustomer,
+                      onPressed: (_loading || _readOnly) ? null : _pickCustomer,
                       child: const Text('Select'),
                     ),
                   ),
@@ -447,7 +501,8 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                         ? 'Valid until: not set'
                         : 'Valid until: ${_validUntil!.toIso8601String().split('T').first}'),
                     trailing: TextButton(
-                      onPressed: _pickValidUntil,
+                      onPressed:
+                          (_loading || _readOnly) ? null : _pickValidUntil,
                       child: const Text('Pick'),
                     ),
                   ),
@@ -457,6 +512,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                     child: TextField(
                       controller: _discountCtrl,
                       keyboardType: TextInputType.number,
+                      enabled: !_readOnly,
                       decoration: const InputDecoration(
                         labelText: 'Discount amount',
                       ),
@@ -467,6 +523,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                     child: TextField(
                       controller: _notesCtrl,
                       maxLines: 2,
+                      enabled: !_readOnly,
                       decoration: const InputDecoration(labelText: 'Notes'),
                     ),
                   ),
@@ -481,7 +538,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                   ListTile(
                     title: const Text('Items'),
                     trailing: TextButton(
-                      onPressed: _pickProduct,
+                      onPressed: (_loading || _readOnly) ? null : _pickProduct,
                       child: const Text('Add'),
                     ),
                   ),
@@ -503,12 +560,16 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                           _lineTotal(item).toStringAsFixed(2),
                           style: theme.textTheme.bodyLarge,
                         ),
-                        onTap: () => _editItem(item),
-                        onLongPress: () {
-                          setState(() {
-                            _items = [..._items]..remove(item);
-                          });
-                        },
+                        onTap: (_loading || _readOnly)
+                            ? null
+                            : () => _editItem(item),
+                        onLongPress: (_loading || _readOnly)
+                            ? null
+                            : () {
+                                setState(() {
+                                  _items = [..._items]..remove(item);
+                                });
+                              },
                       ),
                 ],
               ),
@@ -525,8 +586,10 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
             ),
             const SizedBox(height: 12),
             FilledButton(
-              onPressed: _loading ? null : _submit,
-              child: Text(_isEdit ? 'Update Quote' : 'Create Quote'),
+              onPressed: (_loading || _readOnly) ? null : _submit,
+              child: Text(_readOnly
+                  ? 'Read-only'
+                  : (_isEdit ? 'Update Quote' : 'Create Quote')),
             ),
           ],
         ),
