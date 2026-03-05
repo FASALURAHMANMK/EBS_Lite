@@ -320,13 +320,13 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-  onPressed: () async {
-    final snap = await _future;
-    if (!mounted) return;
-    await _openNewExpense(snap.categories);
-  },
-  child: const Icon(Icons.add_rounded),
-),
+        onPressed: () async {
+          final snap = await _future;
+          if (!mounted) return;
+          await _openNewExpense(snap.categories);
+        },
+        child: const Icon(Icons.add_rounded),
+      ),
     );
   }
 }

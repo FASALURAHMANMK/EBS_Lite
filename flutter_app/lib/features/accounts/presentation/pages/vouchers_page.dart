@@ -225,9 +225,9 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-  onPressed: _openCreateDialog,
-  child: const Icon(Icons.add_rounded),
-),
+        onPressed: _openCreateDialog,
+        child: const Icon(Icons.add_rounded),
+      ),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())

@@ -225,10 +225,10 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-  onPressed: _createPayrollDialog,
-  tooltip: 'Generate Payroll',
-  child: const Icon(Icons.add_rounded),
-),
+        onPressed: _createPayrollDialog,
+        tooltip: 'Generate Payroll',
+        child: const Icon(Icons.add_rounded),
+      ),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
