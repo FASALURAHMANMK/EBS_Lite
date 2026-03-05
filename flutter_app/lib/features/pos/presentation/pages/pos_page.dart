@@ -1,6 +1,11 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../controllers/pos_notifier.dart';
@@ -86,7 +91,7 @@ class PosPage extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           // Product search with live suggestions (show 2)
-          _SearchBar(),
+          const _SearchBar(),
           const SizedBox(height: 8),
           // Cart list (scrollable). No extra spacer; bottom bar has own height.
           const Expanded(child: _CartList()),
@@ -98,45 +103,269 @@ class PosPage extends ConsumerWidget {
   }
 }
 
-class _SearchBar extends ConsumerWidget {
-  final _controller = TextEditingController();
-  _SearchBar();
+class _SearchBar extends ConsumerStatefulWidget {
+  const _SearchBar();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SearchBar> createState() => _SearchBarState();
+}
+
+class _SearchBarState extends ConsumerState<_SearchBar> {
+  static const double _fieldHeight = 56;
+
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+
+  MobileScannerController? _scannerController;
+  bool _showScanner = false;
+  bool _scanLock = false;
+
+  bool get _scanSupported {
+    if (kIsWeb) return true;
+
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android ||
+      TargetPlatform.iOS ||
+      TargetPlatform.macOS =>
+        true,
+      _ => false,
+    };
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    final scannerController = _scannerController;
+    if (scannerController != null) {
+      unawaited(scannerController.dispose());
+    }
+    super.dispose();
+  }
+
+  void _setScannerVisible(bool visible) {
+    if (!_scanSupported) return;
+
+    if (visible == _showScanner) return;
+
+    FocusScope.of(context).unfocus();
+
+    setState(() {
+      _showScanner = visible;
+      _scanLock = false;
+    });
+
+    if (visible) {
+      _scannerController ??= MobileScannerController(
+        detectionSpeed: DetectionSpeed.noDuplicates,
+      );
+    }
+  }
+
+  void _handleDetect(BarcodeCapture capture) {
+    if (!_showScanner || _scanLock) return;
+
+    final raw = capture.barcodes
+        .map((b) => b.rawValue ?? b.displayValue)
+        .whereType<String>()
+        .map((s) => s.trim())
+        .firstWhere((s) => s.isNotEmpty, orElse: () => '');
+
+    if (raw.isEmpty) return;
+
+    setState(() => _scanLock = true);
+    unawaited(HapticFeedback.mediumImpact());
+    unawaited(SystemSound.play(SystemSoundType.click));
+
+    _controller.value = TextEditingValue(
+      text: raw,
+      selection: TextSelection.collapsed(offset: raw.length),
+    );
+    ref.read(posNotifierProvider.notifier).setQuery(raw);
+
+    _setScannerVisible(false);
+  }
+
+  Widget _buildTextField(
+    BuildContext context,
+    List<PosProductDto> suggestions,
+    PosNotifier notifier,
+  ) {
+    return SizedBox(
+      height: _fieldHeight,
+      child: TextField(
+        controller: _controller,
+        focusNode: _focusNode,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          prefixIcon: const Icon(Icons.search_rounded),
+          hintText: 'Search name / barcode…',
+          suffixIconConstraints:
+              const BoxConstraints(minWidth: 0, minHeight: 0),
+          suffixIcon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_scanSupported)
+                IconButton(
+                  tooltip: 'Scan barcode',
+                  icon: const Icon(Icons.qr_code_scanner_rounded),
+                  onPressed: () => _setScannerVisible(true),
+                ),
+              IconButton(
+                tooltip: 'Clear',
+                icon: const Icon(Icons.clear_rounded),
+                onPressed: () {
+                  _controller.clear();
+                  ref.read(posNotifierProvider.notifier).setQuery('');
+                },
+              ),
+            ],
+          ),
+        ),
+        onChanged: notifier.setQuery,
+        onSubmitted: (_) {
+          if (suggestions.isNotEmpty) {
+            notifier.addProduct(suggestions.first);
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildScanner(BuildContext context) {
+    final ctrl = _scannerController;
+
+    return SizedBox(
+      height: _fieldHeight,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            MobileScanner(
+              controller: ctrl,
+              onDetect: _handleDetect,
+              errorBuilder: (context, error) {
+                final scheme = Theme.of(context).colorScheme;
+                return ColoredBox(
+                  color: scheme.surfaceContainerHighest,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        'Camera error: ${error.errorCode.message}',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                );
+              },
+              placeholderBuilder: (_) => ColoredBox(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              ),
+            ),
+            Positioned(
+              left: 8,
+              right: 8,
+              bottom: 6,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    child: Text(
+                      'Align barcode in view',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 4,
+              right: 4,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (ctrl != null)
+                    ValueListenableBuilder<MobileScannerState>(
+                      valueListenable: ctrl,
+                      builder: (context, value, _) {
+                        final torchState = value.torchState;
+                        if (torchState == TorchState.unavailable) {
+                          return const SizedBox.shrink();
+                        }
+                        final isOn = torchState == TorchState.on;
+                        return IconButton(
+                          tooltip: isOn ? 'Flash off' : 'Flash on',
+                          icon: Icon(
+                            isOn
+                                ? Icons.flash_on_rounded
+                                : Icons.flash_off_rounded,
+                            color: Colors.white,
+                          ),
+                          onPressed: () => unawaited(ctrl.toggleTorch()),
+                        );
+                      },
+                    ),
+                  IconButton(
+                    tooltip: 'Close scanner',
+                    icon: const Icon(Icons.close_rounded, color: Colors.white),
+                    onPressed: () => _setScannerVisible(false),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(posNotifierProvider);
     final notifier = ref.read(posNotifierProvider.notifier);
-    _controller.value = TextEditingValue(
-      text: state.query,
-      selection: TextSelection.collapsed(offset: state.query.length),
-    );
+
+    if (!_showScanner && _controller.text != state.query) {
+      _controller.value = TextEditingValue(
+        text: state.query,
+        selection: TextSelection.collapsed(offset: state.query.length),
+      );
+    }
+
     final suggestions = state.suggestions.take(2).toList();
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12.0),
       child: Column(
         children: [
-          TextField(
-            controller: _controller,
-            decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search_rounded),
-                hintText: 'Search...',
-                suffixIcon: IconButton(
-                  tooltip: 'Clear',
-                  icon: const Icon(Icons.clear_rounded),
-                  onPressed: () {
-                    _controller.clear();
-                    ref.read(posNotifierProvider.notifier).setQuery('');
-                  },
-                )),
-            onChanged: notifier.setQuery,
-            onSubmitted: (value) {
-              // Add first suggestion on enter
-              if (suggestions.isNotEmpty) {
-                notifier.addProduct(suggestions.first);
-              }
-            },
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            child: _showScanner
+                ? KeyedSubtree(
+                    key: const ValueKey('scanner'),
+                    child: _buildScanner(context),
+                  )
+                : KeyedSubtree(
+                    key: const ValueKey('textfield'),
+                    child: _buildTextField(context, suggestions, notifier),
+                  ),
           ),
-          if (suggestions.isNotEmpty)
+          if (!_showScanner && suggestions.isNotEmpty)
             Container(
               margin: const EdgeInsets.only(top: 6),
               decoration: BoxDecoration(
