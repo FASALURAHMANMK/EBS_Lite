@@ -130,6 +130,19 @@ class _QuickActionButtonState extends State<QuickActionButton>
     final actions = widget.actions;
     final count = actions.length;
 
+    if (count <= 1) {
+      final action = count == 1 ? actions.first : null;
+      return FloatingActionButton(
+        heroTag: widget.heroTag,
+        tooltip: action?.label,
+        backgroundColor: primary,
+        foregroundColor: iconColor,
+        onPressed: action?.onTap,
+        shape: const CircleBorder(),
+        child: Icon(action?.icon ?? widget.closedIcon),
+      );
+    }
+
     return IgnorePointer(
       ignoring: false,
       child: SizedBox(

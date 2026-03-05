@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../controllers/dashboard_notifier.dart';
+import '../../controllers/dashboard_customization_notifier.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import '../../../../shared/widgets/app_message_view.dart';
 import '../../../../shared/widgets/no_network_view.dart';
 import 'stat_card.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
+import '../dashboard_actions.dart';
+import '../pages/dashboard_customization_page.dart';
 
 class DashboardContent extends ConsumerWidget {
   const DashboardContent({super.key});
@@ -30,6 +33,7 @@ class DashboardContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(dashboardNotifierProvider);
     final outbox = ref.watch(outboxNotifierProvider);
+    final customization = ref.watch(dashboardCustomizationProvider);
     final metrics = state.metrics;
     final size = MediaQuery.of(context).size;
     final shortest = size.shortestSide;
@@ -59,6 +63,17 @@ class DashboardContent extends ConsumerWidget {
                 ? 2
                 : 1;
     final aspect = size.width < 900 ? 1.25 : 1.5;
+
+    final shortcutDefs = customization.shortcutActionIds
+        .map(dashboardActionForId)
+        .whereType<DashboardActionDefinition>()
+        .toList();
+
+    final maxShortcutsShown = crossAxisCount >= 3 ? 4 : 6;
+    final showCustomize = shortcutDefs.length > maxShortcutsShown;
+    final shownShortcuts = showCustomize
+        ? shortcutDefs.take(maxShortcutsShown - 1).toList()
+        : shortcutDefs.take(maxShortcutsShown).toList();
 
     // Pure GridView experience as requested (no Slivers)
     return Padding(
@@ -118,44 +133,56 @@ class DashboardContent extends ConsumerWidget {
                   color: Colors.green,
                 ),
                 // Shortcuts block as a grid tile
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Shortcuts',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: FeatureGrid(
-                          items: const [
-                            FeatureItem(
-                                icon: Icons.point_of_sale_rounded,
-                                label: 'New Sale'),
-                            FeatureItem(
-                                icon: Icons.inventory_2_rounded,
-                                label: 'Products'),
-                            FeatureItem(
-                                icon: Icons.people_alt_rounded,
-                                label: 'Customers'),
-                            FeatureItem(
-                                icon: Icons.point_of_sale_rounded,
-                                label: 'Cash Register'),
-                          ],
+                if (shownShortcuts.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Shortcuts',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: FeatureGrid(
+                            padding: EdgeInsets.zero,
+                            items: [
+                              ...shownShortcuts.map(
+                                (a) => FeatureItem(
+                                  icon: a.icon,
+                                  label: a.label,
+                                  onTap: () => runDashboardAction(
+                                    context,
+                                    ref,
+                                    a.id,
+                                  ),
+                                ),
+                              ),
+                              if (showCustomize)
+                                FeatureItem(
+                                  icon: Icons.tune_rounded,
+                                  label: 'Customize',
+                                  onTap: () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const DashboardCustomizationPage(),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
           ),

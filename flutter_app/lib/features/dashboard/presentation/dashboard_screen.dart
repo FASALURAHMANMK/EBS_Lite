@@ -9,6 +9,7 @@ import 'widgets/dashboard_header.dart';
 import 'widgets/dashboard_sidebar.dart';
 import 'widgets/quick_action_button.dart';
 import '../controllers/dashboard_notifier.dart';
+import '../controllers/dashboard_customization_notifier.dart';
 import '../controllers/ui_prefs_notifier.dart';
 import '../data/models.dart';
 import '../controllers/location_notifier.dart';
@@ -16,13 +17,10 @@ import 'package:ebs_lite/features/sales/presentation/pages/sales_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/purchases_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/inventory_page.dart';
 import 'package:ebs_lite/features/customers/presentation/pages/customers_page.dart';
-import 'package:ebs_lite/features/customers/presentation/widgets/quick_collection_sheet.dart';
-import 'package:ebs_lite/features/pos/presentation/pages/pos_page.dart';
 import 'package:ebs_lite/features/notifications/presentation/pages/notifications_page.dart';
 import 'package:ebs_lite/features/notifications/controllers/notifications_providers.dart';
-import 'package:ebs_lite/features/purchases/presentation/pages/grn_form_page.dart';
-import 'package:ebs_lite/features/expenses/presentation/widgets/quick_expense_sheet.dart';
 import 'dashboard_navigation.dart';
+import 'dashboard_actions.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -41,8 +39,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   // Primary tabs for bottom navigation
   static const _primaryTabs = <_NavItem>[
-    _NavItem('Dashboard', Icons.dashboard_rounded),
-    _NavItem('Sales', Icons.point_of_sale_rounded),
+    _NavItem('Dashboard', Icons.grid_view_rounded),
+    _NavItem('Sales', Icons.storefront_rounded),
     _NavItem('Purchases', Icons.shopping_cart_rounded),
     _NavItem('Inventory', Icons.inventory_2_rounded),
     _NavItem('Customers', Icons.people_alt_rounded),
@@ -52,57 +50,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   static const _secondaryItems = <_NavItem>[
     _NavItem('Reports', Icons.bar_chart_rounded),
     _NavItem('Accounting', Icons.account_balance_wallet_rounded),
-    _NavItem('HR', Icons.group_rounded),
+    _NavItem('HR', Icons.groups_2_rounded),
     _NavItem('Settings', Icons.settings_rounded),
   ];
 
   int _bottomIndex = 0;
-
-  Future<int?> _ensureLocationSelected() async {
-    final state = ref.read(locationNotifierProvider);
-    final selected = state.selected;
-    if (selected != null) return selected.locationId;
-
-    if (state.locations.isNotEmpty) {
-      await _showLocationPicker(state.locations);
-      return ref.read(locationNotifierProvider).selected?.locationId;
-    }
-
-    if (!mounted) return null;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('No locations available')));
-    return null;
-  }
-
-  Future<void> _quickPurchase() async {
-    final locId = await _ensureLocationSelected();
-    if (!mounted || locId == null) return;
-
-    final created = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const GrnFormPage()),
-    );
-    if (!mounted) return;
-    if (created == true) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Purchase/GRN created')));
-    }
-  }
-
-  Future<void> _quickCollection() async {
-    final locId = await _ensureLocationSelected();
-    if (!mounted || locId == null) return;
-
-    await showQuickCollectionSheet(context, ref);
-  }
-
-  Future<void> _quickExpense() async {
-    final locId = await _ensureLocationSelected();
-    if (!mounted || locId == null) return;
-
-    await showQuickExpenseSheet(context, ref);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -179,6 +131,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final currentTitle = _primaryTabs[_bottomIndex].label;
 
     final showQuick = ref.watch(quickActionVisibilityProvider);
+    final customization = ref.watch(dashboardCustomizationProvider);
+    final quickDef = customization.quickActionId == null
+        ? null
+        : dashboardActionForId(customization.quickActionId!);
 
     return Scaffold(
       appBar: DashboardHeader(
@@ -268,38 +224,40 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             .toList(),
       ),
       floatingActionButton: showQuick
-          ? QuickActionButton(
-              openIcon: Icons.close_rounded,
-              closedIcon: Icons.bolt_rounded,
-              useExtendedLabelsOnWide: false,
-              actions: [
-                QuickAction(
-                    icon: Icons.point_of_sale_rounded,
-                    label: 'Sale (${quickCounts?.sales ?? 0})',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const PosPage()),
-                      );
-                    }),
-                QuickAction(
-                    icon: Icons.shopping_cart_rounded,
-                    label: 'Purchase (${quickCounts?.purchases ?? 0})',
-                    onTap: _quickPurchase),
-                QuickAction(
-                    icon: Icons.payments_rounded,
-                    label: 'Collection (${quickCounts?.collections ?? 0})',
-                    onTap: _quickCollection),
-                QuickAction(
-                    icon: Icons.money_off_rounded,
-                    label: 'Expense (${quickCounts?.expenses ?? 0})',
-                    onTap: _quickExpense),
-              ],
-              onOpenChanged: (open) {
-                // Example: dim app bar or log analytics here.
-              },
-            )
+          ? (quickDef == null
+              ? null
+              : QuickActionButton(
+                  heroTag: 'dashboard_quick_action',
+                  useExtendedLabelsOnWide: false,
+                  actions: [
+                    QuickAction(
+                      icon: quickDef.icon,
+                      label: _quickLabel(quickDef.id, quickCounts),
+                      onTap: () =>
+                          runDashboardAction(context, ref, quickDef.id),
+                    ),
+                  ],
+                ))
           : null,
     );
+  }
+
+  String _quickLabel(String actionId, QuickActionCounts? counts) {
+    if (counts == null) {
+      return dashboardActionForId(actionId)?.label ?? 'Action';
+    }
+    switch (actionId) {
+      case 'new_sale':
+        return 'New Sale (${counts.sales})';
+      case 'new_purchase':
+        return 'New Purchase (${counts.purchases})';
+      case 'new_collection':
+        return 'New Collection (${counts.collections})';
+      case 'new_expense':
+        return 'New Expense (${counts.expenses})';
+      default:
+        return dashboardActionForId(actionId)?.label ?? 'Action';
+    }
   }
 
   Future<void> _showLocationPicker(List<Location> locations) async {

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
-import 'package:ebs_lite/features/expenses/presentation/pages/expense_categories_page.dart';
 import 'package:ebs_lite/features/expenses/presentation/pages/expenses_page.dart';
 import 'audit_logs_page.dart';
 import 'cash_register_page.dart';
@@ -33,13 +32,6 @@ class AccountingPage extends StatelessWidget {
         label: 'Expenses',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const ExpensesPage()),
-        ),
-      ),
-      FeatureItem(
-        icon: Icons.category_outlined,
-        label: 'Expense Categories',
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const ExpenseCategoriesPage()),
         ),
       ),
       FeatureItem(

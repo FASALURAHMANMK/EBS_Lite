@@ -6,10 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../controllers/ui_prefs_notifier.dart';
 import '../../../../core/error_handler.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import 'company_settings_page.dart';
+import 'dashboard_customization_page.dart';
 import 'sync_health_page.dart';
 import 'invoice_settings_page.dart';
 import 'payment_modes_page.dart';
@@ -117,7 +117,6 @@ class SettingsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final showQuick = ref.watch(quickActionVisibilityProvider);
     final outbox = ref.watch(outboxNotifierProvider);
     final perms = ref.watch(authPermissionsProvider);
     final showAdmin =
@@ -142,17 +141,20 @@ class SettingsPage extends ConsumerWidget {
             },
           ),
           const SizedBox(height: 12),
-          SwitchListTile.adaptive(
-            value: showQuick,
-            onChanged: (v) =>
-                ref.read(quickActionVisibilityProvider.notifier).setVisible(v),
-            title: const Text('Quick Action Button'),
-            subtitle: const Text('Show floating quick actions'),
-            secondary: const Icon(Icons.flash_on_rounded),
-            tileColor: theme.colorScheme.surface,
+          ListTile(
+            leading: const Icon(Icons.dashboard_customize_rounded),
+            title: const Text('Dashboard'),
+            subtitle: const Text('Shortcuts and quick action'),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+            tileColor: theme.colorScheme.surface,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const DashboardCustomizationPage(),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 12),
           ListTile(

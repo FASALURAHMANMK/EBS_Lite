@@ -1,6 +1,6 @@
 # API Parity Report (Flutter <-> OpenAPI)
 
-- Flutter unique paths: **164**
+- Flutter unique paths: **166**
 - OpenAPI unique paths: **204**
 
 ## Flutter paths missing from OpenAPI
@@ -49,5 +49,3 @@
 - `/settings`
 - `/support/bundle`
 - `/translations`
-- `/user-preferences`
-- `/user-preferences/{}`

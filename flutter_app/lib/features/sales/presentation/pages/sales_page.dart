@@ -49,7 +49,7 @@ class SalesPage extends StatelessWidget {
         ),
       ),
       FeatureItem(
-        icon: Icons.local_offer_rounded,
+        icon: Icons.percent_rounded,
         label: 'Promotions',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const PromotionsPage()),

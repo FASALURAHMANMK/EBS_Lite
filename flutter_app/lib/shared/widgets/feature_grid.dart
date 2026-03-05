@@ -9,9 +9,18 @@ class FeatureItem {
 }
 
 class FeatureGrid extends StatelessWidget {
-  const FeatureGrid({super.key, required this.items});
+  const FeatureGrid({
+    super.key,
+    required this.items,
+    this.padding = const EdgeInsets.all(16),
+    this.physics,
+    this.shrinkWrap = false,
+  });
 
   final List<FeatureItem> items;
+  final EdgeInsetsGeometry padding;
+  final ScrollPhysics? physics;
+  final bool shrinkWrap;
 
   int _columnsForWidth(double w) {
     if (w >= 1200) return 4;
@@ -26,7 +35,9 @@ class FeatureGrid extends StatelessWidget {
       builder: (context, constraints) {
         final cols = _columnsForWidth(constraints.maxWidth);
         return GridView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: padding,
+          physics: physics,
+          shrinkWrap: shrinkWrap,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: cols,
             crossAxisSpacing: 12,
