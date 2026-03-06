@@ -103,7 +103,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final dashboardState = ref.watch(dashboardNotifierProvider);
     final quickCounts = dashboardState.quickActions;
 
-    final theme = Theme.of(context);
     final outboxState = ref.watch(outboxNotifierProvider);
     final outboxNotifier = ref.read(outboxNotifierProvider.notifier);
     // Keep master-data sync alive while the dashboard is active.
@@ -222,22 +221,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       child: Scaffold(
         body: Row(
           children: [
-            SizedBox(
-              width: _desktopSidebarExpanded ? 320 : 56,
-              child: _desktopSidebarExpanded
-                  ? DashboardDesktopSidebar(
-                      onHome: goWideHome,
-                      onOpen: openWide,
-                    )
-                  : _CollapsedSidebar(
-                      onExpand: toggleDesktopSidebar,
-                    ),
-            ),
             if (_desktopSidebarExpanded)
-              VerticalDivider(
-                width: 1,
-                thickness: 1,
-                color: theme.colorScheme.outlineVariant,
+              SizedBox(
+                width: 320,
+                child: DashboardDesktopSidebar(
+                  onHome: goWideHome,
+                  onOpen: openWide,
+                ),
               ),
             Expanded(
               child: Navigator(
@@ -360,31 +350,6 @@ class _DashboardWideHome extends ConsumerWidget {
         onNotifications: () => onOpen(const NotificationsPage()),
       ),
       body: const DashboardContent(),
-    );
-  }
-}
-
-class _CollapsedSidebar extends StatelessWidget {
-  const _CollapsedSidebar({required this.onExpand});
-
-  final VoidCallback onExpand;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.surface,
-      child: SafeArea(
-        child: Column(
-          children: [
-            IconButton(
-              tooltip: 'Show sidebar',
-              icon: const Icon(Icons.menu_rounded),
-              onPressed: onExpand,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

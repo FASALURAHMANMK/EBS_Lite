@@ -9,13 +9,14 @@ import 'package:ebs_lite/features/inventory/presentation/pages/inventory_managem
 import 'package:ebs_lite/features/inventory/presentation/pages/inventory_view_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/stock_adjustments_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/stock_transfers_page.dart';
-import 'package:ebs_lite/features/notifications/controllers/notifications_providers.dart';
-import 'package:ebs_lite/features/notifications/presentation/pages/notifications_page.dart';
 import 'package:ebs_lite/features/pos/presentation/pages/pos_page.dart';
 import 'package:ebs_lite/features/promotions/presentation/pages/promotions_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/goods_receipts_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/purchase_orders_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/purchase_returns_page.dart';
+import 'package:ebs_lite/features/reports/presentation/pages/report_category_page.dart';
+import 'package:ebs_lite/features/reports/presentation/pages/reports_page.dart';
+import 'package:ebs_lite/features/reports/presentation/report_categories.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/invoices_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/quotes_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/sales_history_page.dart';
@@ -24,8 +25,6 @@ import 'package:ebs_lite/features/suppliers/presentation/pages/suppliers_page.da
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/outbox/outbox_notifier.dart';
-import '../../../../core/theme_notifier.dart';
 import '../../controllers/location_notifier.dart';
 import '../dashboard_navigation.dart';
 import 'company_logo.dart';
@@ -46,14 +45,6 @@ class DashboardDesktopSidebar extends ConsumerWidget {
     final authState = ref.watch(authNotifierProvider);
     final perms = ref.watch(authPermissionsProvider);
     final locationState = ref.watch(locationNotifierProvider);
-    final outboxState = ref.watch(outboxNotifierProvider);
-    final outboxNotifier = ref.read(outboxNotifierProvider.notifier);
-    final themeNotifier = ref.read(themeNotifierProvider.notifier);
-    final unreadNotifications =
-        ref.watch(notificationsUnreadCountProvider).maybeWhen(
-              data: (v) => v,
-              orElse: () => 0,
-            );
 
     final showApprovals = perms.contains('VIEW_WORKFLOWS');
 
@@ -127,62 +118,7 @@ class DashboardDesktopSidebar extends ConsumerWidget {
                         },
                       ),
                     ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      _StatusPill(
-                        isOnline: outboxState.isOnline,
-                        isChecking: outboxState.isChecking,
-                        queuedCount: outboxState.queuedCount,
-                        isSyncing: outboxState.isSyncing,
-                        onRetry: outboxState.queuedCount > 0
-                            ? () => outboxNotifier.retryNow()
-                            : null,
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        tooltip: 'Toggle theme',
-                        visualDensity: VisualDensity.compact,
-                        icon: const Icon(Icons.color_lens_rounded,
-                            color: Colors.white),
-                        onPressed: () => themeNotifier.toggle(),
-                      ),
-                      IconButton(
-                        tooltip: 'Notifications',
-                        visualDensity: VisualDensity.compact,
-                        icon: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            const Icon(Icons.notifications_none_rounded,
-                                color: Colors.white),
-                            if (unreadNotifications > 0)
-                              Positioned(
-                                right: -2,
-                                top: -2,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 5, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.error,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  constraints: const BoxConstraints(
-                                      minWidth: 16, minHeight: 16),
-                                  child: Text(
-                                    unreadNotifications > 99
-                                        ? '99+'
-                                        : unreadNotifications.toString(),
-                                    style: theme.textTheme.labelSmall
-                                        ?.copyWith(color: Colors.white),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        onPressed: () => onOpen(const NotificationsPage()),
-                      ),
-                    ],
-                  ),
+                  const SizedBox(height: 4),
                 ],
               ),
             ),
@@ -335,7 +271,7 @@ class DashboardDesktopSidebar extends ConsumerWidget {
                 ),
               ],
             ),
-            const Divider(height: 24),
+            const SizedBox(height: 8),
             _section(
               context,
               icon: Icons.account_balance_wallet_rounded,
@@ -418,18 +354,62 @@ class DashboardDesktopSidebar extends ConsumerWidget {
                 ),
               ],
             ),
-            _tile(
+            _section(
               context,
               icon: Icons.bar_chart_rounded,
-              label: 'Reports',
-              onTap: () => onOpen(DashboardNavigation.pageForLabel('Reports')),
-            ),
-            _tile(
-              context,
-              icon: Icons.account_balance_wallet_rounded,
-              label: 'Accounting',
-              onTap: () =>
-                  onOpen(DashboardNavigation.pageForLabel('Accounting')),
+              title: 'Reports',
+              children: [
+                _child(
+                  context,
+                  icon: Icons.bar_chart_rounded,
+                  label: 'All Reports',
+                  onTap: () => onOpen(const ReportsPage()),
+                ),
+                _child(
+                  context,
+                  icon: Icons.storefront_rounded,
+                  label: 'Sales Reports',
+                  onTap: () => onOpen(
+                    const ReportCategoryPage(
+                      title: salesReportCategoryTitle,
+                      reports: salesReports,
+                    ),
+                  ),
+                ),
+                _child(
+                  context,
+                  icon: Icons.shopping_cart_rounded,
+                  label: 'Purchase Reports',
+                  onTap: () => onOpen(
+                    const ReportCategoryPage(
+                      title: purchaseReportCategoryTitle,
+                      reports: purchaseReports,
+                    ),
+                  ),
+                ),
+                _child(
+                  context,
+                  icon: Icons.account_balance_wallet_rounded,
+                  label: 'Accounts Reports',
+                  onTap: () => onOpen(
+                    const ReportCategoryPage(
+                      title: accountsReportCategoryTitle,
+                      reports: accountsReports,
+                    ),
+                  ),
+                ),
+                _child(
+                  context,
+                  icon: Icons.inventory_2_rounded,
+                  label: 'Inventory Reports',
+                  onTap: () => onOpen(
+                    const ReportCategoryPage(
+                      title: inventoryReportCategoryTitle,
+                      reports: inventoryReports,
+                    ),
+                  ),
+                ),
+              ],
             ),
             if (showApprovals)
               _tile(
@@ -445,7 +425,7 @@ class DashboardDesktopSidebar extends ConsumerWidget {
               label: 'Settings',
               onTap: () => onOpen(DashboardNavigation.pageForLabel('Settings')),
             ),
-            const Divider(height: 24),
+            const Divider(height: 16),
             _tile(
               context,
               icon: Icons.help_outline_rounded,
@@ -491,10 +471,12 @@ class DashboardDesktopSidebar extends ConsumerWidget {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Text(
-                'v1.0.0',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+              child: Center(
+                child: Text(
+                  'v1.0.0',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ),
@@ -553,64 +535,6 @@ class DashboardDesktopSidebar extends ConsumerWidget {
       trailing: const Icon(Icons.chevron_right_rounded, size: 18),
       contentPadding: const EdgeInsets.only(left: 16, right: 12),
       onTap: onTap,
-    );
-  }
-}
-
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({
-    required this.isOnline,
-    required this.isChecking,
-    required this.queuedCount,
-    required this.isSyncing,
-    required this.onRetry,
-  });
-
-  final bool isOnline;
-  final bool isChecking;
-  final int queuedCount;
-  final bool isSyncing;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final statusColor = isChecking
-        ? Colors.white70
-        : (isOnline ? Colors.greenAccent : theme.colorScheme.error);
-    final statusIcon = isChecking
-        ? Icons.cloud_sync_rounded
-        : (isOnline ? Icons.cloud_done_rounded : Icons.cloud_off_rounded);
-
-    return InkWell(
-      onTap: onRetry,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(statusIcon, size: 16, color: statusColor),
-            const SizedBox(width: 6),
-            if (queuedCount > 0 || isSyncing)
-              Text(
-                isSyncing ? 'Syncing…' : 'Queued $queuedCount',
-                style:
-                    theme.textTheme.labelMedium?.copyWith(color: Colors.white),
-              )
-            else
-              Text(
-                isChecking ? 'Checking…' : (isOnline ? 'Online' : 'Offline'),
-                style:
-                    theme.textTheme.labelMedium?.copyWith(color: Colors.white),
-              ),
-          ],
-        ),
-      ),
     );
   }
 }
