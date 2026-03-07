@@ -19,6 +19,10 @@ class InvoicePdfBuilder {
         .cast<Map<String, dynamic>>();
     final subtotal = _asDouble(sale['subtotal']);
     final tax = _asDouble(sale['tax_amount']);
+    final taxBreakdown = (sale['tax_breakdown'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList(growable: false);
     final discount = _asDouble(sale['discount_amount']);
     final total = _asDouble(sale['total_amount']);
 
@@ -38,7 +42,11 @@ class InvoicePdfBuilder {
           _itemsTable(items),
           pw.SizedBox(height: 12),
           _totals(
-              subtotal: subtotal, tax: tax, discount: discount, total: total),
+              subtotal: subtotal,
+              tax: tax,
+              taxBreakdown: taxBreakdown,
+              discount: discount,
+              total: total),
           pw.SizedBox(height: 8),
           pw.Divider(),
           pw.Align(
@@ -138,6 +146,7 @@ class InvoicePdfBuilder {
   static pw.Widget _totals({
     required double subtotal,
     required double tax,
+    required List<Map<String, dynamic>> taxBreakdown,
     required double discount,
     required double total,
   }) {
@@ -161,12 +170,28 @@ class InvoicePdfBuilder {
         children: [
           row('Subtotal', _fmt(subtotal)),
           row('Tax', _fmt(tax)),
+          if (taxBreakdown.isNotEmpty && tax > 0) ...[
+            for (final t in taxBreakdown)
+              row(
+                '  ${_taxLineLabel(t)}',
+                _fmt(_asDouble(t['amount'])),
+              ),
+          ],
           row('Discount', _fmt(discount)),
           pw.Divider(),
           row('Total', _fmt(total), bold: true),
         ],
       ),
     );
+  }
+
+  static String _taxLineLabel(Map<String, dynamic> t) {
+    final taxName = (t['tax_name'] as String?)?.trim() ?? '';
+    final compName = (t['component_name'] as String?)?.trim() ?? 'Tax';
+    final pct = _asDouble(t['percentage']);
+    final base = pct == 0 ? compName : '$compName (${pct.toStringAsFixed(2)}%)';
+    if (taxName.isEmpty || taxName == compName) return base;
+    return '$taxName • $base';
   }
 
   static Future<Uint8List> buildPdfFromHtml(

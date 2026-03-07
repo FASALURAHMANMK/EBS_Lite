@@ -56,9 +56,7 @@ class _TaxesManagementPageState extends ConsumerState<TaxesManagementPage> {
                     child: ListTile(
                       leading: const Icon(Icons.percent_rounded),
                       title: Text(t.name),
-                      subtitle: Text('${t.percentage.toStringAsFixed(2)} %'
-                          '${t.isCompound ? ' • Compound' : ''}'
-                          '${t.isActive ? '' : ' • Inactive'}'),
+                      subtitle: Text(_taxSubtitle(t)),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -114,6 +112,19 @@ class _TaxesManagementPageState extends ConsumerState<TaxesManagementPage> {
     );
   }
 
+  String _taxSubtitle(TaxDto t) {
+    final base = '${t.percentage.toStringAsFixed(2)} %';
+    final comps = t.components
+        .where((c) => c.name.trim().isNotEmpty && c.percentage != 0)
+        .toList(growable: false);
+    final breakdown = comps.isEmpty
+        ? ''
+        : ' • ${comps.map((c) => '${c.name.trim()} ${c.percentage.toStringAsFixed(2)}').join(' + ')}';
+    final compound = t.isCompound ? ' • Compound' : '';
+    final active = t.isActive ? '' : ' • Inactive';
+    return '$base$breakdown$compound$active';
+  }
+
   Future<void> _openEditor(BuildContext context, {TaxDto? initial}) async {
     final name = TextEditingController(text: initial?.name ?? '');
     final percent =
@@ -121,11 +132,36 @@ class _TaxesManagementPageState extends ConsumerState<TaxesManagementPage> {
     bool isCompound = initial?.isCompound ?? false;
     bool isActive = initial?.isActive ?? true;
 
+    final componentNameCtrls = <TextEditingController>[];
+    final componentPctCtrls = <TextEditingController>[];
+    final deferredDisposeCtrls = <TextEditingController>[];
+    void addComponent({String n = '', String p = ''}) {
+      componentNameCtrls.add(TextEditingController(text: n));
+      componentPctCtrls.add(TextEditingController(text: p));
+    }
+
+    final initialComponents = (initial?.components ?? const [])
+        .where((c) => c.name.trim().isNotEmpty)
+        .toList(growable: false);
+    for (final c in initialComponents) {
+      addComponent(n: c.name, p: c.percentage.toString());
+    }
+    bool breakdownEnabled = initialComponents.isNotEmpty;
+
+    double computeComponentsTotal() {
+      var total = 0.0;
+      for (final c in componentPctCtrls) {
+        total += double.tryParse(c.text.trim()) ?? 0;
+      }
+      return total;
+    }
+
     final res = await showDialog<bool>(
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setInner) => AlertDialog(
           title: Text(initial == null ? 'Add Tax' : 'Edit Tax'),
+          scrollable: true,
           content: SizedBox(
             width: 400,
             child: Column(
@@ -136,12 +172,96 @@ class _TaxesManagementPageState extends ConsumerState<TaxesManagementPage> {
                   decoration: const InputDecoration(labelText: 'Name'),
                 ),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: percent,
-                  decoration: const InputDecoration(labelText: 'Percentage'),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                SwitchListTile(
+                  value: breakdownEnabled,
+                  onChanged: (v) => setInner(() {
+                    breakdownEnabled = v;
+                    if (breakdownEnabled && componentNameCtrls.isEmpty) {
+                      addComponent();
+                    }
+                  }),
+                  title: const Text('Tax breakdown'),
+                  subtitle:
+                      const Text('Split tax into components (e.g., CGST/SGST)'),
+                  contentPadding: EdgeInsets.zero,
                 ),
+                if (!breakdownEnabled)
+                  TextField(
+                    controller: percent,
+                    decoration:
+                        const InputDecoration(labelText: 'Total percentage'),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                  )
+                else ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Components (total: ${computeComponentsTotal().toStringAsFixed(2)} %)',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  for (var i = 0; i < componentNameCtrls.length; i++) ...[
+                    KeyedSubtree(
+                      key: ValueKey(componentNameCtrls[i]),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: TextField(
+                              controller: componentNameCtrls[i],
+                              decoration: InputDecoration(
+                                labelText: i == 0 ? 'Component name' : null,
+                                hintText: 'e.g., CGST',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: TextField(
+                              controller: componentPctCtrls[i],
+                              decoration: InputDecoration(
+                                labelText: i == 0 ? 'Percent' : null,
+                                hintText: 'e.g., 9',
+                              ),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              onChanged: (_) => setInner(() {}),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Remove',
+                            onPressed: componentNameCtrls.length <= 1
+                                ? null
+                                : () => setInner(() {
+                                      final removedName =
+                                          componentNameCtrls.removeAt(i);
+                                      final removedPct =
+                                          componentPctCtrls.removeAt(i);
+                                      deferredDisposeCtrls.add(removedName);
+                                      deferredDisposeCtrls.add(removedPct);
+                                    }),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => setInner(() => addComponent()),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Add component'),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 SwitchListTile(
                   value: isCompound,
@@ -167,21 +287,56 @@ class _TaxesManagementPageState extends ConsumerState<TaxesManagementPage> {
         ),
       ),
     );
-    if (res != true) return;
+    if (res != true) {
+      name.dispose();
+      percent.dispose();
+      for (final c in componentNameCtrls) {
+        c.dispose();
+      }
+      for (final c in componentPctCtrls) {
+        c.dispose();
+      }
+      for (final c in deferredDisposeCtrls) {
+        c.dispose();
+      }
+      return;
+    }
     try {
       final repo = ref.read(taxesRepositoryProvider);
-      final p = double.tryParse(percent.text.trim()) ?? 0;
+      final trimmedName = name.text.trim();
+      if (trimmedName.isEmpty) {
+        throw Exception('Name is required');
+      }
+
+      double p = double.tryParse(percent.text.trim()) ?? 0;
+      List<TaxComponentDto>? comps;
+      if (breakdownEnabled) {
+        comps = <TaxComponentDto>[];
+        for (var i = 0; i < componentNameCtrls.length; i++) {
+          final cn = componentNameCtrls[i].text.trim();
+          if (cn.isEmpty) continue;
+          final cp = double.tryParse(componentPctCtrls[i].text.trim()) ?? 0;
+          comps.add(TaxComponentDto(name: cn, percentage: cp, sortOrder: i));
+        }
+        if (comps.isEmpty) {
+          throw Exception('Add at least one component');
+        }
+        p = comps.fold<double>(0, (sum, c) => sum + c.percentage);
+      }
       if (initial == null) {
         await repo.createTax(
-            name: name.text.trim(),
-            percentage: p,
-            isCompound: isCompound,
-            isActive: isActive);
+          name: trimmedName,
+          percentage: p,
+          components: comps,
+          isCompound: isCompound,
+          isActive: isActive,
+        );
       } else {
         await repo.updateTax(
             taxId: initial.taxId,
-            name: name.text.trim(),
+            name: trimmedName,
             percentage: p,
+            components: comps,
             isCompound: isCompound,
             isActive: isActive);
       }
@@ -191,6 +346,18 @@ class _TaxesManagementPageState extends ConsumerState<TaxesManagementPage> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
+    } finally {
+      name.dispose();
+      percent.dispose();
+      for (final c in componentNameCtrls) {
+        c.dispose();
+      }
+      for (final c in componentPctCtrls) {
+        c.dispose();
+      }
+      for (final c in deferredDisposeCtrls) {
+        c.dispose();
+      }
     }
   }
 }

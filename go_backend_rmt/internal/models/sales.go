@@ -5,28 +5,29 @@ import (
 )
 
 type Sale struct {
-	SaleID          int            `json:"sale_id" db:"sale_id"`
-	SaleNumber      string         `json:"sale_number" db:"sale_number"`
-	LocationID      int            `json:"location_id" db:"location_id"`
-	CustomerID      *int           `json:"customer_id,omitempty" db:"customer_id"`
-	SaleDate        time.Time      `json:"sale_date" db:"sale_date"`
-	SaleTime        *time.Time     `json:"sale_time,omitempty" db:"sale_time"`
-	Subtotal        float64        `json:"subtotal" db:"subtotal"`
-	TaxAmount       float64        `json:"tax_amount" db:"tax_amount"`
-	DiscountAmount  float64        `json:"discount_amount" db:"discount_amount"`
-	TotalAmount     float64        `json:"total_amount" db:"total_amount"`
-	PaidAmount      float64        `json:"paid_amount" db:"paid_amount"`
-	PaymentMethodID *int           `json:"payment_method_id,omitempty" db:"payment_method_id"`
-	Status          string         `json:"status" db:"status"`
-	POSStatus       string         `json:"pos_status" db:"pos_status"`
-	IsQuickSale     bool           `json:"is_quick_sale" db:"is_quick_sale"`
-	IsTraining      bool           `json:"is_training" db:"is_training"`
-	Notes           *string        `json:"notes,omitempty" db:"notes"`
-	CreatedBy       int            `json:"created_by" db:"created_by"`
-	UpdatedBy       *int           `json:"updated_by,omitempty" db:"updated_by"`
-	Items           []SaleDetail   `json:"items,omitempty"`
-	Customer        *Customer      `json:"customer,omitempty"`
-	PaymentMethod   *PaymentMethod `json:"payment_method,omitempty"`
+	SaleID          int                `json:"sale_id" db:"sale_id"`
+	SaleNumber      string             `json:"sale_number" db:"sale_number"`
+	LocationID      int                `json:"location_id" db:"location_id"`
+	CustomerID      *int               `json:"customer_id,omitempty" db:"customer_id"`
+	SaleDate        time.Time          `json:"sale_date" db:"sale_date"`
+	SaleTime        *time.Time         `json:"sale_time,omitempty" db:"sale_time"`
+	Subtotal        float64            `json:"subtotal" db:"subtotal"`
+	TaxAmount       float64            `json:"tax_amount" db:"tax_amount"`
+	TaxBreakdown    []TaxBreakdownLine `json:"tax_breakdown,omitempty"`
+	DiscountAmount  float64            `json:"discount_amount" db:"discount_amount"`
+	TotalAmount     float64            `json:"total_amount" db:"total_amount"`
+	PaidAmount      float64            `json:"paid_amount" db:"paid_amount"`
+	PaymentMethodID *int               `json:"payment_method_id,omitempty" db:"payment_method_id"`
+	Status          string             `json:"status" db:"status"`
+	POSStatus       string             `json:"pos_status" db:"pos_status"`
+	IsQuickSale     bool               `json:"is_quick_sale" db:"is_quick_sale"`
+	IsTraining      bool               `json:"is_training" db:"is_training"`
+	Notes           *string            `json:"notes,omitempty" db:"notes"`
+	CreatedBy       int                `json:"created_by" db:"created_by"`
+	UpdatedBy       *int               `json:"updated_by,omitempty" db:"updated_by"`
+	Items           []SaleDetail       `json:"items,omitempty"`
+	Customer        *Customer          `json:"customer,omitempty"`
+	PaymentMethod   *PaymentMethod     `json:"payment_method,omitempty"`
 	SyncModel
 }
 

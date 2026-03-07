@@ -537,12 +537,10 @@ func (s *POSService) SearchCustomers(companyID int, searchTerm string) ([]models
 
 func (s *POSService) GetPaymentMethods(companyID int) ([]models.PaymentMethod, error) {
 	query := `
-		SELECT DISTINCT ON (LOWER(name), type)
-		       method_id, company_id, name, type, external_integration, is_active
+		SELECT method_id, company_id, name, type, external_integration, is_active
 		FROM payment_methods
-		WHERE (company_id = $1 OR company_id IS NULL) AND is_active = TRUE
-		-- Prefer company-specific rows over global defaults when names/types overlap.
-		ORDER BY LOWER(name), type, (company_id IS NULL) ASC, method_id ASC
+		WHERE company_id = $1 AND is_active = TRUE
+		ORDER BY LOWER(name), type, method_id ASC
 	`
 
 	rows, err := s.db.Query(query, companyID)

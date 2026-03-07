@@ -1041,6 +1041,22 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       current = taxes.first.taxId;
     }
     if (!mounted) return null;
+
+    String subtitleFor(TaxDto t) {
+      final pct = (t.percentage % 1 == 0)
+          ? t.percentage.toStringAsFixed(0)
+          : t.percentage.toStringAsFixed(2);
+      final comps = t.components
+          .where((c) => c.name.trim().isNotEmpty && c.percentage != 0)
+          .toList(growable: false);
+      if (comps.isEmpty) return '$pct %';
+      final breakdown = comps
+          .map((c) =>
+              '${c.name.trim()} ${(c.percentage % 1 == 0) ? c.percentage.toStringAsFixed(0) : c.percentage.toStringAsFixed(2)}')
+          .join(' + ');
+      return '$pct % • $breakdown';
+    }
+
     return showDialog<TaxDto?>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -1061,8 +1077,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                         return RadioListTile<int>(
                           value: t.taxId,
                           title: Text(t.name),
-                          subtitle: Text(
-                              '${(t.percentage % 1 == 0 ? t.percentage.toStringAsFixed(0) : t.percentage.toStringAsFixed(2))} %'),
+                          subtitle: Text(subtitleFor(t)),
                         );
                       },
                     ),

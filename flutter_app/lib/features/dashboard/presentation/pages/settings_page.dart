@@ -12,10 +12,8 @@ import 'company_settings_page.dart';
 import 'dashboard_customization_page.dart';
 import 'sync_health_page.dart';
 import 'invoice_settings_page.dart';
-import 'payment_modes_page.dart';
 import 'printer_profiles_page.dart';
 import 'security_settings_page.dart';
-import 'tax_settings_page.dart';
 import 'theme_settings_page.dart';
 import 'package:ebs_lite/features/notifications/presentation/pages/notifications_page.dart';
 import 'package:ebs_lite/features/admin/presentation/pages/admin_page.dart';
@@ -174,27 +172,13 @@ class SettingsPage extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.business_rounded),
             title: const Text('Company Settings'),
-            subtitle: const Text('Manage Company Settings'),
+            subtitle: const Text('Company profile, taxes, payment methods'),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: theme.colorScheme.surface,
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const CompanySettingsPage()),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          ListTile(
-            leading: const Icon(Icons.percent_rounded),
-            title: const Text('Tax Settings'),
-            subtitle: const Text('Default tax name/percent'),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            tileColor: theme.colorScheme.surface,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const TaxSettingsPage()),
               );
             },
           ),
@@ -209,20 +193,6 @@ class SettingsPage extends ConsumerWidget {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const InvoiceSettingsPage()),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          ListTile(
-            leading: const Icon(Icons.account_balance_wallet_rounded),
-            title: const Text('Payment methods'),
-            subtitle: const Text('Modes + allowed currencies'),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            tileColor: theme.colorScheme.surface,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const PaymentModesPage()),
               );
             },
           ),

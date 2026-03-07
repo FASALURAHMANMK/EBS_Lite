@@ -272,27 +272,6 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
               ),
             ),
             Positioned(
-              left: 8,
-              right: 8,
-              bottom: 6,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    child: Text(
-                      'Align barcode in view',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
               top: 4,
               right: 4,
               child: Row(

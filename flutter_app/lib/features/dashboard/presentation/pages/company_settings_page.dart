@@ -341,7 +341,7 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                     leading: const Icon(Icons.percent_rounded),
                     title: const Text('Manage Taxes'),
                     subtitle:
-                        const Text('Add or edit tax types (name, percentage)'),
+                        const Text('Add or edit tax types (with breakdowns)'),
                     tileColor: theme.colorScheme.surface,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),

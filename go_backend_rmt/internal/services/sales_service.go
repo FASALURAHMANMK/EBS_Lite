@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 	"time"
 
@@ -343,7 +344,183 @@ func (s *SalesService) GetSaleByID(saleID, companyID int) (*models.Sale, error) 
 	}
 	sale.Items = items
 
+	if bd, berr := s.computeSaleTaxBreakdown(companyID, sale.Items); berr == nil {
+		sale.TaxBreakdown = bd
+	} else {
+		log.Printf("warning: failed to compute tax breakdown for sale_id=%d: %v", saleID, berr)
+	}
+
 	return &sale, nil
+}
+
+func (s *SalesService) computeSaleTaxBreakdown(companyID int, items []models.SaleDetail) ([]models.TaxBreakdownLine, error) {
+	type compMeta struct {
+		name  string
+		pct   float64
+		order int
+	}
+	type taxMeta struct {
+		name       string
+		totalPct   float64
+		components []compMeta
+	}
+
+	taxIDSet := map[int]struct{}{}
+	for _, it := range items {
+		if it.TaxID == nil {
+			continue
+		}
+		if it.TaxAmount <= 0 {
+			continue
+		}
+		taxIDSet[*it.TaxID] = struct{}{}
+	}
+	if len(taxIDSet) == 0 {
+		return nil, nil
+	}
+
+	taxIDs := make([]int, 0, len(taxIDSet))
+	for id := range taxIDSet {
+		taxIDs = append(taxIDs, id)
+	}
+	sort.Ints(taxIDs)
+
+	rows, err := s.db.Query(`
+		SELECT t.tax_id, t.name, t.percentage,
+		       tc.component_id, tc.name, tc.percentage, tc.sort_order
+		FROM taxes t
+		LEFT JOIN tax_components tc ON tc.tax_id = t.tax_id
+		WHERE t.company_id = $1 AND t.tax_id = ANY($2)
+		ORDER BY t.tax_id, tc.sort_order, tc.component_id
+	`, companyID, pq.Array(taxIDs))
+	if err != nil {
+		return nil, fmt.Errorf("failed to load tax metadata: %w", err)
+	}
+	defer rows.Close()
+
+	meta := map[int]*taxMeta{}
+	for rows.Next() {
+		var taxID int
+		var taxName string
+		var taxPct float64
+		var compID sql.NullInt64
+		var compName sql.NullString
+		var compPct sql.NullFloat64
+		var compOrder sql.NullInt64
+		if err := rows.Scan(&taxID, &taxName, &taxPct, &compID, &compName, &compPct, &compOrder); err != nil {
+			return nil, fmt.Errorf("failed to scan tax metadata: %w", err)
+		}
+		m, ok := meta[taxID]
+		if !ok {
+			m = &taxMeta{name: taxName, totalPct: taxPct}
+			meta[taxID] = m
+		}
+		if compName.Valid && compPct.Valid {
+			m.components = append(m.components, compMeta{
+				name:  compName.String,
+				pct:   compPct.Float64,
+				order: int(compOrder.Int64),
+			})
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read tax metadata: %w", err)
+	}
+
+	type aggKey struct {
+		taxID int
+		name  string
+		pct   float64
+	}
+	type aggVal struct {
+		line  models.TaxBreakdownLine
+		order int
+	}
+	acc := map[aggKey]*aggVal{}
+
+	for _, it := range items {
+		if it.TaxID == nil || it.TaxAmount <= 0 {
+			continue
+		}
+		tm := meta[*it.TaxID]
+		if tm == nil {
+			continue
+		}
+
+		if len(tm.components) > 0 && tm.totalPct > 0 {
+			for _, c := range tm.components {
+				amt := it.TaxAmount * (c.pct / tm.totalPct)
+				k := aggKey{taxID: *it.TaxID, name: c.name, pct: c.pct}
+				v := acc[k]
+				if v == nil {
+					v = &aggVal{
+						line: models.TaxBreakdownLine{
+							TaxID:         *it.TaxID,
+							TaxName:       tm.name,
+							ComponentName: c.name,
+							Percentage:    c.pct,
+							Amount:        0,
+						},
+						order: c.order,
+					}
+					acc[k] = v
+				}
+				v.line.Amount += amt
+			}
+		} else {
+			k := aggKey{taxID: *it.TaxID, name: tm.name, pct: tm.totalPct}
+			v := acc[k]
+			if v == nil {
+				v = &aggVal{
+					line: models.TaxBreakdownLine{
+						TaxID:         *it.TaxID,
+						TaxName:       tm.name,
+						ComponentName: tm.name,
+						Percentage:    tm.totalPct,
+						Amount:        0,
+					},
+					order: 0,
+				}
+				acc[k] = v
+			}
+			v.line.Amount += it.TaxAmount
+		}
+	}
+
+	out := make([]models.TaxBreakdownLine, 0, len(acc))
+	type sortable struct {
+		taxName string
+		taxID   int
+		order   int
+		name    string
+		line    models.TaxBreakdownLine
+	}
+	tmp := make([]sortable, 0, len(acc))
+	for _, v := range acc {
+		tmp = append(tmp, sortable{
+			taxName: v.line.TaxName,
+			taxID:   v.line.TaxID,
+			order:   v.order,
+			name:    v.line.ComponentName,
+			line:    v.line,
+		})
+	}
+	sort.Slice(tmp, func(i, j int) bool {
+		if tmp[i].taxName != tmp[j].taxName {
+			return tmp[i].taxName < tmp[j].taxName
+		}
+		if tmp[i].taxID != tmp[j].taxID {
+			return tmp[i].taxID < tmp[j].taxID
+		}
+		if tmp[i].order != tmp[j].order {
+			return tmp[i].order < tmp[j].order
+		}
+		return tmp[i].name < tmp[j].name
+	})
+	for _, it := range tmp {
+		out = append(out, it.line)
+	}
+	return out, nil
 }
 
 // GetSaleByNumber fetches a sale by its sale_number within a company.

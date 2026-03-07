@@ -149,6 +149,10 @@ EscPos _ticketFromSale({
       .cast<Map<String, dynamic>>();
   final subtotal = _asDouble(sale['subtotal']);
   final tax = _asDouble(sale['tax_amount']);
+  final taxBreakdown = (sale['tax_breakdown'] as List<dynamic>? ?? const [])
+      .whereType<Map>()
+      .map((e) => Map<String, dynamic>.from(e))
+      .toList(growable: false);
   final discount = _asDouble(sale['discount_amount']);
   final total = _asDouble(sale['total_amount']);
 
@@ -179,6 +183,13 @@ EscPos _ticketFromSale({
   p.hr();
   p.text(_padBoth('Subtotal', _fmt(subtotal), charsPerLine));
   p.text(_padBoth('Tax', _fmt(tax), charsPerLine));
+  if (taxBreakdown.isNotEmpty && tax > 0) {
+    for (final t in taxBreakdown) {
+      final label = '  ${_taxLineLabel(t)}';
+      final amt = _fmt(_asDouble(t['amount']));
+      p.text(_padBoth(label, amt, charsPerLine));
+    }
+  }
   if (discount > 0) p.text(_padBoth('Discount', _fmt(discount), charsPerLine));
   p.setBold(true);
   p.text(_padBoth('TOTAL', _fmt(total), charsPerLine));
@@ -232,4 +243,13 @@ String _padBoth(String left, String right, int width) {
 String _padLeft(String text, int width) {
   if (text.length >= width) return text;
   return (' ' * (width - text.length)) + text;
+}
+
+String _taxLineLabel(Map<String, dynamic> t) {
+  final taxName = (t['tax_name'] as String?)?.trim() ?? '';
+  final compName = (t['component_name'] as String?)?.trim() ?? 'Tax';
+  final pct = _asDouble(t['percentage']);
+  final base = pct == 0 ? compName : '$compName (${pct.toStringAsFixed(2)}%)';
+  if (taxName.isEmpty || taxName == compName) return base;
+  return '$taxName • $base';
 }
