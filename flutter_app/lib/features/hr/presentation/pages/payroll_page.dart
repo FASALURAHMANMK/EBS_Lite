@@ -4,12 +4,20 @@ import 'package:intl/intl.dart';
 
 import '../../data/hr_repository.dart';
 import '../../data/models.dart';
+import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
 import '../../../../core/error_handler.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import 'payslip_page.dart';
 
 class PayrollPage extends ConsumerStatefulWidget {
-  const PayrollPage({super.key});
+  const PayrollPage({
+    super.key,
+    this.fromMenu = false,
+    this.onMenuSelect,
+  });
+
+  final bool fromMenu;
+  final void Function(BuildContext context, String label)? onMenuSelect;
 
   @override
   ConsumerState<PayrollPage> createState() => _PayrollPageState();
@@ -75,11 +83,53 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
     final basic = TextEditingController();
     final allowances = TextEditingController(text: '0');
     final deductions = TextEditingController(text: '0');
+    bool autoCalc = true;
+    PayrollCalculationDto? calc;
+    bool calcLoading = false;
+
+    Future<void> runCalc(
+        BuildContext dialogContext, StateSetter setInner) async {
+      final messenger = ScaffoldMessenger.of(context);
+      final empId = int.tryParse(emp.text.trim());
+      final baseMonthly = double.tryParse(basic.text.trim());
+      if (empId == null || empId <= 0) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Enter a valid employee id first')),
+        );
+        return;
+      }
+      setInner(() => calcLoading = true);
+      PayrollCalculationDto? res;
+      Object? err;
+      try {
+        res = await ref.read(hrRepositoryProvider).calculatePayroll(
+              employeeId: empId,
+              month: month,
+              baseMonthlySalary: baseMonthly,
+            );
+      } catch (e) {
+        err = e;
+      }
+
+      if (!mounted) return;
+      if (!dialogContext.mounted) return;
+
+      setInner(() {
+        calcLoading = false;
+        if (res != null) calc = res;
+      });
+
+      if (err != null) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(ErrorHandler.message(err))),
+        );
+      }
+    }
 
     final ok = await showDialog<bool>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setInner) => AlertDialog(
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setInner) => AlertDialog(
           title: const Text('Generate Payroll'),
           content: SizedBox(
             width: 420,
@@ -120,11 +170,58 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
                   controller: basic,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Basic Salary',
-                    prefixIcon: Icon(Icons.payments_rounded),
+                  decoration: InputDecoration(
+                    labelText:
+                        autoCalc ? 'Base monthly salary' : 'Basic Salary',
+                    prefixIcon: const Icon(Icons.payments_rounded),
                   ),
                 ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: autoCalc,
+                  onChanged: (v) => setInner(() {
+                    autoCalc = v;
+                    calc = null;
+                  }),
+                  title: const Text('Auto-calculate (attendance + leaves)'),
+                ),
+                if (autoCalc) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: calcLoading
+                          ? null
+                          : () => runCalc(dialogContext, setInner),
+                      icon: calcLoading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.calculate_rounded),
+                      label: const Text('Calculate'),
+                    ),
+                  ),
+                  if (calc != null) ...[
+                    const SizedBox(height: 8),
+                    Card(
+                      elevation: 0,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Text(
+                          'Working days: ${calc!.workingDays}\n'
+                          'Payable days: ${calc!.payableDays.toStringAsFixed(1)}\n'
+                          'Present: ${calc!.presentDays.toStringAsFixed(1)}\n'
+                          'Approved leave: ${calc!.approvedLeaveDays.toStringAsFixed(1)}\n'
+                          'Unpaid absence: ${calc!.unpaidAbsenceDays.toStringAsFixed(1)}\n'
+                          'Prorated basic: ${calc!.proratedBasicSalary.toStringAsFixed(2)}',
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
                 const SizedBox(height: 8),
                 TextField(
                   controller: allowances,
@@ -170,7 +267,7 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
     if (empId == null || empId <= 0 || basicVal == null || basicVal < 0) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter valid employee and salary')),
+        const SnackBar(content: Text('Enter valid employee and base salary')),
       );
       return;
     }
@@ -182,6 +279,7 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
             basicSalary: basicVal,
             allowances: allowanceVal,
             deductions: deductionVal,
+            autoCalculate: autoCalc,
           );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -213,8 +311,18 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
   @override
   Widget build(BuildContext context) {
     final df = DateFormat('yyyy-MM-dd');
-    return Scaffold(
+    final scaffold = Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.fromMenu,
+        leading: widget.fromMenu
+            ? Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Menu',
+                  icon: const Icon(Icons.menu_rounded),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              )
+            : null,
         title: const Text('Payroll'),
         actions: [
           IconButton(
@@ -224,6 +332,11 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
           ),
         ],
       ),
+      drawer: widget.fromMenu
+          ? DashboardSidebar(
+              onSelect: (label) => widget.onMenuSelect?.call(context, label),
+            )
+          : null,
       floatingActionButton: FloatingActionButton(
         onPressed: _createPayrollDialog,
         tooltip: 'Generate Payroll',
@@ -332,5 +445,8 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
                   ),
       ),
     );
+
+    if (!widget.fromMenu) return scaffold;
+    return PopScope(canPop: false, child: scaffold);
   }
 }

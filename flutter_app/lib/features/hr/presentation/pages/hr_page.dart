@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
 import 'attendance_page.dart';
+import 'departments_designations_page.dart';
+import 'employees_page.dart';
 import 'payroll_page.dart';
 
 class HRPage extends StatelessWidget {
@@ -9,6 +11,21 @@ class HRPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
+      FeatureItem(
+        icon: Icons.account_tree_rounded,
+        label: 'Departments & Designations',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+              builder: (_) => const DepartmentsDesignationsPage()),
+        ),
+      ),
+      FeatureItem(
+        icon: Icons.badge_rounded,
+        label: 'Employees',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const EmployeesPage()),
+        ),
+      ),
       FeatureItem(
         icon: Icons.how_to_reg_rounded,
         label: 'Attendance Register',

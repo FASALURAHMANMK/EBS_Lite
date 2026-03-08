@@ -144,6 +144,11 @@ func (s *CompanyService) CreateCompany(req *models.CreateCompanyRequest, userID 
 		return nil, fmt.Errorf("failed to seed default payment method: %w", err)
 	}
 
+	// Seed minimal chart of accounts (needed for ledgers + reports).
+	if err := seedMinimalChartOfAccountsTx(tx, company.CompanyID); err != nil {
+		return nil, err
+	}
+
 	// Create default location
 	var defaultLocationID int
 	if err := tx.QueryRow(`

@@ -17,11 +17,26 @@ type Payroll struct {
 }
 
 type CreatePayrollRequest struct {
-	EmployeeID  int     `json:"employee_id" validate:"required"`
-	Month       string  `json:"month" validate:"required"`
-	BasicSalary float64 `json:"basic_salary" validate:"required,gte=0"`
-	Allowances  float64 `json:"allowances" validate:"gte=0"`
-	Deductions  float64 `json:"deductions" validate:"gte=0"`
+	EmployeeID    int     `json:"employee_id" validate:"required"`
+	Month         string  `json:"month" validate:"required"`
+	BasicSalary   float64 `json:"basic_salary" validate:"required,gte=0"`
+	Allowances    float64 `json:"allowances" validate:"gte=0"`
+	Deductions    float64 `json:"deductions" validate:"gte=0"`
+	AutoCalculate *bool   `json:"auto_calculate,omitempty"`
+}
+
+type PayrollCalculation struct {
+	EmployeeID          int       `json:"employee_id"`
+	Month               string    `json:"month"`
+	PayPeriodStart      time.Time `json:"pay_period_start"`
+	PayPeriodEnd        time.Time `json:"pay_period_end"`
+	BaseMonthlySalary   float64   `json:"base_monthly_salary"`
+	WorkingDays         int       `json:"working_days"`
+	PayableDays         float64   `json:"payable_days"`
+	PresentDays         float64   `json:"present_days"`
+	ApprovedLeaveDays   float64   `json:"approved_leave_days"`
+	UnpaidAbsenceDays   float64   `json:"unpaid_absence_days"`
+	ProratedBasicSalary float64   `json:"prorated_basic_salary"`
 }
 
 type SalaryComponent struct {

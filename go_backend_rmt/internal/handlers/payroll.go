@@ -82,7 +82,8 @@ func (h *PayrollHandler) MarkPayrollPaid(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid payroll ID", err)
 		return
 	}
-	if err := h.payrollService.MarkPayrollPaid(payrollID, companyID); err != nil {
+	userID := c.GetInt("user_id")
+	if err := h.payrollService.MarkPayrollPaid(payrollID, companyID, userID); err != nil {
 		if err.Error() == "payroll not found" {
 			utils.NotFoundResponse(c, "Payroll not found")
 			return
@@ -91,6 +92,48 @@ func (h *PayrollHandler) MarkPayrollPaid(c *gin.Context) {
 		return
 	}
 	utils.SuccessResponse(c, "Payroll marked as paid", nil)
+}
+
+// GET /payrolls/calculate
+func (h *PayrollHandler) CalculatePayroll(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	empStr := c.Query("employee_id")
+	if empStr == "" {
+		utils.ErrorResponse(c, http.StatusBadRequest, "employee_id is required", nil)
+		return
+	}
+	employeeID, err := strconv.Atoi(empStr)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid employee_id", err)
+		return
+	}
+	month := c.Query("month")
+	if month == "" {
+		utils.ErrorResponse(c, http.StatusBadRequest, "month is required", nil)
+		return
+	}
+
+	var baseSalary *float64
+	if bs := c.Query("base_monthly_salary"); bs != "" {
+		if v, err := strconv.ParseFloat(bs, 64); err == nil {
+			baseSalary = &v
+		}
+	}
+
+	calc, err := h.payrollService.CalculatePayroll(companyID, employeeID, month, baseSalary)
+	if err != nil {
+		if err.Error() == "employee not found" {
+			utils.NotFoundResponse(c, "Employee not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to calculate payroll", err)
+		return
+	}
+	utils.SuccessResponse(c, "Payroll calculated", calc)
 }
 
 func (h *PayrollHandler) AddSalaryComponent(c *gin.Context) {

@@ -3,11 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../../../shared/widgets/app_error_view.dart';
+import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
 import '../../data/expenses_repository.dart';
 import '../../data/models.dart';
 
 class ExpenseCategoriesPage extends ConsumerStatefulWidget {
-  const ExpenseCategoriesPage({super.key});
+  const ExpenseCategoriesPage({
+    super.key,
+    this.fromMenu = false,
+    this.onMenuSelect,
+  });
+
+  final bool fromMenu;
+  final void Function(BuildContext context, String label)? onMenuSelect;
 
   @override
   ConsumerState<ExpenseCategoriesPage> createState() =>
@@ -143,8 +151,18 @@ class _ExpenseCategoriesPageState extends ConsumerState<ExpenseCategoriesPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final scaffold = Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.fromMenu,
+        leading: widget.fromMenu
+            ? Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Menu',
+                  icon: const Icon(Icons.menu_rounded),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              )
+            : null,
         title: const Text('Expense Categories'),
         actions: [
           IconButton(
@@ -154,6 +172,11 @@ class _ExpenseCategoriesPageState extends ConsumerState<ExpenseCategoriesPage> {
           ),
         ],
       ),
+      drawer: widget.fromMenu
+          ? DashboardSidebar(
+              onSelect: (label) => widget.onMenuSelect?.call(context, label),
+            )
+          : null,
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: FutureBuilder<List<ExpenseCategoryDto>>(
@@ -209,5 +232,8 @@ class _ExpenseCategoriesPageState extends ConsumerState<ExpenseCategoriesPage> {
         ),
       ),
     );
+
+    if (!widget.fromMenu) return scaffold;
+    return PopScope(canPop: false, child: scaffold);
   }
 }

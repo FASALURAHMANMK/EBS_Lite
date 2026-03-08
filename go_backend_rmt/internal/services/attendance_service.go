@@ -181,3 +181,80 @@ func (s *AttendanceService) GetAttendanceRecords(companyID int, employeeID *int,
 	}
 	return records, nil
 }
+
+func (s *AttendanceService) ListLeaves(companyID int, filters map[string]string) ([]models.LeaveWithEmployee, error) {
+	query := `
+		SELECT l.leave_id, l.employee_id, e.name AS employee_name,
+		       l.start_date, l.end_date, COALESCE(l.reason, ''), l.status,
+		       l.approved_by, l.approved_at, l.decision_notes,
+		       l.sync_status, l.created_at, l.updated_at, l.is_deleted
+		FROM leaves l
+		JOIN employees e ON e.employee_id = l.employee_id
+		WHERE e.company_id = $1 AND l.is_deleted = FALSE
+	`
+
+	args := []interface{}{companyID}
+	argPos := 1
+	if status := filters["status"]; status != "" {
+		argPos++
+		query += fmt.Sprintf(" AND l.status = $%d", argPos)
+		args = append(args, status)
+	}
+	if empID := filters["employee_id"]; empID != "" {
+		argPos++
+		query += fmt.Sprintf(" AND l.employee_id = $%d", argPos)
+		args = append(args, empID)
+	}
+	query += " ORDER BY l.created_at DESC"
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list leaves: %w", err)
+	}
+	defer rows.Close()
+
+	var list []models.LeaveWithEmployee
+	for rows.Next() {
+		var row models.LeaveWithEmployee
+		if err := rows.Scan(
+			&row.LeaveID, &row.EmployeeID, &row.EmployeeName,
+			&row.StartDate, &row.EndDate, &row.Reason, &row.Status,
+			&row.ApprovedBy, &row.ApprovedAt, &row.DecisionNotes,
+			&row.SyncStatus, &row.CreatedAt, &row.UpdatedAt, &row.IsDeleted,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan leave: %w", err)
+		}
+		list = append(list, row)
+	}
+	return list, nil
+}
+
+func (s *AttendanceService) DecideLeave(companyID, leaveID, approverUserID int, approve bool, decisionNotes *string) error {
+	newStatus := "REJECTED"
+	if approve {
+		newStatus = "APPROVED"
+	}
+
+	res, err := s.db.Exec(`
+		UPDATE leaves l
+		SET status = $1,
+		    approved_by = $2,
+		    approved_at = CURRENT_TIMESTAMP,
+		    decision_notes = $3,
+		    updated_at = CURRENT_TIMESTAMP
+		FROM employees e
+		WHERE l.leave_id = $4
+		  AND l.employee_id = e.employee_id
+		  AND e.company_id = $5
+		  AND l.is_deleted = FALSE
+		  AND l.status = 'PENDING'
+	`, newStatus, approverUserID, decisionNotes, leaveID, companyID)
+	if err != nil {
+		return fmt.Errorf("failed to update leave decision: %w", err)
+	}
+	aff, _ := res.RowsAffected()
+	if aff == 0 {
+		return fmt.Errorf("leave not found")
+	}
+	return nil
+}

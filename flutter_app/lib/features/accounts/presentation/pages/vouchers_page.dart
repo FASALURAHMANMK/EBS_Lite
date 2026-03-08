@@ -4,11 +4,19 @@ import 'package:intl/intl.dart';
 
 import '../../data/accounts_repository.dart';
 import '../../data/models.dart';
+import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
 import '../../../../core/error_handler.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 
 class VouchersPage extends ConsumerStatefulWidget {
-  const VouchersPage({super.key});
+  const VouchersPage({
+    super.key,
+    this.fromMenu = false,
+    this.onMenuSelect,
+  });
+
+  final bool fromMenu;
+  final void Function(BuildContext context, String label)? onMenuSelect;
 
   @override
   ConsumerState<VouchersPage> createState() => _VouchersPageState();
@@ -96,7 +104,26 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
 
   Future<void> _openCreateDialog() async {
     String type = 'payment';
-    final accountId = TextEditingController();
+    List<LedgerBalanceDto> accounts = const [];
+    int? selectedAccountId;
+    try {
+      accounts = await ref.read(accountsRepositoryProvider).getLedgerBalances();
+      if (accounts.isNotEmpty) selectedAccountId = accounts.first.accountId;
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not load accounts list. Enter Account ID manually.\n${ErrorHandler.message(e)}',
+          ),
+        ),
+      );
+    }
+    if (!mounted) return;
+
+    final accountId = TextEditingController(
+      text: selectedAccountId == null ? '' : selectedAccountId.toString(),
+    );
     final amount = TextEditingController();
     final reference = TextEditingController();
     final description = TextEditingController();
@@ -121,14 +148,46 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
                   onChanged: (v) => setInner(() => type = v ?? type),
                 ),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: accountId,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Account ID',
-                    prefixIcon: Icon(Icons.account_tree_rounded),
+                if (accounts.isNotEmpty)
+                  DropdownButtonFormField<int>(
+                    key: ValueKey(selectedAccountId),
+                    initialValue: selectedAccountId,
+                    decoration: const InputDecoration(
+                      labelText: 'Account',
+                      prefixIcon: Icon(Icons.account_tree_rounded),
+                    ),
+                    items: accounts
+                        .map(
+                          (a) => DropdownMenuItem<int>(
+                            value: a.accountId,
+                            child: Text(
+                              [
+                                if (a.accountCode != null &&
+                                    a.accountCode!.trim().isNotEmpty)
+                                  a.accountCode!,
+                                a.accountName ?? 'Account #${a.accountId}',
+                                if (a.accountType != null &&
+                                    a.accountType!.trim().isNotEmpty)
+                                  '(${a.accountType})',
+                              ].join(' '),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      setInner(() => selectedAccountId = v);
+                      accountId.text = (v ?? '').toString();
+                    },
+                  )
+                else
+                  TextField(
+                    controller: accountId,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Account ID',
+                      prefixIcon: Icon(Icons.account_tree_rounded),
+                    ),
                   ),
-                ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: amount,
@@ -213,8 +272,18 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
     final df = DateFormat('yyyy-MM-dd');
     String dateLabel(DateTime? d) => d == null ? 'Any' : df.format(d);
 
-    return Scaffold(
+    final scaffold = Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.fromMenu,
+        leading: widget.fromMenu
+            ? Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Menu',
+                  icon: const Icon(Icons.menu_rounded),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              )
+            : null,
         title: const Text('Vouchers'),
         actions: [
           IconButton(
@@ -224,6 +293,11 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
           ),
         ],
       ),
+      drawer: widget.fromMenu
+          ? DashboardSidebar(
+              onSelect: (label) => widget.onMenuSelect?.call(context, label),
+            )
+          : null,
       floatingActionButton: FloatingActionButton(
         onPressed: _openCreateDialog,
         child: const Icon(Icons.add_rounded),
@@ -322,5 +396,8 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
                   ),
       ),
     );
+
+    if (!widget.fromMenu) return scaffold;
+    return PopScope(canPop: false, child: scaffold);
   }
 }

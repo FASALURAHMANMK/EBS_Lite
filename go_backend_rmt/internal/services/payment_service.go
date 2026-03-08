@@ -167,6 +167,9 @@ func (s *PaymentService) CreatePayment(companyID, locationID, userID int, req *m
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
+	// Best-effort: post to accounting ledger (idempotent by reference).
+	_ = (&LedgerService{db: s.db}).RecordSupplierPayment(companyID, p.PaymentID, userID)
+
 	p.SupplierID = supplierID
 	p.PurchaseID = req.PurchaseID
 	p.LocationID = &locationID

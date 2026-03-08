@@ -20,9 +20,17 @@ import 'package:ebs_lite/features/admin/presentation/pages/admin_page.dart';
 import 'package:ebs_lite/features/auth/controllers/auth_permissions_provider.dart';
 import 'package:ebs_lite/features/workflow/presentation/pages/workflow_requests_page.dart';
 import 'package:ebs_lite/features/bulk_io/presentation/pages/import_export_page.dart';
+import '../widgets/dashboard_sidebar.dart';
 
 class SettingsPage extends ConsumerWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({
+    super.key,
+    this.fromMenu = false,
+    this.onMenuSelect,
+  });
+
+  final bool fromMenu;
+  final void Function(BuildContext context, String label)? onMenuSelect;
 
   static const String appVersion =
       String.fromEnvironment('APP_VERSION', defaultValue: 'unknown');
@@ -120,8 +128,25 @@ class SettingsPage extends ConsumerWidget {
     final showAdmin =
         perms.contains('VIEW_USERS') || perms.contains('VIEW_ROLES');
     final showWorkflows = perms.contains('VIEW_WORKFLOWS');
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+    final scaffold = Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: !fromMenu,
+        leading: fromMenu
+            ? Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Menu',
+                  icon: const Icon(Icons.menu_rounded),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              )
+            : null,
+        title: const Text('Settings'),
+      ),
+      drawer: fromMenu
+          ? DashboardSidebar(
+              onSelect: (label) => onMenuSelect?.call(context, label),
+            )
+          : null,
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -303,5 +328,8 @@ class SettingsPage extends ConsumerWidget {
         ],
       ),
     );
+
+    if (!fromMenu) return scaffold;
+    return PopScope(canPop: false, child: scaffold);
   }
 }

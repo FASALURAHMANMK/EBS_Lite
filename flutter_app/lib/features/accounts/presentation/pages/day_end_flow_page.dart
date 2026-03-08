@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../../dashboard/data/models.dart';
+import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
 import '../../data/accounts_repository.dart';
 import '../../data/models.dart';
 import '../../../../core/error_handler.dart';
@@ -11,7 +12,14 @@ import '../../../reports/presentation/pages/report_category_page.dart';
 import '../../../reports/presentation/pages/report_viewer_page.dart';
 
 class DayEndFlowPage extends ConsumerStatefulWidget {
-  const DayEndFlowPage({super.key});
+  const DayEndFlowPage({
+    super.key,
+    this.fromMenu = false,
+    this.onMenuSelect,
+  });
+
+  final bool fromMenu;
+  final void Function(BuildContext context, String label)? onMenuSelect;
 
   @override
   ConsumerState<DayEndFlowPage> createState() => _DayEndFlowPageState();
@@ -130,8 +138,18 @@ class _DayEndFlowPageState extends ConsumerState<DayEndFlowPage> {
     final reg = _openRegister;
     final theme = Theme.of(context);
 
-    return Scaffold(
+    final scaffold = Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.fromMenu,
+        leading: widget.fromMenu
+            ? Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Menu',
+                  icon: const Icon(Icons.menu_rounded),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              )
+            : null,
         title: const Text('Day End'),
         actions: [
           IconButton(
@@ -141,6 +159,11 @@ class _DayEndFlowPageState extends ConsumerState<DayEndFlowPage> {
           ),
         ],
       ),
+      drawer: widget.fromMenu
+          ? DashboardSidebar(
+              onSelect: (label) => widget.onMenuSelect?.call(context, label),
+            )
+          : null,
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -312,5 +335,8 @@ class _DayEndFlowPageState extends ConsumerState<DayEndFlowPage> {
                       ),
       ),
     );
+
+    if (!widget.fromMenu) return scaffold;
+    return PopScope(canPop: false, child: scaffold);
   }
 }

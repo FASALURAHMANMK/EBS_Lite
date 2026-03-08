@@ -161,16 +161,8 @@ func (s *ExpenseService) lookupExpenseIdempotencyKey(companyID, locationID int, 
 }
 
 func (s *ExpenseService) ensureLedgerExpense(companyID, expenseID int, amount float64, userID int) error {
-	ref := fmt.Sprintf("%d", expenseID)
-	_, err := s.db.Exec(`
-		INSERT INTO ledger_entries (company_id, reference, debit, created_by, updated_by)
-		SELECT $1,$2,$3,$4,$4
-		WHERE NOT EXISTS (
-			SELECT 1 FROM ledger_entries
-			WHERE company_id = $1 AND reference = $2 AND debit = $3 AND COALESCE(credit, 0) = 0
-		)
-	`, companyID, ref, amount, userID)
-	return err
+	_ = amount // ledger posting loads canonical amount/date from DB
+	return (&LedgerService{db: s.db}).RecordExpense(companyID, expenseID, userID)
 }
 
 func (s *ExpenseService) GetCategories(companyID int) ([]models.ExpenseCategory, error) {

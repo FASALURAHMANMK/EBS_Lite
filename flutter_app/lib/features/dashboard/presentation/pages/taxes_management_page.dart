@@ -199,7 +199,10 @@ class _TaxesManagementPageState extends ConsumerState<TaxesManagementPage> {
                     alignment: Alignment.centerLeft,
                     child: Text(
                       'Components (total: ${computeComponentsTotal().toStringAsFixed(2)} %)',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelLarge
+                          ?.copyWith(fontWeight: FontWeight.w600),
                     ),
                   ),
                   const SizedBox(height: 8),

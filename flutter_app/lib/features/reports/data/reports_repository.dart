@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -48,6 +50,22 @@ class ReportsRepository {
       mimeType: mimeType,
       subject: shareTitle ?? 'Report ${_endpointSlug(endpoint)}',
       text: 'Please find the attached report.',
+    );
+  }
+
+  Future<Uint8List> downloadReportBytes(
+    String endpoint, {
+    required String format,
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    final qp = <String, dynamic>{
+      if (queryParameters != null) ...queryParameters,
+      'format': format,
+    };
+    return FileTransfer.downloadBytes(
+      _dio,
+      endpoint,
+      queryParameters: qp,
     );
   }
 

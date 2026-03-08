@@ -1,7 +1,7 @@
 # API Parity Report (Flutter <-> OpenAPI)
 
-- Flutter unique paths: **166**
-- OpenAPI unique paths: **204**
+- Flutter unique paths: **177**
+- OpenAPI unique paths: **214**
 
 ## Flutter paths missing from OpenAPI
 - None
@@ -11,15 +11,14 @@
 
 ## OpenAPI paths unused by Flutter
 (Often means the UI is still a placeholder, or endpoints can be removed if truly not needed.)
-- `/auth/refresh-token`
 - `/cash-registers/events`
 - `/collections/outstanding`
 - `/collections/{}`
 - `/collections/{}/receipt`
 - `/currencies/{}`
 - `/customers/{}/credit`
-- `/employees`
-- `/employees/{}`
+- `/employee-roles`
+- `/employee-roles/{}`
 - `/expenses/{}`
 - `/health`
 - `/inventory/barcode`

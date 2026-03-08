@@ -108,18 +108,23 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
+                  _item(context, Icons.grid_view_rounded, 'Dashboard'),
+                  const Divider(height: 24),
                   _section(context, Icons.account_balance_wallet_rounded,
                       'Accounts', const [
                     'Cash Register',
                     'Day Open/Close',
                     'Expenses',
-                    'Expense Categories',
                     'Vouchers',
                     'Ledgers',
                     'Audit'
                   ]),
-                  _section(context, Icons.group_rounded, 'HR',
-                      const ['Attendance Register', 'Payroll Management']),
+                  _section(context, Icons.group_rounded, 'HR', const [
+                    'Departments & Designations',
+                    'Employees',
+                    'Attendance Register',
+                    'Payroll Management'
+                  ]),
                   _section(context, Icons.bar_chart_rounded, 'Reports',
                       const ['Sales', 'Purchase', 'Accounts', 'Inventory']),
                   const Divider(height: 24),

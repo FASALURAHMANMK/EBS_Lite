@@ -3,10 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../../auth/controllers/auth_permissions_provider.dart';
+import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
 import '../../data/workflow_repository.dart';
 
 class WorkflowRequestsPage extends ConsumerStatefulWidget {
-  const WorkflowRequestsPage({super.key});
+  const WorkflowRequestsPage({
+    super.key,
+    this.fromMenu = false,
+    this.onMenuSelect,
+  });
+
+  final bool fromMenu;
+  final void Function(BuildContext context, String label)? onMenuSelect;
 
   @override
   ConsumerState<WorkflowRequestsPage> createState() =>
@@ -44,8 +52,18 @@ class _WorkflowRequestsPageState extends ConsumerState<WorkflowRequestsPage> {
     final perms = ref.watch(authPermissionsProvider);
     final canApprove = perms.contains('APPROVE_WORKFLOWS');
 
-    return Scaffold(
+    final scaffold = Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.fromMenu,
+        leading: widget.fromMenu
+            ? Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Menu',
+                  icon: const Icon(Icons.menu_rounded),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              )
+            : null,
         title: const Text('Approvals'),
         actions: [
           IconButton(
@@ -55,6 +73,11 @@ class _WorkflowRequestsPageState extends ConsumerState<WorkflowRequestsPage> {
           ),
         ],
       ),
+      drawer: widget.fromMenu
+          ? DashboardSidebar(
+              onSelect: (label) => widget.onMenuSelect?.call(context, label),
+            )
+          : null,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _requests.isEmpty
@@ -93,9 +116,10 @@ class _WorkflowRequestsPageState extends ConsumerState<WorkflowRequestsPage> {
                           trailing: canApprove
                               ? Text(
                                   r.status,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600),
                                 )
                               : null,
                         ),
@@ -104,6 +128,9 @@ class _WorkflowRequestsPageState extends ConsumerState<WorkflowRequestsPage> {
                   ),
                 ),
     );
+
+    if (!widget.fromMenu) return scaffold;
+    return PopScope(canPop: false, child: scaffold);
   }
 }
 
@@ -211,7 +238,10 @@ class _WorkflowRequestDetailPageState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Status: ${r.status}',
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelLarge
+                          ?.copyWith(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Text('State ID: ${r.stateId}'),
                   Text('Approver role ID: ${r.approverRoleId}'),

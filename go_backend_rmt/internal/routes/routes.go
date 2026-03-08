@@ -47,6 +47,8 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 	ledgerHandler := handlers.NewLedgerHandler()
 	reportsHandler := handlers.NewReportsHandler()
 	employeeHandler := handlers.NewEmployeeHandler()
+	departmentHandler := handlers.NewDepartmentHandler()
+	designationHandler := handlers.NewDesignationHandler()
 	payrollHandler := handlers.NewPayrollHandler()
 	attendanceHandler := handlers.NewAttendanceHandler()
 	workflowHandler := handlers.NewWorkflowHandler()
@@ -457,6 +459,36 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				employees.DELETE("/:id", middleware.RequirePermission("DELETE_EMPLOYEES"), employeeHandler.DeleteEmployee)
 			}
 
+			// Departments (HR master) routes (require company)
+			departments := protected.Group("/departments")
+			departments.Use(middleware.RequireCompanyAccess())
+			{
+				departments.GET("", middleware.RequirePermission("VIEW_DEPARTMENTS"), departmentHandler.List)
+				departments.POST("", middleware.RequirePermission("MANAGE_DEPARTMENTS"), departmentHandler.Create)
+				departments.PUT("/:id", middleware.RequirePermission("MANAGE_DEPARTMENTS"), departmentHandler.Update)
+				departments.DELETE("/:id", middleware.RequirePermission("MANAGE_DEPARTMENTS"), departmentHandler.Delete)
+			}
+
+			// Designations (HR master) routes (require company)
+			designations := protected.Group("/designations")
+			designations.Use(middleware.RequireCompanyAccess())
+			{
+				designations.GET("", middleware.RequirePermission("VIEW_DESIGNATIONS"), designationHandler.List)
+				designations.POST("", middleware.RequirePermission("MANAGE_DESIGNATIONS"), designationHandler.Create)
+				designations.PUT("/:id", middleware.RequirePermission("MANAGE_DESIGNATIONS"), designationHandler.Update)
+				designations.DELETE("/:id", middleware.RequirePermission("MANAGE_DESIGNATIONS"), designationHandler.Delete)
+			}
+
+			// Backward-compatible alias for older clients.
+			employeeRoles := protected.Group("/employee-roles")
+			employeeRoles.Use(middleware.RequireCompanyAccess())
+			{
+				employeeRoles.GET("", middleware.RequirePermission("VIEW_DESIGNATIONS"), designationHandler.List)
+				employeeRoles.POST("", middleware.RequirePermission("MANAGE_DESIGNATIONS"), designationHandler.Create)
+				employeeRoles.PUT("/:id", middleware.RequirePermission("MANAGE_DESIGNATIONS"), designationHandler.Update)
+				employeeRoles.DELETE("/:id", middleware.RequirePermission("MANAGE_DESIGNATIONS"), designationHandler.Delete)
+			}
+
 			// Attendance routes (require company)
 			attendance := protected.Group("/attendance")
 			attendance.Use(middleware.RequireCompanyAccess())
@@ -464,6 +496,9 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				attendance.POST("/check-in", middleware.RequirePermission("MANAGE_ATTENDANCE"), attendanceHandler.CheckIn)
 				attendance.POST("/check-out", middleware.RequirePermission("MANAGE_ATTENDANCE"), attendanceHandler.CheckOut)
 				attendance.POST("/leave", middleware.RequirePermission("MANAGE_ATTENDANCE"), attendanceHandler.ApplyLeave)
+				attendance.GET("/leaves", middleware.RequirePermission("VIEW_LEAVES"), attendanceHandler.GetLeaves)
+				attendance.PUT("/leaves/:id/approve", middleware.RequirePermission("APPROVE_LEAVES"), attendanceHandler.ApproveLeave)
+				attendance.PUT("/leaves/:id/reject", middleware.RequirePermission("APPROVE_LEAVES"), attendanceHandler.RejectLeave)
 				attendance.GET("/holidays", middleware.RequirePermission("VIEW_ATTENDANCE"), attendanceHandler.GetHolidays)
 				attendance.GET("/records", middleware.RequirePermission("VIEW_ATTENDANCE"), attendanceHandler.GetAttendanceRecords)
 			}
@@ -473,6 +508,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			payrolls.Use(middleware.RequireCompanyAccess())
 			{
 				payrolls.GET("", middleware.RequirePermission("VIEW_PAYROLLS"), payrollHandler.GetPayrolls)
+				payrolls.GET("/calculate", middleware.RequirePermission("CALCULATE_PAYROLLS"), payrollHandler.CalculatePayroll)
 				payrolls.POST("", middleware.RequirePermission("CREATE_PAYROLLS"), payrollHandler.CreatePayroll)
 				payrolls.PUT("/:id/mark-paid", middleware.RequirePermission("PROCESS_PAYROLLS"), payrollHandler.MarkPayrollPaid)
 				payrolls.POST("/:id/components", middleware.RequirePermission("CREATE_PAYROLLS"), payrollHandler.AddSalaryComponent)

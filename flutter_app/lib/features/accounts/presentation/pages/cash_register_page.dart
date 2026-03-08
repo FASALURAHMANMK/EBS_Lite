@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../../dashboard/data/models.dart';
+import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
 import '../../../accounts/data/accounts_repository.dart';
 import '../../../accounts/data/models.dart';
 import '../../../../core/error_handler.dart';
@@ -13,7 +14,14 @@ import '../../controllers/training_mode_notifier.dart';
 import 'day_end_flow_page.dart';
 
 class CashRegisterPage extends ConsumerStatefulWidget {
-  const CashRegisterPage({super.key});
+  const CashRegisterPage({
+    super.key,
+    this.fromMenu = false,
+    this.onMenuSelect,
+  });
+
+  final bool fromMenu;
+  final void Function(BuildContext context, String label)? onMenuSelect;
 
   @override
   ConsumerState<CashRegisterPage> createState() => _CashRegisterPageState();
@@ -468,8 +476,18 @@ class _CashRegisterPageState extends ConsumerState<CashRegisterPage> {
     final theme = Theme.of(context);
     final openRegister = _openRegister;
 
-    return Scaffold(
+    final scaffold = Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.fromMenu,
+        leading: widget.fromMenu
+            ? Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Menu',
+                  icon: const Icon(Icons.menu_rounded),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              )
+            : null,
         title: const Text('Cash Register'),
         actions: [
           IconButton(
@@ -479,6 +497,11 @@ class _CashRegisterPageState extends ConsumerState<CashRegisterPage> {
           ),
         ],
       ),
+      drawer: widget.fromMenu
+          ? DashboardSidebar(
+              onSelect: (label) => widget.onMenuSelect?.call(context, label),
+            )
+          : null,
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -633,6 +656,9 @@ class _CashRegisterPageState extends ConsumerState<CashRegisterPage> {
                   ),
       ),
     );
+
+    if (!widget.fromMenu) return scaffold;
+    return PopScope(canPop: false, child: scaffold);
   }
 }
 

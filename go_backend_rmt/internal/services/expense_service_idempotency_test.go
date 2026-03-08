@@ -42,10 +42,6 @@ func TestExpenseService_CreateExpense_IdempotencyExistingReturnsExisting(t *test
 		WithArgs(idemKey, locationID, companyID).
 		WillReturnRows(sqlmock.NewRows([]string{"expense_id"}).AddRow(99))
 
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO ledger_entries (company_id, reference, debit, created_by, updated_by)")).
-		WithArgs(companyID, "99", req.Amount, userID).
-		WillReturnResult(sqlmock.NewResult(0, 1))
-
 	id, err := svc.CreateExpense(companyID, locationID, userID, req, idemKey)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -113,10 +109,6 @@ func TestExpenseService_CreateExpense_IdempotencyUniqueViolationReturnsExisting(
 	mock.ExpectQuery("(?s)SELECT e\\.expense_id.*FROM expenses e.*WHERE e\\.idempotency_key = \\$1.*").
 		WithArgs(idemKey, locationID, companyID).
 		WillReturnRows(sqlmock.NewRows([]string{"expense_id"}).AddRow(123))
-
-	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO ledger_entries (company_id, reference, debit, created_by, updated_by)")).
-		WithArgs(companyID, "123", req.Amount, userID).
-		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	id, err := svc.CreateExpense(companyID, locationID, userID, req, idemKey)
 	if err != nil {

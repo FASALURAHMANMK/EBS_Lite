@@ -69,14 +69,13 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
                   widget.isSidebarExpanded ? 'Hide sidebar' : 'Show sidebar',
               icon: Icon(
                 widget.isSidebarExpanded
-                    ? Icons.menu_open_rounded
+                    ? Icons.menu_rounded
                     : Icons.menu_rounded,
               ),
               onPressed: widget.onSidebarToggle,
             )
           : null,
-      title: Text(widget.title,
-          style: const TextStyle(fontWeight: FontWeight.w600)),
+      title: Text(widget.title),
       actions: [
         // Online/Sync status chip
         Padding(

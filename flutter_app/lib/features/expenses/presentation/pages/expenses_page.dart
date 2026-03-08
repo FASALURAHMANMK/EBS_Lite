@@ -4,12 +4,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/error_handler.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import '../../../../shared/widgets/app_error_view.dart';
+import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
 import '../../data/expenses_repository.dart';
 import '../../data/models.dart';
 import 'expense_categories_page.dart';
 
 class ExpensesPage extends ConsumerStatefulWidget {
-  const ExpensesPage({super.key});
+  const ExpensesPage({
+    super.key,
+    this.fromMenu = false,
+    this.onMenuSelect,
+  });
+
+  final bool fromMenu;
+  final void Function(BuildContext context, String label)? onMenuSelect;
 
   @override
   ConsumerState<ExpensesPage> createState() => _ExpensesPageState();
@@ -147,11 +155,16 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                       },
                     ),
                     if (!outbox.isOnline)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
                         child: Text(
                           'You are offline. This expense will be queued and synced when online.',
-                          style: TextStyle(fontSize: 12),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
                         ),
                       ),
                   ],
@@ -200,8 +213,18 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final scaffold = Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.fromMenu,
+        leading: widget.fromMenu
+            ? Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Menu',
+                  icon: const Icon(Icons.menu_rounded),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              )
+            : null,
         title: const Text('Expenses'),
         actions: [
           IconButton(
@@ -223,6 +246,11 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
           ),
         ],
       ),
+      drawer: widget.fromMenu
+          ? DashboardSidebar(
+              onSelect: (label) => widget.onMenuSelect?.call(context, label),
+            )
+          : null,
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: FutureBuilder<_ExpensesLoad>(
@@ -328,6 +356,9 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
         child: const Icon(Icons.add_rounded),
       ),
     );
+
+    if (!widget.fromMenu) return scaffold;
+    return PopScope(canPop: false, child: scaffold);
   }
 }
 

@@ -6,10 +6,18 @@ import 'package:intl/intl.dart';
 
 import '../../data/accounts_repository.dart';
 import '../../data/models.dart';
+import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 
 class AuditLogsPage extends ConsumerStatefulWidget {
-  const AuditLogsPage({super.key});
+  const AuditLogsPage({
+    super.key,
+    this.fromMenu = false,
+    this.onMenuSelect,
+  });
+
+  final bool fromMenu;
+  final void Function(BuildContext context, String label)? onMenuSelect;
 
   @override
   ConsumerState<AuditLogsPage> createState() => _AuditLogsPageState();
@@ -131,12 +139,17 @@ class _AuditLogsPageState extends ConsumerState<AuditLogsPage> {
   }
 
   Widget _detail(String label, String value) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+          Text(
+            label,
+            style: theme.textTheme.labelLarge
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 4),
           Text(value),
         ],
@@ -150,8 +163,18 @@ class _AuditLogsPageState extends ConsumerState<AuditLogsPage> {
     String dateLabel(DateTime? d) =>
         d == null ? 'Any' : DateFormat('yyyy-MM-dd').format(d);
 
-    return Scaffold(
+    final scaffold = Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.fromMenu,
+        leading: widget.fromMenu
+            ? Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Menu',
+                  icon: const Icon(Icons.menu_rounded),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              )
+            : null,
         title: const Text('Audit Logs'),
         actions: [
           IconButton(
@@ -161,6 +184,11 @@ class _AuditLogsPageState extends ConsumerState<AuditLogsPage> {
           ),
         ],
       ),
+      drawer: widget.fromMenu
+          ? DashboardSidebar(
+              onSelect: (label) => widget.onMenuSelect?.call(context, label),
+            )
+          : null,
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -259,5 +287,8 @@ class _AuditLogsPageState extends ConsumerState<AuditLogsPage> {
                   ),
       ),
     );
+
+    if (!widget.fromMenu) return scaffold;
+    return PopScope(canPop: false, child: scaffold);
   }
 }

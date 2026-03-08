@@ -1,5 +1,116 @@
 import 'package:intl/intl.dart';
 
+class EmployeeDto {
+  final int employeeId;
+  final int companyId;
+  final int? locationId;
+  final String? employeeCode;
+  final String name;
+  final String? phone;
+  final String? email;
+  final String? address;
+  final String? position;
+  final String? department;
+  final int? departmentId;
+  final int? designationId;
+  final double? salary;
+  final DateTime? hireDate;
+  final bool isActive;
+  final DateTime? lastCheckIn;
+  final DateTime? lastCheckOut;
+  final double? leaveBalance;
+  final int? userId;
+
+  EmployeeDto({
+    required this.employeeId,
+    required this.companyId,
+    required this.locationId,
+    required this.employeeCode,
+    required this.name,
+    required this.phone,
+    required this.email,
+    required this.address,
+    required this.position,
+    required this.department,
+    required this.departmentId,
+    required this.designationId,
+    required this.salary,
+    required this.hireDate,
+    required this.isActive,
+    required this.lastCheckIn,
+    required this.lastCheckOut,
+    required this.leaveBalance,
+    required this.userId,
+  });
+
+  factory EmployeeDto.fromJson(Map<String, dynamic> json) => EmployeeDto(
+        employeeId: _asInt(json['employee_id']),
+        companyId: _asInt(json['company_id']),
+        locationId: _asNullableInt(json['location_id']),
+        employeeCode: json['employee_code']?.toString(),
+        name: (json['name'] ?? '').toString(),
+        phone: json['phone']?.toString(),
+        email: json['email']?.toString(),
+        address: json['address']?.toString(),
+        position: json['position']?.toString(),
+        department: json['department']?.toString(),
+        departmentId: _asNullableInt(json['department_id']),
+        designationId: _asNullableInt(json['designation_id']),
+        salary: _asNullableDouble(json['salary']),
+        hireDate: _asNullableDate(json['hire_date']),
+        isActive: (json['is_active'] as bool?) ?? true,
+        lastCheckIn: _asNullableDate(json['last_check_in']),
+        lastCheckOut: _asNullableDate(json['last_check_out']),
+        leaveBalance: _asNullableDouble(json['leave_balance']),
+        userId: _asNullableInt(json['user_id']),
+      );
+}
+
+class DepartmentDto {
+  final int departmentId;
+  final String name;
+  final bool isActive;
+
+  const DepartmentDto({
+    required this.departmentId,
+    required this.name,
+    required this.isActive,
+  });
+
+  factory DepartmentDto.fromJson(Map<String, dynamic> json) => DepartmentDto(
+        departmentId: _asInt(json['department_id']),
+        name: (json['name'] ?? '').toString(),
+        isActive: (json['is_active'] as bool?) ?? true,
+      );
+}
+
+class DesignationDto {
+  final int designationId;
+  final int? departmentId;
+  final int? defaultAppRoleId;
+  final String name;
+  final String? description;
+  final bool isActive;
+
+  const DesignationDto({
+    required this.designationId,
+    required this.departmentId,
+    required this.defaultAppRoleId,
+    required this.name,
+    required this.description,
+    required this.isActive,
+  });
+
+  factory DesignationDto.fromJson(Map<String, dynamic> json) => DesignationDto(
+        designationId: _asInt(json['designation_id']),
+        departmentId: _asNullableInt(json['department_id']),
+        defaultAppRoleId: _asNullableInt(json['default_app_role_id']),
+        name: (json['name'] ?? '').toString(),
+        description: json['description']?.toString(),
+        isActive: (json['is_active'] as bool?) ?? true,
+      );
+}
+
 class AttendanceDto {
   final int attendanceId;
   final int employeeId;
@@ -45,6 +156,49 @@ class LeaveDto {
         endDate: _asDate(json['end_date']),
         reason: (json['reason'] ?? '').toString(),
         status: (json['status'] ?? '').toString(),
+      );
+}
+
+class LeaveApprovalDto {
+  final int leaveId;
+  final int employeeId;
+  final String employeeName;
+  final DateTime startDate;
+  final DateTime endDate;
+  final String reason;
+  final String status;
+  final int? approvedBy;
+  final DateTime? approvedAt;
+  final String? decisionNotes;
+  final DateTime? createdAt;
+
+  const LeaveApprovalDto({
+    required this.leaveId,
+    required this.employeeId,
+    required this.employeeName,
+    required this.startDate,
+    required this.endDate,
+    required this.reason,
+    required this.status,
+    required this.approvedBy,
+    required this.approvedAt,
+    required this.decisionNotes,
+    required this.createdAt,
+  });
+
+  factory LeaveApprovalDto.fromJson(Map<String, dynamic> json) =>
+      LeaveApprovalDto(
+        leaveId: _asInt(json['leave_id']),
+        employeeId: _asInt(json['employee_id']),
+        employeeName: (json['employee_name'] ?? '').toString(),
+        startDate: _asDate(json['start_date']),
+        endDate: _asDate(json['end_date']),
+        reason: (json['reason'] ?? '').toString(),
+        status: (json['status'] ?? '').toString(),
+        approvedBy: _asNullableInt(json['approved_by']),
+        approvedAt: _asNullableDate(json['approved_at']),
+        decisionNotes: json['decision_notes']?.toString(),
+        createdAt: _asNullableDate(json['created_at']),
       );
 }
 
@@ -102,6 +256,49 @@ class PayrollDto {
         netSalary: _asDouble(json['net_salary']),
         status: (json['status'] ?? '').toString(),
         processedBy: _asNullableInt(json['processed_by']),
+      );
+}
+
+class PayrollCalculationDto {
+  final int employeeId;
+  final String month;
+  final DateTime payPeriodStart;
+  final DateTime payPeriodEnd;
+  final double baseMonthlySalary;
+  final int workingDays;
+  final double payableDays;
+  final double presentDays;
+  final double approvedLeaveDays;
+  final double unpaidAbsenceDays;
+  final double proratedBasicSalary;
+
+  const PayrollCalculationDto({
+    required this.employeeId,
+    required this.month,
+    required this.payPeriodStart,
+    required this.payPeriodEnd,
+    required this.baseMonthlySalary,
+    required this.workingDays,
+    required this.payableDays,
+    required this.presentDays,
+    required this.approvedLeaveDays,
+    required this.unpaidAbsenceDays,
+    required this.proratedBasicSalary,
+  });
+
+  factory PayrollCalculationDto.fromJson(Map<String, dynamic> json) =>
+      PayrollCalculationDto(
+        employeeId: _asInt(json['employee_id']),
+        month: (json['month'] ?? '').toString(),
+        payPeriodStart: _asDate(json['pay_period_start']),
+        payPeriodEnd: _asDate(json['pay_period_end']),
+        baseMonthlySalary: _asDouble(json['base_monthly_salary']),
+        workingDays: _asInt(json['working_days']),
+        payableDays: _asDouble(json['payable_days']),
+        presentDays: _asDouble(json['present_days']),
+        approvedLeaveDays: _asDouble(json['approved_leave_days']),
+        unpaidAbsenceDays: _asDouble(json['unpaid_absence_days']),
+        proratedBasicSalary: _asDouble(json['prorated_basic_salary']),
       );
 }
 
@@ -229,6 +426,14 @@ double _asDouble(dynamic v) {
   if (v is num) return v.toDouble();
   if (v is String) return double.tryParse(v) ?? 0.0;
   return 0.0;
+}
+
+double? _asNullableDouble(dynamic v) {
+  if (v == null) return null;
+  if (v is double) return v;
+  if (v is num) return v.toDouble();
+  if (v is String) return double.tryParse(v);
+  return null;
 }
 
 DateTime _asDate(dynamic v) {

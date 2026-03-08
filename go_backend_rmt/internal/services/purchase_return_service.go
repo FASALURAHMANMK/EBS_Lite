@@ -337,8 +337,7 @@ func (s *PurchaseReturnService) CreatePurchaseReturn(companyID, locationID, user
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 
 	}
-	ledgerService := NewLedgerService()
-	_ = ledgerService.RecordPurchaseReturn(companyID, returnData.ReturnID, totalAmount, userID)
+	_ = (&LedgerService{db: s.db}).RecordPurchaseReturn(companyID, returnData.ReturnID, userID)
 
 	// Set response data
 	returnData.ReturnNumber = returnNumber

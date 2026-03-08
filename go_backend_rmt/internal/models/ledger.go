@@ -28,6 +28,9 @@ type LedgerEntryWithDetails struct {
 }
 
 type AccountBalance struct {
-	AccountID int     `json:"account_id" db:"account_id"`
-	Balance   float64 `json:"balance" db:"balance"`
+	AccountID   int     `json:"account_id" db:"account_id"`
+	AccountCode *string `json:"account_code,omitempty" db:"account_code"`
+	AccountName string  `json:"account_name" db:"account_name"`
+	AccountType string  `json:"account_type" db:"account_type"`
+	Balance     float64 `json:"balance" db:"balance"`
 }

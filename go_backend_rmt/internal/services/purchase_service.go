@@ -502,8 +502,7 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	ledgerService := NewLedgerService()
-	_ = ledgerService.RecordPurchase(companyID, purchase.PurchaseID, totalAmount, userID)
+	_ = (&LedgerService{db: s.db}).RecordPurchase(companyID, purchase.PurchaseID, userID)
 
 	// Set response data
 	purchase.PurchaseNumber = purchaseNumber

@@ -158,3 +158,78 @@ func (h *AttendanceHandler) GetAttendanceRecords(c *gin.Context) {
 	}
 	utils.SuccessResponse(c, "Attendance records retrieved", records)
 }
+
+// GET /attendance/leaves
+func (h *AttendanceHandler) GetLeaves(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	filters := map[string]string{}
+	if status := c.Query("status"); status != "" {
+		filters["status"] = status
+	}
+	if empID := c.Query("employee_id"); empID != "" {
+		filters["employee_id"] = empID
+	}
+
+	leaves, err := h.attendanceService.ListLeaves(companyID, filters)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to list leaves", err)
+		return
+	}
+	utils.SuccessResponse(c, "Leaves retrieved", leaves)
+}
+
+// PUT /attendance/leaves/:id/approve
+func (h *AttendanceHandler) ApproveLeave(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	leaveID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid leave ID", err)
+		return
+	}
+	var req models.LeaveDecisionRequest
+	_ = c.ShouldBindJSON(&req)
+	userID := c.GetInt("user_id")
+	if err := h.attendanceService.DecideLeave(companyID, leaveID, userID, true, req.DecisionNotes); err != nil {
+		if err.Error() == "leave not found" {
+			utils.NotFoundResponse(c, "Leave not found or not pending")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to approve leave", err)
+		return
+	}
+	utils.SuccessResponse(c, "Leave approved", nil)
+}
+
+// PUT /attendance/leaves/:id/reject
+func (h *AttendanceHandler) RejectLeave(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	leaveID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid leave ID", err)
+		return
+	}
+	var req models.LeaveDecisionRequest
+	_ = c.ShouldBindJSON(&req)
+	userID := c.GetInt("user_id")
+	if err := h.attendanceService.DecideLeave(companyID, leaveID, userID, false, req.DecisionNotes); err != nil {
+		if err.Error() == "leave not found" {
+			utils.NotFoundResponse(c, "Leave not found or not pending")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to reject leave", err)
+		return
+	}
+	utils.SuccessResponse(c, "Leave rejected", nil)
+}

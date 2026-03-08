@@ -60,8 +60,16 @@ ColorScheme _darkScheme() {
 /// LIGHT THEME
 final ThemeData lightTheme = () {
   final scheme = _lightScheme();
+  final baseTextTheme = ThemeData(
+    useMaterial3: true,
+    colorScheme: scheme,
+    brightness: Brightness.light,
+  ).textTheme.apply(fontFamily: 'Inter');
   return ThemeData(
     useMaterial3: true,
+    fontFamily: 'Inter',
+    textTheme: baseTextTheme,
+    primaryTextTheme: baseTextTheme,
     colorScheme: scheme,
     scaffoldBackgroundColor: scheme.surface,
     splashFactory: InkSparkle.splashFactory,
@@ -73,6 +81,7 @@ final ThemeData lightTheme = () {
       elevation: 0,
       centerTitle: true,
       titleTextStyle: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 20,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
@@ -100,7 +109,10 @@ final ThemeData lightTheme = () {
       filled: true,
       fillColor: scheme.surface,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      hintStyle: TextStyle(color: scheme.onSurface.withValues(alpha: 0.5)),
+      hintStyle: TextStyle(
+        fontFamily: 'Inter',
+        color: scheme.onSurface.withValues(alpha: 0.5),
+      ),
       border: OutlineInputBorder(
           borderRadius: _rMd, borderSide: BorderSide(color: scheme.outline)),
       enabledBorder: OutlineInputBorder(
@@ -113,7 +125,10 @@ final ThemeData lightTheme = () {
       focusedErrorBorder: OutlineInputBorder(
           borderRadius: _rMd,
           borderSide: BorderSide(color: scheme.error, width: 2)),
-      labelStyle: TextStyle(color: scheme.onSurface.withValues(alpha: 0.8)),
+      labelStyle: TextStyle(
+        fontFamily: 'Inter',
+        color: scheme.onSurface.withValues(alpha: 0.8),
+      ),
     ),
 
     // Buttons
@@ -123,7 +138,8 @@ final ThemeData lightTheme = () {
         foregroundColor: scheme.onPrimary,
         shape: RoundedRectangleBorder(borderRadius: _rMd),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700),
+        textStyle:
+            const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
@@ -133,6 +149,8 @@ final ThemeData lightTheme = () {
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: _rMd),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        textStyle:
+            const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -141,6 +159,8 @@ final ThemeData lightTheme = () {
         foregroundColor: scheme.onSurface,
         shape: RoundedRectangleBorder(borderRadius: _rMd),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        textStyle:
+            const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
@@ -148,6 +168,8 @@ final ThemeData lightTheme = () {
         foregroundColor: scheme.primary,
         shape: RoundedRectangleBorder(borderRadius: _rMd),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        textStyle:
+            const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
       ),
     ),
 
@@ -173,7 +195,7 @@ final ThemeData lightTheme = () {
       backgroundColor: scheme.surface,
       selectedColor: scheme.primary.withValues(alpha: 0.15),
       disabledColor: scheme.surfaceContainerHighest,
-      labelStyle: TextStyle(color: scheme.onSurface),
+      labelStyle: TextStyle(fontFamily: 'Inter', color: scheme.onSurface),
       side: BorderSide(color: scheme.outline),
       shape: RoundedRectangleBorder(borderRadius: _rMd),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -188,10 +210,11 @@ final ThemeData lightTheme = () {
       // Smaller labels; fill selected label with primary color
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
+          fontFamily: 'Inter',
           fontSize: 12,
           fontWeight: states.contains(WidgetState.selected)
               ? FontWeight.w700
-              : FontWeight.w600,
+              : FontWeight.w500,
           color: states.contains(WidgetState.selected)
               ? scheme.primary
               : scheme.onSurface.withValues(alpha: .70),
@@ -212,7 +235,8 @@ final ThemeData lightTheme = () {
       unselectedLabelColor: scheme.onSurface.withValues(alpha: 0.6),
       indicator: UnderlineTabIndicator(
           borderSide: BorderSide(color: scheme.primary, width: 2)),
-      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+      labelStyle:
+          const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700),
     ),
     // NavigationRail (desktop/tablet sidebar)
     navigationRailTheme: NavigationRailThemeData(
@@ -221,13 +245,15 @@ final ThemeData lightTheme = () {
       unselectedIconTheme:
           IconThemeData(color: scheme.onSurface.withValues(alpha: .70)),
       selectedLabelTextStyle: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 13,
         fontWeight: FontWeight.w700,
         color: scheme.primary,
       ),
       unselectedLabelTextStyle: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 13,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w500,
         color: scheme.onSurface.withValues(alpha: .70),
       ),
     ),
@@ -241,8 +267,9 @@ final ThemeData lightTheme = () {
       selectedTileColor: scheme.primary.withValues(alpha: 0.06),
       iconColor: scheme.onSurface.withValues(alpha: .8),
       titleTextStyle: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 14,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w500,
         color: scheme.onSurface,
       ),
     ),
@@ -266,12 +293,25 @@ final ThemeData lightTheme = () {
       backgroundColor: scheme.surface,
       shape: RoundedRectangleBorder(borderRadius: _rLg),
     ),
+    popupMenuTheme: const PopupMenuThemeData(
+      textStyle: TextStyle(fontFamily: 'Inter'),
+    ),
+    dropdownMenuTheme: const DropdownMenuThemeData(
+      textStyle: TextStyle(fontFamily: 'Inter'),
+    ),
+    menuButtonTheme: const MenuButtonThemeData(
+      style: ButtonStyle(
+        textStyle: WidgetStatePropertyAll(TextStyle(fontFamily: 'Inter')),
+      ),
+    ),
 
     // SnackBar & Progress
     snackBarTheme: SnackBarThemeData(
       backgroundColor: scheme.primary,
-      contentTextStyle:
-          TextStyle(color: scheme.onPrimary, fontWeight: FontWeight.w600),
+      contentTextStyle: TextStyle(
+          fontFamily: 'Inter',
+          color: scheme.onPrimary,
+          fontWeight: FontWeight.w500),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: _rMd),
     ),
@@ -283,8 +323,16 @@ final ThemeData lightTheme = () {
 /// DARK THEME
 final ThemeData darkTheme = () {
   final scheme = _darkScheme();
+  final baseTextTheme = ThemeData(
+    useMaterial3: true,
+    colorScheme: scheme,
+    brightness: Brightness.dark,
+  ).textTheme.apply(fontFamily: 'Inter');
   return ThemeData(
     useMaterial3: true,
+    fontFamily: 'Inter',
+    textTheme: baseTextTheme,
+    primaryTextTheme: baseTextTheme,
     colorScheme: scheme,
     scaffoldBackgroundColor: scheme.surface,
     splashFactory: InkSparkle.splashFactory,
@@ -294,6 +342,7 @@ final ThemeData darkTheme = () {
       elevation: 0,
       centerTitle: true,
       titleTextStyle: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 20,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
@@ -316,7 +365,10 @@ final ThemeData darkTheme = () {
       filled: true,
       fillColor: scheme.surface,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      hintStyle: TextStyle(color: scheme.onSurface.withValues(alpha: 0.55)),
+      hintStyle: TextStyle(
+        fontFamily: 'Inter',
+        color: scheme.onSurface.withValues(alpha: 0.55),
+      ),
       border: OutlineInputBorder(
           borderRadius: _rMd, borderSide: BorderSide(color: scheme.outline)),
       enabledBorder: OutlineInputBorder(
@@ -329,7 +381,10 @@ final ThemeData darkTheme = () {
       focusedErrorBorder: OutlineInputBorder(
           borderRadius: _rMd,
           borderSide: BorderSide(color: scheme.error, width: 2)),
-      labelStyle: TextStyle(color: scheme.onSurface.withValues(alpha: 0.9)),
+      labelStyle: TextStyle(
+        fontFamily: 'Inter',
+        color: scheme.onSurface.withValues(alpha: 0.9),
+      ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
@@ -337,7 +392,8 @@ final ThemeData darkTheme = () {
         foregroundColor: scheme.onPrimary,
         shape: RoundedRectangleBorder(borderRadius: _rMd),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700),
+        textStyle:
+            const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
@@ -347,6 +403,8 @@ final ThemeData darkTheme = () {
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: _rMd),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        textStyle:
+            const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -355,6 +413,8 @@ final ThemeData darkTheme = () {
         foregroundColor: scheme.onSurface,
         shape: RoundedRectangleBorder(borderRadius: _rMd),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        textStyle:
+            const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
@@ -362,6 +422,8 @@ final ThemeData darkTheme = () {
         foregroundColor: scheme.primary,
         shape: RoundedRectangleBorder(borderRadius: _rMd),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        textStyle:
+            const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
       ),
     ),
     checkboxTheme: CheckboxThemeData(
@@ -383,7 +445,7 @@ final ThemeData darkTheme = () {
       backgroundColor: scheme.surface,
       selectedColor: scheme.primary.withValues(alpha: 0.18),
       disabledColor: scheme.surfaceContainerHighest,
-      labelStyle: TextStyle(color: scheme.onSurface),
+      labelStyle: TextStyle(fontFamily: 'Inter', color: scheme.onSurface),
       side: BorderSide(color: scheme.outline),
       shape: RoundedRectangleBorder(borderRadius: _rMd),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -396,10 +458,11 @@ final ThemeData darkTheme = () {
       // Smaller labels; fill selected label with primary color
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
+          fontFamily: 'Inter',
           fontSize: 12,
           fontWeight: states.contains(WidgetState.selected)
               ? FontWeight.w700
-              : FontWeight.w600,
+              : FontWeight.w500,
           color: states.contains(WidgetState.selected)
               ? scheme.primary
               : scheme.onSurface.withValues(alpha: .75),
@@ -418,7 +481,8 @@ final ThemeData darkTheme = () {
       unselectedLabelColor: scheme.onSurface.withValues(alpha: 0.7),
       indicator: UnderlineTabIndicator(
           borderSide: BorderSide(color: scheme.primary, width: 2)),
-      labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+      labelStyle:
+          const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700),
     ),
     navigationRailTheme: NavigationRailThemeData(
       backgroundColor: scheme.surface,
@@ -426,13 +490,15 @@ final ThemeData darkTheme = () {
       unselectedIconTheme:
           IconThemeData(color: scheme.onSurface.withValues(alpha: .75)),
       selectedLabelTextStyle: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 13,
         fontWeight: FontWeight.w700,
         color: scheme.primary,
       ),
       unselectedLabelTextStyle: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 13,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w500,
         color: scheme.onSurface.withValues(alpha: .75),
       ),
     ),
@@ -444,8 +510,9 @@ final ThemeData darkTheme = () {
       selectedTileColor: scheme.primary.withValues(alpha: 0.09),
       iconColor: scheme.onSurface.withValues(alpha: .9),
       titleTextStyle: TextStyle(
+        fontFamily: 'Inter',
         fontSize: 14,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w500,
         color: scheme.onSurface,
       ),
     ),
@@ -465,10 +532,23 @@ final ThemeData darkTheme = () {
       backgroundColor: scheme.surface,
       shape: RoundedRectangleBorder(borderRadius: _rLg),
     ),
+    popupMenuTheme: const PopupMenuThemeData(
+      textStyle: TextStyle(fontFamily: 'Inter'),
+    ),
+    dropdownMenuTheme: const DropdownMenuThemeData(
+      textStyle: TextStyle(fontFamily: 'Inter'),
+    ),
+    menuButtonTheme: const MenuButtonThemeData(
+      style: ButtonStyle(
+        textStyle: WidgetStatePropertyAll(TextStyle(fontFamily: 'Inter')),
+      ),
+    ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: scheme.primary,
-      contentTextStyle:
-          TextStyle(color: scheme.onPrimary, fontWeight: FontWeight.w600),
+      contentTextStyle: TextStyle(
+          fontFamily: 'Inter',
+          color: scheme.onPrimary,
+          fontWeight: FontWeight.w500),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: _rMd),
     ),

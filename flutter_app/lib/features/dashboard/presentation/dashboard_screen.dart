@@ -152,7 +152,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         drawer: DashboardSidebar(
           onSelect: (label) {
             Navigator.of(context).maybePop();
-            DashboardNavigation.pushForLabel(context, label);
+            if (label == 'Dashboard') {
+              setState(() => _bottomIndex = 0);
+              return;
+            }
+            DashboardNavigation.pushForLabel(context, label, fromMenu: true);
           },
         ),
         body: IndexedStack(
@@ -193,18 +197,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       );
     }
 
-    void openWide(Widget page) {
+    void pushWide(Widget page) {
       _wideNavigatorKey.currentState?.push(
         MaterialPageRoute(builder: (_) => page),
       );
     }
 
-    void goWideHome() {
-      _wideNavigatorKey.currentState?.popUntil((r) => r.isFirst);
+    void openWideRoot(Widget page) {
+      _wideNavigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => page),
+        (r) => false,
+      );
     }
 
     void toggleDesktopSidebar() {
       setState(() => _desktopSidebarExpanded = !_desktopSidebarExpanded);
+    }
+
+    Widget wideHome() => _DashboardWideHome(
+          onOpen: pushWide,
+          isSidebarExpanded: _desktopSidebarExpanded,
+          onToggleSidebar: toggleDesktopSidebar,
+        );
+
+    void goWideHome() {
+      openWideRoot(wideHome());
     }
 
     return PopScope(
@@ -226,7 +243,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 width: 320,
                 child: DashboardDesktopSidebar(
                   onHome: goWideHome,
-                  onOpen: openWide,
+                  onOpen: openWideRoot,
                 ),
               ),
             Expanded(
@@ -234,11 +251,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 key: _wideNavigatorKey,
                 onGenerateRoute: (settings) => MaterialPageRoute(
                   settings: settings,
-                  builder: (_) => _DashboardWideHome(
-                    onOpen: openWide,
-                    isSidebarExpanded: _desktopSidebarExpanded,
-                    onToggleSidebar: toggleDesktopSidebar,
-                  ),
+                  builder: (_) => wideHome(),
                 ),
               ),
             ),

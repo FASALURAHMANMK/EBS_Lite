@@ -15,6 +15,13 @@ class TrainingModeOverlay extends ConsumerWidget {
     if (!trainingEnabled) return child;
 
     final theme = Theme.of(context);
+    final trainingBannerTextStyle = (theme.textTheme.labelLarge ??
+            theme.textTheme.bodyMedium ??
+            const TextStyle())
+        .copyWith(
+      color: Colors.white,
+      fontWeight: FontWeight.w600,
+    );
     return Stack(
       children: [
         child,
@@ -54,13 +61,10 @@ class TrainingModeOverlay extends ConsumerWidget {
                     children: [
                       const Icon(Icons.school_rounded, color: Colors.white),
                       const SizedBox(width: 8),
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'TRAINING MODE — transactions will not post to stock/cash',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: trainingBannerTextStyle,
                         ),
                       ),
                     ],

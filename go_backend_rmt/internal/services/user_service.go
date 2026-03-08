@@ -70,7 +70,7 @@ func (s *UserService) GetUsers(companyID *int, locationID *int) ([]models.UserRe
 	return users, nil
 }
 
-func (s *UserService) CreateUser(req *models.CreateUserRequest) (*models.UserResponse, error) {
+func (s *UserService) CreateUser(req *models.CreateUserRequest, creatorUserID int) (*models.UserResponse, error) {
 	// Check if username or email already exists
 	exists, err := s.checkUserExists(req.Username, req.Email)
 	if err != nil {
@@ -86,24 +86,61 @@ func (s *UserService) CreateUser(req *models.CreateUserRequest) (*models.UserRes
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
 	// Insert user
 	query := `
 		INSERT INTO users (company_id, location_id, role_id, username, email, password_hash,
 						  first_name, last_name, phone, preferred_language, secondary_language)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		RETURNING user_id, created_at
+		RETURNING user_id
 	`
 
 	var userID int
-	var createdAt string
-	err = s.db.QueryRow(query,
+	err = tx.QueryRow(query,
 		req.CompanyID, req.LocationID, req.RoleID, req.Username, req.Email,
 		hashedPassword, req.FirstName, req.LastName, req.Phone,
 		req.PreferredLanguage, req.SecondaryLanguage,
-	).Scan(&userID, &createdAt)
-
+	).Scan(&userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+
+	// Ensure every app user is also an employee (employees can exist without a user).
+	employeeName := req.Username
+	if req.FirstName != nil || req.LastName != nil {
+		first := ""
+		last := ""
+		if req.FirstName != nil {
+			first = strings.TrimSpace(*req.FirstName)
+		}
+		if req.LastName != nil {
+			last = strings.TrimSpace(*req.LastName)
+		}
+		full := strings.TrimSpace(strings.TrimSpace(first + " " + last))
+		if full != "" {
+			employeeName = full
+		}
+	}
+	if _, err := tx.Exec(`
+		INSERT INTO employees (
+			company_id, location_id, user_id, name, phone, email,
+			is_active, created_by, updated_by
+		)
+		SELECT $1,$2,$3,$4,$5,$6,TRUE,$7,$7
+		WHERE NOT EXISTS (
+			SELECT 1 FROM employees WHERE company_id = $1 AND user_id = $3 AND is_deleted = FALSE
+		)
+	`, req.CompanyID, req.LocationID, userID, employeeName, req.Phone, req.Email, creatorUserID); err != nil {
+		return nil, fmt.Errorf("failed to create employee for user: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit user create: %w", err)
 	}
 
 	// Return created user

@@ -28,7 +28,21 @@ class FlutterCall:
 
 
 _DIO_CALL_RE = re.compile(
-    r"\b(_dio|dio)\.(get|post|put|delete)\(\s*'([^']+)'",
+    # Heuristic: treat any identifier that ends with "dio" (case-sensitive),
+    # plus the common `_dio`/`dio` names, as a Dio instance.
+    #
+    # This catches patterns like:
+    #   _dio.get('/customers')
+    #   dio.post("/auth/login", ...)
+    #   refreshDio.post(
+    #       '/auth/refresh-token',
+    #       data: {...},
+    #   )
+    #
+    # Note: This is intentionally regex-based and may have false positives if
+    # another object uses `.get/.post` with a literal path. The "endswith dio"
+    # filter keeps the noise low in this repo.
+    r"\b([A-Za-z_][A-Za-z0-9_]*(?:Dio|dio)|_dio|dio)\.(get|post|put|delete|patch)\(\s*['\"]([^'\"]+)['\"]",
     re.MULTILINE,
 )
 

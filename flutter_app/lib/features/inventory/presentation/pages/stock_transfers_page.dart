@@ -207,8 +207,10 @@ class _TransferTile extends ConsumerWidget {
               color: _statusColor(context),
               borderRadius: BorderRadius.circular(999)),
           child: Text(item.status.replaceAll('_', ' '),
-              style:
-                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              )),
         ),
         const SizedBox(width: 8),
         Expanded(

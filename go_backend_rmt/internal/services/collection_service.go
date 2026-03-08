@@ -139,6 +139,8 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 					)
 				}
 			}
+			// Best-effort: ensure accounting ledger entries exist (idempotent by reference).
+			_ = (&LedgerService{db: s.db}).RecordCollection(companyID, existing.CollectionID, userID)
 			return existing, nil
 		}
 	}
@@ -343,6 +345,9 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
+
+	// Best-effort: post to accounting ledger (idempotent by reference).
+	_ = (&LedgerService{db: s.db}).RecordCollection(companyID, col.CollectionID, userID)
 
 	col.CustomerID = req.CustomerID
 	col.LocationID = locationID

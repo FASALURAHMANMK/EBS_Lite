@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../../dashboard/data/models.dart';
@@ -137,6 +138,23 @@ class _ReportViewerPageState extends ConsumerState<ReportViewerPage> {
     }
   }
 
+  Future<void> _printPdf() async {
+    try {
+      final bytes =
+          await ref.read(reportsRepositoryProvider).downloadReportBytes(
+                widget.config.endpoint,
+                format: 'pdf',
+                queryParameters: _buildQuery(),
+              );
+      await Printing.layoutPdf(onLayout: (_) async => bytes);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ErrorHandler.message(e))),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final locationState = ref.watch(locationNotifierProvider);
@@ -152,10 +170,17 @@ class _ReportViewerPageState extends ConsumerState<ReportViewerPage> {
             icon: const Icon(Icons.refresh_rounded),
           ),
           PopupMenuButton<String>(
-            onSelected: _export,
+            onSelected: (v) {
+              if (v == 'print') {
+                _printPdf();
+              } else {
+                _export(v);
+              }
+            },
             itemBuilder: (context) => const [
               PopupMenuItem(value: 'pdf', child: Text('Export PDF')),
               PopupMenuItem(value: 'excel', child: Text('Export Excel')),
+              PopupMenuItem(value: 'print', child: Text('Print PDF')),
             ],
           ),
         ],
@@ -346,55 +371,120 @@ class _ReportDataView extends StatelessWidget {
       if (list.isEmpty) {
         return const Center(child: Text('No results found'));
       }
+      final allMaps = list.every((e) => e is Map);
+      if (allMaps) {
+        final rows = list.cast<Map>();
+        return _MapTableView(rows: rows);
+      }
       return ListView.separated(
         padding: const EdgeInsets.all(12),
         itemCount: list.length,
         separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, i) {
-          final row = list[i];
-          return Card(
-            elevation: 0,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: _buildRow(row),
-            ),
-          );
-        },
+        itemBuilder: (context, i) => Card(
+          elevation: 0,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(list[i].toString()),
+          ),
+        ),
       );
     }
     if (data is Map) {
-      return ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          Card(
-            elevation: 0,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: _buildRow(data),
-            ),
-          ),
-        ],
-      );
+      final map = (data as Map).cast<dynamic, dynamic>();
+      return _KeyValueTableView(map: map);
     }
     return Center(child: Text(data.toString()));
   }
+}
 
-  Widget _buildRow(dynamic row) {
-    if (row is Map) {
-      final entries =
-          row.entries.map((e) => MapEntry(e.key.toString(), e.value)).toList();
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: entries
-            .map(
-              (e) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text('${e.key}: ${e.value ?? '—'}'),
-              ),
-            )
-            .toList(),
-      );
+class _KeyValueTableView extends StatelessWidget {
+  const _KeyValueTableView({required this.map});
+
+  final Map<dynamic, dynamic> map;
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = map.entries
+        .map((e) => MapEntry(e.key.toString(), e.value))
+        .toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        Card(
+          elevation: 0,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columns: const [
+                DataColumn(label: Text('Field')),
+                DataColumn(label: Text('Value')),
+              ],
+              rows: entries
+                  .map(
+                    (e) => DataRow(
+                      cells: [
+                        DataCell(Text(e.key)),
+                        DataCell(Text((e.value ?? '—').toString())),
+                      ],
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MapTableView extends StatelessWidget {
+  const _MapTableView({required this.rows});
+
+  final List<Map> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    final columns = <String>{};
+    for (final r in rows.take(200)) {
+      for (final k in r.keys) {
+        columns.add(k.toString());
+      }
     }
-    return Text(row.toString());
+    final orderedCols = columns.toList()..sort();
+
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Card(
+        elevation: 0,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 720),
+            child: SingleChildScrollView(
+              child: DataTable(
+                columns:
+                    orderedCols.map((c) => DataColumn(label: Text(c))).toList(),
+                rows: rows
+                    .take(500)
+                    .map(
+                      (r) => DataRow(
+                        cells: orderedCols
+                            .map(
+                              (c) => DataCell(
+                                Text((r[c] ?? '—').toString()),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

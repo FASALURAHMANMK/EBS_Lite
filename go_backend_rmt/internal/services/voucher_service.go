@@ -24,15 +24,7 @@ func (s *VoucherService) CreateVoucher(companyID, userID int, vType string, req 
 	if err != nil {
 		return 0, fmt.Errorf("failed to create voucher: %w", err)
 	}
-	ledger := NewLedgerService()
-	switch vType {
-	case "payment":
-		_ = ledger.RecordExpense(companyID, id, req.Amount, userID)
-	case "receipt":
-		_ = ledger.RecordSale(companyID, id, req.Amount, userID)
-	case "journal":
-		// Placeholder for journal entries
-	}
+	_ = (&LedgerService{db: s.db}).RecordVoucher(companyID, id, userID)
 	return id, nil
 }
 

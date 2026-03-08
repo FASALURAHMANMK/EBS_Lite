@@ -85,13 +85,25 @@ class VoucherDto {
 
 class LedgerBalanceDto {
   final int accountId;
+  final String? accountCode;
+  final String? accountName;
+  final String? accountType;
   final double balance;
 
-  LedgerBalanceDto({required this.accountId, required this.balance});
+  LedgerBalanceDto({
+    required this.accountId,
+    required this.accountCode,
+    required this.accountName,
+    required this.accountType,
+    required this.balance,
+  });
 
   factory LedgerBalanceDto.fromJson(Map<String, dynamic> json) =>
       LedgerBalanceDto(
         accountId: _asInt(json['account_id']),
+        accountCode: json['account_code']?.toString(),
+        accountName: json['account_name']?.toString(),
+        accountType: json['account_type']?.toString(),
         balance: _asDouble(json['balance']),
       );
 }

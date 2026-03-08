@@ -952,8 +952,9 @@ func (s *SalesService) CreateSaleWithOptions(
 
 	if !opts.IsTraining {
 		// Record ledger entry
-		ledgerService := NewLedgerService()
-		_ = ledgerService.RecordSale(companyID, saleID, totalAmount, userID)
+		if err := (&LedgerService{db: s.db}).RecordSale(companyID, saleID, userID); err != nil {
+			log.Printf("sales_service: failed to post sale %d to ledger: %v", saleID, err)
+		}
 
 		// Award loyalty points if customer is provided (async operation)
 		if req.CustomerID != nil {

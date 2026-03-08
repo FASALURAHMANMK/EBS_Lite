@@ -3,11 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/accounts_repository.dart';
 import '../../data/models.dart';
+import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import 'ledger_entries_page.dart';
 
 class LedgersPage extends ConsumerStatefulWidget {
-  const LedgersPage({super.key});
+  const LedgersPage({
+    super.key,
+    this.fromMenu = false,
+    this.onMenuSelect,
+  });
+
+  final bool fromMenu;
+  final void Function(BuildContext context, String label)? onMenuSelect;
 
   @override
   ConsumerState<LedgersPage> createState() => _LedgersPageState();
@@ -52,14 +60,31 @@ class _LedgersPageState extends ConsumerState<LedgersPage> {
   @override
   Widget build(BuildContext context) {
     final query = _search.text.trim();
+    final lower = query.toLowerCase();
     final filtered = query.isEmpty
         ? _balances
-        : _balances
-            .where((b) => b.accountId.toString().contains(query))
-            .toList();
+        : _balances.where((b) {
+            if (b.accountId.toString().contains(query)) return true;
+            final code = (b.accountCode ?? '').toLowerCase();
+            final name = (b.accountName ?? '').toLowerCase();
+            final type = (b.accountType ?? '').toLowerCase();
+            return code.contains(lower) ||
+                name.contains(lower) ||
+                type.contains(lower);
+          }).toList();
 
-    return Scaffold(
+    final scaffold = Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.fromMenu,
+        leading: widget.fromMenu
+            ? Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Menu',
+                  icon: const Icon(Icons.menu_rounded),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              )
+            : null,
         title: const Text('Ledgers'),
         actions: [
           IconButton(
@@ -69,6 +94,11 @@ class _LedgersPageState extends ConsumerState<LedgersPage> {
           ),
         ],
       ),
+      drawer: widget.fromMenu
+          ? DashboardSidebar(
+              onSelect: (label) => widget.onMenuSelect?.call(context, label),
+            )
+          : null,
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -81,7 +111,7 @@ class _LedgersPageState extends ConsumerState<LedgersPage> {
                         child: TextField(
                           controller: _search,
                           decoration: const InputDecoration(
-                            hintText: 'Search by account ID',
+                            hintText: 'Search code, name, type, or ID',
                             prefixIcon: Icon(Icons.search_rounded),
                           ),
                           onChanged: (_) => setState(() {}),
@@ -104,9 +134,22 @@ class _LedgersPageState extends ConsumerState<LedgersPage> {
                                     child: ListTile(
                                       leading:
                                           const Icon(Icons.menu_book_rounded),
-                                      title: Text('Account #${b.accountId}'),
+                                      title: Text(
+                                        b.accountName == null ||
+                                                b.accountName!.trim().isEmpty
+                                            ? 'Account #${b.accountId}'
+                                            : '${b.accountCode ?? ''} ${b.accountName}'
+                                                .trim(),
+                                      ),
                                       subtitle: Text(
-                                          'Balance: ${b.balance.toStringAsFixed(2)}'),
+                                        [
+                                          if (b.accountType != null &&
+                                              b.accountType!.trim().isNotEmpty)
+                                            b.accountType!,
+                                          'Balance: ${b.balance.toStringAsFixed(2)}',
+                                          'ID: ${b.accountId}',
+                                        ].join(' • '),
+                                      ),
                                       trailing: const Icon(
                                           Icons.chevron_right_rounded),
                                       onTap: () => Navigator.of(context).push(
@@ -125,5 +168,8 @@ class _LedgersPageState extends ConsumerState<LedgersPage> {
                   ),
       ),
     );
+
+    if (!widget.fromMenu) return scaffold;
+    return PopScope(canPop: false, child: scaffold);
   }
 }

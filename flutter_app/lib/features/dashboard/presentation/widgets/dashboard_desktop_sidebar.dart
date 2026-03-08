@@ -15,7 +15,6 @@ import 'package:ebs_lite/features/purchases/presentation/pages/goods_receipts_pa
 import 'package:ebs_lite/features/purchases/presentation/pages/purchase_orders_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/purchase_returns_page.dart';
 import 'package:ebs_lite/features/reports/presentation/pages/report_category_page.dart';
-import 'package:ebs_lite/features/reports/presentation/pages/reports_page.dart';
 import 'package:ebs_lite/features/reports/presentation/report_categories.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/invoices_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/quotes_page.dart';
@@ -302,14 +301,6 @@ class DashboardDesktopSidebar extends ConsumerWidget {
                 ),
                 _child(
                   context,
-                  icon: Icons.category_rounded,
-                  label: 'Expense Categories',
-                  onTap: () => onOpen(
-                    DashboardNavigation.pageForLabel('Expense Categories'),
-                  ),
-                ),
-                _child(
-                  context,
                   icon: Icons.receipt_long_rounded,
                   label: 'Vouchers',
                   onTap: () =>
@@ -338,6 +329,22 @@ class DashboardDesktopSidebar extends ConsumerWidget {
               children: [
                 _child(
                   context,
+                  icon: Icons.account_tree_rounded,
+                  label: 'Departments & Designations',
+                  onTap: () => onOpen(
+                    DashboardNavigation.pageForLabel(
+                        'Departments & Designations'),
+                  ),
+                ),
+                _child(
+                  context,
+                  icon: Icons.badge_rounded,
+                  label: 'Employees',
+                  onTap: () =>
+                      onOpen(DashboardNavigation.pageForLabel('Employees')),
+                ),
+                _child(
+                  context,
                   icon: Icons.how_to_reg_rounded,
                   label: 'Attendance Register',
                   onTap: () => onOpen(DashboardNavigation.pageForLabel(
@@ -359,12 +366,6 @@ class DashboardDesktopSidebar extends ConsumerWidget {
               icon: Icons.bar_chart_rounded,
               title: 'Reports',
               children: [
-                _child(
-                  context,
-                  icon: Icons.bar_chart_rounded,
-                  label: 'All Reports',
-                  onTap: () => onOpen(const ReportsPage()),
-                ),
                 _child(
                   context,
                   icon: Icons.storefront_rounded,
@@ -532,7 +533,6 @@ class DashboardDesktopSidebar extends ConsumerWidget {
       visualDensity: VisualDensity.compact,
       leading: Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
       title: Text(label),
-      trailing: const Icon(Icons.chevron_right_rounded, size: 18),
       contentPadding: const EdgeInsets.only(left: 16, right: 12),
       onTap: onTap,
     );

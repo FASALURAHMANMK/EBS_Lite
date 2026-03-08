@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'report_viewer_page.dart';
+import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
 
 class ReportConfig {
   final String title;
@@ -31,15 +32,36 @@ class ReportCategoryPage extends StatelessWidget {
     super.key,
     required this.title,
     required this.reports,
+    this.fromMenu = false,
+    this.onMenuSelect,
   });
 
   final String title;
   final List<ReportConfig> reports;
+  final bool fromMenu;
+  final void Function(BuildContext context, String label)? onMenuSelect;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
+    final scaffold = Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: !fromMenu,
+        leading: fromMenu
+            ? Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Menu',
+                  icon: const Icon(Icons.menu_rounded),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              )
+            : null,
+        title: Text(title),
+      ),
+      drawer: fromMenu
+          ? DashboardSidebar(
+              onSelect: (label) => onMenuSelect?.call(context, label),
+            )
+          : null,
       body: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: reports.length,
@@ -63,5 +85,8 @@ class ReportCategoryPage extends StatelessWidget {
         },
       ),
     );
+
+    if (!fromMenu) return scaffold;
+    return PopScope(canPop: false, child: scaffold);
   }
 }

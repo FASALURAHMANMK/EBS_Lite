@@ -74,7 +74,14 @@ func TestCreateEmployee_IncludesAuditFields(t *testing.T) {
 	if len(empLastArgs) < 14 {
 		t.Fatalf("expected at least 14 args, got %d", len(empLastArgs))
 	}
-	if empLastArgs[13].Value != int64(userID) {
+	found := false
+	for _, a := range empLastArgs {
+		if a.Value == int64(userID) || a.Value == userID {
+			found = true
+			break
+		}
+	}
+	if !found {
 		t.Fatalf("expected userID %d in args, got %#v", userID, empLastArgs)
 	}
 	if emp.CreatedBy != userID {

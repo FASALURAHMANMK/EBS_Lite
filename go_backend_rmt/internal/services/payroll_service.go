@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"math"
 	"time"
 
 	"erp-backend/internal/database"
@@ -75,7 +76,16 @@ func (s *PayrollService) CreatePayroll(companyID int, req *models.CreatePayrollR
 		return nil, fmt.Errorf("invalid month format")
 	}
 	end := start.AddDate(0, 1, -1)
-	gross := req.BasicSalary + req.Allowances
+	basicSalary := req.BasicSalary
+	if req.AutoCalculate != nil && *req.AutoCalculate {
+		calc, err := s.CalculatePayroll(companyID, req.EmployeeID, req.Month, &basicSalary)
+		if err != nil {
+			return nil, err
+		}
+		basicSalary = calc.ProratedBasicSalary
+	}
+
+	gross := basicSalary + req.Allowances
 	net := gross - req.Deductions
 	query := `
                 INSERT INTO payroll (employee_id, pay_period_start, pay_period_end, basic_salary,
@@ -84,7 +94,7 @@ func (s *PayrollService) CreatePayroll(companyID int, req *models.CreatePayrollR
                 RETURNING payroll_id, created_at`
 	var p models.Payroll
 	err = s.db.QueryRow(query,
-		req.EmployeeID, start, end, req.BasicSalary, gross, req.Deductions, net, userID,
+		req.EmployeeID, start, end, basicSalary, gross, req.Deductions, net, userID,
 	).Scan(&p.PayrollID, &p.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payroll: %w", err)
@@ -92,7 +102,7 @@ func (s *PayrollService) CreatePayroll(companyID int, req *models.CreatePayrollR
 	p.EmployeeID = req.EmployeeID
 	p.PayPeriodStart = start
 	p.PayPeriodEnd = end
-	p.BasicSalary = req.BasicSalary
+	p.BasicSalary = basicSalary
 	p.GrossSalary = gross
 	p.TotalDeductions = req.Deductions
 	p.NetSalary = net
@@ -101,14 +111,52 @@ func (s *PayrollService) CreatePayroll(companyID int, req *models.CreatePayrollR
 	return &p, nil
 }
 
-func (s *PayrollService) MarkPayrollPaid(payrollID, companyID int) error {
+func (s *PayrollService) MarkPayrollPaid(payrollID, companyID, userID int) error {
+	var basic float64
+	var payPeriodEnd time.Time
+	err := s.db.QueryRow(`
+		SELECT p.basic_salary, p.pay_period_end
+		FROM payroll p
+		JOIN employees e ON p.employee_id = e.employee_id
+		WHERE p.payroll_id = $1 AND e.company_id = $2
+	`, payrollID, companyID).Scan(&basic, &payPeriodEnd)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf("payroll not found")
+		}
+		return fmt.Errorf("failed to load payroll: %w", err)
+	}
+
+	var compTotal float64
+	if err := s.db.QueryRow(`SELECT COALESCE(SUM(amount),0) FROM salary_components WHERE payroll_id = $1 AND is_deleted = FALSE`, payrollID).Scan(&compTotal); err != nil {
+		return fmt.Errorf("failed to sum salary components: %w", err)
+	}
+	var advTotal float64
+	if err := s.db.QueryRow(`SELECT COALESCE(SUM(amount),0) FROM payroll_advances WHERE payroll_id = $1 AND is_deleted = FALSE`, payrollID).Scan(&advTotal); err != nil {
+		return fmt.Errorf("failed to sum advances: %w", err)
+	}
+	var dedTotal float64
+	if err := s.db.QueryRow(`SELECT COALESCE(SUM(amount),0) FROM payroll_deductions WHERE payroll_id = $1 AND is_deleted = FALSE`, payrollID).Scan(&dedTotal); err != nil {
+		return fmt.Errorf("failed to sum deductions: %w", err)
+	}
+
+	gross := basic + compTotal
+	totalDeductions := advTotal + dedTotal
+	net := gross - totalDeductions
+	if net < 0 {
+		net = 0
+	}
+
 	result, err := s.db.Exec(`
-                UPDATE payroll p
-                SET status = 'PAID', updated_at = CURRENT_TIMESTAMP
-                FROM employees e
-                WHERE p.payroll_id = $1 AND p.employee_id = e.employee_id AND e.company_id = $2`,
-		payrollID, companyID,
-	)
+		UPDATE payroll p
+		SET status = 'PAID',
+		    gross_salary = $1,
+		    total_deductions = $2,
+		    net_salary = $3,
+		    updated_at = CURRENT_TIMESTAMP
+		FROM employees e
+		WHERE p.payroll_id = $4 AND p.employee_id = e.employee_id AND e.company_id = $5
+	`, gross, totalDeductions, net, payrollID, companyID)
 	if err != nil {
 		return fmt.Errorf("failed to mark payroll paid: %w", err)
 	}
@@ -119,7 +167,192 @@ func (s *PayrollService) MarkPayrollPaid(payrollID, companyID int) error {
 	if rows == 0 {
 		return fmt.Errorf("payroll not found")
 	}
+
+	ledger := NewLedgerService()
+	if err := ledger.RecordPayrollPayment(companyID, payrollID, userID, payPeriodEnd); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func (s *PayrollService) CalculatePayroll(companyID, employeeID int, month string, baseMonthlySalary *float64) (*models.PayrollCalculation, error) {
+	start, err := time.Parse("2006-01", month)
+	if err != nil {
+		return nil, fmt.Errorf("invalid month format")
+	}
+	end := start.AddDate(0, 1, -1)
+
+	var salary sql.NullFloat64
+	if err := s.db.QueryRow(`
+		SELECT salary
+		FROM employees
+		WHERE employee_id = $1 AND company_id = $2 AND is_deleted = FALSE
+	`, employeeID, companyID).Scan(&salary); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("employee not found")
+		}
+		return nil, fmt.Errorf("failed to load employee salary: %w", err)
+	}
+
+	base := 0.0
+	if baseMonthlySalary != nil && *baseMonthlySalary > 0 {
+		base = *baseMonthlySalary
+	} else if salary.Valid && salary.Float64 > 0 {
+		base = salary.Float64
+	}
+	if base <= 0 {
+		return nil, fmt.Errorf("base monthly salary is required (employee salary missing)")
+	}
+
+	type holidayRow struct {
+		Date        time.Time
+		IsRecurring bool
+	}
+	rows, err := s.db.Query(`
+		SELECT date, is_recurring
+		FROM holidays
+		WHERE company_id = $1
+		  AND is_deleted = FALSE
+		  AND (
+			(is_recurring = FALSE AND date BETWEEN $2 AND $3)
+			OR (is_recurring = TRUE AND EXTRACT(MONTH FROM date) = $4)
+		  )
+	`, companyID, start, end, int(start.Month()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to list holidays: %w", err)
+	}
+	defer rows.Close()
+
+	holidaySet := map[string]struct{}{}
+	for rows.Next() {
+		var h holidayRow
+		if err := rows.Scan(&h.Date, &h.IsRecurring); err != nil {
+			return nil, fmt.Errorf("failed to scan holiday: %w", err)
+		}
+		date := h.Date
+		if h.IsRecurring {
+			date = time.Date(start.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+		}
+		holidaySet[date.Format("2006-01-02")] = struct{}{}
+	}
+
+	workingCredits := map[string]float64{}
+	workingDays := 0
+	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+		if d.Weekday() == time.Saturday || d.Weekday() == time.Sunday {
+			continue
+		}
+		key := d.Format("2006-01-02")
+		if _, ok := holidaySet[key]; ok {
+			continue
+		}
+		workingDays++
+		workingCredits[key] = 0
+	}
+
+	presentDays := 0.0
+	attRows, err := s.db.Query(`
+		SELECT date, status
+		FROM attendance
+		WHERE employee_id = $1 AND is_deleted = FALSE AND date BETWEEN $2 AND $3
+	`, employeeID, start, end)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load attendance: %w", err)
+	}
+	defer attRows.Close()
+	for attRows.Next() {
+		var day time.Time
+		var status string
+		if err := attRows.Scan(&day, &status); err != nil {
+			return nil, fmt.Errorf("failed to scan attendance: %w", err)
+		}
+		key := day.Format("2006-01-02")
+		if _, ok := workingCredits[key]; !ok {
+			continue
+		}
+		credit := 0.0
+		switch status {
+		case "PRESENT", "LATE":
+			credit = 1
+		case "HALF_DAY":
+			credit = 0.5
+		default:
+			credit = 0
+		}
+		if credit > workingCredits[key] {
+			workingCredits[key] = credit
+		}
+		presentDays += credit
+	}
+
+	approvedLeaveDays := 0.0
+	leaveRows, err := s.db.Query(`
+		SELECT start_date, end_date
+		FROM leaves
+		WHERE employee_id = $1
+		  AND status = 'APPROVED'
+		  AND is_deleted = FALSE
+		  AND start_date <= $3
+		  AND end_date >= $2
+	`, employeeID, start, end)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load approved leaves: %w", err)
+	}
+	defer leaveRows.Close()
+	for leaveRows.Next() {
+		var ls, le time.Time
+		if err := leaveRows.Scan(&ls, &le); err != nil {
+			return nil, fmt.Errorf("failed to scan leave: %w", err)
+		}
+		if ls.Before(start) {
+			ls = start
+		}
+		if le.After(end) {
+			le = end
+		}
+		for d := ls; !d.After(le); d = d.AddDate(0, 0, 1) {
+			key := d.Format("2006-01-02")
+			cur, ok := workingCredits[key]
+			if !ok {
+				continue
+			}
+			if cur < 1 {
+				approvedLeaveDays += 1 - cur
+				workingCredits[key] = 1
+			}
+		}
+	}
+
+	payableDays := 0.0
+	for _, c := range workingCredits {
+		payableDays += c
+	}
+	unpaidAbsenceDays := float64(workingDays) - payableDays
+	if unpaidAbsenceDays < 0 {
+		unpaidAbsenceDays = 0
+	}
+
+	prorated := base
+	if workingDays > 0 {
+		perDay := base / float64(workingDays)
+		prorated = perDay * payableDays
+	}
+	prorated = math.Round(prorated*100) / 100
+
+	return &models.PayrollCalculation{
+		EmployeeID:          employeeID,
+		Month:               month,
+		PayPeriodStart:      start,
+		PayPeriodEnd:        end,
+		BaseMonthlySalary:   base,
+		WorkingDays:         workingDays,
+		PayableDays:         payableDays,
+		PresentDays:         presentDays,
+		ApprovedLeaveDays:   approvedLeaveDays,
+		UnpaidAbsenceDays:   unpaidAbsenceDays,
+		ProratedBasicSalary: prorated,
+	}, nil
 }
 
 func (s *PayrollService) AddSalaryComponent(payrollID, companyID int, req *models.AddComponentRequest) (*models.SalaryComponent, error) {
