@@ -544,69 +544,86 @@ class _LowStockPanel extends StatelessWidget {
                     ],
                   ],
                 )
-              : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    headingRowHeight: 42,
-                    dataRowMinHeight: 50,
-                    dataRowMaxHeight: 56,
-                    horizontalMargin: 12,
-                    columnSpacing: 18,
-                    columns: const [
-                      DataColumn(label: Text('Item Name')),
-                      DataColumn(numeric: true, label: Text('Current Stock')),
-                      DataColumn(label: Text('Status')),
-                    ],
-                    rows: items
-                        .map(
-                          (item) => DataRow(
-                            cells: [
-                              DataCell(
-                                ConstrainedBox(
-                                  constraints:
-                                      const BoxConstraints(maxWidth: 220),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item.productName,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      if (item.locationName.isNotEmpty)
-                                        Text(
-                                          item.locationName,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodySmall
-                                              ?.copyWith(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .onSurfaceVariant,
-                                              ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              DataCell(
-                                Text(
-                                  formatStock(item.currentStock),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleSmall
-                                      ?.copyWith(fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                              DataCell(_SeverityBadge(severity: item.severity)),
-                            ],
+              : LayoutBuilder(
+                  builder: (context, constraints) => SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: ConstrainedBox(
+                      constraints:
+                          BoxConstraints(minWidth: constraints.maxWidth),
+                      child: DataTable(
+                        headingRowHeight: 42,
+                        dataRowMinHeight: 50,
+                        dataRowMaxHeight: 56,
+                        horizontalMargin: 12,
+                        columnSpacing: 18,
+                        columns: const [
+                          DataColumn(label: Text('Item Name')),
+                          DataColumn(
+                            numeric: true,
+                            label: Text('Current Stock'),
                           ),
-                        )
-                        .toList(),
+                          DataColumn(label: Text('Status')),
+                        ],
+                        rows: items
+                            .map(
+                              (item) => DataRow(
+                                cells: [
+                                  DataCell(
+                                    ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 220,
+                                      ),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            item.productName,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (item.locationName.isNotEmpty)
+                                            Text(
+                                              item.locationName,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
+                                                  ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(
+                                      formatStock(item.currentStock),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    _SeverityBadge(
+                                      severity: item.severity,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
                   ),
                 ),
     );

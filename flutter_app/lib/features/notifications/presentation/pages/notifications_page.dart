@@ -214,12 +214,13 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                         if (!context.mounted) return;
                         await showDialog<void>(
                           context: context,
-                          builder: (_) => AlertDialog(
+                          builder: (dialogContext) => AlertDialog(
                             title: Text(n.title),
                             content: Text(n.body),
                             actions: [
                               TextButton(
-                                onPressed: () => Navigator.of(context).pop(),
+                                onPressed: () =>
+                                    Navigator.of(dialogContext).pop(),
                                 child: const Text('Close'),
                               ),
                             ],

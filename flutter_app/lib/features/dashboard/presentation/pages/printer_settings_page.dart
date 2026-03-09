@@ -7,6 +7,7 @@ import 'package:flutter_pos_printer_platform_image_3/flutter_pos_printer_platfor
 import 'dart:io';
 
 import '../../../../core/error_handler.dart';
+import '../../../../core/pdf/pdf_theme.dart';
 import '../../../pos/data/printer_settings_repository.dart';
 import '../../../pos/utils/escpos.dart';
 
@@ -88,7 +89,7 @@ class _PrinterSettingsPageState extends ConsumerState<PrinterSettingsPage> {
         }
       } else {
         await Printing.layoutPdf(onLayout: (format) async {
-          final doc = pw.Document();
+          final doc = pw.Document(theme: await PdfTheme.inter());
           doc.addPage(pw.Page(
               build: (ctx) =>
                   pw.Center(child: pw.Text('Test Print - ${p.name}'))));

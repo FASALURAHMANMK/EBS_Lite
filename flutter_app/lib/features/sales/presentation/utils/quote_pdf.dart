@@ -5,6 +5,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import '../../../../core/pdf/pdf_theme.dart';
+
 class QuotePdfBuilder {
   static Future<Uint8List> buildPdfFromWidgets(
     Map<String, dynamic> quote,
@@ -12,7 +14,7 @@ class QuotePdfBuilder {
     PdfPageFormat? format,
     String? logoUrl,
   }) async {
-    final doc = pw.Document();
+    final doc = pw.Document(theme: await PdfTheme.inter());
 
     final quoteNumber = (quote['quote_number'] as String?) ?? '';
     final items = (quote['items'] as List<dynamic>? ?? const [])

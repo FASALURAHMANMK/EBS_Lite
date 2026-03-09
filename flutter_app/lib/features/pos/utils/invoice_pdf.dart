@@ -5,6 +5,8 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/pdf/pdf_theme.dart';
+
 class InvoicePdfBuilder {
   static Future<Uint8List> buildPdfFromWidgets(
     Map<String, dynamic> sale,
@@ -12,7 +14,7 @@ class InvoicePdfBuilder {
     PdfPageFormat? format,
     String? logoUrl,
   }) async {
-    final doc = pw.Document();
+    final doc = pw.Document(theme: await PdfTheme.inter());
 
     final saleNumber = (sale['sale_number'] as String?) ?? '';
     final items = (sale['items'] as List<dynamic>? ?? const [])
