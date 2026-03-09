@@ -61,6 +61,9 @@ Future<void> showAppBlockingProgressDialog(
 }) {
   return showDialog<void>(
     context: context,
+    // Use the nearest Navigator (not the root) so callers can safely dismiss
+    // the dialog with Navigator.of(context).pop() even inside nested Navigators.
+    useRootNavigator: false,
     barrierDismissible: false,
     builder: (_) => PopScope(
       canPop: false,

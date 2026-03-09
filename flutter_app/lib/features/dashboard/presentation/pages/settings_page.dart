@@ -51,6 +51,7 @@ class SettingsPage extends ConsumerWidget {
       context,
       message: 'Generating support bundle...',
     );
+    var progressDialogOpen = true;
 
     try {
       final failed =
@@ -93,6 +94,7 @@ class SettingsPage extends ConsumerWidget {
 
       if (context.mounted) {
         Navigator.of(context).pop();
+        progressDialogOpen = false;
       }
 
       await Share.shareXFiles(
@@ -102,7 +104,10 @@ class SettingsPage extends ConsumerWidget {
       );
     } catch (e) {
       if (context.mounted) {
-        Navigator.of(context).pop();
+        if (progressDialogOpen) {
+          Navigator.of(context).pop();
+          progressDialogOpen = false;
+        }
         messenger.showSnackBar(
           SnackBar(content: Text(ErrorHandler.message(e))),
         );
