@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../data/purchases_repository.dart';
 import 'po_form_page.dart';
@@ -59,6 +61,7 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final q = _search.text.trim().toLowerCase();
     final filtered = q.isEmpty
         ? _all
@@ -71,6 +74,8 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
 
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
         title: const Text('Purchase Orders'),
         actions: [
           IconButton(

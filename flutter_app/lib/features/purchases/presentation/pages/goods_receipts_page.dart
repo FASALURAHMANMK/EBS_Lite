@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../data/grn_repository.dart';
@@ -47,6 +49,7 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     Theme.of(context);
     final q = _search.text.trim().toLowerCase();
     final filtered = q.isEmpty
@@ -59,6 +62,8 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
 
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
         title: const Text('Goods Receipt Notes'),
         actions: [
           IconButton(
@@ -298,10 +303,15 @@ class _ReceiveAgainstPoPageState extends ConsumerState<_ReceiveAgainstPoPage> {
   @override
   Widget build(BuildContext context) {
     final po = _po;
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final items =
         (po?['items'] as List? ?? const []).cast<Map<String, dynamic>>();
     return Scaffold(
-      appBar: AppBar(title: Text('Receive ${po?['purchase_number'] ?? ''}')),
+      appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
+        title: Text('Receive ${po?['purchase_number'] ?? ''}'),
+      ),
       body: SafeArea(
         child: _loading
             ? const LinearProgressIndicator(minHeight: 2)

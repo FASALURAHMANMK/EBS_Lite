@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 
 import '../../data/sales_repository.dart';
 import '../../../pos/data/pos_repository.dart';
@@ -7,6 +8,7 @@ import '../../../pos/data/models.dart';
 import '../../../pos/presentation/pages/pos_page.dart';
 import 'sale_detail_page.dart';
 import '../utils/invoice_actions.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 class InvoicesPage extends ConsumerStatefulWidget {
   const InvoicesPage({super.key});
@@ -224,6 +226,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final q = _search.text.trim().toLowerCase();
 
     // Sort newest first
@@ -253,6 +256,8 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
 
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
         title: const Text('Invoices'),
         actions: [
           IconButton(

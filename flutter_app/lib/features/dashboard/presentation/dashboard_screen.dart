@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/offline_cache/master_data_sync_notifier.dart';
 import '../../../core/layout/app_breakpoints.dart';
+import '../../../core/layout/desktop_sidebar_notifier.dart';
 import '../../../core/outbox/outbox_notifier.dart';
 import '../../../core/theme_notifier.dart';
 import 'widgets/dashboard_content.dart';
@@ -33,7 +34,6 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   bool _promptedLocation = false;
-  bool _desktopSidebarExpanded = true;
   final GlobalKey<NavigatorState> _wideNavigatorKey =
       GlobalKey<NavigatorState>();
 
@@ -57,6 +57,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final isTabletOrDesktop = AppBreakpoints.isTabletOrDesktop(context);
+    final desktopSidebarExpanded = ref.watch(desktopSidebarExpandedProvider);
 
     // Reload dashboard data when selected location changes
     ref.listen<LocationState>(locationNotifierProvider, (prev, next) {
@@ -210,14 +211,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       );
     }
 
-    void toggleDesktopSidebar() {
-      setState(() => _desktopSidebarExpanded = !_desktopSidebarExpanded);
-    }
-
     Widget wideHome() => _DashboardWideHome(
           onOpen: pushWide,
-          isSidebarExpanded: _desktopSidebarExpanded,
-          onToggleSidebar: toggleDesktopSidebar,
         );
 
     void goWideHome() {
@@ -238,7 +233,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       child: Scaffold(
         body: Row(
           children: [
-            if (_desktopSidebarExpanded)
+            if (desktopSidebarExpanded)
               SizedBox(
                 width: 320,
                 child: DashboardDesktopSidebar(
@@ -326,13 +321,9 @@ class _NavItem {
 class _DashboardWideHome extends ConsumerWidget {
   const _DashboardWideHome({
     required this.onOpen,
-    required this.isSidebarExpanded,
-    required this.onToggleSidebar,
   });
 
   final ValueChanged<Widget> onOpen;
-  final bool isSidebarExpanded;
-  final VoidCallback onToggleSidebar;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -347,9 +338,6 @@ class _DashboardWideHome extends ConsumerWidget {
 
     return Scaffold(
       appBar: DashboardHeader(
-        showSidebarToggle: true,
-        isSidebarExpanded: isSidebarExpanded,
-        onSidebarToggle: onToggleSidebar,
         onToggleTheme: () => themeNotifier.toggle(),
         isOnline: outboxState.isOnline,
         isChecking: outboxState.isChecking,

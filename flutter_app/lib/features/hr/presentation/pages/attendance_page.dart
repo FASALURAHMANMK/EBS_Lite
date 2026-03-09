@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../data/hr_repository.dart';
 import '../../data/models.dart';
@@ -225,6 +227,7 @@ class _AttendancePageState extends ConsumerState<AttendancePage>
 
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final scaffold = Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: !widget.fromMenu,
@@ -236,7 +239,8 @@ class _AttendancePageState extends ConsumerState<AttendancePage>
                   onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               )
-            : null,
+            : (isWide ? const DesktopSidebarToggleLeading() : null),
+        leadingWidth: (!widget.fromMenu && isWide) ? 104 : null,
         title: const Text('Attendance'),
         bottom: TabBar(
           controller: _tabController,

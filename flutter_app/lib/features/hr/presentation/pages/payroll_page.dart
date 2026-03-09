@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../data/hr_repository.dart';
 import '../../data/models.dart';
@@ -310,6 +312,7 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final df = DateFormat('yyyy-MM-dd');
     final scaffold = Scaffold(
       appBar: AppBar(
@@ -322,7 +325,8 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
                   onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               )
-            : null,
+            : (isWide ? const DesktopSidebarToggleLeading() : null),
+        leadingWidth: (!widget.fromMenu && isWide) ? 104 : null,
         title: const Text('Payroll'),
         actions: [
           IconButton(

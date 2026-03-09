@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../data/models.dart';
@@ -375,9 +377,12 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
 
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
         title: const Text('Promotions'),
         actions: [
           IconButton(

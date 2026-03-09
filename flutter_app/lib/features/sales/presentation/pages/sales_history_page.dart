@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../data/sales_repository.dart';
 import '../../../pos/data/pos_repository.dart';
@@ -262,6 +264,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final q = _search.text.trim().toLowerCase();
 
     // Merge sales and returns
@@ -308,6 +311,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
 
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
         title: const Text('Sales History'),
         actions: [
           IconButton(

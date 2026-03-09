@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../data/hr_repository.dart';
 import '../../data/models.dart';
@@ -132,6 +134,7 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final query = _searchCtrl.text.trim().toLowerCase();
     final filtered = query.isEmpty
         ? _employees
@@ -158,7 +161,8 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
                   onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               )
-            : null,
+            : (isWide ? const DesktopSidebarToggleLeading() : null),
+        leadingWidth: (!widget.fromMenu && isWide) ? 104 : null,
         title: const Text('Employees'),
         actions: [
           IconButton(
@@ -174,10 +178,10 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
             )
           : null,
       floatingActionButton: FloatingActionButton(
-  onPressed: _openCreate,
-  tooltip: 'Add Employee',
-  child: const Icon(Icons.add_rounded),
-),
+        onPressed: _openCreate,
+        tooltip: 'Add Employee',
+        child: const Icon(Icons.add_rounded),
+      ),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())

@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -122,6 +124,7 @@ class SettingsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final theme = Theme.of(context);
     final outbox = ref.watch(outboxNotifierProvider);
     final perms = ref.watch(authPermissionsProvider);
@@ -139,7 +142,8 @@ class SettingsPage extends ConsumerWidget {
                   onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               )
-            : null,
+            : (isWide ? const DesktopSidebarToggleLeading() : null),
+        leadingWidth: (!fromMenu && isWide) ? 104 : null,
         title: const Text('Settings'),
       ),
       drawer: fromMenu

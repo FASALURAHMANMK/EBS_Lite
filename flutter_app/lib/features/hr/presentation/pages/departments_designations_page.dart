@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../../../shared/widgets/app_error_view.dart';
@@ -514,6 +516,7 @@ class _DepartmentsDesignationsPageState
 
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final uniqueDepartmentsById = <int, DepartmentDto>{};
     for (final d in _departments) {
       uniqueDepartmentsById[d.departmentId] = d;
@@ -547,7 +550,8 @@ class _DepartmentsDesignationsPageState
                   onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               )
-            : null,
+            : (isWide ? const DesktopSidebarToggleLeading() : null),
+        leadingWidth: (!widget.fromMenu && isWide) ? 104 : null,
         title: const Text('Departments & Designations'),
         actions: [
           IconButton(
@@ -557,11 +561,11 @@ class _DepartmentsDesignationsPageState
           ),
         ],
       ),
-     floatingActionButton: FloatingActionButton(
-  onPressed: _openCreateDepartment,
-  tooltip: 'Add Department',
-  child: const Icon(Icons.add_rounded),
-),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _openCreateDepartment,
+        tooltip: 'Add Department',
+        child: const Icon(Icons.add_rounded),
+      ),
       drawer: widget.fromMenu
           ? DashboardSidebar(
               onSelect: (label) => widget.onMenuSelect?.call(context, label),

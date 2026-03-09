@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../../auth/controllers/auth_permissions_provider.dart';
@@ -49,6 +51,7 @@ class _WorkflowRequestsPageState extends ConsumerState<WorkflowRequestsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final perms = ref.watch(authPermissionsProvider);
     final canApprove = perms.contains('APPROVE_WORKFLOWS');
 
@@ -63,7 +66,8 @@ class _WorkflowRequestsPageState extends ConsumerState<WorkflowRequestsPage> {
                   onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               )
-            : null,
+            : (isWide ? const DesktopSidebarToggleLeading() : null),
+        leadingWidth: (!widget.fromMenu && isWide) ? 104 : null,
         title: const Text('Approvals'),
         actions: [
           IconButton(
@@ -222,11 +226,16 @@ class _WorkflowRequestDetailPageState
   @override
   Widget build(BuildContext context) {
     final r = widget.request;
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final perms = ref.watch(authPermissionsProvider);
     final canApprove = perms.contains('APPROVE_WORKFLOWS');
 
     return Scaffold(
-      appBar: AppBar(title: Text('Request #${r.approvalId}')),
+      appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
+        title: Text('Request #${r.approvalId}'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

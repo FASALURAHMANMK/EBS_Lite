@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 import 'package:intl/intl.dart';
 
 import '../../../dashboard/controllers/location_notifier.dart';
@@ -469,6 +471,7 @@ class _CashRegisterPageState extends ConsumerState<CashRegisterPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final locationState = ref.watch(locationNotifierProvider);
     final location = locationState.selected;
     _syncLocation(location);
@@ -479,6 +482,7 @@ class _CashRegisterPageState extends ConsumerState<CashRegisterPage> {
     final scaffold = Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: !widget.fromMenu,
+        leadingWidth: (!widget.fromMenu && isWide) ? 104 : null,
         leading: widget.fromMenu
             ? Builder(
                 builder: (context) => IconButton(
@@ -487,7 +491,7 @@ class _CashRegisterPageState extends ConsumerState<CashRegisterPage> {
                   onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               )
-            : null,
+            : (isWide ? const DesktopSidebarToggleLeading() : null),
         title: const Text('Cash Register'),
         actions: [
           IconButton(

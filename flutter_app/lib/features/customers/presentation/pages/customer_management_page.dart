@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../data/models.dart';
 import '../../data/customer_repository.dart';
@@ -42,6 +44,7 @@ class _CustomerManagementPageState
 
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     // When queued transactions sync (or we regain online), refresh so
     // list cards (credit balances etc) don't stay stale.
     ref.listen(outboxNotifierProvider, (prev, next) {
@@ -56,6 +59,8 @@ class _CustomerManagementPageState
 
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
         title: const Text('Customers'),
         actions: [
           IconButton(

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/layout/app_breakpoints.dart';
+import '../../../../shared/widgets/desktop_sidebar_toggle_action.dart';
+
 class DashboardHeader extends ConsumerStatefulWidget
     implements PreferredSizeWidget {
   const DashboardHeader({
@@ -8,6 +11,7 @@ class DashboardHeader extends ConsumerStatefulWidget
     this.showSidebarToggle = false,
     this.isSidebarExpanded = true,
     this.onSidebarToggle,
+    this.automaticallyImplyLeading,
     this.isOnline = true,
     this.isChecking = false,
     this.queuedCount = 0,
@@ -23,6 +27,10 @@ class DashboardHeader extends ConsumerStatefulWidget
   final bool showSidebarToggle;
   final bool isSidebarExpanded;
   final VoidCallback? onSidebarToggle;
+
+  /// Controls whether an AppBar leading is automatically provided when
+  /// [showSidebarToggle] is false (e.g. drawer/back button).
+  final bool? automaticallyImplyLeading;
 
   /// Realtime/Sync status
   final bool isOnline;
@@ -48,6 +56,7 @@ class DashboardHeader extends ConsumerStatefulWidget
 class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final statusColor = widget.isChecking
@@ -62,19 +71,25 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
     return AppBar(
       elevation: 0,
       centerTitle: false,
-      automaticallyImplyLeading: !widget.showSidebarToggle,
-      leading: widget.showSidebarToggle
-          ? IconButton(
-              tooltip:
-                  widget.isSidebarExpanded ? 'Hide sidebar' : 'Show sidebar',
-              icon: Icon(
-                widget.isSidebarExpanded
-                    ? Icons.menu_rounded
-                    : Icons.menu_rounded,
-              ),
-              onPressed: widget.onSidebarToggle,
-            )
-          : null,
+      automaticallyImplyLeading: isWide
+          ? false
+          : (widget.automaticallyImplyLeading ?? !widget.showSidebarToggle),
+      leadingWidth: isWide ? 104 : null,
+      leading: isWide
+          ? const DesktopSidebarToggleLeading()
+          : (widget.showSidebarToggle
+              ? IconButton(
+                  tooltip: widget.isSidebarExpanded
+                      ? 'Hide sidebar'
+                      : 'Show sidebar',
+                  icon: Icon(
+                    widget.isSidebarExpanded
+                        ? Icons.menu_open_rounded
+                        : Icons.menu_rounded,
+                  ),
+                  onPressed: widget.onSidebarToggle,
+                )
+              : null),
       title: Text(widget.title),
       actions: [
         // Online/Sync status chip

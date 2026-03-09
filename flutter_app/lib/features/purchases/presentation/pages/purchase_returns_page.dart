@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../data/purchase_returns_repository.dart';
@@ -54,6 +56,7 @@ class _PurchaseReturnsPageState extends ConsumerState<PurchaseReturnsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final q = _search.text.trim().toLowerCase();
     final filtered = q.isEmpty
         ? _all
@@ -63,6 +66,8 @@ class _PurchaseReturnsPageState extends ConsumerState<PurchaseReturnsPage> {
             .toList();
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
         title: const Text('Purchase Returns'),
         actions: [
           IconButton(
@@ -322,8 +327,13 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('New Purchase Return')),
+      appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
+        title: const Text('New Purchase Return'),
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),

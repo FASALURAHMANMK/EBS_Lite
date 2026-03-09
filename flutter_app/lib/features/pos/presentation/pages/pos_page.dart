@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../controllers/pos_notifier.dart';
@@ -22,12 +24,15 @@ class PosPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final state = ref.watch(posNotifierProvider);
     final notifier = ref.read(posNotifierProvider.notifier);
     final loc = ref.watch(locationNotifierProvider).selected;
 
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
         title: const Text('New Sale'),
         centerTitle: true,
         actions: [

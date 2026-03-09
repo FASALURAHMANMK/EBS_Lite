@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../../loyalty/data/loyalty_repository.dart';
 import '../../../../shared/widgets/app_error_view.dart';
@@ -129,9 +131,14 @@ class _LoyaltyManagementPageState extends ConsumerState<LoyaltyManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Loyalty Management')),
+      appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
+        title: const Text('Loyalty Management'),
+      ),
       floatingActionButton: FloatingActionButton.extended(
           onPressed: _addTierDialog, label: const Icon(Icons.add_rounded)),
       body: RefreshIndicator(

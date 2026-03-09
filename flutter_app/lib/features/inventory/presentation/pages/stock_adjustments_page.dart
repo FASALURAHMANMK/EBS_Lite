@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../data/inventory_repository.dart';
@@ -59,6 +61,7 @@ class _StockAdjustmentsPageState extends ConsumerState<StockAdjustmentsPage> {
     final theme = Theme.of(context);
     final loc = ref.watch(locationNotifierProvider).selected;
     final locName = loc?.name ?? '—';
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
 
     final groups = _all;
     final q = _search.text.trim().toLowerCase();
@@ -72,6 +75,8 @@ class _StockAdjustmentsPageState extends ConsumerState<StockAdjustmentsPage> {
 
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
         title: const Text('Stock Adjustments'),
         actions: [
           IconButton(
@@ -210,8 +215,11 @@ class _AdjustmentDocumentFormPageState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
         title: const Text('New Adjustment'),
       ),
       body: SafeArea(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../controllers/category_brand_notifiers.dart';
 import '../../data/inventory_repository.dart';
@@ -14,6 +16,7 @@ class CategoryManagementPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final state = ref.watch(categoryManagementProvider);
     final notifier = ref.read(categoryManagementProvider.notifier);
     final theme = Theme.of(context);
@@ -25,6 +28,8 @@ class CategoryManagementPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
         title: const Text('Category Management'),
         actions: [
           IconButton(

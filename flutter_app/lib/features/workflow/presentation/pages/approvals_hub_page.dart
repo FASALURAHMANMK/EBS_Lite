@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../../auth/controllers/auth_permissions_provider.dart';
 import '../../../hr/presentation/pages/leave_approvals_page.dart';
@@ -18,6 +20,7 @@ class ApprovalsHubPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final perms = ref.watch(authPermissionsProvider);
     final canViewWorkflows = perms.contains('VIEW_WORKFLOWS');
     final canViewLeaves = perms.contains('VIEW_LEAVES');
@@ -33,7 +36,8 @@ class ApprovalsHubPage extends ConsumerWidget {
                   onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               )
-            : null,
+            : (isWide ? const DesktopSidebarToggleLeading() : null),
+        leadingWidth: (!fromMenu && isWide) ? 104 : null,
         title: const Text('Approvals'),
       ),
       drawer: fromMenu

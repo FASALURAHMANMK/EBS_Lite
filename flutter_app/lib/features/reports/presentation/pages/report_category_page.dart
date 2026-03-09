@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import 'report_viewer_page.dart';
 import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
@@ -43,6 +45,7 @@ class ReportCategoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final scaffold = Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: !fromMenu,
@@ -54,7 +57,8 @@ class ReportCategoryPage extends StatelessWidget {
                   onPressed: () => Scaffold.of(context).openDrawer(),
                 ),
               )
-            : null,
+            : (isWide ? const DesktopSidebarToggleLeading() : null),
+        leadingWidth: (!fromMenu && isWide) ? 104 : null,
         title: Text(title),
       ),
       drawer: fromMenu

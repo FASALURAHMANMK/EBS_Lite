@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../controllers/inventory_notifier.dart';
 import '../../data/models.dart';
@@ -211,6 +213,7 @@ class _InventoryViewPageState extends ConsumerState<InventoryViewPage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(inventoryNotifierProvider);
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final locState = ref.watch(locationNotifierProvider);
     ref.listen<LocationState>(locationNotifierProvider, (prev, next) async {
       final prevId = prev?.selected?.locationId;
@@ -253,6 +256,8 @@ class _InventoryViewPageState extends ConsumerState<InventoryViewPage> {
 
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
         title: const Text('Inventory'),
       ),
       body: Column(
