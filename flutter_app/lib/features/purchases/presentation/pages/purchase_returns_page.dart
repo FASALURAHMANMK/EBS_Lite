@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
+import 'package:ebs_lite/shared/widgets/app_selection_dialog.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../data/purchase_returns_repository.dart';
@@ -533,73 +534,69 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
     return showDialog<InventoryListItem?>(
       context: context,
       builder: (context) => StatefulBuilder(
-          builder: (context, setInner) => AlertDialog(
-                title: const Text('Select Product'),
-                content: SizedBox(
-                  width: 720,
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    TextField(
-                        decoration: const InputDecoration(
-                            hintText: 'Search by name or SKU',
-                            prefixIcon: Icon(Icons.search_rounded)),
-                        onChanged: (v) async {
-                          final q = v.trim();
-                          if (q.isEmpty) {
-                            setInner(() => results = List.of(initial));
-                            return;
-                          }
-                          final list = await repo.searchProducts(q);
-                          setInner(() => results = list);
-                        }),
-                    const SizedBox(height: 8),
-                    Flexible(
-                        child: results.isEmpty
-                            ? const Center(child: Text('No products'))
-                            : RadioGroup<int>(
-                                groupValue: selectedId,
-                                onChanged: (value) =>
-                                    setInner(() => selectedId = value),
-                                child: ListView.builder(
-                                    shrinkWrap: true,
-                                    itemCount: results.length,
-                                    itemBuilder: (context, i) {
-                                      final it = results[i];
-                                      return RadioListTile<int>(
-                                          value: it.productId,
-                                          title: Text(it.name),
-                                          subtitle: Text([
-                                            (it.sku ?? '').isNotEmpty
-                                                ? 'SKU: ${it.sku}'
-                                                : null,
-                                            'Stock: ${it.stock.toStringAsFixed(2)}'
-                                          ].whereType<String>().join(' · ')));
-                                    })))
-                  ]),
+        builder: (context, setInner) => AppSelectionDialog(
+          title: 'Select Product',
+          maxWidth: 720,
+          searchField: TextField(
+            decoration: const InputDecoration(
+              hintText: 'Search by name or SKU',
+              prefixIcon: Icon(Icons.search_rounded),
+            ),
+            onChanged: (v) async {
+              final q = v.trim();
+              if (q.isEmpty) {
+                setInner(() => results = List.of(initial));
+                return;
+              }
+              final list = await repo.searchProducts(q);
+              setInner(() => results = list);
+            },
+          ),
+          body: results.isEmpty
+              ? const Center(child: Text('No products'))
+              : RadioGroup<int>(
+                  groupValue: selectedId,
+                  onChanged: (value) => setInner(() => selectedId = value),
+                  child: ListView.builder(
+                    itemCount: results.length,
+                    itemBuilder: (context, i) {
+                      final it = results[i];
+                      return RadioListTile<int>(
+                        value: it.productId,
+                        title: Text(it.name),
+                        subtitle: Text([
+                          (it.sku ?? '').isNotEmpty ? 'SKU: ${it.sku}' : null,
+                          'Stock: ${it.stock.toStringAsFixed(2)}'
+                        ].whereType<String>().join(' · ')),
+                      );
+                    },
+                  ),
                 ),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(context, null),
-                      child: const Text('Cancel')),
-                  FilledButton(
-                      onPressed: () {
-                        final it = results.firstWhere(
-                            (e) => e.productId == selectedId,
-                            orElse: () => InventoryListItem(
-                                productId: -1,
-                                name: '',
-                                sku: null,
-                                categoryName: null,
-                                brandName: null,
-                                unitSymbol: null,
-                                reorderLevel: 0,
-                                stock: 0,
-                                isLowStock: false,
-                                price: null));
-                        Navigator.pop(context, it.productId == -1 ? null : it);
-                      },
-                      child: const Text('Select'))
-                ],
-              )),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, null),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () {
+                  final it = results.firstWhere(
+                      (e) => e.productId == selectedId,
+                      orElse: () => InventoryListItem(
+                          productId: -1,
+                          name: '',
+                          sku: null,
+                          categoryName: null,
+                          brandName: null,
+                          unitSymbol: null,
+                          reorderLevel: 0,
+                          stock: 0,
+                          isLowStock: false,
+                          price: null));
+                  Navigator.pop(context, it.productId == -1 ? null : it);
+                },
+                child: const Text('Select'))
+          ],
+        ),
+      ),
     );
   }
 }
@@ -647,60 +644,49 @@ class _SupplierPicker extends ConsumerWidget {
     try {
       results = await repo.getSuppliers();
     } catch (_) {}
-    int? selected;
+    int? selected = supplierId;
     if (!context.mounted) return null;
     return showDialog<(int, String)?>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setInner) => AlertDialog(
-          title: const Text('Select Supplier'),
-          content: SizedBox(
-            width: 720,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  decoration: const InputDecoration(
-                    hintText: 'Search suppliers',
-                    prefixIcon: Icon(Icons.search_rounded),
-                  ),
-                  onChanged: (v) async {
-                    final q = v.trim();
-                    try {
-                      final list =
-                          await repo.getSuppliers(search: q.isEmpty ? null : q);
-                      setInner(() => results = list);
-                    } catch (_) {}
-                  },
-                ),
-                const SizedBox(height: 8),
-                Flexible(
-                  child: results.isEmpty
-                      ? const Center(child: Text('No suppliers'))
-                      : RadioGroup<int>(
-                          groupValue: selected,
-                          onChanged: (value) =>
-                              setInner(() => selected = value),
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: results.length,
-                            itemBuilder: (context, i) {
-                              final s = results[i];
-                              return RadioListTile<int>(
-                                value: s.supplierId,
-                                title: Text(s.name),
-                                subtitle: Text([
-                                  (s.phone ?? ''),
-                                  (s.email ?? '')
-                                ].where((e) => e.isNotEmpty).join(' • ')),
-                              );
-                            },
-                          ),
-                        ),
-                ),
-              ],
+        builder: (context, setInner) => AppSelectionDialog(
+          title: 'Select Supplier',
+          maxWidth: 720,
+          searchField: TextField(
+            decoration: const InputDecoration(
+              hintText: 'Search suppliers',
+              prefixIcon: Icon(Icons.search_rounded),
             ),
+            onChanged: (v) async {
+              final q = v.trim();
+              try {
+                final list =
+                    await repo.getSuppliers(search: q.isEmpty ? null : q);
+                setInner(() => results = list);
+              } catch (_) {}
+            },
           ),
+          body: results.isEmpty
+              ? const Center(child: Text('No suppliers'))
+              : RadioGroup<int>(
+                  groupValue: selected,
+                  onChanged: (value) => setInner(() => selected = value),
+                  child: ListView.builder(
+                    itemCount: results.length,
+                    itemBuilder: (context, i) {
+                      final s = results[i];
+                      return RadioListTile<int>(
+                        value: s.supplierId,
+                        title: Text(s.name),
+                        subtitle: Text(
+                          [(s.phone ?? ''), (s.email ?? '')]
+                              .where((e) => e.isNotEmpty)
+                              .join(' • '),
+                        ),
+                      );
+                    },
+                  ),
+                ),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(context),

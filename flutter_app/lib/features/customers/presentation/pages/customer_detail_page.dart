@@ -155,28 +155,33 @@ class _CustomerDetailPageState extends ConsumerState<CustomerDetailPage> {
                                     return const SizedBox.shrink();
                                   }
                                   final pts = ss.data!.loyaltyPoints;
-                                  return Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Chip(
-                                            label: Text(
-                                                'Points: ${pts.toStringAsFixed(0)}')),
-                                        const SizedBox(width: 6),
-                                        FutureBuilder<LoyaltySettingsDto>(
-                                          future: _loySettingsFuture,
-                                          builder: (context, ls) {
-                                            if (!ls.hasData) {
-                                              return const SizedBox.shrink();
-                                            }
-                                            final avail = (pts -
-                                                    ls.data!.minPointsReserve)
-                                                .clamp(0, double.infinity);
-                                            return Chip(
-                                                label: Text(
-                                                    'Avail: ${avail.toStringAsFixed(0)}'));
-                                          },
+                                  return Wrap(
+                                    spacing: 8,
+                                    runSpacing: 4,
+                                    children: [
+                                      Chip(
+                                        label: Text(
+                                          'Points: ${pts.toStringAsFixed(0)}',
                                         ),
-                                      ]);
+                                      ),
+                                      FutureBuilder<LoyaltySettingsDto>(
+                                        future: _loySettingsFuture,
+                                        builder: (context, ls) {
+                                          if (!ls.hasData) {
+                                            return const SizedBox.shrink();
+                                          }
+                                          final avail =
+                                              (pts - ls.data!.minPointsReserve)
+                                                  .clamp(0, double.infinity);
+                                          return Chip(
+                                            label: Text(
+                                              'Avail: ${avail.toStringAsFixed(0)}',
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  );
                                 },
                               ),
                             ]);

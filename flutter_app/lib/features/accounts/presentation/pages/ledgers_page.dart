@@ -6,7 +6,10 @@ import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 import '../../data/accounts_repository.dart';
 import '../../data/models.dart';
 import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
+import '../../../../shared/widgets/app_empty_view.dart';
 import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_loading_view.dart';
+import '../../../../shared/widgets/app_scrollbar.dart';
 import 'ledger_entries_page.dart';
 
 class LedgersPage extends ConsumerStatefulWidget {
@@ -105,7 +108,7 @@ class _LedgersPageState extends ConsumerState<LedgersPage> {
           : null,
       body: SafeArea(
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const AppLoadingView(label: 'Loading ledger balances')
             : _error != null
                 ? AppErrorView(error: _error!, onRetry: _load)
                 : Column(
@@ -123,49 +126,64 @@ class _LedgersPageState extends ConsumerState<LedgersPage> {
                       ),
                       Expanded(
                         child: filtered.isEmpty
-                            ? const Center(
-                                child: Text('No ledger balances found'),
+                            ? ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                children: const [
+                                  SizedBox(height: 64),
+                                  AppEmptyView(
+                                    title: 'No ledger balances found',
+                                    message:
+                                        'Ledger balances matching the current search will appear here.',
+                                    icon: Icons.menu_book_outlined,
+                                  ),
+                                ],
                               )
-                            : ListView.separated(
-                                padding: const EdgeInsets.all(12),
-                                itemCount: filtered.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 8),
-                                itemBuilder: (context, i) {
-                                  final b = filtered[i];
-                                  return Card(
-                                    elevation: 0,
-                                    child: ListTile(
-                                      leading:
-                                          const Icon(Icons.menu_book_rounded),
-                                      title: Text(
-                                        b.accountName == null ||
-                                                b.accountName!.trim().isEmpty
-                                            ? 'Account #${b.accountId}'
-                                            : '${b.accountCode ?? ''} ${b.accountName}'
-                                                .trim(),
-                                      ),
-                                      subtitle: Text(
-                                        [
-                                          if (b.accountType != null &&
-                                              b.accountType!.trim().isNotEmpty)
-                                            b.accountType!,
-                                          'Balance: ${b.balance.toStringAsFixed(2)}',
-                                          'ID: ${b.accountId}',
-                                        ].join(' • '),
-                                      ),
-                                      trailing: const Icon(
-                                          Icons.chevron_right_rounded),
-                                      onTap: () => Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => LedgerEntriesPage(
-                                            accountId: b.accountId,
+                            : AppScrollbar(
+                                builder: (context, controller) =>
+                                    ListView.separated(
+                                  controller: controller,
+                                  padding: const EdgeInsets.all(12),
+                                  itemCount: filtered.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(height: 8),
+                                  itemBuilder: (context, i) {
+                                    final b = filtered[i];
+                                    return Card(
+                                      elevation: 0,
+                                      child: ListTile(
+                                        leading:
+                                            const Icon(Icons.menu_book_rounded),
+                                        title: Text(
+                                          b.accountName == null ||
+                                                  b.accountName!.trim().isEmpty
+                                              ? 'Account #${b.accountId}'
+                                              : '${b.accountCode ?? ''} ${b.accountName}'
+                                                  .trim(),
+                                        ),
+                                        subtitle: Text(
+                                          [
+                                            if (b.accountType != null &&
+                                                b.accountType!
+                                                    .trim()
+                                                    .isNotEmpty)
+                                              b.accountType!,
+                                            'Balance: ${b.balance.toStringAsFixed(2)}',
+                                            'ID: ${b.accountId}',
+                                          ].join(' • '),
+                                        ),
+                                        trailing: const Icon(
+                                            Icons.chevron_right_rounded),
+                                        onTap: () => Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => LedgerEntriesPage(
+                                              accountId: b.accountId,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                  );
-                                },
+                                    );
+                                  },
+                                ),
                               ),
                       ),
                     ],

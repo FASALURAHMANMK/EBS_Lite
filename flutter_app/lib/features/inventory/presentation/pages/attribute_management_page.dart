@@ -299,6 +299,7 @@ Future<bool?> _showAttributeDialog(BuildContext context,
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 initialValue: type,
                 items: AttributeManagementPage._types
                     .map((t) => DropdownMenuItem(value: t, child: Text(t)))

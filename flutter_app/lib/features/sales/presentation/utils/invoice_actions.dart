@@ -13,6 +13,7 @@ import '../../../pos/utils/escpos.dart';
 import '../../../pos/utils/invoice_pdf.dart';
 import '../../../../core/api_client.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_sheet_header.dart';
 
 class InvoiceActions {
   InvoiceActions({required this.ref, required this.context});
@@ -87,49 +88,81 @@ class InvoiceActions {
     if (!context.mounted) return;
     await showModalBottomSheet(
       context: context,
+      useSafeArea: true,
+      showDragHandle: true,
       builder: (ctx) {
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const ListTile(title: Text('Select Printer'), dense: true),
-              ...printers.map((p) => ListTile(
-                    leading: Icon(p.kind.startsWith('thermal')
-                        ? Icons.print_rounded
-                        : Icons.picture_as_pdf_rounded),
-                    title: Text(p.name),
-                    subtitle:
-                        Text('${p.kind.toUpperCase()} • ${p.connectionType}'),
-                    onTap: () async {
-                      Navigator.of(ctx).pop();
-                      await _printToPrinter(p, sale, company);
-                    },
-                  )),
-              if (printers.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(children: [
-                    const Text('No printers configured. Printing to A4.'),
-                    const SizedBox(height: 8),
-                    FilledButton(
-                      onPressed: () async {
-                        Navigator.of(ctx).pop();
-                        final logoUrl = _resolveLogoUrl(company);
-                        await Printing.layoutPdf(
-                          onLayout: (format) =>
-                              InvoicePdfBuilder.buildPdfFromWidgets(
-                            sale,
-                            company,
-                            format: PdfPageFormat.a4,
-                            logoUrl: logoUrl,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(ctx).height * 0.72,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const AppSheetHeader(
+                    title: 'Select Printer',
+                    icon: Icons.print_rounded,
+                  ),
+                  const SizedBox(height: 8),
+                  if (printers.isNotEmpty)
+                    Flexible(
+                      child: ListView(
+                        shrinkWrap: true,
+                        children: [
+                          for (final p in printers)
+                            ListTile(
+                              contentPadding:
+                                  const EdgeInsets.symmetric(horizontal: 4),
+                              leading: Icon(
+                                p.kind.startsWith('thermal')
+                                    ? Icons.print_rounded
+                                    : Icons.picture_as_pdf_rounded,
+                              ),
+                              title: Text(p.name),
+                              subtitle: Text(
+                                '${p.kind.toUpperCase()} • ${p.connectionType}',
+                              ),
+                              onTap: () async {
+                                Navigator.of(ctx).pop();
+                                await _printToPrinter(p, sale, company);
+                              },
+                            ),
+                        ],
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('No printers configured. Printing to A4.'),
+                          const SizedBox(height: 12),
+                          FilledButton(
+                            onPressed: () async {
+                              Navigator.of(ctx).pop();
+                              final logoUrl = _resolveLogoUrl(company);
+                              await Printing.layoutPdf(
+                                onLayout: (format) =>
+                                    InvoicePdfBuilder.buildPdfFromWidgets(
+                                  sale,
+                                  company,
+                                  format: PdfPageFormat.a4,
+                                  logoUrl: logoUrl,
+                                ),
+                              );
+                            },
+                            child: const Text('Print A4 Now'),
                           ),
-                        );
-                      },
-                      child: const Text('Print A4 Now'),
+                        ],
+                      ),
                     ),
-                  ]),
-                ),
-            ],
+                ],
+              ),
+            ),
           ),
         );
       },

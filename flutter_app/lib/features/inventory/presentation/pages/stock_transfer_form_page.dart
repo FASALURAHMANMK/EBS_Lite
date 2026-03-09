@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../../dashboard/data/models.dart';
+import '../../../../shared/widgets/app_selection_dialog.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
 import '../../../../core/error_handler.dart';
@@ -400,53 +401,50 @@ class _ProductPicker extends ConsumerWidget {
   Future<InventoryListItem?> _openDialog(
       BuildContext context, WidgetRef ref) async {
     final repo = ref.read(inventoryRepositoryProvider);
+    List<InventoryListItem> initial = const [];
+    try {
+      initial = await repo.getStock();
+    } catch (_) {}
     String query = '';
-    List<InventoryListItem> results = const [];
+    List<InventoryListItem> results = List.of(initial);
+    if (!context.mounted) return null;
     return showDialog<InventoryListItem>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setInner) => AlertDialog(
-          title: const Text('Select Product'),
-          content: SizedBox(
-            width: 480,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  decoration: const InputDecoration(
-                      hintText: 'Search',
-                      prefixIcon: Icon(Icons.search_rounded)),
-                  onChanged: (v) async {
-                    query = v.trim();
-                    if (query.length < 2) {
-                      setInner(() => results = const []);
-                      return;
-                    }
-                    final list = await repo.searchProducts(query);
-                    setInner(() => results = list);
+        builder: (context, setInner) => AppSelectionDialog(
+          title: 'Select Product',
+          maxWidth: 560,
+          searchField: TextField(
+            decoration: const InputDecoration(
+              hintText: 'Search',
+              prefixIcon: Icon(Icons.search_rounded),
+            ),
+            onChanged: (v) async {
+              query = v.trim();
+              if (query.isEmpty) {
+                setInner(() => results = List.of(initial));
+                return;
+              }
+              final list = await repo.searchProducts(query);
+              setInner(() => results = list);
+            },
+          ),
+          body: results.isEmpty
+              ? const Center(child: Text('No products'))
+              : ListView.builder(
+                  itemCount: results.length,
+                  itemBuilder: (context, i) {
+                    final p = results[i];
+                    return ListTile(
+                      title: Text(p.name),
+                      subtitle: Text([
+                        (p.sku ?? ''),
+                        if ((p.categoryName ?? '').isNotEmpty) p.categoryName!
+                      ].where((e) => e.toString().isNotEmpty).join(' · ')),
+                      onTap: () => Navigator.of(context).pop(p),
+                    );
                   },
                 ),
-                const SizedBox(height: 8),
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: results.length,
-                    itemBuilder: (context, i) {
-                      final p = results[i];
-                      return ListTile(
-                        title: Text(p.name),
-                        subtitle: Text([
-                          (p.sku ?? ''),
-                          if ((p.categoryName ?? '').isNotEmpty) p.categoryName!
-                        ].where((e) => e.toString().isNotEmpty).join(' · ')),
-                        onTap: () => Navigator.of(context).pop(p),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
           actions: [
             TextButton(
                 onPressed: () => Navigator.of(context).pop(),

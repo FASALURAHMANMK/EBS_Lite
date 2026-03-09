@@ -24,6 +24,7 @@ import 'package:ebs_lite/features/suppliers/presentation/pages/suppliers_page.da
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../shared/widgets/app_confirm_dialog.dart';
 import '../../controllers/location_notifier.dart';
 import '../dashboard_navigation.dart';
 import 'company_logo.dart';
@@ -448,24 +449,15 @@ class DashboardDesktopSidebar extends ConsumerWidget {
               icon: Icons.logout_rounded,
               label: 'Logout',
               onTap: () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Logout'),
-                    content: const Text('Are you sure you want to logout?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text('Logout'),
-                      ),
-                    ],
-                  ),
+                final confirm = await showAppConfirmDialog(
+                  context,
+                  title: 'Logout',
+                  message: 'Are you sure you want to logout?',
+                  confirmLabel: 'Logout',
+                  icon: Icons.logout_rounded,
+                  destructive: true,
                 );
-                if (confirm == true) {
+                if (confirm) {
                   await ref.read(authNotifierProvider.notifier).logout();
                 }
               },

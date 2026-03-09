@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
+import '../../../../shared/widgets/app_empty_view.dart';
+import '../../../../shared/widgets/app_selection_dialog.dart';
 import '../../data/sales_repository.dart';
 import '../../../pos/data/pos_repository.dart';
 import '../../../pos/data/models.dart';
@@ -166,89 +168,79 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
               Future.microtask(() => doSearch(''));
             }
 
-            return AlertDialog(
-              title: const Text('Select Customers'),
-              content: SizedBox(
-                width: 420,
-                height: 420,
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: controller,
-                      decoration: InputDecoration(
-                        hintText: 'Search customers',
-                        prefixIcon: const Icon(Icons.search_rounded),
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.search_rounded),
-                          onPressed: () => doSearch(controller.text.trim()),
-                        ),
-                      ),
-                      onSubmitted: (v) => doSearch(v.trim()),
-                    ),
-                    const SizedBox(height: 8),
-                    if (loading) const LinearProgressIndicator(minHeight: 2),
-                    Expanded(
-                      child: results.isEmpty && !loading
-                          ? const Center(child: Text('No customers'))
-                          : ListView.builder(
-                              itemCount: results.length,
-                              itemBuilder: (context, i) {
-                                final c = results[i];
-                                final checked = selected.contains(c.customerId);
-                                return CheckboxListTile(
-                                  value: checked,
-                                  title: Text(c.name),
-                                  subtitle: Text([
-                                    if ((c.phone ?? '').isNotEmpty) c.phone!,
-                                    if ((c.email ?? '').isNotEmpty) c.email!,
-                                  ].where((e) => e.isNotEmpty).join(' · ')),
-                                  onChanged: (v) {
-                                    if (v == true) {
-                                      selected.add(c.customerId);
-                                    } else {
-                                      selected.remove(c.customerId);
-                                    }
-                                    setStateDialog(() {});
-                                  },
-                                );
-                              },
-                            ),
-                    ),
-                    Row(
-                      children: [
-                        TextButton(
-                          onPressed: () {
-                            selected.clear();
+            return AppSelectionDialog(
+              title: 'Select Customers',
+              maxWidth: 480,
+              loading: loading,
+              searchField: TextField(
+                controller: controller,
+                decoration: InputDecoration(
+                  hintText: 'Search customers',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.search_rounded),
+                    onPressed: () => doSearch(controller.text.trim()),
+                  ),
+                ),
+                onChanged: (v) => doSearch(v.trim()),
+                onSubmitted: (v) => doSearch(v.trim()),
+              ),
+              body: results.isEmpty && !loading
+                  ? const Center(child: Text('No customers'))
+                  : ListView.builder(
+                      itemCount: results.length,
+                      itemBuilder: (context, i) {
+                        final c = results[i];
+                        final checked = selected.contains(c.customerId);
+                        return CheckboxListTile(
+                          value: checked,
+                          title: Text(c.name),
+                          subtitle: Text([
+                            if ((c.phone ?? '').isNotEmpty) c.phone!,
+                            if ((c.email ?? '').isNotEmpty) c.email!,
+                          ].where((e) => e.isNotEmpty).join(' · ')),
+                          onChanged: (v) {
+                            if (v == true) {
+                              selected.add(c.customerId);
+                            } else {
+                              selected.remove(c.customerId);
+                            }
                             setStateDialog(() {});
                           },
-                          child: const Text('Clear'),
-                        ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(null),
-                          child: const Text('Cancel'),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          onPressed: () {
-                            final mapById = {
-                              for (final r in results) r.customerId: r,
-                              for (final r in _selectedCustomers)
-                                r.customerId: r,
-                            };
-                            final list = selected
-                                .map((id) => mapById[id])
-                                .whereType<PosCustomerDto>()
-                                .toList();
-                            Navigator.of(context).pop(list);
-                          },
-                          child: const Text('Apply'),
-                        ),
-                      ],
-                    )
-                  ],
-                ),
+                        );
+                      },
+                    ),
+              footer: Row(
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      selected.clear();
+                      setStateDialog(() {});
+                    },
+                    child: const Text('Clear'),
+                  ),
+                ],
               ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(null),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final mapById = {
+                      for (final r in results) r.customerId: r,
+                      for (final r in _selectedCustomers) r.customerId: r,
+                    };
+                    final list = selected
+                        .map((id) => mapById[id])
+                        .whereType<PosCustomerDto>()
+                        .toList();
+                    Navigator.of(context).pop(list);
+                  },
+                  child: const Text('Apply'),
+                ),
+              ],
             );
           },
         );
@@ -421,7 +413,18 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
             ),
             Expanded(
               child: filtered.isEmpty
-                  ? const Center(child: Text('No sales or returns'))
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(height: 64),
+                        AppEmptyView(
+                          title: 'No sales or returns',
+                          message:
+                              'Transactions matching the current filters will appear here.',
+                          icon: Icons.receipt_long_outlined,
+                        ),
+                      ],
+                    )
                   : ListView.separated(
                       padding: const EdgeInsets.all(12),
                       itemCount: filtered.length,

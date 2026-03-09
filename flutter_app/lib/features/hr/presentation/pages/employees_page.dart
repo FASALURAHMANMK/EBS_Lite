@@ -218,6 +218,7 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
                                   ),
                                 ),
                                 DropdownButton<String>(
+                                  isExpanded: true,
                                   value: _status,
                                   items: const [
                                     DropdownMenuItem(
@@ -228,9 +229,12 @@ class _EmployeesPageState extends ConsumerState<EmployeesPage> {
                                         value: 'inactive',
                                         child: Text('Inactive')),
                                   ],
-                                  onChanged: (v) async {
-                                    setState(() => _status = v ?? 'all');
-                                    await _load();
+                                  onChanged: (v) {
+                                    final next = v ?? 'all';
+                                    if (next == _status) return;
+                                    setState(() => _status = next);
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) => _load());
                                   },
                                 ),
                               ],

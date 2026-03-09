@@ -4,6 +4,8 @@ import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_empty_view.dart';
+import '../../../../shared/widgets/app_loading_view.dart';
 import '../../../auth/controllers/auth_permissions_provider.dart';
 import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
 import '../../data/workflow_repository.dart';
@@ -83,9 +85,22 @@ class _WorkflowRequestsPageState extends ConsumerState<WorkflowRequestsPage> {
             )
           : null,
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoadingView(label: 'Loading approval requests')
           : _requests.isEmpty
-              ? const Center(child: Text('No pending requests'))
+              ? RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [
+                      SizedBox(height: 64),
+                      AppEmptyView(
+                        title: 'No pending requests',
+                        message: 'Approval requests will show up here.',
+                        icon: Icons.approval_outlined,
+                      ),
+                    ],
+                  ),
+                )
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView.separated(

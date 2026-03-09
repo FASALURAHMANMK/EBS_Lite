@@ -5,7 +5,9 @@ import '../../controllers/dashboard_notifier.dart';
 import '../../controllers/dashboard_customization_notifier.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import '../../../../core/layout/app_breakpoints.dart';
+import '../../../../shared/widgets/app_loading_view.dart';
 import '../../../../shared/widgets/app_message_view.dart';
+import '../../../../shared/widgets/app_scrollbar.dart';
 import '../../../../shared/widgets/no_network_view.dart';
 import 'stat_card.dart';
 import 'package:ebs_lite/shared/widgets/feature_grid.dart';
@@ -40,7 +42,7 @@ class DashboardContent extends ConsumerWidget {
 
     // Loading and error states so we don't show zeros by default
     if (state.isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const AppLoadingView(label: 'Loading dashboard');
     }
     if (state.error != null) {
       void onRetry() => ref.read(dashboardNotifierProvider.notifier).load();
@@ -75,6 +77,7 @@ class DashboardContent extends ConsumerWidget {
                       ? 2
                       : 1;
           final aspect = width < 900 ? 1.25 : 1.5;
+          final gridSpacing = width < 900 ? 12.0 : 16.0;
 
           final maxShortcutsShown = crossAxisCount >= 3 ? 4 : 6;
           final showCustomize = shortcutDefs.length > maxShortcutsShown;
@@ -92,151 +95,174 @@ class DashboardContent extends ConsumerWidget {
                     .titleLarge
                     ?.copyWith(fontWeight: FontWeight.w800),
               ),
+              const SizedBox(height: 4),
+              Text(
+                'Track totals, cash flow, and quick actions in one place.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
               const SizedBox(height: 12),
               // Grid takes the remaining space and scrolls
               Expanded(
-                child: GridView.count(
-                  crossAxisCount: crossAxisCount,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: aspect,
-                  children: [
-                    StatCard(
-                      icon: Icons.credit_card_rounded,
-                      title: 'Total Credit Outstanding',
-                      value: _fmt(metrics?.creditOutstanding),
-                      subtitle: 'All customers',
-                      color: Colors.indigo,
-                    ),
-                    StatCard(
-                      icon: Icons.inventory_2_rounded,
-                      title: 'Total Inventory Value',
-                      value: _fmt(metrics?.inventoryValue),
-                      subtitle: 'Across warehouses',
-                      color: Colors.teal,
-                    ),
-                    StatCard(
-                      icon: Icons.swap_horiz_rounded,
-                      title: "Today's Sales",
-                      value: _fmt(metrics?.todaySales),
-                      subtitle: 'Net transactions',
-                      color: Colors.orange,
-                    ),
-                    StatCard(
-                      icon: Icons.shopping_bag_rounded,
-                      title: "Today's Purchases",
-                      value: _fmt(metrics?.todayPurchases),
-                      subtitle: 'Supplier orders',
-                      color: Colors.purple,
-                    ),
-                    StatCard(
-                      icon: Icons.attach_money_rounded,
-                      title: 'Daily Cash Summary',
-                      value: _fmt(metrics?.dailyCashSummary),
-                      subtitle: 'Cash flow',
-                      color: Colors.green,
-                    ),
-                    // Shortcuts block as a grid tile
-                    if (shownShortcuts.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Shortcuts',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w800),
+                child: AppScrollbar(
+                  builder: (context, controller) => GridView.count(
+                    controller: controller,
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: gridSpacing,
+                    mainAxisSpacing: gridSpacing,
+                    childAspectRatio: aspect,
+                    children: [
+                      StatCard(
+                        icon: Icons.credit_card_rounded,
+                        title: 'Total Credit Outstanding',
+                        value: _fmt(metrics?.creditOutstanding),
+                        subtitle: 'All customers',
+                        color: Colors.indigo,
+                      ),
+                      StatCard(
+                        icon: Icons.inventory_2_rounded,
+                        title: 'Total Inventory Value',
+                        value: _fmt(metrics?.inventoryValue),
+                        subtitle: 'Across warehouses',
+                        color: Colors.teal,
+                      ),
+                      StatCard(
+                        icon: Icons.swap_horiz_rounded,
+                        title: "Today's Sales",
+                        value: _fmt(metrics?.todaySales),
+                        subtitle: 'Net transactions',
+                        color: Colors.orange,
+                      ),
+                      StatCard(
+                        icon: Icons.shopping_bag_rounded,
+                        title: "Today's Purchases",
+                        value: _fmt(metrics?.todayPurchases),
+                        subtitle: 'Supplier orders',
+                        color: Colors.purple,
+                      ),
+                      StatCard(
+                        icon: Icons.attach_money_rounded,
+                        title: 'Daily Cash Summary',
+                        value: _fmt(metrics?.dailyCashSummary),
+                        subtitle: 'Cash flow',
+                        color: Colors.green,
+                      ),
+                      // Shortcuts block as a grid tile
+                      if (shownShortcuts.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color:
+                                  Theme.of(context).colorScheme.outlineVariant,
                             ),
-                            const SizedBox(height: 8),
-                            Expanded(
-                              child: isWide
-                                  ? ListView.separated(
-                                      padding: EdgeInsets.zero,
-                                      itemCount: shownShortcuts.length +
-                                          (showCustomize ? 1 : 0),
-                                      separatorBuilder: (_, __) =>
-                                          const Divider(height: 1),
-                                      itemBuilder: (context, index) {
-                                        if (showCustomize &&
-                                            index == shownShortcuts.length) {
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Shortcuts',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w800),
+                              ),
+                              const SizedBox(height: 8),
+                              Expanded(
+                                child: isWide
+                                    ? ListView.separated(
+                                        padding: EdgeInsets.zero,
+                                        itemCount: shownShortcuts.length +
+                                            (showCustomize ? 1 : 0),
+                                        separatorBuilder: (_, __) =>
+                                            const Divider(height: 1),
+                                        itemBuilder: (context, index) {
+                                          if (showCustomize &&
+                                              index == shownShortcuts.length) {
+                                            return ListTile(
+                                              dense: true,
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              contentPadding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 4,
+                                              ),
+                                              leading: const Icon(
+                                                  Icons.tune_rounded),
+                                              title: const Text('Customize'),
+                                              trailing: const Icon(
+                                                Icons.chevron_right_rounded,
+                                              ),
+                                              onTap: () =>
+                                                  Navigator.of(context).push(
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      const DashboardCustomizationPage(),
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                          final a = shownShortcuts[index];
                                           return ListTile(
                                             dense: true,
                                             visualDensity:
                                                 VisualDensity.compact,
-                                            contentPadding: EdgeInsets.zero,
-                                            leading:
-                                                const Icon(Icons.tune_rounded),
-                                            title: const Text('Customize'),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                              horizontal: 4,
+                                            ),
+                                            leading: Icon(a.icon),
+                                            title: Text(a.label),
                                             trailing: const Icon(
                                               Icons.chevron_right_rounded,
                                             ),
-                                            onTap: () =>
-                                                Navigator.of(context).push(
-                                              MaterialPageRoute(
-                                                builder: (_) =>
-                                                    const DashboardCustomizationPage(),
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                        final a = shownShortcuts[index];
-                                        return ListTile(
-                                          dense: true,
-                                          visualDensity: VisualDensity.compact,
-                                          contentPadding: EdgeInsets.zero,
-                                          leading: Icon(a.icon),
-                                          title: Text(a.label),
-                                          trailing: const Icon(
-                                            Icons.chevron_right_rounded,
-                                          ),
-                                          onTap: () => runDashboardAction(
-                                            context,
-                                            ref,
-                                            a.id,
-                                          ),
-                                        );
-                                      },
-                                    )
-                                  : FeatureGrid(
-                                      padding: EdgeInsets.zero,
-                                      items: [
-                                        ...shownShortcuts.map(
-                                          (a) => FeatureItem(
-                                            icon: a.icon,
-                                            label: a.label,
                                             onTap: () => runDashboardAction(
                                               context,
                                               ref,
                                               a.id,
                                             ),
-                                          ),
-                                        ),
-                                        if (showCustomize)
-                                          FeatureItem(
-                                            icon: Icons.tune_rounded,
-                                            label: 'Customize',
-                                            onTap: () =>
-                                                Navigator.of(context).push(
-                                              MaterialPageRoute(
-                                                builder: (_) =>
-                                                    const DashboardCustomizationPage(),
+                                          );
+                                        },
+                                      )
+                                    : FeatureGrid(
+                                        padding: EdgeInsets.zero,
+                                        items: [
+                                          ...shownShortcuts.map(
+                                            (a) => FeatureItem(
+                                              icon: a.icon,
+                                              label: a.label,
+                                              onTap: () => runDashboardAction(
+                                                context,
+                                                ref,
+                                                a.id,
                                               ),
                                             ),
                                           ),
-                                      ],
-                                    ),
-                            ),
-                          ],
+                                          if (showCustomize)
+                                            FeatureItem(
+                                              icon: Icons.tune_rounded,
+                                              label: 'Customize',
+                                              onTap: () =>
+                                                  Navigator.of(context).push(
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      const DashboardCustomizationPage(),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],

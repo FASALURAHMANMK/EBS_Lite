@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
+import 'package:ebs_lite/shared/widgets/app_selection_dialog.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../data/inventory_repository.dart';
@@ -442,57 +443,44 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
     return showDialog<InventoryListItem?>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setInner) => AlertDialog(
-          title: const Text('Select Product'),
-          content: SizedBox(
-            width: 720,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  decoration: const InputDecoration(
-                    hintText: 'Search by name or SKU',
-                    prefixIcon: Icon(Icons.search_rounded),
-                  ),
-                  onChanged: (v) async {
-                    query = v.trim();
-                    if (query.isEmpty) {
-                      setInner(() => results = List.of(initial));
-                      return;
-                    }
-                    final list = await repo.searchProducts(query);
-                    setInner(() => results = list);
-                  },
-                ),
-                const SizedBox(height: 8),
-                Flexible(
-                  child: results.isEmpty
-                      ? const Center(child: Text('No products'))
-                      : RadioGroup<int>(
-                          groupValue: selectedId,
-                          onChanged: (value) =>
-                              setInner(() => selectedId = value),
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: results.length,
-                            itemBuilder: (context, i) {
-                              final it = results[i];
-                              return RadioListTile<int>(
-                                value: it.productId,
-                                title: Text(it.name),
-                                subtitle: Text([
-                                  if ((it.sku ?? '').isNotEmpty)
-                                    'SKU: ${it.sku}',
-                                  'Stock: ${it.stock.toStringAsFixed(2)}'
-                                ].join(' • ')),
-                              );
-                            },
-                          ),
-                        ),
-                ),
-              ],
+        builder: (context, setInner) => AppSelectionDialog(
+          title: 'Select Product',
+          maxWidth: 720,
+          searchField: TextField(
+            decoration: const InputDecoration(
+              hintText: 'Search by name or SKU',
+              prefixIcon: Icon(Icons.search_rounded),
             ),
+            onChanged: (v) async {
+              query = v.trim();
+              if (query.isEmpty) {
+                setInner(() => results = List.of(initial));
+                return;
+              }
+              final list = await repo.searchProducts(query);
+              setInner(() => results = list);
+            },
           ),
+          body: results.isEmpty
+              ? const Center(child: Text('No products'))
+              : RadioGroup<int>(
+                  groupValue: selectedId,
+                  onChanged: (value) => setInner(() => selectedId = value),
+                  child: ListView.builder(
+                    itemCount: results.length,
+                    itemBuilder: (context, i) {
+                      final it = results[i];
+                      return RadioListTile<int>(
+                        value: it.productId,
+                        title: Text(it.name),
+                        subtitle: Text([
+                          if ((it.sku ?? '').isNotEmpty) 'SKU: ${it.sku}',
+                          'Stock: ${it.stock.toStringAsFixed(2)}'
+                        ].join(' • ')),
+                      );
+                    },
+                  ),
+                ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).maybePop(null),

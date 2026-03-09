@@ -12,6 +12,49 @@ const Color _surfaceDark = Color(0xFF15181C);
 // Shared radii
 const BorderRadius _rMd = BorderRadius.all(Radius.circular(16));
 const BorderRadius _rLg = BorderRadius.all(Radius.circular(20));
+const Size _buttonMinSize = Size(0, 44);
+const EdgeInsets _buttonPadding =
+    EdgeInsets.symmetric(horizontal: 16, vertical: 12);
+const EdgeInsets _buttonPaddingCompact =
+    EdgeInsets.symmetric(horizontal: 12, vertical: 10);
+const EdgeInsets _listTilePadding =
+    EdgeInsets.symmetric(horizontal: 14, vertical: 6);
+const double _textScaleFactor = 0.96;
+
+TextStyle? _scaleTextStyle(TextStyle? style) {
+  if (style == null) return null;
+  return style.copyWith(
+    fontFamily: 'Inter',
+    fontSize:
+        style.fontSize == null ? null : style.fontSize! * _textScaleFactor,
+  );
+}
+
+TextTheme _buildBaseTextTheme(ColorScheme scheme, Brightness brightness) {
+  final base = ThemeData(
+    useMaterial3: true,
+    colorScheme: scheme,
+    brightness: brightness,
+  ).textTheme;
+
+  return base.copyWith(
+    displayLarge: _scaleTextStyle(base.displayLarge),
+    displayMedium: _scaleTextStyle(base.displayMedium),
+    displaySmall: _scaleTextStyle(base.displaySmall),
+    headlineLarge: _scaleTextStyle(base.headlineLarge),
+    headlineMedium: _scaleTextStyle(base.headlineMedium),
+    headlineSmall: _scaleTextStyle(base.headlineSmall),
+    titleLarge: _scaleTextStyle(base.titleLarge),
+    titleMedium: _scaleTextStyle(base.titleMedium),
+    titleSmall: _scaleTextStyle(base.titleSmall),
+    bodyLarge: _scaleTextStyle(base.bodyLarge),
+    bodyMedium: _scaleTextStyle(base.bodyMedium),
+    bodySmall: _scaleTextStyle(base.bodySmall),
+    labelLarge: _scaleTextStyle(base.labelLarge),
+    labelMedium: _scaleTextStyle(base.labelMedium),
+    labelSmall: _scaleTextStyle(base.labelSmall),
+  );
+}
 
 ColorScheme _lightScheme() {
   final base =
@@ -60,14 +103,12 @@ ColorScheme _darkScheme() {
 /// LIGHT THEME
 final ThemeData lightTheme = () {
   final scheme = _lightScheme();
-  final baseTextTheme = ThemeData(
-    useMaterial3: true,
-    colorScheme: scheme,
-    brightness: Brightness.light,
-  ).textTheme.apply(fontFamily: 'Inter');
+  final baseTextTheme = _buildBaseTextTheme(scheme, Brightness.light);
   return ThemeData(
     useMaterial3: true,
     fontFamily: 'Inter',
+    visualDensity: VisualDensity.standard,
+    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     textTheme: baseTextTheme,
     primaryTextTheme: baseTextTheme,
     colorScheme: scheme,
@@ -82,7 +123,7 @@ final ThemeData lightTheme = () {
       centerTitle: true,
       titleTextStyle: TextStyle(
         fontFamily: 'Inter',
-        fontSize: 20,
+        fontSize: 19,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
@@ -108,7 +149,7 @@ final ThemeData lightTheme = () {
       isDense: true,
       filled: true,
       fillColor: scheme.surface,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       hintStyle: TextStyle(
         fontFamily: 'Inter',
         color: scheme.onSurface.withValues(alpha: 0.5),
@@ -136,8 +177,9 @@ final ThemeData lightTheme = () {
       style: FilledButton.styleFrom(
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
+        minimumSize: _buttonMinSize,
         shape: RoundedRectangleBorder(borderRadius: _rMd),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        padding: _buttonPadding,
         textStyle:
             const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700),
       ),
@@ -147,8 +189,9 @@ final ThemeData lightTheme = () {
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
         elevation: 0,
+        minimumSize: _buttonMinSize,
         shape: RoundedRectangleBorder(borderRadius: _rMd),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        padding: _buttonPadding,
         textStyle:
             const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
       ),
@@ -157,8 +200,9 @@ final ThemeData lightTheme = () {
       style: OutlinedButton.styleFrom(
         side: BorderSide(color: scheme.outline),
         foregroundColor: scheme.onSurface,
+        minimumSize: _buttonMinSize,
         shape: RoundedRectangleBorder(borderRadius: _rMd),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        padding: _buttonPadding,
         textStyle:
             const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
       ),
@@ -166,8 +210,9 @@ final ThemeData lightTheme = () {
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: scheme.primary,
+        minimumSize: _buttonMinSize,
         shape: RoundedRectangleBorder(borderRadius: _rMd),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: _buttonPaddingCompact,
         textStyle:
             const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
       ),
@@ -196,9 +241,10 @@ final ThemeData lightTheme = () {
       selectedColor: scheme.primary.withValues(alpha: 0.15),
       disabledColor: scheme.surfaceContainerHighest,
       labelStyle: TextStyle(fontFamily: 'Inter', color: scheme.onSurface),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 4),
       side: BorderSide(color: scheme.outline),
       shape: RoundedRectangleBorder(borderRadius: _rMd),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
     ),
 
     // NavigationBar (bottom)
@@ -211,7 +257,7 @@ final ThemeData lightTheme = () {
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
           fontFamily: 'Inter',
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: states.contains(WidgetState.selected)
               ? FontWeight.w700
               : FontWeight.w500,
@@ -246,13 +292,13 @@ final ThemeData lightTheme = () {
           IconThemeData(color: scheme.onSurface.withValues(alpha: .70)),
       selectedLabelTextStyle: TextStyle(
         fontFamily: 'Inter',
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: FontWeight.w700,
         color: scheme.primary,
       ),
       unselectedLabelTextStyle: TextStyle(
         fontFamily: 'Inter',
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: FontWeight.w500,
         color: scheme.onSurface.withValues(alpha: .70),
       ),
@@ -261,16 +307,46 @@ final ThemeData lightTheme = () {
     // Dividers & Lists
     dividerTheme:
         DividerThemeData(color: scheme.outline, thickness: 1, space: 24),
+    dataTableTheme: DataTableThemeData(
+      headingRowColor: WidgetStatePropertyAll(scheme.surfaceContainerHighest),
+      headingTextStyle: TextStyle(
+        fontFamily: 'Inter',
+        fontWeight: FontWeight.w700,
+        color: scheme.onSurface,
+      ),
+      dataTextStyle: TextStyle(
+        fontFamily: 'Inter',
+        color: scheme.onSurface,
+      ),
+      dividerThickness: 1,
+      horizontalMargin: 16,
+      columnSpacing: 20,
+      headingRowHeight: 44,
+      dataRowMinHeight: 42,
+      dataRowMaxHeight: 52,
+    ),
     listTileTheme: ListTileThemeData(
       shape: RoundedRectangleBorder(borderRadius: _rMd),
       tileColor: scheme.surface,
       selectedTileColor: scheme.primary.withValues(alpha: 0.06),
       iconColor: scheme.onSurface.withValues(alpha: .8),
+      contentPadding: _listTilePadding,
+      minLeadingWidth: 20,
+      horizontalTitleGap: 12,
+      minVerticalPadding: 6,
       titleTextStyle: TextStyle(
         fontFamily: 'Inter',
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: FontWeight.w500,
         color: scheme.onSurface,
+      ),
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(
+        padding: const EdgeInsets.all(8),
+        minimumSize: const Size(40, 40),
+        shape: RoundedRectangleBorder(borderRadius: _rMd),
+        foregroundColor: scheme.onSurface.withValues(alpha: .85),
       ),
     ),
 
@@ -323,14 +399,12 @@ final ThemeData lightTheme = () {
 /// DARK THEME
 final ThemeData darkTheme = () {
   final scheme = _darkScheme();
-  final baseTextTheme = ThemeData(
-    useMaterial3: true,
-    colorScheme: scheme,
-    brightness: Brightness.dark,
-  ).textTheme.apply(fontFamily: 'Inter');
+  final baseTextTheme = _buildBaseTextTheme(scheme, Brightness.dark);
   return ThemeData(
     useMaterial3: true,
     fontFamily: 'Inter',
+    visualDensity: VisualDensity.standard,
+    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     textTheme: baseTextTheme,
     primaryTextTheme: baseTextTheme,
     colorScheme: scheme,
@@ -343,7 +417,7 @@ final ThemeData darkTheme = () {
       centerTitle: true,
       titleTextStyle: TextStyle(
         fontFamily: 'Inter',
-        fontSize: 20,
+        fontSize: 19,
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,
       ),
@@ -364,7 +438,7 @@ final ThemeData darkTheme = () {
       isDense: true,
       filled: true,
       fillColor: scheme.surface,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       hintStyle: TextStyle(
         fontFamily: 'Inter',
         color: scheme.onSurface.withValues(alpha: 0.55),
@@ -390,8 +464,9 @@ final ThemeData darkTheme = () {
       style: FilledButton.styleFrom(
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
+        minimumSize: _buttonMinSize,
         shape: RoundedRectangleBorder(borderRadius: _rMd),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        padding: _buttonPadding,
         textStyle:
             const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w700),
       ),
@@ -401,8 +476,9 @@ final ThemeData darkTheme = () {
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
         elevation: 0,
+        minimumSize: _buttonMinSize,
         shape: RoundedRectangleBorder(borderRadius: _rMd),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        padding: _buttonPadding,
         textStyle:
             const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
       ),
@@ -411,8 +487,9 @@ final ThemeData darkTheme = () {
       style: OutlinedButton.styleFrom(
         side: BorderSide(color: scheme.outline),
         foregroundColor: scheme.onSurface,
+        minimumSize: _buttonMinSize,
         shape: RoundedRectangleBorder(borderRadius: _rMd),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        padding: _buttonPadding,
         textStyle:
             const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
       ),
@@ -420,8 +497,9 @@ final ThemeData darkTheme = () {
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: scheme.primary,
+        minimumSize: _buttonMinSize,
         shape: RoundedRectangleBorder(borderRadius: _rMd),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: _buttonPaddingCompact,
         textStyle:
             const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
       ),
@@ -446,9 +524,10 @@ final ThemeData darkTheme = () {
       selectedColor: scheme.primary.withValues(alpha: 0.18),
       disabledColor: scheme.surfaceContainerHighest,
       labelStyle: TextStyle(fontFamily: 'Inter', color: scheme.onSurface),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 4),
       side: BorderSide(color: scheme.outline),
       shape: RoundedRectangleBorder(borderRadius: _rMd),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: scheme.surface,
@@ -459,7 +538,7 @@ final ThemeData darkTheme = () {
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
           fontFamily: 'Inter',
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: states.contains(WidgetState.selected)
               ? FontWeight.w700
               : FontWeight.w500,
@@ -491,29 +570,59 @@ final ThemeData darkTheme = () {
           IconThemeData(color: scheme.onSurface.withValues(alpha: .75)),
       selectedLabelTextStyle: TextStyle(
         fontFamily: 'Inter',
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: FontWeight.w700,
         color: scheme.primary,
       ),
       unselectedLabelTextStyle: TextStyle(
         fontFamily: 'Inter',
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: FontWeight.w500,
         color: scheme.onSurface.withValues(alpha: .75),
       ),
     ),
     dividerTheme:
         DividerThemeData(color: scheme.outline, thickness: 1, space: 24),
+    dataTableTheme: DataTableThemeData(
+      headingRowColor: WidgetStatePropertyAll(scheme.surfaceContainerHighest),
+      headingTextStyle: TextStyle(
+        fontFamily: 'Inter',
+        fontWeight: FontWeight.w700,
+        color: scheme.onSurface,
+      ),
+      dataTextStyle: TextStyle(
+        fontFamily: 'Inter',
+        color: scheme.onSurface,
+      ),
+      dividerThickness: 1,
+      horizontalMargin: 16,
+      columnSpacing: 20,
+      headingRowHeight: 44,
+      dataRowMinHeight: 42,
+      dataRowMaxHeight: 52,
+    ),
     listTileTheme: ListTileThemeData(
       shape: RoundedRectangleBorder(borderRadius: _rMd),
       tileColor: scheme.surface,
       selectedTileColor: scheme.primary.withValues(alpha: 0.09),
       iconColor: scheme.onSurface.withValues(alpha: .9),
+      contentPadding: _listTilePadding,
+      minLeadingWidth: 20,
+      horizontalTitleGap: 12,
+      minVerticalPadding: 6,
       titleTextStyle: TextStyle(
         fontFamily: 'Inter',
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: FontWeight.w500,
         color: scheme.onSurface,
+      ),
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(
+        padding: const EdgeInsets.all(8),
+        minimumSize: const Size(40, 40),
+        shape: RoundedRectangleBorder(borderRadius: _rMd),
+        foregroundColor: scheme.onSurface.withValues(alpha: .9),
       ),
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(

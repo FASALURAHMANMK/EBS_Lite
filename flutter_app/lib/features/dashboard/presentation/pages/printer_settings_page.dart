@@ -262,6 +262,7 @@ class _PrinterEditDialogState extends State<_PrinterEditDialog> {
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: _kind,
                   items: const [
                     DropdownMenuItem(
@@ -282,6 +283,7 @@ class _PrinterEditDialogState extends State<_PrinterEditDialog> {
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: _conn,
                   items: [
                     if (isThermal)

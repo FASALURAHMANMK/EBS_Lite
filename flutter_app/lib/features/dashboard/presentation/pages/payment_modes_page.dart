@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_confirm_dialog.dart';
 import '../../data/payment_methods_repository.dart';
 import '../../data/currency_repository.dart';
 
@@ -58,7 +59,16 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Payment Modes')),
+      appBar: AppBar(
+        title: const Text('Payment Modes'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: _loading ? null : _load,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openEditor(context),
         child: const Icon(Icons.add_rounded),
@@ -92,24 +102,15 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
                           tooltip: 'Delete',
                           icon: const Icon(Icons.delete_outline_rounded),
                           onPressed: () async {
-                            final ok = await showDialog<bool>(
-                                  context: context,
-                                  builder: (_) => AlertDialog(
-                                    title: const Text('Delete Payment Mode'),
-                                    content: Text('Delete "${m.name}"?'),
-                                    actions: [
-                                      TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, false),
-                                          child: const Text('Cancel')),
-                                      FilledButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, true),
-                                          child: const Text('Delete')),
-                                    ],
-                                  ),
-                                ) ??
-                                false;
+                            final ok = await showAppConfirmDialog(
+                              context,
+                              title: 'Delete Payment Mode',
+                              message:
+                                  'Delete "${m.name}"? This cannot be undone.',
+                              confirmLabel: 'Delete',
+                              icon: Icons.delete_outline_rounded,
+                              destructive: true,
+                            );
                             if (!ok) return;
                             try {
                               await ref
@@ -161,6 +162,7 @@ class _PaymentModesPageState extends ConsumerState<PaymentModesPage> {
                     decoration: const InputDecoration(labelText: 'Name')),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Type'),
                   initialValue: type,
                   items: types

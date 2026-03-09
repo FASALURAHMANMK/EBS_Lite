@@ -4,6 +4,9 @@ import 'package:ebs_lite/features/auth/data/auth_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../shared/widgets/app_confirm_dialog.dart';
+import '../../../../shared/widgets/app_empty_view.dart';
+import '../../../../shared/widgets/app_loading_view.dart';
 import '../../data/device_sessions_repository.dart';
 
 class DeviceSessionsPage extends ConsumerStatefulWidget {
@@ -50,28 +53,16 @@ class _DeviceSessionsPageState extends ConsumerState<DeviceSessionsPage> {
   Future<void> _revoke(DeviceSessionDto s) async {
     final isCurrent =
         _currentSessionId != null && s.sessionId == _currentSessionId;
-    final ok = await showDialog<bool>(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Revoke session'),
-            content: Text(
-              isCurrent
-                  ? 'Revoke this device session? You may be logged out.'
-                  : 'Revoke this session?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Revoke'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+    final ok = await showAppConfirmDialog(
+      context,
+      title: 'Revoke Session',
+      message: isCurrent
+          ? 'Revoke this device session? You may be logged out.'
+          : 'Revoke this session?',
+      confirmLabel: 'Revoke',
+      icon: Icons.logout_rounded,
+      destructive: true,
+    );
     if (!ok) return;
 
     try {
@@ -111,9 +102,23 @@ class _DeviceSessionsPageState extends ConsumerState<DeviceSessionsPage> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoadingView(label: 'Loading device sessions')
           : _sessions.isEmpty
-              ? const Center(child: Text('No active sessions'))
+              ? RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [
+                      SizedBox(height: 64),
+                      AppEmptyView(
+                        title: 'No active sessions',
+                        message:
+                            'Signed-in devices will appear here when available.',
+                        icon: Icons.devices_outlined,
+                      ),
+                    ],
+                  ),
+                )
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView.separated(

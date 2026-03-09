@@ -53,53 +53,50 @@ class StatCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (icon != null)
-                  CircleAvatar(
-                    radius: iconRadius,
-                    backgroundColor: (color ?? theme.colorScheme.primary)
-                        .withValues(alpha: 0.15),
-                    child: Icon(
-                      icon,
-                      color: color ?? theme.colorScheme.primary,
-                      size: dense ? 18 : 22,
-                    ),
-                  ),
-                if (icon != null) SizedBox(height: iconGap),
-                Text(
-                  title,
-                  maxLines: titleMaxLines,
-                  overflow: TextOverflow.ellipsis,
-                  style: titleStyle,
-                ),
-                const SizedBox(height: 6),
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.bottomLeft,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          value,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: valueStyle,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (icon != null)
+                      CircleAvatar(
+                        radius: iconRadius,
+                        backgroundColor: (color ?? theme.colorScheme.primary)
+                            .withValues(alpha: 0.15),
+                        child: Icon(
+                          icon,
+                          color: color ?? theme.colorScheme.primary,
+                          size: dense ? 18 : 22,
                         ),
-                        if (showSubtitle) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            subtitle!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ],
+                      ),
+                    if (icon != null) SizedBox(width: iconGap),
+                    Expanded(
+                      child: Text(
+                        title,
+                        maxLines: titleMaxLines,
+                        overflow: TextOverflow.ellipsis,
+                        style: titleStyle,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: valueStyle,
+                ),
+                if (showSubtitle) ...[
+                  const Spacer(),
+                  Text(
+                    subtitle!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                ),
+                ] else
+                  const Spacer(),
               ],
             ),
           ),

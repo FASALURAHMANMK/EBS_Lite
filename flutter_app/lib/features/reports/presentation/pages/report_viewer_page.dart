@@ -7,7 +7,10 @@ import '../../../dashboard/controllers/location_notifier.dart';
 import '../../../dashboard/data/models.dart';
 import '../../data/reports_repository.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_empty_view.dart';
 import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_loading_view.dart';
+import '../../../../shared/widgets/app_scrollbar.dart';
 import 'report_category_page.dart';
 
 class ReportViewerPage extends ConsumerStatefulWidget {
@@ -208,7 +211,7 @@ class _ReportViewerPageState extends ConsumerState<ReportViewerPage> {
             ),
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const AppLoadingView(label: 'Loading report')
                   : _error != null
                       ? AppErrorView(error: _error!, onRetry: _load)
                       : _ReportDataView(data: _data),
@@ -265,91 +268,134 @@ class _FiltersCard extends StatelessWidget {
       margin: const EdgeInsets.all(12),
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (config.supportsDateRange)
-                  OutlinedButton.icon(
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (config.supportsDateRange)
+                ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 168),
+                  child: OutlinedButton.icon(
                     onPressed: onPickFrom,
                     icon: const Icon(Icons.event_rounded),
                     label: Text('From: ${dateLabel(fromDate)}'),
                   ),
-                if (config.supportsDateRange)
-                  OutlinedButton.icon(
+                ),
+              if (config.supportsDateRange)
+                ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 168),
+                  child: OutlinedButton.icon(
                     onPressed: onPickTo,
                     icon: const Icon(Icons.event_available_rounded),
                     label: Text('To: ${dateLabel(toDate)}'),
                   ),
-                if (config.supportsLocation && locations.isNotEmpty)
-                  DropdownButton<int?>(
-                    value: locationId,
-                    hint: const Text('Location'),
-                    items: [
-                      const DropdownMenuItem<int?>(
-                        value: null,
-                        child: Text('All locations'),
-                      ),
-                      ...locations.map(
-                        (l) => DropdownMenuItem<int?>(
-                          value: l.locationId,
-                          child: Text(l.name),
-                        ),
-                      )
-                    ],
-                    onChanged: onLocationChanged,
-                  ),
-                if (config.supportsGroupBy)
-                  DropdownButton<String>(
-                    value: groupBy,
-                    items: const [
-                      DropdownMenuItem(value: 'day', child: Text('Daily')),
-                      DropdownMenuItem(value: 'month', child: Text('Monthly')),
-                      DropdownMenuItem(value: 'year', child: Text('Yearly')),
-                    ],
-                    onChanged: (v) => onGroupByChanged(v ?? 'day'),
-                  ),
-                if (config.supportsExpensesGroupBy)
-                  DropdownButton<String>(
-                    value: expensesGroupBy,
-                    items: const [
-                      DropdownMenuItem(value: 'none', child: Text('No Group')),
-                      DropdownMenuItem(value: 'day', child: Text('Daily')),
-                      DropdownMenuItem(value: 'month', child: Text('Monthly')),
-                    ],
-                    onChanged: (v) => onExpensesGroupByChanged(v ?? 'none'),
-                  ),
-                if (config.supportsLimit)
-                  SizedBox(
-                    width: 110,
-                    child: TextField(
-                      controller: limitCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Limit',
-                      ),
-                    ),
-                  ),
-                if (config.supportsProductId)
-                  SizedBox(
-                    width: 150,
-                    child: TextField(
-                      controller: productIdCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Product ID',
-                      ),
-                    ),
-                  ),
-                FilledButton(
-                  onPressed: onApply,
-                  child: const Text('Apply'),
                 ),
-              ],
-            ),
-          ],
+              if (config.supportsLocation && locations.isNotEmpty)
+                SizedBox(
+                  width: 220,
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Location',
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int?>(
+                        isExpanded: true,
+                        value: locationId,
+                        hint: const Text('Location'),
+                        items: [
+                          const DropdownMenuItem<int?>(
+                            value: null,
+                            child: Text('All locations'),
+                          ),
+                          ...locations.map(
+                            (l) => DropdownMenuItem<int?>(
+                              value: l.locationId,
+                              child: Text(l.name),
+                            ),
+                          )
+                        ],
+                        onChanged: onLocationChanged,
+                      ),
+                    ),
+                  ),
+                ),
+              if (config.supportsGroupBy)
+                SizedBox(
+                  width: 180,
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Group By',
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: groupBy,
+                        items: const [
+                          DropdownMenuItem(value: 'day', child: Text('Daily')),
+                          DropdownMenuItem(
+                              value: 'month', child: Text('Monthly')),
+                          DropdownMenuItem(
+                              value: 'year', child: Text('Yearly')),
+                        ],
+                        onChanged: (v) => onGroupByChanged(v ?? 'day'),
+                      ),
+                    ),
+                  ),
+                ),
+              if (config.supportsExpensesGroupBy)
+                SizedBox(
+                  width: 180,
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Expenses Group',
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: expensesGroupBy,
+                        items: const [
+                          DropdownMenuItem(
+                              value: 'none', child: Text('No Group')),
+                          DropdownMenuItem(value: 'day', child: Text('Daily')),
+                          DropdownMenuItem(
+                              value: 'month', child: Text('Monthly')),
+                        ],
+                        onChanged: (v) => onExpensesGroupByChanged(v ?? 'none'),
+                      ),
+                    ),
+                  ),
+                ),
+              if (config.supportsLimit)
+                SizedBox(
+                  width: 110,
+                  child: TextField(
+                    controller: limitCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Limit',
+                    ),
+                  ),
+                ),
+              if (config.supportsProductId)
+                SizedBox(
+                  width: 150,
+                  child: TextField(
+                    controller: productIdCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Product ID',
+                    ),
+                  ),
+                ),
+              FilledButton.icon(
+                onPressed: onApply,
+                icon: const Icon(Icons.filter_alt_rounded),
+                label: const Text('Apply'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -364,12 +410,20 @@ class _ReportDataView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (data == null) {
-      return const Center(child: Text('No data available'));
+      return const AppEmptyView(
+        title: 'No data available',
+        message: 'This report has no data for the current filters.',
+        icon: Icons.bar_chart_rounded,
+      );
     }
     if (data is List) {
       final list = data as List;
       if (list.isEmpty) {
-        return const Center(child: Text('No results found'));
+        return const AppEmptyView(
+          title: 'No results found',
+          message: 'Try changing the report filters and run it again.',
+          icon: Icons.table_rows_outlined,
+        );
       }
       final allMaps = list.every((e) => e is Map);
       if (allMaps) {
@@ -393,7 +447,51 @@ class _ReportDataView extends StatelessWidget {
       final map = (data as Map).cast<dynamic, dynamic>();
       return _KeyValueTableView(map: map);
     }
-    return Center(child: Text(data.toString()));
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(data.toString()),
+      ),
+    );
+  }
+}
+
+class _TableShell extends StatelessWidget {
+  const _TableShell({
+    required this.child,
+    this.caption,
+  });
+
+  final Widget child;
+  final String? caption;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Card(
+        elevation: 0,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (caption != null) ...[
+                Text(
+                  caption!,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              Expanded(child: child),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -409,11 +507,11 @@ class _KeyValueTableView extends StatelessWidget {
         .toList()
       ..sort((a, b) => a.key.compareTo(b.key));
 
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: [
-        Card(
-          elevation: 0,
+    return _TableShell(
+      caption: '${entries.length} fields',
+      child: AppScrollbar(
+        builder: (context, controller) => SingleChildScrollView(
+          controller: controller,
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: DataTable(
@@ -434,7 +532,7 @@ class _KeyValueTableView extends StatelessWidget {
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -454,15 +552,16 @@ class _MapTableView extends StatelessWidget {
     }
     final orderedCols = columns.toList()..sort();
 
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Card(
-        elevation: 0,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 720),
-            child: SingleChildScrollView(
+    return _TableShell(
+      caption:
+          '${rows.length} rows • ${orderedCols.length} columns${rows.length > 500 ? ' • showing first 500' : ''}',
+      child: AppScrollbar(
+        builder: (context, controller) => SingleChildScrollView(
+          controller: controller,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 720),
               child: DataTable(
                 columns:
                     orderedCols.map((c) => DataColumn(label: Text(c))).toList(),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_selection_dialog.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
 import '../../../suppliers/data/supplier_repository.dart';
@@ -981,48 +982,47 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   }
 
   Future<_SupplierPick?> _openSupplierPicker() async {
+    final repo = ref.read(supplierRepositoryProvider);
+    List<_SupplierPick> initial = const [];
+    try {
+      initial = (await repo.getSuppliers())
+          .map((e) => _SupplierPick(e.supplierId, e.name))
+          .toList();
+    } catch (_) {}
     String query = '';
-    List<_SupplierPick> results = const [];
+    List<_SupplierPick> results = List.of(initial);
+    if (!mounted) return null;
     return showDialog<_SupplierPick>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setInner) => AlertDialog(
-          title: const Text('Select Supplier'),
-          content: SizedBox(
-            width: 480,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  decoration: const InputDecoration(
-                      hintText: 'Search',
-                      prefixIcon: Icon(Icons.search_rounded)),
-                  onChanged: (v) async {
-                    query = v.trim();
-                    final repo = ref.read(supplierRepositoryProvider);
-                    final list = await repo.getSuppliers(search: query);
-                    setInner(() => results = list
-                        .map((e) => _SupplierPick(e.supplierId, e.name))
-                        .toList());
+        builder: (context, setInner) => AppSelectionDialog(
+          title: 'Select Supplier',
+          maxWidth: 560,
+          searchField: TextField(
+            decoration: const InputDecoration(
+              hintText: 'Search',
+              prefixIcon: Icon(Icons.search_rounded),
+            ),
+            onChanged: (v) async {
+              query = v.trim();
+              final list = await repo.getSuppliers(search: query);
+              setInner(() => results = list
+                  .map((e) => _SupplierPick(e.supplierId, e.name))
+                  .toList());
+            },
+          ),
+          body: results.isEmpty
+              ? const Center(child: Text('No suppliers'))
+              : ListView.builder(
+                  itemCount: results.length,
+                  itemBuilder: (context, i) {
+                    final s = results[i];
+                    return ListTile(
+                      title: Text(s.name),
+                      onTap: () => Navigator.of(context).pop(s),
+                    );
                   },
                 ),
-                const SizedBox(height: 8),
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: results.length,
-                    itemBuilder: (context, i) {
-                      final s = results[i];
-                      return ListTile(
-                        title: Text(s.name),
-                        onTap: () => Navigator.of(context).pop(s),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
           actions: [
             TextButton(
                 onPressed: () => Navigator.of(context).pop(),

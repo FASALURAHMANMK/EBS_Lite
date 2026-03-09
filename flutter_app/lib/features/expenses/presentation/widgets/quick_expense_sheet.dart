@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/error_handler.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_sheet_header.dart';
 import '../../data/expenses_repository.dart';
 import '../../data/models.dart';
 
@@ -11,6 +12,7 @@ Future<bool?> showQuickExpenseSheet(BuildContext context, WidgetRef ref) {
   return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     showDragHandle: true,
     builder: (_) => const _QuickExpenseSheet(),
   );
@@ -128,7 +130,6 @@ class _QuickExpenseSheetState extends ConsumerState<_QuickExpenseSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final bottom = MediaQuery.of(context).viewInsets.bottom;
 
     return Padding(
@@ -140,83 +141,83 @@ class _QuickExpenseSheetState extends ConsumerState<_QuickExpenseSheet> {
             )
           : (_error != null)
               ? AppErrorView(error: _error!, onRetry: _load)
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.money_off_rounded),
-                        const SizedBox(width: 8),
-                        Text('Quick Expense',
-                            style: theme.textTheme.titleMedium),
-                        const Spacer(),
-                        IconButton(
+              : SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      AppSheetHeader(
+                        title: 'Quick Expense',
+                        icon: Icons.money_off_rounded,
+                        trailing: IconButton(
                           tooltip: 'Refresh',
                           onPressed: _load,
                           icon: const Icon(Icons.refresh_rounded),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<int>(
-                      initialValue: _categoryId,
-                      items: _categories
-                          .map((c) => DropdownMenuItem<int>(
-                                value: c.categoryId,
-                                child: Text(c.name),
-                              ))
-                          .toList(),
-                      onChanged: _saving
-                          ? null
-                          : (v) => setState(() => _categoryId = v),
-                      decoration: const InputDecoration(
-                        labelText: 'Category',
-                        prefixIcon: Icon(Icons.category_rounded),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _amount,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Amount',
-                        prefixIcon: Icon(Icons.attach_money_rounded),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<int>(
+                        isExpanded: true,
+                        initialValue: _categoryId,
+                        items: _categories
+                            .map((c) => DropdownMenuItem<int>(
+                                  value: c.categoryId,
+                                  child: Text(c.name),
+                                ))
+                            .toList(),
+                        onChanged: _saving
+                            ? null
+                            : (v) => setState(() => _categoryId = v),
+                        decoration: const InputDecoration(
+                          labelText: 'Category',
+                          prefixIcon: Icon(Icons.category_rounded),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: _saving ? null : _pickDate,
-                      icon: const Icon(Icons.event_rounded),
-                      label: Text(
-                        'Date: ${_date.year.toString().padLeft(4, '0')}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _amount,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Amount',
+                          prefixIcon: Icon(Icons.attach_money_rounded),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _notes,
-                      decoration: const InputDecoration(
-                        labelText: 'Notes (optional)',
-                        prefixIcon: Icon(Icons.notes_rounded),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: _saving ? null : _pickDate,
+                        icon: const Icon(Icons.event_rounded),
+                        label: Text(
+                          'Date: ${_date.year.toString().padLeft(4, '0')}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 48,
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: _saving ? null : _save,
-                        child: _saving
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2.4),
-                              )
-                            : const Text('Save Expense'),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _notes,
+                        decoration: const InputDecoration(
+                          labelText: 'Notes (optional)',
+                          prefixIcon: Icon(Icons.notes_rounded),
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 48,
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: _saving ? null : _save,
+                          child: _saving
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.4,
+                                  ),
+                                )
+                              : const Text('Save Expense'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
     );
   }

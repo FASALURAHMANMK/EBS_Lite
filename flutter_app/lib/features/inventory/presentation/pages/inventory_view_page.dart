@@ -8,7 +8,10 @@ import '../../data/models.dart';
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../../dashboard/data/models.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
+import '../../../../shared/widgets/app_empty_view.dart';
+import '../../../../shared/widgets/app_loading_view.dart';
 import '../../../../shared/widgets/app_message_view.dart';
+import '../../../../shared/widgets/app_scrollbar.dart';
 import '../../../../shared/widgets/no_network_view.dart';
 import 'product_transactions_page.dart';
 
@@ -281,10 +284,13 @@ class _InventoryViewPageState extends ConsumerState<InventoryViewPage> {
           const SizedBox(height: 4),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-            child: Row(
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Expanded(
-                  flex: 8,
+                SizedBox(
+                  width: isWide ? 300 : MediaQuery.sizeOf(context).width - 112,
                   child: _CategoryField(
                     label: 'Category',
                     valueText: () {
@@ -310,21 +316,22 @@ class _InventoryViewPageState extends ConsumerState<InventoryViewPage> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
-                IconButton(
-                  tooltip: 'Sort',
-                  icon: const Icon(Icons.sort_rounded),
+                OutlinedButton.icon(
                   onPressed: _openSortDialog,
+                  icon: const Icon(Icons.sort_rounded),
+                  label: const Text('Sort'),
                 ),
-                const SizedBox(width: 4),
-                IconButton(
-                  tooltip: 'Filters',
-                  icon: const Icon(Icons.filter_list_rounded),
+                OutlinedButton.icon(
                   onPressed: () => _openFilterDialog(
                     onlyLowStock: state.onlyLowStock,
                     onApply: (low) => notifier.setOnlyLowStock(low),
                   ),
+                  icon: const Icon(Icons.filter_list_rounded),
+                  label: const Text('Filters'),
                 ),
+                Chip(label: Text('${filtered.length} items')),
+                if (state.onlyLowStock)
+                  const Chip(label: Text('Low stock only')),
               ],
             ),
           ),
@@ -356,29 +363,25 @@ class _InventoryViewPageState extends ConsumerState<InventoryViewPage> {
             ),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Divider(thickness: 1, color: Colors.grey),
-                ),
-                Container(width: 1, height: 20, color: Colors.grey),
-                const SizedBox(width: 8),
-                IconButton(
-                  tooltip: state.viewMode == InventoryViewMode.grid
-                      ? 'Switch to list view'
-                      : 'Switch to grid view',
-                  onPressed: () => notifier.setViewMode(
-                    state.viewMode == InventoryViewMode.grid
-                        ? InventoryViewMode.list
-                        : InventoryViewMode.grid,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: SegmentedButton<InventoryViewMode>(
+                segments: const [
+                  ButtonSegment(
+                    value: InventoryViewMode.grid,
+                    icon: Icon(Icons.grid_view_rounded),
+                    label: Text('Grid'),
                   ),
-                  icon: Icon(
-                    state.viewMode == InventoryViewMode.grid
-                        ? Icons.view_list_rounded
-                        : Icons.grid_view_rounded,
+                  ButtonSegment(
+                    value: InventoryViewMode.list,
+                    icon: Icon(Icons.view_list_rounded),
+                    label: Text('List'),
                   ),
-                ),
-              ],
+                ],
+                selected: {state.viewMode},
+                onSelectionChanged: (selection) =>
+                    notifier.setViewMode(selection.first),
+              ),
             ),
           ),
           Expanded(
@@ -429,6 +432,9 @@ class _InventoryViewPageState extends ConsumerState<InventoryViewPage> {
       BuildContext context, List<InventoryListItem> items) {
     final state = ref.watch(inventoryNotifierProvider);
     if (items.isEmpty) {
+      if (state.isLoading) {
+        return const AppLoadingView(label: 'Loading products');
+      }
       if (state.error != null) {
         final outbox = ref.watch(outboxNotifierProvider);
         void onRetry() => ref.read(inventoryNotifierProvider.notifier).load();
@@ -441,7 +447,18 @@ class _InventoryViewPageState extends ConsumerState<InventoryViewPage> {
               )
             : NoNetworkView(onRetry: onRetry);
       }
-      return const Center(child: Text('No products available'));
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 64),
+          AppEmptyView(
+            title: 'No products available',
+            message:
+                'Products for the selected filters and location will appear here.',
+            icon: Icons.inventory_2_outlined,
+          ),
+        ],
+      );
     }
     return state.viewMode == InventoryViewMode.grid
         ? _GridList(items: items)
@@ -508,16 +525,19 @@ class _GridList extends StatelessWidget {
           crossAxisCount = 2;
         }
         final childAspectRatio = width < 600 ? 0.95 : 1.4;
-        return GridView.builder(
-          padding: const EdgeInsets.all(12),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: childAspectRatio,
+        return AppScrollbar(
+          builder: (context, controller) => GridView.builder(
+            controller: controller,
+            padding: const EdgeInsets.all(12),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: childAspectRatio,
+            ),
+            itemCount: items.length,
+            itemBuilder: (context, i) => _InventoryCard(item: items[i]),
           ),
-          itemCount: items.length,
-          itemBuilder: (context, i) => _InventoryCard(item: items[i]),
         );
       },
     );
@@ -530,11 +550,14 @@ class _ListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(12),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, i) => _InventoryTile(item: items[i]),
+    return AppScrollbar(
+      builder: (context, controller) => ListView.separated(
+        controller: controller,
+        padding: const EdgeInsets.all(12),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemBuilder: (context, i) => _InventoryTile(item: items[i]),
+      ),
     );
   }
 }
@@ -664,6 +687,13 @@ class _InventoryTile extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text('Stock: ${item.stock.toStringAsFixed(2)}'),
+          if (item.price != null)
+            Text(
+              'Price: ${item.price!.toStringAsFixed(2)}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           if (low)
             Text('Low',
                 style: TextStyle(

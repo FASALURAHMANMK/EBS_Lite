@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_confirm_dialog.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
 import '../../data/expenses_repository.dart';
@@ -106,24 +107,14 @@ class _ExpenseCategoriesPageState extends ConsumerState<ExpenseCategoriesPage> {
   }
 
   Future<void> _delete(ExpenseCategoryDto c) async {
-    final ok = await showDialog<bool>(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Delete Category'),
-            content: Text('Delete "${c.name}"?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+    final ok = await showAppConfirmDialog(
+      context,
+      title: 'Delete Category',
+      message: 'Delete "${c.name}"? This cannot be undone.',
+      confirmLabel: 'Delete',
+      icon: Icons.delete_outline_rounded,
+      destructive: true,
+    );
     if (!ok) return;
     try {
       await ref.read(expensesRepositoryProvider).deleteCategory(c.categoryId);
@@ -165,6 +156,11 @@ class _ExpenseCategoriesPageState extends ConsumerState<ExpenseCategoriesPage> {
             : null,
         title: const Text('Expense Categories'),
         actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _refresh,
+          ),
           IconButton(
             tooltip: 'New Category',
             icon: const Icon(Icons.add_rounded),

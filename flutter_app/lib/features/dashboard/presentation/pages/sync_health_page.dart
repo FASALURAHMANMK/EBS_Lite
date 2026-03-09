@@ -110,6 +110,17 @@ class _SyncHealthPageState extends ConsumerState<SyncHealthPage> {
     await _reload();
   }
 
+  Future<void> _handleItemAction(String action, OutboxItem item) async {
+    switch (action) {
+      case 'retry':
+        await _retryItem(item);
+        break;
+      case 'discard':
+        await _confirmDiscard(item);
+        break;
+    }
+  }
+
   Future<void> _retryItem(OutboxItem item) async {
     if (item.id == null) return;
     await ref.read(outboxNotifierProvider.notifier).retryItem(item.id!);
@@ -245,15 +256,12 @@ class _SyncHealthPageState extends ConsumerState<SyncHealthPage> {
                         ),
                         isThreeLine: true,
                         trailing: PopupMenuButton<String>(
-                          onSelected: (v) async {
-                            switch (v) {
-                              case 'retry':
-                                await _retryItem(item);
-                                break;
-                              case 'discard':
-                                await _confirmDiscard(item);
-                                break;
-                            }
+                          onSelected: (v) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (!mounted) return;
+                              // ignore: unawaited_futures
+                              _handleItemAction(v, item);
+                            });
                           },
                           itemBuilder: (_) => const [
                             PopupMenuItem(

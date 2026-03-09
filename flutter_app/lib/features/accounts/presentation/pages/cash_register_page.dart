@@ -10,6 +10,7 @@ import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
 import '../../../accounts/data/accounts_repository.dart';
 import '../../../accounts/data/models.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_confirm_dialog.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import '../../../../shared/widgets/manager_override_dialog.dart';
 import '../../controllers/training_mode_notifier.dart';
@@ -407,29 +408,16 @@ class _CashRegisterPageState extends ConsumerState<CashRegisterPage> {
       {required bool enabled}) async {
     if (_actionBusy) return;
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title:
-            Text(enabled ? 'Enable training mode?' : 'Disable training mode?'),
-        content: Text(
-          enabled
-              ? 'Training sales will not post to real stock/cash totals. Offline sync for checkout is disabled in training mode.'
-              : 'This returns the register to normal posting mode.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(enabled ? 'Enable' : 'Disable'),
-          ),
-        ],
-      ),
+    final confirm = await showAppConfirmDialog(
+      context,
+      title: enabled ? 'Enable Training Mode' : 'Disable Training Mode',
+      message: enabled
+          ? 'Training sales will not post to real stock or cash totals. Offline checkout sync is disabled while training mode is on.'
+          : 'This returns the register to normal posting mode.',
+      confirmLabel: enabled ? 'Enable' : 'Disable',
+      icon: enabled ? Icons.school_rounded : Icons.storefront_rounded,
     );
-    if (confirm != true) return;
+    if (!confirm) return;
     if (!mounted) return;
 
     final override = await showManagerOverrideDialog(

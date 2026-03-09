@@ -70,6 +70,7 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
 
     return AppBar(
       elevation: 0,
+      titleSpacing: isWide ? 12 : null,
       centerTitle: false,
       automaticallyImplyLeading: isWide
           ? false
@@ -94,7 +95,7 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
       actions: [
         // Online/Sync status chip
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Tooltip(
             message: widget.isChecking
                 ? 'Checking connection…'
@@ -106,7 +107,7 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
         ),
         if (widget.queuedCount > 0 || widget.isSyncing)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             child: InkWell(
               onTap: widget.onRetry,
               borderRadius: BorderRadius.circular(16),
@@ -116,7 +117,7 @@ class _DashboardHeaderState extends ConsumerState<DashboardHeader> {
                     : '${widget.queuedCount} queued • Tap to retry',
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(16),

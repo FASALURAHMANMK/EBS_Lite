@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/error_handler.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_sheet_header.dart';
+import '../../../../shared/widgets/app_selection_dialog.dart';
 import '../../data/customer_repository.dart';
 import '../../data/models.dart';
 
@@ -11,6 +13,7 @@ Future<bool?> showQuickCollectionSheet(BuildContext context, WidgetRef ref) {
   return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     showDragHandle: true,
     builder: (_) => const _QuickCollectionSheet(),
   );
@@ -138,7 +141,6 @@ class _QuickCollectionSheetState extends ConsumerState<_QuickCollectionSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final bottom = MediaQuery.of(context).viewInsets.bottom;
 
     return Padding(
@@ -150,104 +152,104 @@ class _QuickCollectionSheetState extends ConsumerState<_QuickCollectionSheet> {
             )
           : (_error != null)
               ? AppErrorView(error: _error!, onRetry: _load)
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.payments_rounded),
-                        const SizedBox(width: 8),
-                        Text('Quick Collection',
-                            style: theme.textTheme.titleMedium),
-                        const Spacer(),
-                        IconButton(
+              : SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      AppSheetHeader(
+                        title: 'Quick Collection',
+                        icon: Icons.payments_rounded,
+                        trailing: IconButton(
                           tooltip: 'Refresh',
                           onPressed: _load,
                           icon: const Icon(Icons.refresh_rounded),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Card(
-                      elevation: 0,
-                      child: ListTile(
-                        leading: const Icon(Icons.person_rounded),
-                        title: Text(_customer?.name ?? 'Select customer'),
-                        subtitle: Text((_customer?.phone ?? '').isEmpty
-                            ? 'Tap to choose'
-                            : _customer!.phone!),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: _pickCustomer,
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _amount,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Amount',
-                        prefixIcon: Icon(Icons.attach_money_rounded),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<int>(
-                      initialValue: _paymentMethodId,
-                      items: [
-                        const DropdownMenuItem<int>(
-                          value: null,
-                          child: Text('Payment method (optional)'),
+                      const SizedBox(height: 8),
+                      Card(
+                        elevation: 0,
+                        child: ListTile(
+                          leading: const Icon(Icons.person_rounded),
+                          title: Text(_customer?.name ?? 'Select customer'),
+                          subtitle: Text((_customer?.phone ?? '').isEmpty
+                              ? 'Tap to choose'
+                              : _customer!.phone!),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: _pickCustomer,
                         ),
-                        ..._paymentMethods.map((m) {
-                          final id = (m['method_id'] as int?) ?? 0;
-                          final name = (m['name'] ?? '').toString();
-                          return DropdownMenuItem<int>(
-                            value: id == 0 ? null : id,
-                            child: Text(name.isEmpty ? 'Method #$id' : name),
-                          );
-                        }),
-                      ],
-                      onChanged: _saving
-                          ? null
-                          : (v) => setState(() => _paymentMethodId = v),
-                      decoration: const InputDecoration(
-                        labelText: 'Payment Method',
-                        prefixIcon: Icon(Icons.credit_card_rounded),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _reference,
-                      decoration: const InputDecoration(
-                        labelText: 'Reference (optional)',
-                        prefixIcon: Icon(Icons.confirmation_number_outlined),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _amount,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Amount',
+                          prefixIcon: Icon(Icons.attach_money_rounded),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _notes,
-                      decoration: const InputDecoration(
-                        labelText: 'Notes (optional)',
-                        prefixIcon: Icon(Icons.notes_rounded),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<int>(
+                        isExpanded: true,
+                        initialValue: _paymentMethodId,
+                        items: [
+                          const DropdownMenuItem<int>(
+                            value: null,
+                            child: Text('Payment method (optional)'),
+                          ),
+                          ..._paymentMethods.map((m) {
+                            final id = (m['method_id'] as int?) ?? 0;
+                            final name = (m['name'] ?? '').toString();
+                            return DropdownMenuItem<int>(
+                              value: id == 0 ? null : id,
+                              child: Text(name.isEmpty ? 'Method #$id' : name),
+                            );
+                          }),
+                        ],
+                        onChanged: _saving
+                            ? null
+                            : (v) => setState(() => _paymentMethodId = v),
+                        decoration: const InputDecoration(
+                          labelText: 'Payment Method',
+                          prefixIcon: Icon(Icons.credit_card_rounded),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 48,
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: _saving ? null : _save,
-                        child: _saving
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2.4),
-                              )
-                            : const Text('Save Collection'),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _reference,
+                        decoration: const InputDecoration(
+                          labelText: 'Reference (optional)',
+                          prefixIcon: Icon(Icons.confirmation_number_outlined),
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _notes,
+                        decoration: const InputDecoration(
+                          labelText: 'Notes (optional)',
+                          prefixIcon: Icon(Icons.notes_rounded),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 48,
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: _saving ? null : _save,
+                          child: _saving
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.4,
+                                  ),
+                                )
+                              : const Text('Save Collection'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
     );
   }
@@ -281,48 +283,37 @@ class _CustomerPickerDialogState extends State<_CustomerPickerDialog> {
             return hay.contains(q);
           }).toList();
 
-    return AlertDialog(
-      title: const Text('Select customer'),
-      content: SizedBox(
-        width: 520,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _search,
-              onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                hintText: 'Search name/phone/email',
-                prefixIcon: Icon(Icons.search_rounded),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 360,
-              child: filtered.isEmpty
-                  ? const Center(child: Text('No customers'))
-                  : ListView.separated(
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (context, i) {
-                        final c = filtered[i];
-                        return ListTile(
-                          leading: const Icon(Icons.person_rounded),
-                          title: Text(c.name),
-                          subtitle: Text(
-                            [c.phone, c.email]
-                                .whereType<String>()
-                                .where((s) => s.trim().isNotEmpty)
-                                .join(' • '),
-                          ),
-                          onTap: () => Navigator.of(context).pop(c),
-                        );
-                      },
-                    ),
-            ),
-          ],
+    return AppSelectionDialog(
+      title: 'Select Customer',
+      maxWidth: 560,
+      searchField: TextField(
+        controller: _search,
+        onChanged: (_) => setState(() {}),
+        decoration: const InputDecoration(
+          hintText: 'Search name/phone/email',
+          prefixIcon: Icon(Icons.search_rounded),
         ),
       ),
+      body: filtered.isEmpty
+          ? const Center(child: Text('No customers'))
+          : ListView.separated(
+              itemCount: filtered.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, i) {
+                final c = filtered[i];
+                return ListTile(
+                  leading: const Icon(Icons.person_rounded),
+                  title: Text(c.name),
+                  subtitle: Text(
+                    [c.phone, c.email]
+                        .whereType<String>()
+                        .where((s) => s.trim().isNotEmpty)
+                        .join(' • '),
+                  ),
+                  onTap: () => Navigator.of(context).pop(c),
+                );
+              },
+            ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),

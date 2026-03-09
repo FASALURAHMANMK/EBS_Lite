@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../shared/widgets/app_confirm_dialog.dart';
 import '../../../auth/controllers/auth_notifier.dart';
 import '../../../auth/controllers/auth_permissions_provider.dart';
 import '../../controllers/location_notifier.dart';
@@ -155,23 +156,13 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                     title: const Text('Logout'),
                     horizontalTitleGap: 12,
                     onTap: () async {
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Logout'),
-                          content:
-                              const Text('Are you sure you want to logout?'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text('Cancel'),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, true),
-                              child: const Text('Logout'),
-                            ),
-                          ],
-                        ),
+                      final confirm = await showAppConfirmDialog(
+                        context,
+                        title: 'Logout',
+                        message: 'Are you sure you want to logout?',
+                        confirmLabel: 'Logout',
+                        icon: Icons.logout_rounded,
+                        destructive: true,
                       );
                       if (confirm == true) {
                         await ref.read(authNotifierProvider.notifier).logout();
@@ -207,7 +198,10 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
       horizontalTitleGap: 12,
       onTap: () {
         Navigator.pop(context);
-        widget.onSelect?.call(label);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          widget.onSelect?.call(label);
+        });
       },
     );
   }
@@ -233,7 +227,10 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                 contentPadding: const EdgeInsets.only(left: 8, right: 16),
                 onTap: () {
                   Navigator.pop(context);
-                  widget.onSelect?.call(label);
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    widget.onSelect?.call(label);
+                  });
                 },
               ),
             )

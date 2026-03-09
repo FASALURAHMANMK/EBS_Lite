@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_confirm_dialog.dart';
 import '../../../auth/controllers/auth_notifier.dart';
 import '../../data/invoice_templates_repository.dart';
 
@@ -65,24 +66,14 @@ class _InvoiceTemplatesPageState extends ConsumerState<InvoiceTemplatesPage> {
   }
 
   Future<void> _delete(InvoiceTemplateDto t) async {
-    final ok = await showDialog<bool>(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Delete template'),
-            content: Text('Delete "${t.name}"?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+    final ok = await showAppConfirmDialog(
+      context,
+      title: 'Delete Template',
+      message: 'Delete "${t.name}"? This cannot be undone.',
+      confirmLabel: 'Delete',
+      icon: Icons.delete_outline_rounded,
+      destructive: true,
+    );
     if (!ok) return;
     try {
       await ref.read(invoiceTemplatesRepositoryProvider).delete(t.templateId);
@@ -98,7 +89,16 @@ class _InvoiceTemplatesPageState extends ConsumerState<InvoiceTemplatesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Invoice Templates')),
+      appBar: AppBar(
+        title: const Text('Invoice Templates'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: _loading ? null : _load,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openEditor(),
         child: const Icon(Icons.add_rounded),

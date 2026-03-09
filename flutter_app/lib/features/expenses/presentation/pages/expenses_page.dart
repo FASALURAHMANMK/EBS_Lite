@@ -302,9 +302,11 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                             ),
                           ),
                         ],
-                        onChanged: (v) async {
+                        onChanged: (v) {
+                          if (v == _categoryId) return;
                           setState(() => _categoryId = v);
-                          await _refresh();
+                          WidgetsBinding.instance
+                              .addPostFrameCallback((_) => _refresh());
                         },
                       ),
                     ),

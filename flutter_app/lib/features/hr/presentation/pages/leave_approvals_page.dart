@@ -5,7 +5,9 @@ import 'package:intl/intl.dart';
 import '../../data/hr_repository.dart';
 import '../../data/models.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_empty_view.dart';
 import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_loading_view.dart';
 
 class LeaveApprovalsPage extends ConsumerStatefulWidget {
   const LeaveApprovalsPage({super.key});
@@ -24,7 +26,7 @@ class _LeaveApprovalsPageState extends ConsumerState<LeaveApprovalsPage> {
   @override
   void initState() {
     super.initState();
-    _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   Future<void> _load() async {
@@ -135,50 +137,66 @@ class _LeaveApprovalsPageState extends ConsumerState<LeaveApprovalsPage> {
         ],
       ),
       body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-                ? AppErrorView(error: _error!, onRetry: _load)
-                : Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.filter_list_rounded),
-                            const SizedBox(width: 8),
-                            DropdownButton<String>(
-                              value: _status,
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'PENDING',
-                                  child: Text('Pending'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'APPROVED',
-                                  child: Text('Approved'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'REJECTED',
-                                  child: Text('Rejected'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'ALL',
-                                  child: Text('All'),
-                                ),
-                              ],
-                              onChanged: (v) async {
-                                setState(() => _status = v ?? 'PENDING');
-                                await _load();
-                              },
-                            ),
-                          ],
-                        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.filter_list_rounded),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: _status,
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'PENDING',
+                            child: Text('Pending'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'APPROVED',
+                            child: Text('Approved'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'REJECTED',
+                            child: Text('Rejected'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'ALL',
+                            child: Text('All'),
+                          ),
+                        ],
+                        onChanged: (v) {
+                          final next = v ?? 'PENDING';
+                          if (next == _status) return;
+                          setState(() => _status = next);
+                          WidgetsBinding.instance
+                              .addPostFrameCallback((_) => _load());
+                        },
                       ),
-                      Expanded(
-                        child: _leaves.isEmpty
-                            ? const Center(child: Text('No leave requests'))
-                            : ListView.separated(
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (_loading) const LinearProgressIndicator(minHeight: 2),
+            Expanded(
+              child: _error != null
+                  ? AppErrorView(error: _error!, onRetry: _load)
+                  : (_loading && _leaves.isEmpty)
+                      ? const AppLoadingView(label: 'Loading leave approvals')
+                      : _leaves.isEmpty
+                          ? const AppEmptyView(
+                              title: 'No leave requests',
+                              message:
+                                  'Leave requests will appear here when available.',
+                              icon: Icons.event_busy_outlined,
+                            )
+                          : RefreshIndicator(
+                              onRefresh: _load,
+                              child: ListView.separated(
                                 padding: const EdgeInsets.all(12),
                                 itemCount: _leaves.length,
                                 separatorBuilder: (_, __) =>
@@ -225,9 +243,10 @@ class _LeaveApprovalsPageState extends ConsumerState<LeaveApprovalsPage> {
                                   );
                                 },
                               ),
-                      ),
-                    ],
-                  ),
+                            ),
+            ),
+          ],
+        ),
       ),
     );
   }

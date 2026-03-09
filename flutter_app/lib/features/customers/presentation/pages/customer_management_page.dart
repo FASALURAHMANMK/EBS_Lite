@@ -7,6 +7,8 @@ import '../../data/models.dart';
 import '../../data/customer_repository.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_empty_view.dart';
+import '../../../../shared/widgets/app_loading_view.dart';
 import 'customer_detail_page.dart';
 import 'customer_create_page.dart';
 
@@ -98,7 +100,7 @@ class _CustomerManagementPageState
                 future: _future,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const LinearProgressIndicator(minHeight: 2);
+                    return const AppLoadingView(label: 'Loading customers');
                   }
                   if (snapshot.hasError) {
                     return ListView(
@@ -114,7 +116,18 @@ class _CustomerManagementPageState
                   }
                   final items = snapshot.data ?? const [];
                   if (items.isEmpty) {
-                    return const Center(child: Text('No customers'));
+                    return ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        const SizedBox(height: 64),
+                        const AppEmptyView(
+                          title: 'No customers yet',
+                          message:
+                              'Customers you create or sync will appear here.',
+                          icon: Icons.people_outline_rounded,
+                        ),
+                      ],
+                    );
                   }
                   return ListView.separated(
                     padding: const EdgeInsets.all(12),

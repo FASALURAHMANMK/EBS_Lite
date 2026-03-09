@@ -140,6 +140,7 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: type,
                   decoration: const InputDecoration(labelText: 'Type'),
                   items: const [
@@ -152,6 +153,7 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
                 const SizedBox(height: 8),
                 if (accounts.isNotEmpty)
                   DropdownButtonFormField<int>(
+                    isExpanded: true,
                     key: ValueKey(selectedAccountId),
                     initialValue: selectedAccountId,
                     decoration: const InputDecoration(
@@ -321,6 +323,7 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
                           runSpacing: 8,
                           children: [
                             DropdownButton<String>(
+                              isExpanded: true,
                               value: _typeFilter,
                               items: const [
                                 DropdownMenuItem(
@@ -332,9 +335,13 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
                                 DropdownMenuItem(
                                     value: 'journal', child: Text('Journal')),
                               ],
-                              onChanged: (v) async {
-                                setState(() => _typeFilter = v ?? 'all');
-                                await _load(reset: true);
+                              onChanged: (v) {
+                                final next = v ?? 'all';
+                                if (next == _typeFilter) return;
+                                setState(() => _typeFilter = next);
+                                WidgetsBinding.instance.addPostFrameCallback(
+                                  (_) => _load(reset: true),
+                                );
                               },
                             ),
                             OutlinedButton.icon(

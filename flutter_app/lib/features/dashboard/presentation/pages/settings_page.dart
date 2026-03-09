@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
+import '../../../../shared/widgets/app_confirm_dialog.dart';
 import 'company_settings_page.dart';
 import 'dashboard_customization_page.dart';
 import 'sync_health_page.dart';
@@ -46,22 +47,9 @@ class SettingsPage extends ConsumerWidget {
     final messenger = ScaffoldMessenger.of(context);
     final outboxState = ref.read(outboxNotifierProvider);
 
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const AlertDialog(
-        content: Row(
-          children: [
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            SizedBox(width: 12),
-            Expanded(child: Text('Generating support bundle...')),
-          ],
-        ),
-      ),
+    showAppBlockingProgressDialog(
+      context,
+      message: 'Generating support bundle...',
     );
 
     try {

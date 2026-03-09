@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_selection_dialog.dart';
 import '../../data/models.dart';
 import '../../data/pos_repository.dart';
 
@@ -22,6 +23,12 @@ class _CustomerSelectorDialogState
   List<PosCustomerDto> _results = const [];
   bool _loading = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(() => _search(''));
+  }
 
   Future<void> _search(String q) async {
     setState(() {
@@ -74,76 +81,64 @@ class _CustomerSelectorDialogState
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Select Customer'),
-      content: SizedBox(
-        width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _controller,
-              decoration: const InputDecoration(
-                hintText: 'Search name / phone / email',
-                prefixIcon: Icon(Icons.search_rounded),
-              ),
-              onChanged: (v) {
-                if (v.trim().isEmpty) {
-                  setState(() => _results = const []);
-                } else {
-                  _search(v);
-                }
-              },
-            ),
-            const SizedBox(height: 12),
-            if (_loading) const LinearProgressIndicator(minHeight: 2),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(_error!,
-                    style:
-                        TextStyle(color: Theme.of(context).colorScheme.error)),
-              ),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _results.length,
-                itemBuilder: (context, index) {
-                  final c = _results[index];
-                  return ListTile(
-                    title: Text(c.name),
-                    subtitle: Text(
-                        [c.phone, c.email].whereType<String>().join(' • ')),
-                    onTap: () => Navigator.of(context).pop(c),
-                  );
-                },
-              ),
-            ),
-            const Divider(height: 16),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text('Quick Add',
-                  style: Theme.of(context).textTheme.titleSmall),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                prefixIcon: Icon(Icons.person_add_alt_1_rounded),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Phone (optional)',
-                prefixIcon: Icon(Icons.phone_rounded),
-              ),
-            ),
-          ],
+    return AppSelectionDialog(
+      title: 'Select Customer',
+      maxWidth: 460,
+      maxHeight: 580,
+      loading: _loading,
+      errorText: _error,
+      searchField: TextField(
+        controller: _controller,
+        decoration: const InputDecoration(
+          hintText: 'Search name / phone / email',
+          prefixIcon: Icon(Icons.search_rounded),
         ),
+        onChanged: (value) => _search(value.trim()),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: _results.isEmpty && !_loading
+                ? const Center(child: Text('No customers'))
+                : ListView.builder(
+                    itemCount: _results.length,
+                    itemBuilder: (context, index) {
+                      final c = _results[index];
+                      return ListTile(
+                        title: Text(c.name),
+                        subtitle: Text(
+                            [c.phone, c.email].whereType<String>().join(' • ')),
+                        onTap: () => Navigator.of(context).pop(c),
+                      );
+                    },
+                  ),
+          ),
+          const Divider(height: 20),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Quick Add',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _nameController,
+            decoration: const InputDecoration(
+              labelText: 'Name',
+              prefixIcon: Icon(Icons.person_add_alt_1_rounded),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'Phone (optional)',
+              prefixIcon: Icon(Icons.phone_rounded),
+            ),
+          ),
+        ],
       ),
       actions: [
         TextButton(

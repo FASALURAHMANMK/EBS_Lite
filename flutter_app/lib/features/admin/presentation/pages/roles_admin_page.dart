@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_confirm_dialog.dart';
 import '../../../auth/controllers/auth_permissions_provider.dart';
 import '../../data/roles_repository.dart';
 import 'role_permissions_page.dart';
@@ -50,24 +51,14 @@ class _RolesAdminPageState extends ConsumerState<RolesAdminPage> {
 
   Future<void> _delete(RoleDto r) async {
     if (r.isSystemRole) return;
-    final ok = await showDialog<bool>(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Delete role'),
-            content: Text('Delete "${r.name}"?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+    final ok = await showAppConfirmDialog(
+      context,
+      title: 'Delete Role',
+      message: 'Delete "${r.name}"? This cannot be undone.',
+      confirmLabel: 'Delete',
+      icon: Icons.delete_outline_rounded,
+      destructive: true,
+    );
     if (!ok) return;
     try {
       await ref.read(rolesRepositoryProvider).deleteRole(r.roleId);

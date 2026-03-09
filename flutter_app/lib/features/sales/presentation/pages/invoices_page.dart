@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 
+import '../../../../shared/widgets/app_selection_dialog.dart';
+import '../../../../shared/widgets/app_empty_view.dart';
 import '../../data/sales_repository.dart';
 import '../../../pos/data/pos_repository.dart';
 import '../../../pos/data/models.dart';
@@ -80,6 +82,27 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
     }
   }
 
+  Future<void> _handleInvoiceAction(String action, int saleId) async {
+    final actions = InvoiceActions(
+      ref: ref,
+      context: context,
+    );
+    switch (action) {
+      case 'view':
+        if (!mounted) return;
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => SaleDetailPage(saleId: saleId)),
+        );
+        return;
+      case 'print':
+        await actions.printSmart(saleId);
+        return;
+      case 'share':
+        await actions.shareInvoice(saleId);
+        return;
+    }
+  }
+
   Future<void> _pickDateRange() async {
     final now = DateTime.now();
     final firstDate = DateTime(now.year - 3, 1, 1);
@@ -128,89 +151,79 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
               Future.microtask(() => doSearch(''));
             }
 
-            return AlertDialog(
-              title: const Text('Select Customers'),
-              content: SizedBox(
-                width: 420,
-                height: 420,
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: controller,
-                      decoration: InputDecoration(
-                        hintText: 'Search customers',
-                        prefixIcon: const Icon(Icons.search_rounded),
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.search_rounded),
-                          onPressed: () => doSearch(controller.text.trim()),
-                        ),
-                      ),
-                      onSubmitted: (v) => doSearch(v.trim()),
-                    ),
-                    const SizedBox(height: 8),
-                    if (loading) const LinearProgressIndicator(minHeight: 2),
-                    Expanded(
-                      child: results.isEmpty && !loading
-                          ? const Center(child: Text('No customers'))
-                          : ListView.builder(
-                              itemCount: results.length,
-                              itemBuilder: (context, i) {
-                                final c = results[i];
-                                final checked = selected.contains(c.customerId);
-                                return CheckboxListTile(
-                                  value: checked,
-                                  title: Text(c.name),
-                                  subtitle: Text([
-                                    if ((c.phone ?? '').isNotEmpty) c.phone!,
-                                    if ((c.email ?? '').isNotEmpty) c.email!,
-                                  ].where((e) => e.isNotEmpty).join(' · ')),
-                                  onChanged: (v) {
-                                    if (v == true) {
-                                      selected.add(c.customerId);
-                                    } else {
-                                      selected.remove(c.customerId);
-                                    }
-                                    setStateDialog(() {});
-                                  },
-                                );
-                              },
-                            ),
-                    ),
-                    Row(
-                      children: [
-                        TextButton(
-                          onPressed: () {
-                            selected.clear();
+            return AppSelectionDialog(
+              title: 'Select Customers',
+              maxWidth: 480,
+              loading: loading,
+              searchField: TextField(
+                controller: controller,
+                decoration: InputDecoration(
+                  hintText: 'Search customers',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.search_rounded),
+                    onPressed: () => doSearch(controller.text.trim()),
+                  ),
+                ),
+                onChanged: (v) => doSearch(v.trim()),
+                onSubmitted: (v) => doSearch(v.trim()),
+              ),
+              body: results.isEmpty && !loading
+                  ? const Center(child: Text('No customers'))
+                  : ListView.builder(
+                      itemCount: results.length,
+                      itemBuilder: (context, i) {
+                        final c = results[i];
+                        final checked = selected.contains(c.customerId);
+                        return CheckboxListTile(
+                          value: checked,
+                          title: Text(c.name),
+                          subtitle: Text([
+                            if ((c.phone ?? '').isNotEmpty) c.phone!,
+                            if ((c.email ?? '').isNotEmpty) c.email!,
+                          ].where((e) => e.isNotEmpty).join(' · ')),
+                          onChanged: (v) {
+                            if (v == true) {
+                              selected.add(c.customerId);
+                            } else {
+                              selected.remove(c.customerId);
+                            }
                             setStateDialog(() {});
                           },
-                          child: const Text('Clear'),
-                        ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(null),
-                          child: const Text('Cancel'),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          onPressed: () {
-                            final mapById = {
-                              for (final r in results) r.customerId: r,
-                              for (final r in _selectedCustomers)
-                                r.customerId: r,
-                            };
-                            final list = selected
-                                .map((id) => mapById[id])
-                                .whereType<PosCustomerDto>()
-                                .toList();
-                            Navigator.of(context).pop(list);
-                          },
-                          child: const Text('Apply'),
-                        ),
-                      ],
-                    )
-                  ],
-                ),
+                        );
+                      },
+                    ),
+              footer: Row(
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      selected.clear();
+                      setStateDialog(() {});
+                    },
+                    child: const Text('Clear'),
+                  ),
+                ],
               ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(null),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final mapById = {
+                      for (final r in results) r.customerId: r,
+                      for (final r in _selectedCustomers) r.customerId: r,
+                    };
+                    final list = selected
+                        .map((id) => mapById[id])
+                        .whereType<PosCustomerDto>()
+                        .toList();
+                    Navigator.of(context).pop(list);
+                  },
+                  child: const Text('Apply'),
+                ),
+              ],
             );
           },
         );
@@ -352,7 +365,18 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
             ),
             Expanded(
               child: filtered.isEmpty
-                  ? const Center(child: Text('No invoices'))
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(height: 64),
+                        AppEmptyView(
+                          title: 'No invoices found',
+                          message:
+                              'Invoices matching the current filters will appear here.',
+                          icon: Icons.receipt_long_outlined,
+                        ),
+                      ],
+                    )
                   : ListView.separated(
                       padding: const EdgeInsets.all(12),
                       itemCount: filtered.length,
@@ -386,23 +410,14 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
                                     style: theme.textTheme.titleMedium),
                                 PopupMenuButton<String>(
                                   tooltip: 'Invoice actions',
-                                  onSelected: (v) async {
+                                  onSelected: (v) {
                                     if (saleId == null) return;
-                                    final actions = InvoiceActions(
-                                      ref: ref,
-                                      context: context,
-                                    );
-                                    if (v == 'view') {
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                            builder: (_) =>
-                                                SaleDetailPage(saleId: saleId)),
-                                      );
-                                    } else if (v == 'print') {
-                                      await actions.printSmart(saleId);
-                                    } else if (v == 'share') {
-                                      await actions.shareInvoice(saleId);
-                                    }
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                      if (!mounted) return;
+                                      // ignore: unawaited_futures
+                                      _handleInvoiceAction(v, saleId);
+                                    });
                                   },
                                   itemBuilder: (context) => const [
                                     PopupMenuItem(

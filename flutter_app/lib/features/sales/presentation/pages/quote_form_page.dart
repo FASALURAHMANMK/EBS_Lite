@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error_handler.dart';
+import '../../../../shared/widgets/app_selection_dialog.dart';
 import '../../../pos/data/models.dart';
 import '../../../pos/data/pos_repository.dart';
 import '../../../dashboard/controllers/location_notifier.dart';
@@ -152,48 +153,39 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
               Future.microtask(() => doSearch(''));
             }
 
-            return AlertDialog(
-              title: const Text('Select Customer'),
-              content: SizedBox(
-                width: 420,
-                height: 420,
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: controller,
-                      decoration: InputDecoration(
-                        hintText: 'Search customers',
-                        prefixIcon: const Icon(Icons.search_rounded),
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.search_rounded),
-                          onPressed: () => doSearch(controller.text.trim()),
-                        ),
-                      ),
-                      onSubmitted: (v) => doSearch(v.trim()),
-                    ),
-                    const SizedBox(height: 8),
-                    if (loading) const LinearProgressIndicator(minHeight: 2),
-                    Expanded(
-                      child: results.isEmpty && !loading
-                          ? const Center(child: Text('No customers'))
-                          : ListView.builder(
-                              itemCount: results.length,
-                              itemBuilder: (context, i) {
-                                final c = results[i];
-                                return ListTile(
-                                  title: Text(c.name),
-                                  subtitle: Text([
-                                    if ((c.phone ?? '').isNotEmpty) c.phone!,
-                                    if ((c.email ?? '').isNotEmpty) c.email!,
-                                  ].where((e) => e.isNotEmpty).join(' - ')),
-                                  onTap: () => Navigator.of(context).pop(c),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
+            return AppSelectionDialog(
+              title: 'Select Customer',
+              maxWidth: 460,
+              loading: loading,
+              searchField: TextField(
+                controller: controller,
+                decoration: InputDecoration(
+                  hintText: 'Search customers',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.search_rounded),
+                    onPressed: () => doSearch(controller.text.trim()),
+                  ),
                 ),
+                onChanged: (v) => doSearch(v.trim()),
+                onSubmitted: (v) => doSearch(v.trim()),
               ),
+              body: results.isEmpty && !loading
+                  ? const Center(child: Text('No customers'))
+                  : ListView.builder(
+                      itemCount: results.length,
+                      itemBuilder: (context, i) {
+                        final c = results[i];
+                        return ListTile(
+                          title: Text(c.name),
+                          subtitle: Text([
+                            if ((c.phone ?? '').isNotEmpty) c.phone!,
+                            if ((c.email ?? '').isNotEmpty) c.email!,
+                          ].where((e) => e.isNotEmpty).join(' - ')),
+                          onTap: () => Navigator.of(context).pop(c),
+                        );
+                      },
+                    ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(null),
@@ -239,46 +231,37 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
               Future.microtask(() => doSearch(''));
             }
 
-            return AlertDialog(
-              title: const Text('Add Item'),
-              content: SizedBox(
-                width: 520,
-                height: 420,
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: controller,
-                      decoration: InputDecoration(
-                        hintText: 'Search products',
-                        prefixIcon: const Icon(Icons.search_rounded),
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.search_rounded),
-                          onPressed: () => doSearch(controller.text.trim()),
-                        ),
-                      ),
-                      onSubmitted: (v) => doSearch(v.trim()),
-                    ),
-                    const SizedBox(height: 8),
-                    if (loading) const LinearProgressIndicator(minHeight: 2),
-                    Expanded(
-                      child: results.isEmpty && !loading
-                          ? const Center(child: Text('No products'))
-                          : ListView.builder(
-                              itemCount: results.length,
-                              itemBuilder: (context, i) {
-                                final p = results[i];
-                                return ListTile(
-                                  title: Text(p.name),
-                                  subtitle: Text(
-                                      'Price: ${p.price.toStringAsFixed(2)}'),
-                                  onTap: () => Navigator.of(context).pop(p),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
+            return AppSelectionDialog(
+              title: 'Add Item',
+              maxWidth: 560,
+              loading: loading,
+              searchField: TextField(
+                controller: controller,
+                decoration: InputDecoration(
+                  hintText: 'Search products',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.search_rounded),
+                    onPressed: () => doSearch(controller.text.trim()),
+                  ),
                 ),
+                onChanged: (v) => doSearch(v.trim()),
+                onSubmitted: (v) => doSearch(v.trim()),
               ),
+              body: results.isEmpty && !loading
+                  ? const Center(child: Text('No products'))
+                  : ListView.builder(
+                      itemCount: results.length,
+                      itemBuilder: (context, i) {
+                        final p = results[i];
+                        return ListTile(
+                          title: Text(p.name),
+                          subtitle:
+                              Text('Price: ${p.price.toStringAsFixed(2)}'),
+                          onTap: () => Navigator.of(context).pop(p),
+                        );
+                      },
+                    ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(null),

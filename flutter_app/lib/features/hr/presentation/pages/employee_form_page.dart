@@ -351,6 +351,7 @@ class _EmployeeFormPageState extends ConsumerState<EmployeeFormPage> {
               ),
             if (locations.isNotEmpty)
               DropdownButtonFormField<int?>(
+                isExpanded: true,
                 key: ValueKey(safeLocationId),
                 initialValue: safeLocationId,
                 decoration: const InputDecoration(labelText: 'Location'),
@@ -423,6 +424,7 @@ class _EmployeeFormPageState extends ConsumerState<EmployeeFormPage> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<int?>(
+                    isExpanded: true,
                     key: ValueKey(safeDepartmentId),
                     initialValue: safeDepartmentId,
                     decoration: const InputDecoration(
@@ -452,6 +454,7 @@ class _EmployeeFormPageState extends ConsumerState<EmployeeFormPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: DropdownButtonFormField<int?>(
+                    isExpanded: true,
                     key: ValueKey(safeDesignationId),
                     initialValue: safeDesignationId,
                     decoration: const InputDecoration(
@@ -585,6 +588,7 @@ class _EmployeeFormPageState extends ConsumerState<EmployeeFormPage> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int?>(
+                  isExpanded: true,
                   key: ValueKey(safeAppRoleId),
                   initialValue: safeAppRoleId,
                   decoration: const InputDecoration(

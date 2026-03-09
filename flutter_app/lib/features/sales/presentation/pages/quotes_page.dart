@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
+import '../../../../shared/widgets/app_empty_view.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import '../../data/sales_repository.dart';
 import 'quote_detail_page.dart';
@@ -24,7 +25,7 @@ class _QuotesPageState extends ConsumerState<QuotesPage> {
   @override
   void initState() {
     super.initState();
-    _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   Future<void> _load() async {
@@ -89,22 +90,29 @@ class _QuotesPageState extends ConsumerState<QuotesPage> {
                 children: [
                   const Text('Status:'),
                   const SizedBox(width: 12),
-                  DropdownButton<String>(
-                    value: _statusFilter,
-                    items: const [
-                      DropdownMenuItem(value: 'ALL', child: Text('All')),
-                      DropdownMenuItem(value: 'DRAFT', child: Text('Draft')),
-                      DropdownMenuItem(value: 'SENT', child: Text('Sent')),
-                      DropdownMenuItem(
-                          value: 'ACCEPTED', child: Text('Accepted')),
-                      DropdownMenuItem(
-                          value: 'CONVERTED', child: Text('Converted')),
-                    ],
-                    onChanged: (value) async {
-                      if (value == null) return;
-                      setState(() => _statusFilter = value);
-                      await _load();
-                    },
+                  Expanded(
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: _statusFilter,
+                        items: const [
+                          DropdownMenuItem(value: 'ALL', child: Text('All')),
+                          DropdownMenuItem(
+                              value: 'DRAFT', child: Text('Draft')),
+                          DropdownMenuItem(value: 'SENT', child: Text('Sent')),
+                          DropdownMenuItem(
+                              value: 'ACCEPTED', child: Text('Accepted')),
+                          DropdownMenuItem(
+                              value: 'CONVERTED', child: Text('Converted')),
+                        ],
+                        onChanged: (value) {
+                          if (value == null || value == _statusFilter) return;
+                          setState(() => _statusFilter = value);
+                          WidgetsBinding.instance
+                              .addPostFrameCallback((_) => _load());
+                        },
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -113,7 +121,12 @@ class _QuotesPageState extends ConsumerState<QuotesPage> {
               child: _error != null
                   ? AppErrorView(error: _error!, onRetry: _load)
                   : _quotes.isEmpty
-                      ? const Center(child: Text('No quotes'))
+                      ? const AppEmptyView(
+                          title: 'No quotes',
+                          message:
+                              'Quotes will appear here once they are created.',
+                          icon: Icons.request_quote_outlined,
+                        )
                       : ListView.separated(
                           padding: const EdgeInsets.all(12),
                           itemCount: _quotes.length,

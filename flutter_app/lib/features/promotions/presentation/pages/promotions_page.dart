@@ -106,6 +106,7 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         initialValue: discountType,
                         decoration: const InputDecoration(
                           labelText: 'Discount Type',
@@ -180,6 +181,7 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         initialValue: applicableTo,
                         decoration: const InputDecoration(
                           labelText: 'Applicable To',
@@ -374,6 +376,32 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
     }
   }
 
+  Future<void> _handlePromotionAction(String action, PromotionDto promo) async {
+    if (action == 'edit') {
+      await _openEditor(initial: promo);
+      return;
+    }
+    if (action == 'toggle') {
+      try {
+        await ref.read(promotionsRepositoryProvider).updatePromotion(
+              promo.promotionId,
+              isActive: !promo.isActive,
+            );
+        await _load();
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ErrorHandler.message(e))),
+        );
+      }
+      return;
+    }
+    if (action == 'delete') {
+      await _deletePromotion(promo);
+      return;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -404,9 +432,9 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
             SwitchListTile(
               value: _activeOnly,
               title: const Text('Show active only'),
-              onChanged: (v) async {
+              onChanged: (v) {
                 setState(() => _activeOnly = v);
-                await _load();
+                WidgetsBinding.instance.addPostFrameCallback((_) => _load());
               },
             ),
             Expanded(
@@ -442,28 +470,13 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                             subtitle: Text(subtitle),
                             trailing: PopupMenuButton<String>(
                               tooltip: 'Promotion actions',
-                              onSelected: (v) async {
-                                if (v == 'edit') {
-                                  await _openEditor(initial: p);
-                                } else if (v == 'toggle') {
-                                  try {
-                                    await ref
-                                        .read(promotionsRepositoryProvider)
-                                        .updatePromotion(
-                                          p.promotionId,
-                                          isActive: !p.isActive,
-                                        );
-                                    await _load();
-                                  } catch (e) {
-                                    if (!context.mounted) return;
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                            content:
-                                                Text(ErrorHandler.message(e))));
-                                  }
-                                } else if (v == 'delete') {
-                                  await _deletePromotion(p);
-                                }
+                              onSelected: (v) {
+                                WidgetsBinding.instance
+                                    .addPostFrameCallback((_) {
+                                  if (!mounted) return;
+                                  // ignore: unawaited_futures
+                                  _handlePromotionAction(v, p);
+                                });
                               },
                               itemBuilder: (context) => [
                                 const PopupMenuItem(

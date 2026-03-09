@@ -146,6 +146,23 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
     }
   }
 
+  Future<void> _handleMenuAction(String value) async {
+    switch (value) {
+      case 'sent':
+        await _updateStatus('SENT');
+        break;
+      case 'accepted':
+        await _updateStatus('ACCEPTED');
+        break;
+      case 'convert':
+        await _convertToSale();
+        break;
+      case 'delete':
+        await _delete();
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -186,21 +203,12 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
           ),
           if (!isConverted)
             PopupMenuButton<String>(
-              onSelected: (value) async {
-                switch (value) {
-                  case 'sent':
-                    await _updateStatus('SENT');
-                    break;
-                  case 'accepted':
-                    await _updateStatus('ACCEPTED');
-                    break;
-                  case 'convert':
-                    await _convertToSale();
-                    break;
-                  case 'delete':
-                    await _delete();
-                    break;
-                }
+              onSelected: (value) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
+                  // ignore: unawaited_futures
+                  _handleMenuAction(value);
+                });
               },
               itemBuilder: (context) => const [
                 PopupMenuItem(value: 'sent', child: Text('Mark Sent')),

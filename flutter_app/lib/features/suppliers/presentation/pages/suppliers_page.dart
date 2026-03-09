@@ -6,6 +6,8 @@ import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 import '../../data/models.dart';
 import '../../data/supplier_repository.dart';
 import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_empty_view.dart';
+import '../../../../shared/widgets/app_loading_view.dart';
 import 'supplier_detail_page.dart';
 import 'supplier_create_page.dart';
 
@@ -83,7 +85,7 @@ class _SuppliersPageState extends ConsumerState<SuppliersPage> {
                 future: _future,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const LinearProgressIndicator(minHeight: 2);
+                    return const AppLoadingView(label: 'Loading suppliers');
                   }
                   if (snapshot.hasError) {
                     return ListView(
@@ -99,7 +101,18 @@ class _SuppliersPageState extends ConsumerState<SuppliersPage> {
                   }
                   final items = snapshot.data ?? const [];
                   if (items.isEmpty) {
-                    return const Center(child: Text('No suppliers'));
+                    return ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        const SizedBox(height: 64),
+                        const AppEmptyView(
+                          title: 'No suppliers yet',
+                          message:
+                              'Suppliers you create or sync will appear here.',
+                          icon: Icons.local_shipping_outlined,
+                        ),
+                      ],
+                    );
                   }
                   return ListView.separated(
                     padding: const EdgeInsets.all(12),

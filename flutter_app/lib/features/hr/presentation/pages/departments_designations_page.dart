@@ -251,6 +251,7 @@ class _DepartmentsDesignationsPageState
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<int?>(
+                  isExpanded: true,
                   key: ValueKey(defaultAppRoleId),
                   initialValue: defaultAppRoleId,
                   decoration: const InputDecoration(
@@ -365,6 +366,7 @@ class _DepartmentsDesignationsPageState
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<int?>(
+                  isExpanded: true,
                   key: ValueKey(departmentId),
                   initialValue: departmentId == null ||
                           deptItems.any((d) => d.departmentId == departmentId)
@@ -386,6 +388,7 @@ class _DepartmentsDesignationsPageState
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<int?>(
+                  isExpanded: true,
                   key: ValueKey(defaultAppRoleId),
                   initialValue: defaultAppRoleId == null ||
                           appRoles.any((r) => r.roleId == defaultAppRoleId)
