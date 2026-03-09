@@ -13,12 +13,16 @@ import 'location_notifier.dart';
 class DashboardState {
   final DashboardMetrics? metrics;
   final QuickActionCounts? quickActions;
+  final List<DashboardCashFlowTransaction> recentTransactions;
+  final List<DashboardLowStockItem> lowStockItems;
   final bool isLoading;
   final String? error;
 
   const DashboardState({
     this.metrics,
     this.quickActions,
+    this.recentTransactions = const [],
+    this.lowStockItems = const [],
     this.isLoading = false,
     this.error,
   });
@@ -26,12 +30,16 @@ class DashboardState {
   DashboardState copyWith({
     DashboardMetrics? metrics,
     QuickActionCounts? quickActions,
+    List<DashboardCashFlowTransaction>? recentTransactions,
+    List<DashboardLowStockItem>? lowStockItems,
     bool? isLoading,
     String? error,
   }) {
     return DashboardState(
       metrics: metrics ?? this.metrics,
       quickActions: quickActions ?? this.quickActions,
+      recentTransactions: recentTransactions ?? this.recentTransactions,
+      lowStockItems: lowStockItems ?? this.lowStockItems,
       isLoading: isLoading ?? this.isLoading,
       error: error,
     );
@@ -41,7 +49,7 @@ class DashboardState {
 class DashboardNotifier extends StateNotifier<DashboardState> {
   DashboardNotifier(this._repository, this._ref)
       : super(const DashboardState()) {
-    _timer = Timer.periodic(const Duration(seconds: 45), (_) {
+    _timer = Timer.periodic(const Duration(seconds: 20), (_) {
       // ignore: unawaited_futures
       _silentRefresh();
     });
@@ -64,14 +72,14 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
       final locState = _ref.read(locationNotifierProvider);
       final selectedLocationId = locState.selected?.locationId;
 
-      final metrics =
-          await _repository.getMetrics(locationId: selectedLocationId);
-      final actions =
-          await _repository.getQuickActions(locationId: selectedLocationId);
+      final overview =
+          await _repository.getOverview(locationId: selectedLocationId);
       state = state.copyWith(
         isLoading: false,
-        metrics: metrics,
-        quickActions: actions,
+        metrics: overview.metrics,
+        quickActions: overview.quickActions,
+        recentTransactions: overview.recentTransactions,
+        lowStockItems: overview.lowStockItems,
       );
     } catch (e) {
       if (e is DioException && e.response?.statusCode == 401) {

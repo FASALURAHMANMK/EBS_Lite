@@ -203,6 +203,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
+  /dashboard/overview:
+    get:
+      summary: GET /api/v1/dashboard/overview
+      parameters:
+        - in: query
+          name: location_id
+          required: false
+          schema:
+            type: integer
+          description: Optional location scope. If omitted, aggregates across all company locations.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/DashboardOverview'
   /dashboard/quick-actions:
     get:
       summary: GET /api/v1/dashboard/quick-actions
@@ -4718,6 +4740,117 @@ components:
         meta:
           type: object
           additionalProperties: true
+    DashboardMetrics:
+      type: object
+      properties:
+        credit_outstanding:
+          type: number
+          format: float
+        inventory_value:
+          type: number
+          format: float
+        today_sales:
+          type: number
+          format: float
+        today_purchases:
+          type: number
+          format: float
+        cash_in:
+          type: number
+          format: float
+        cash_out:
+          type: number
+          format: float
+        daily_cash_summary:
+          type: number
+          format: float
+        total_sales:
+          type: number
+          format: float
+        total_purchases:
+          type: number
+          format: float
+        cash_in_total:
+          type: number
+          format: float
+        cash_out_total:
+          type: number
+          format: float
+    QuickActionCounts:
+      type: object
+      properties:
+        sales_today:
+          type: integer
+        purchases_today:
+          type: integer
+        collections_today:
+          type: integer
+        expenses_today:
+          type: integer
+        payments_today:
+          type: integer
+        receipts_today:
+          type: integer
+        journals_today:
+          type: integer
+        low_stock_items:
+          type: integer
+    DashboardCashFlowTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+        transaction_type:
+          type: string
+        entity_name:
+          type: string
+        reference_number:
+          type: string
+          nullable: true
+        amount:
+          type: number
+          format: float
+        flow_direction:
+          type: string
+        status:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+    DashboardLowStockItem:
+      type: object
+      properties:
+        product_id:
+          type: integer
+        product_name:
+          type: string
+        location_name:
+          type: string
+        current_stock:
+          type: number
+          format: float
+        reorder_level:
+          type: integer
+        severity:
+          type: string
+    DashboardOverview:
+      type: object
+      properties:
+        metrics:
+          $ref: '#/components/schemas/DashboardMetrics'
+        quick_actions:
+          $ref: '#/components/schemas/QuickActionCounts'
+        recent_transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardCashFlowTransaction'
+        low_stock_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardLowStockItem'
+        refreshed_at:
+          type: string
+          format: date-time
     GenericObject:
       type: object
       additionalProperties: true

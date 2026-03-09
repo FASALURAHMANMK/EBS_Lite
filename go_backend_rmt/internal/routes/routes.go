@@ -139,6 +139,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			dashboard := protected.Group("/dashboard")
 			dashboard.Use(middleware.RequireCompanyAccess())
 			{
+				dashboard.GET("/overview", middleware.RequirePermission("VIEW_DASHBOARD"), dashboardHandler.GetOverview)
 				dashboard.GET("/metrics", middleware.RequirePermission("VIEW_DASHBOARD"), dashboardHandler.GetMetrics)
 				dashboard.GET("/quick-actions", middleware.RequirePermission("VIEW_DASHBOARD"), dashboardHandler.GetQuickActions)
 			}

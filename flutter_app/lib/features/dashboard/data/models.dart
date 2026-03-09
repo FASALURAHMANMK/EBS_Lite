@@ -102,6 +102,115 @@ class QuickActionCounts {
   }
 }
 
+class DashboardOverview {
+  final DashboardMetrics metrics;
+  final QuickActionCounts quickActions;
+  final List<DashboardCashFlowTransaction> recentTransactions;
+  final List<DashboardLowStockItem> lowStockItems;
+
+  DashboardOverview({
+    required this.metrics,
+    required this.quickActions,
+    required this.recentTransactions,
+    required this.lowStockItems,
+  });
+
+  factory DashboardOverview.fromJson(Map<String, dynamic> json) {
+    return DashboardOverview(
+      metrics: DashboardMetrics.fromJson(
+        (json['metrics'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{},
+      ),
+      quickActions: QuickActionCounts.fromJson(
+        (json['quick_actions'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{},
+      ),
+      recentTransactions: ((json['recent_transactions'] as List?) ?? const [])
+          .whereType<Map>()
+          .map(
+            (item) => DashboardCashFlowTransaction.fromJson(
+              item.cast<String, dynamic>(),
+            ),
+          )
+          .toList(),
+      lowStockItems: ((json['low_stock_items'] as List?) ?? const [])
+          .whereType<Map>()
+          .map(
+            (item) => DashboardLowStockItem.fromJson(
+              item.cast<String, dynamic>(),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class DashboardCashFlowTransaction {
+  final String id;
+  final String transactionType;
+  final String entityName;
+  final String? referenceNumber;
+  final double amount;
+  final String flowDirection;
+  final String status;
+  final DateTime? occurredAt;
+
+  DashboardCashFlowTransaction({
+    required this.id,
+    required this.transactionType,
+    required this.entityName,
+    required this.referenceNumber,
+    required this.amount,
+    required this.flowDirection,
+    required this.status,
+    required this.occurredAt,
+  });
+
+  factory DashboardCashFlowTransaction.fromJson(Map<String, dynamic> json) {
+    final occurredAtRaw = json['occurred_at']?.toString();
+    return DashboardCashFlowTransaction(
+      id: json['id']?.toString() ?? '',
+      transactionType: json['transaction_type']?.toString() ?? '',
+      entityName: json['entity_name']?.toString() ?? '',
+      referenceNumber: json['reference_number']?.toString(),
+      amount: (json['amount'] as num?)?.toDouble() ?? 0,
+      flowDirection: json['flow_direction']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      occurredAt:
+          occurredAtRaw == null ? null : DateTime.tryParse(occurredAtRaw),
+    );
+  }
+}
+
+class DashboardLowStockItem {
+  final int productId;
+  final String productName;
+  final String locationName;
+  final double currentStock;
+  final int reorderLevel;
+  final String severity;
+
+  DashboardLowStockItem({
+    required this.productId,
+    required this.productName,
+    required this.locationName,
+    required this.currentStock,
+    required this.reorderLevel,
+    required this.severity,
+  });
+
+  factory DashboardLowStockItem.fromJson(Map<String, dynamic> json) {
+    return DashboardLowStockItem(
+      productId: json['product_id'] as int? ?? 0,
+      productName: json['product_name']?.toString() ?? '',
+      locationName: json['location_name']?.toString() ?? '',
+      currentStock: (json['current_stock'] as num?)?.toDouble() ?? 0,
+      reorderLevel: json['reorder_level'] as int? ?? 0,
+      severity: json['severity']?.toString() ?? 'LOW',
+    );
+  }
+}
+
 class Location {
   final int locationId;
   final String name;

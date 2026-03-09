@@ -8,6 +8,16 @@ class DashboardRepository {
   DashboardRepository(this._dio);
   final Dio _dio;
 
+  Future<DashboardOverview> getOverview({int? locationId}) async {
+    final res = await _dio.get(
+      '/dashboard/overview',
+      queryParameters: locationId != null ? {'location_id': locationId} : null,
+    );
+    return DashboardOverview.fromJson(
+      res.data['data'] as Map<String, dynamic>,
+    );
+  }
+
   Future<DashboardMetrics> getMetrics({int? locationId}) async {
     final res = await _dio.get(
       '/dashboard/metrics',

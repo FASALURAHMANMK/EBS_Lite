@@ -141,7 +141,6 @@ class _CustomerSelectorDialogState
           const SizedBox(height: 12),
         ],
       ),
-      
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),

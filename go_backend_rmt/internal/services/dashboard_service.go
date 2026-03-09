@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
@@ -149,6 +150,7 @@ func (s *DashboardService) GetMetrics(companyID int, locationID *int) (*models.D
 		}
 	}
 	metrics.CashOut = supplierPayments + expenses
+	metrics.DailyCashSummary = metrics.CashIn - metrics.CashOut
 
 	// Totals (all-time aggregates) for convenience in UI when today's values are zero
 	{
@@ -233,6 +235,36 @@ func (s *DashboardService) GetMetrics(companyID int, locationID *int) (*models.D
 	}
 
 	return metrics, nil
+}
+
+func (s *DashboardService) GetOverview(companyID int, locationID *int) (*models.DashboardOverview, error) {
+	metrics, err := s.GetMetrics(companyID, locationID)
+	if err != nil {
+		return nil, err
+	}
+
+	quickActions, err := s.GetQuickActionCounts(companyID, locationID)
+	if err != nil {
+		return nil, err
+	}
+
+	recentTransactions, err := s.GetRecentCashFlowTransactions(companyID, locationID, 10)
+	if err != nil {
+		return nil, err
+	}
+
+	lowStockItems, err := s.GetLowStockItems(companyID, locationID, 8)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.DashboardOverview{
+		Metrics:            metrics,
+		QuickActions:       quickActions,
+		RecentTransactions: recentTransactions,
+		LowStockItems:      lowStockItems,
+		RefreshedAt:        time.Now().UTC(),
+	}, nil
 }
 
 // GetQuickActionCounts returns counts for quick actions on dashboard
@@ -364,4 +396,238 @@ func (s *DashboardService) GetQuickActionCounts(companyID int, locationID *int) 
 	}
 
 	return counts, nil
+}
+
+func (s *DashboardService) GetRecentCashFlowTransactions(companyID int, locationID *int, limit int) ([]models.DashboardCashFlowTransaction, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 25 {
+		limit = 25
+	}
+
+	locClause := func(alias string) string {
+		if locationID == nil {
+			return ""
+		}
+		return fmt.Sprintf(" AND %s.location_id = $2", alias)
+	}
+	collectionLocClause := ""
+	args := []interface{}{companyID}
+	if locationID != nil {
+		args = append(args, *locationID)
+		collectionLocClause = " AND col.location_id = $2"
+	}
+
+	query := fmt.Sprintf(`
+        SELECT id, transaction_type, entity_name, reference_number, amount, flow_direction, status, occurred_at
+        FROM (
+            SELECT CONCAT('sale-', s.sale_id)::text AS id,
+                   'SALE' AS transaction_type,
+                   COALESCE(NULLIF(TRIM(c.name), ''), 'Walk-in Customer') AS entity_name,
+                   s.sale_number AS reference_number,
+                   COALESCE(s.total_amount, 0)::float8 AS amount,
+                   'IN' AS flow_direction,
+                   COALESCE(NULLIF(TRIM(s.status), ''), 'COMPLETED') AS status,
+                   (s.sale_date::timestamp + COALESCE(s.sale_time, TIME '00:00')) AS occurred_at
+            FROM sales s
+            LEFT JOIN customers c ON s.customer_id = c.customer_id
+            JOIN locations l ON s.location_id = l.location_id
+            WHERE l.company_id = $1%s
+              AND s.is_deleted = FALSE
+
+            UNION ALL
+
+            SELECT CONCAT('sale-return-', sr.return_id)::text AS id,
+                   'SALE_RETURN' AS transaction_type,
+                   COALESCE(NULLIF(TRIM(c.name), ''), 'Walk-in Customer') AS entity_name,
+                   sr.return_number AS reference_number,
+                   COALESCE(sr.total_amount, 0)::float8 AS amount,
+                   'OUT' AS flow_direction,
+                   COALESCE(NULLIF(TRIM(sr.status), ''), 'COMPLETED') AS status,
+                   COALESCE(sr.updated_at, sr.created_at, sr.return_date::timestamp) AS occurred_at
+            FROM sale_returns sr
+            LEFT JOIN customers c ON sr.customer_id = c.customer_id
+            JOIN locations l ON sr.location_id = l.location_id
+            WHERE l.company_id = $1%s
+              AND sr.is_deleted = FALSE
+
+            UNION ALL
+
+            SELECT CONCAT('collection-', col.collection_id)::text AS id,
+                   'COLLECTION' AS transaction_type,
+                   COALESCE(NULLIF(TRIM(cu.name), ''), 'Customer') AS entity_name,
+                   col.collection_number AS reference_number,
+                   COALESCE(col.amount, 0)::float8 AS amount,
+                   'IN' AS flow_direction,
+                   'COLLECTED' AS status,
+                   COALESCE(col.updated_at, col.created_at, col.collection_date::timestamp) AS occurred_at
+            FROM collections col
+            JOIN customers cu ON col.customer_id = cu.customer_id
+            WHERE cu.company_id = $1%s
+
+            UNION ALL
+
+            SELECT CONCAT('purchase-', p.purchase_id)::text AS id,
+                   'PURCHASE' AS transaction_type,
+                   COALESCE(NULLIF(TRIM(sup.name), ''), 'Supplier') AS entity_name,
+                   p.purchase_number AS reference_number,
+                   COALESCE(p.total_amount, 0)::float8 AS amount,
+                   'OUT' AS flow_direction,
+                   COALESCE(NULLIF(TRIM(p.status), ''), 'COMPLETED') AS status,
+                   COALESCE(p.updated_at, p.created_at, p.purchase_date::timestamp) AS occurred_at
+            FROM purchases p
+            JOIN suppliers sup ON p.supplier_id = sup.supplier_id
+            JOIN locations l ON p.location_id = l.location_id
+            WHERE l.company_id = $1%s
+              AND p.is_deleted = FALSE
+
+            UNION ALL
+
+            SELECT CONCAT('purchase-return-', pr.return_id)::text AS id,
+                   'PURCHASE_RETURN' AS transaction_type,
+                   COALESCE(NULLIF(TRIM(sup.name), ''), 'Supplier') AS entity_name,
+                   pr.return_number AS reference_number,
+                   COALESCE(pr.total_amount, 0)::float8 AS amount,
+                   'IN' AS flow_direction,
+                   COALESCE(NULLIF(TRIM(pr.status), ''), 'COMPLETED') AS status,
+                   COALESCE(pr.updated_at, pr.created_at, pr.return_date::timestamp) AS occurred_at
+            FROM purchase_returns pr
+            JOIN suppliers sup ON pr.supplier_id = sup.supplier_id
+            JOIN locations l ON pr.location_id = l.location_id
+            WHERE l.company_id = $1%s
+              AND pr.is_deleted = FALSE
+
+            UNION ALL
+
+            SELECT CONCAT('expense-', e.expense_id)::text AS id,
+                   'EXPENSE' AS transaction_type,
+                   COALESCE(NULLIF(TRIM(e.vendor_name), ''), NULLIF(TRIM(ec.name), ''), 'Expense') AS entity_name,
+                   e.expense_number AS reference_number,
+                   COALESCE(e.amount, 0)::float8 AS amount,
+                   'OUT' AS flow_direction,
+                   'POSTED' AS status,
+                   COALESCE(e.updated_at, e.created_at, e.expense_date::timestamp) AS occurred_at
+            FROM expenses e
+            JOIN expense_categories ec ON e.category_id = ec.category_id
+            JOIN locations l ON e.location_id = l.location_id
+            WHERE l.company_id = $1%s
+              AND e.is_deleted = FALSE
+        ) dashboard_tx
+        ORDER BY occurred_at DESC, id DESC
+        LIMIT %d`,
+		locClause("s"),
+		locClause("sr"),
+		collectionLocClause,
+		locClause("p"),
+		locClause("pr"),
+		locClause("e"),
+		limit,
+	)
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query recent cash flow transactions: %w", err)
+	}
+	defer rows.Close()
+
+	var transactions []models.DashboardCashFlowTransaction
+	for rows.Next() {
+		var item models.DashboardCashFlowTransaction
+		if err := rows.Scan(
+			&item.ID,
+			&item.TransactionType,
+			&item.EntityName,
+			&item.ReferenceNumber,
+			&item.Amount,
+			&item.FlowDirection,
+			&item.Status,
+			&item.OccurredAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan recent cash flow transaction: %w", err)
+		}
+		transactions = append(transactions, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate recent cash flow transactions: %w", err)
+	}
+
+	return transactions, nil
+}
+
+func (s *DashboardService) GetLowStockItems(companyID int, locationID *int, limit int) ([]models.DashboardLowStockItem, error) {
+	if limit <= 0 {
+		limit = 8
+	}
+	if limit > 20 {
+		limit = 20
+	}
+
+	locClause := func(alias string) string {
+		if locationID == nil {
+			return ""
+		}
+		return fmt.Sprintf(" AND %s.location_id = $2", alias)
+	}
+
+	args := []interface{}{companyID}
+	if locationID != nil {
+		args = append(args, *locationID)
+	}
+
+	query := fmt.Sprintf(`
+        SELECT st.product_id,
+               COALESCE(p.name, '') AS product_name,
+               COALESCE(l.name, '') AS location_name,
+               COALESCE(st.quantity, 0)::float8 AS current_stock,
+               COALESCE(p.reorder_level, 0) AS reorder_level,
+               CASE
+                   WHEN COALESCE(st.quantity, 0) <= GREATEST(COALESCE(p.reorder_level, 0) / 2.0, 1)
+                       THEN 'CRITICAL'
+                   ELSE 'LOW'
+               END AS severity
+        FROM stock st
+        JOIN locations l ON st.location_id = l.location_id
+        JOIN products p ON st.product_id = p.product_id
+        WHERE l.company_id = $1%s
+          AND l.is_active = TRUE
+          AND p.is_deleted = FALSE
+          AND p.is_active = TRUE
+          AND COALESCE(p.reorder_level, 0) > 0
+          AND COALESCE(st.quantity, 0) <= COALESCE(p.reorder_level, 0)
+        ORDER BY CASE
+                     WHEN COALESCE(st.quantity, 0) <= GREATEST(COALESCE(p.reorder_level, 0) / 2.0, 1)
+                         THEN 0
+                     ELSE 1
+                 END,
+                 COALESCE(st.quantity, 0) ASC,
+                 p.name ASC
+        LIMIT %d`, locClause("st"), limit)
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query low stock items: %w", err)
+	}
+	defer rows.Close()
+
+	var items []models.DashboardLowStockItem
+	for rows.Next() {
+		var item models.DashboardLowStockItem
+		if err := rows.Scan(
+			&item.ProductID,
+			&item.ProductName,
+			&item.LocationName,
+			&item.CurrentStock,
+			&item.ReorderLevel,
+			&item.Severity,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan low stock item: %w", err)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate low stock items: %w", err)
+	}
+
+	return items, nil
 }
