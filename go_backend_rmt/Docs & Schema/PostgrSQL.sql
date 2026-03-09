@@ -545,6 +545,7 @@ CREATE TABLE sale_details (
     product_name VARCHAR(255), -- For quick sales
     quantity NUMERIC(10,3) NOT NULL,
     unit_price NUMERIC(12,2) NOT NULL,
+    cost_price NUMERIC(12,2) NOT NULL DEFAULT 0,
     discount_percentage NUMERIC(5,2) DEFAULT 0,
     discount_amount NUMERIC(12,2) DEFAULT 0,
     tax_id INTEGER REFERENCES taxes(tax_id),
@@ -595,7 +596,9 @@ CREATE TABLE sale_return_details (
     product_id INTEGER REFERENCES products(product_id),
     quantity NUMERIC(10,3) NOT NULL,
     unit_price NUMERIC(12,2) NOT NULL,
-    line_total NUMERIC(12,2) NOT NULL
+    line_total NUMERIC(12,2) NOT NULL,
+    tax_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+    cost_price NUMERIC(12,2) NOT NULL DEFAULT 0
 );
 -- Purchase Orders Table
 CREATE TABLE purchase_orders (

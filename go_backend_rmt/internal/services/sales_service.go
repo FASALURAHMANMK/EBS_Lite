@@ -31,6 +31,7 @@ type sqlQueryer interface {
 type productMeta struct {
 	TaxID        *int
 	IsSerialized bool
+	CostPrice    float64
 }
 
 func uniqueInts(in []int) []int {
@@ -58,7 +59,7 @@ func fetchProductMeta(q sqlQueryer, companyID int, productIDs []int) (map[int]pr
 		return map[int]productMeta{}, nil
 	}
 	rows, err := q.Query(`
-		SELECT product_id, tax_id, is_serialized
+		SELECT product_id, tax_id, is_serialized, COALESCE(cost_price, 0)::float8
 		FROM products
 		WHERE company_id = $1 AND is_deleted = FALSE AND product_id = ANY($2)
 	`, companyID, pq.Array(ids))
@@ -72,7 +73,8 @@ func fetchProductMeta(q sqlQueryer, companyID int, productIDs []int) (map[int]pr
 		var pid int
 		var taxID sql.NullInt64
 		var isSerialized bool
-		if err := rows.Scan(&pid, &taxID, &isSerialized); err != nil {
+		var costPrice float64
+		if err := rows.Scan(&pid, &taxID, &isSerialized, &costPrice); err != nil {
 			return nil, fmt.Errorf("failed to scan product: %w", err)
 		}
 		var tid *int
@@ -80,7 +82,11 @@ func fetchProductMeta(q sqlQueryer, companyID int, productIDs []int) (map[int]pr
 			v := int(taxID.Int64)
 			tid = &v
 		}
-		out[pid] = productMeta{TaxID: tid, IsSerialized: isSerialized}
+		out[pid] = productMeta{
+			TaxID:        tid,
+			IsSerialized: isSerialized,
+			CostPrice:    costPrice,
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("failed to read products: %w", err)
@@ -908,14 +914,23 @@ func (s *SalesService) CreateSaleWithOptions(
 		}
 
 		// Insert sale detail
+		costPrice := 0.0
+		if item.ProductID != nil {
+			meta, ok := productMetaByID[*item.ProductID]
+			if !ok {
+				return nil, fmt.Errorf("product not found")
+			}
+			costPrice = meta.CostPrice
+		}
+
 		_, err = tx.Exec(`
 			INSERT INTO sale_details (sale_id, product_id, product_name, quantity, unit_price,
-									 discount_percentage, discount_amount, tax_id, tax_amount, 
-									 line_total, serial_numbers, notes)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+									 discount_percentage, discount_amount, tax_id, tax_amount,
+									 line_total, serial_numbers, notes, cost_price)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		`, saleID, item.ProductID, item.ProductName, item.Quantity, item.UnitPrice,
 			item.DiscountPercent, discountAmount, effectiveTaxID, taxAmount, lineTotal,
-			pq.Array(item.SerialNumbers), item.Notes)
+			pq.Array(item.SerialNumbers), item.Notes, costPrice)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to create sale item: %w", err)

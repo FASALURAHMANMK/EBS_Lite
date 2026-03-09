@@ -18,11 +18,11 @@ func TestSalesService_CalculateTotals_BatchedQueries(t *testing.T) {
 
 	svc := &SalesService{db: db}
 
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT product_id, tax_id, is_serialized")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT product_id, tax_id, is_serialized, COALESCE(cost_price, 0)::float8")).
 		WithArgs(1, sqlmock.AnyArg()).
-		WillReturnRows(sqlmock.NewRows([]string{"product_id", "tax_id", "is_serialized"}).
-			AddRow(1, 10, false).
-			AddRow(2, nil, false))
+		WillReturnRows(sqlmock.NewRows([]string{"product_id", "tax_id", "is_serialized", "cost_price"}).
+			AddRow(1, 10, false, 25.0).
+			AddRow(2, nil, false, 15.0))
 
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT tax_id, percentage")).
 		WithArgs(1, sqlmock.AnyArg()).
@@ -66,10 +66,10 @@ func TestSalesService_CalculateTotals_MissingTaxUsesStableError(t *testing.T) {
 
 	svc := &SalesService{db: db}
 
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT product_id, tax_id, is_serialized")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT product_id, tax_id, is_serialized, COALESCE(cost_price, 0)::float8")).
 		WithArgs(1, sqlmock.AnyArg()).
-		WillReturnRows(sqlmock.NewRows([]string{"product_id", "tax_id", "is_serialized"}).
-			AddRow(1, 10, false))
+		WillReturnRows(sqlmock.NewRows([]string{"product_id", "tax_id", "is_serialized", "cost_price"}).
+			AddRow(1, 10, false, 25.0))
 
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT tax_id, percentage")).
 		WithArgs(1, sqlmock.AnyArg()).

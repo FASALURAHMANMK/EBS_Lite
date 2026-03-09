@@ -13,6 +13,14 @@ type ReturnsService struct {
 	db *sql.DB
 }
 
+type saleReturnAllocation struct {
+	SaleDetailID int
+	Quantity     float64
+	UnitPrice    float64
+	TaxAmount    float64
+	CostPrice    float64
+}
+
 func NewReturnsService() *ReturnsService {
 	return &ReturnsService{
 		db: database.GetDB(),
@@ -234,18 +242,14 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 		}
 	}
 
-	// Calculate total amount
-	totalAmount := float64(0)
-	for _, item := range req.Items {
-		totalAmount += item.Quantity * item.UnitPrice
-	}
-
 	// Start transaction
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback()
+
+	totalAmount := float64(0)
 
 	ns := NewNumberingSequenceService()
 	returnNumber, err := ns.NextNumber(tx, "sale_return", companyID, &locationID)
@@ -268,16 +272,24 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 
 	// Create return items and update stock
 	for _, item := range req.Items {
-		lineTotal := item.Quantity * item.UnitPrice
-
-		// Insert return detail
-		_, err = tx.Exec(`
-			INSERT INTO sale_return_details (return_id, product_id, quantity, unit_price, line_total)
-			VALUES ($1, $2, $3, $4, $5)
-		`, returnID, item.ProductID, item.Quantity, item.UnitPrice, lineTotal)
-
+		allocations, err := s.allocateSaleReturnLines(tx, companyID, req.SaleID, item.ProductID, item.Quantity)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create return item: %w", err)
+			return nil, fmt.Errorf("failed to allocate return item %d: %w", item.ProductID, err)
+		}
+		for _, allocation := range allocations {
+			lineTotal := allocation.Quantity * item.UnitPrice
+			totalAmount += lineTotal
+
+			_, err = tx.Exec(`
+				INSERT INTO sale_return_details (
+					return_id, sale_detail_id, product_id, quantity, unit_price, line_total, tax_amount, cost_price
+				)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			`, returnID, allocation.SaleDetailID, item.ProductID, allocation.Quantity, item.UnitPrice, lineTotal, allocation.TaxAmount, allocation.CostPrice)
+
+			if err != nil {
+				return nil, fmt.Errorf("failed to create return item: %w", err)
+			}
 		}
 
 		// Update stock (add back returned quantity) - skip in training mode.
@@ -287,6 +299,16 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 				return nil, fmt.Errorf("failed to update stock: %w", err)
 			}
 		}
+	}
+
+	if _, err := tx.Exec(`
+		UPDATE sale_returns
+		SET total_amount = $1,
+		    updated_at = CURRENT_TIMESTAMP,
+		    updated_by = $2
+		WHERE return_id = $3
+	`, totalAmount, userID, returnID); err != nil {
+		return nil, fmt.Errorf("failed to update return total: %w", err)
 	}
 
 	// Update original sale's paid amount if needed
@@ -320,6 +342,12 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	if !isTraining {
+		if err := (&LedgerService{db: s.db}).RecordSaleReturn(companyID, returnID, userID); err != nil {
+			return nil, fmt.Errorf("failed to post sale return to ledger: %w", err)
+		}
 	}
 
 	// Return created return record
@@ -607,42 +635,11 @@ func (s *ReturnsService) GetReturnedQuantitiesBySaleDetail(companyID, saleID int
 }
 
 func (s *ReturnsService) validateReturnItem(companyID, saleID, productID int, returnQuantity float64) (bool, error) {
-	// Get original sale quantity
-	var originalQuantity float64
-	err := s.db.QueryRow(`
-		SELECT quantity FROM sale_details 
-		WHERE sale_id = $1 AND product_id = $2
-		  AND EXISTS (
-			  SELECT 1 FROM sales s
-			  JOIN locations l ON s.location_id = l.location_id
-			  WHERE s.sale_id = $1 AND l.company_id = $3 AND s.is_deleted = FALSE
-		  )
-	`, saleID, productID, companyID).Scan(&originalQuantity)
-
-	if err == sql.ErrNoRows {
-		return false, fmt.Errorf("product not found in original sale")
-	}
+	available, err := s.availableSaleReturnQuantity(s.db, companyID, saleID, productID)
 	if err != nil {
 		return false, err
 	}
-
-	// Get total already returned for this product in this sale
-	var totalReturned float64
-	err = s.db.QueryRow(`
-		SELECT COALESCE(SUM(srd.quantity), 0)
-		FROM sale_return_details srd
-		JOIN sale_returns sr ON srd.return_id = sr.return_id
-		JOIN locations l ON sr.location_id = l.location_id
-		WHERE sr.sale_id = $1 AND srd.product_id = $2 AND l.company_id = $3 AND sr.status = 'COMPLETED'
-	`, saleID, productID, companyID).Scan(&totalReturned)
-
-	if err != nil {
-		return false, err
-	}
-
-	// Check if return quantity is valid
-	availableForReturn := originalQuantity - totalReturned
-	return returnQuantity <= availableForReturn, nil
+	return returnQuantity <= available, nil
 }
 
 func (s *ReturnsService) verifySaleInCompany(saleID, companyID int) error {
@@ -694,4 +691,146 @@ func (s *ReturnsService) updateStock(tx *sql.Tx, locationID, productID int, quan
 	`, locationID, productID, quantityChange)
 
 	return err
+}
+
+func (s *ReturnsService) availableSaleReturnQuantity(q interface {
+	Query(query string, args ...any) (*sql.Rows, error)
+}, companyID, saleID, productID int) (float64, error) {
+	rows, err := q.Query(`
+		SELECT
+			sd.sale_detail_id,
+			sd.quantity,
+			COALESCE(ret.returned_qty, 0)::float8 AS returned_qty
+		FROM sale_details sd
+		JOIN sales s ON s.sale_id = sd.sale_id
+		JOIN locations l ON l.location_id = s.location_id
+		LEFT JOIN (
+			SELECT
+				srd.sale_detail_id,
+				COALESCE(SUM(srd.quantity), 0)::float8 AS returned_qty
+			FROM sale_return_details srd
+			JOIN sale_returns sr ON sr.return_id = srd.return_id
+			WHERE sr.sale_id = $1 AND sr.status = 'COMPLETED'
+			GROUP BY srd.sale_detail_id
+		) ret ON ret.sale_detail_id = sd.sale_detail_id
+		WHERE sd.sale_id = $1
+		  AND sd.product_id = $2
+		  AND l.company_id = $3
+		  AND s.is_deleted = FALSE
+		ORDER BY sd.sale_detail_id
+	`, saleID, productID, companyID)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	total := 0.0
+	found := false
+	for rows.Next() {
+		found = true
+		var saleDetailID int
+		var quantity float64
+		var returnedQty float64
+		if err := rows.Scan(&saleDetailID, &quantity, &returnedQty); err != nil {
+			return 0, err
+		}
+		available := quantity - returnedQty
+		if available > 0 {
+			total += available
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	if !found {
+		return 0, fmt.Errorf("product not found in original sale")
+	}
+	return total, nil
+}
+
+func (s *ReturnsService) allocateSaleReturnLines(tx *sql.Tx, companyID, saleID, productID int, requestedQty float64) ([]saleReturnAllocation, error) {
+	rows, err := tx.Query(`
+		SELECT
+			sd.sale_detail_id,
+			sd.quantity,
+			sd.unit_price,
+			COALESCE(sd.tax_amount, 0)::float8 AS tax_amount,
+			COALESCE(sd.cost_price, 0)::float8 AS cost_price,
+			COALESCE(ret.returned_qty, 0)::float8 AS returned_qty
+		FROM sale_details sd
+		JOIN sales s ON s.sale_id = sd.sale_id
+		JOIN locations l ON l.location_id = s.location_id
+		LEFT JOIN (
+			SELECT
+				srd.sale_detail_id,
+				COALESCE(SUM(srd.quantity), 0)::float8 AS returned_qty
+			FROM sale_return_details srd
+			JOIN sale_returns sr ON sr.return_id = srd.return_id
+			WHERE sr.sale_id = $1 AND sr.status = 'COMPLETED'
+			GROUP BY srd.sale_detail_id
+		) ret ON ret.sale_detail_id = sd.sale_detail_id
+		WHERE sd.sale_id = $1
+		  AND sd.product_id = $2
+		  AND l.company_id = $3
+		  AND s.is_deleted = FALSE
+		ORDER BY sd.sale_detail_id
+		FOR UPDATE
+	`, saleID, productID, companyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	remaining := requestedQty
+	allocations := make([]saleReturnAllocation, 0)
+	found := false
+	for rows.Next() {
+		found = true
+		var saleDetailID int
+		var quantity float64
+		var unitPrice float64
+		var taxAmount float64
+		var costPrice float64
+		var returnedQty float64
+		if err := rows.Scan(&saleDetailID, &quantity, &unitPrice, &taxAmount, &costPrice, &returnedQty); err != nil {
+			return nil, err
+		}
+		available := quantity - returnedQty
+		if available <= 0 {
+			continue
+		}
+		allocatedQty := available
+		if allocatedQty > remaining {
+			allocatedQty = remaining
+		}
+		if allocatedQty <= 0 {
+			continue
+		}
+
+		perUnitTax := 0.0
+		if quantity > 0 {
+			perUnitTax = taxAmount / quantity
+		}
+		allocations = append(allocations, saleReturnAllocation{
+			SaleDetailID: saleDetailID,
+			Quantity:     allocatedQty,
+			UnitPrice:    unitPrice,
+			TaxAmount:    perUnitTax * allocatedQty,
+			CostPrice:    costPrice,
+		})
+		remaining -= allocatedQty
+		if remaining <= 0.000001 {
+			break
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("product not found in original sale")
+	}
+	if remaining > 0.000001 {
+		return nil, fmt.Errorf("invalid return quantity for product %d", productID)
+	}
+	return allocations, nil
 }

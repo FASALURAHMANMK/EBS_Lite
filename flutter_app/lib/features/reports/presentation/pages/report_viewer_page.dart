@@ -214,7 +214,10 @@ class _ReportViewerPageState extends ConsumerState<ReportViewerPage> {
                   ? const AppLoadingView(label: 'Loading report')
                   : _error != null
                       ? AppErrorView(error: _error!, onRetry: _load)
-                      : _ReportDataView(data: _data),
+                      : _ReportDataView(
+                          endpoint: widget.config.endpoint,
+                          data: _data,
+                        ),
             ),
           ],
         ),
@@ -349,7 +352,7 @@ class _FiltersCard extends StatelessWidget {
                   width: 180,
                   child: InputDecorator(
                     decoration: const InputDecoration(
-                      labelText: 'Expenses Group',
+                      labelText: 'Group Expenses By',
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
@@ -392,7 +395,7 @@ class _FiltersCard extends StatelessWidget {
               FilledButton.icon(
                 onPressed: onApply,
                 icon: const Icon(Icons.filter_alt_rounded),
-                label: const Text('Apply'),
+                label: const Text('Run Report'),
               ),
             ],
           ),
@@ -403,8 +406,12 @@ class _FiltersCard extends StatelessWidget {
 }
 
 class _ReportDataView extends StatelessWidget {
-  const _ReportDataView({required this.data});
+  const _ReportDataView({
+    required this.endpoint,
+    required this.data,
+  });
 
+  final String endpoint;
   final dynamic data;
 
   @override
@@ -428,7 +435,10 @@ class _ReportDataView extends StatelessWidget {
       final allMaps = list.every((e) => e is Map);
       if (allMaps) {
         final rows = list.cast<Map>();
-        return _MapTableView(rows: rows);
+        return _MapTableView(
+          endpoint: endpoint,
+          rows: rows,
+        );
       }
       return ListView.separated(
         padding: const EdgeInsets.all(12),
@@ -445,7 +455,10 @@ class _ReportDataView extends StatelessWidget {
     }
     if (data is Map) {
       final map = (data as Map).cast<dynamic, dynamic>();
-      return _KeyValueTableView(map: map);
+      return _KeyValueTableView(
+        endpoint: endpoint,
+        map: map,
+      );
     }
     return Center(
       child: Padding(
@@ -496,8 +509,12 @@ class _TableShell extends StatelessWidget {
 }
 
 class _KeyValueTableView extends StatelessWidget {
-  const _KeyValueTableView({required this.map});
+  const _KeyValueTableView({
+    required this.endpoint,
+    required this.map,
+  });
 
+  final String endpoint;
   final Map<dynamic, dynamic> map;
 
   @override
@@ -523,8 +540,12 @@ class _KeyValueTableView extends StatelessWidget {
                   .map(
                     (e) => DataRow(
                       cells: [
-                        DataCell(Text(e.key)),
-                        DataCell(Text((e.value ?? '—').toString())),
+                        DataCell(
+                            Text(_ReportDisplay.labelForKey(endpoint, e.key))),
+                        DataCell(
+                          Text(_ReportDisplay.formatValue(
+                              endpoint, e.key, e.value)),
+                        ),
                       ],
                     ),
                   )
@@ -538,8 +559,12 @@ class _KeyValueTableView extends StatelessWidget {
 }
 
 class _MapTableView extends StatelessWidget {
-  const _MapTableView({required this.rows});
+  const _MapTableView({
+    required this.endpoint,
+    required this.rows,
+  });
 
+  final String endpoint;
   final List<Map> rows;
 
   @override
@@ -550,7 +575,10 @@ class _MapTableView extends StatelessWidget {
         columns.add(k.toString());
       }
     }
-    final orderedCols = columns.toList()..sort();
+    final orderedCols = _ReportDisplay.orderColumns(
+      endpoint,
+      columns.map((e) => e.toString()).toList(),
+    );
 
     return _TableShell(
       caption:
@@ -563,8 +591,13 @@ class _MapTableView extends StatelessWidget {
             child: ConstrainedBox(
               constraints: const BoxConstraints(minWidth: 720),
               child: DataTable(
-                columns:
-                    orderedCols.map((c) => DataColumn(label: Text(c))).toList(),
+                columns: orderedCols
+                    .map(
+                      (c) => DataColumn(
+                        label: Text(_ReportDisplay.labelForKey(endpoint, c)),
+                      ),
+                    )
+                    .toList(),
                 rows: rows
                     .take(500)
                     .map(
@@ -572,7 +605,13 @@ class _MapTableView extends StatelessWidget {
                         cells: orderedCols
                             .map(
                               (c) => DataCell(
-                                Text((r[c] ?? '—').toString()),
+                                Text(
+                                  _ReportDisplay.formatValue(
+                                    endpoint,
+                                    c,
+                                    r[c],
+                                  ),
+                                ),
                               ),
                             )
                             .toList(),
@@ -585,5 +624,295 @@ class _MapTableView extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _ReportDisplay {
+  static final DateFormat _dateFormat = DateFormat('yyyy-MM-dd');
+  static final DateFormat _dateTimeFormat = DateFormat('yyyy-MM-dd HH:mm');
+
+  static const Map<String, List<String>> _columnOrderByEndpoint = {
+    '/reports/sales-summary': [
+      'period',
+      'transactions',
+      'total_sales',
+      'outstanding',
+    ],
+    '/reports/top-products': [
+      'product_id',
+      'product_name',
+      'quantity_sold',
+      'revenue',
+    ],
+    '/reports/customer-balances': [
+      'customer_id',
+      'name',
+      'total_due',
+    ],
+    '/reports/tax': [
+      'tax_name',
+      'tax_rate',
+      'taxable_amount',
+      'tax_amount',
+    ],
+    '/reports/purchase-vs-returns': [
+      'purchases_total',
+      'returns_total',
+      'net_purchases',
+      'purchases_outstanding',
+    ],
+    '/reports/supplier': [
+      'supplier_id',
+      'supplier_name',
+      'purchases_total',
+      'purchases_paid',
+      'purchases_outstanding',
+      'returns_total',
+    ],
+    '/reports/daily-cash': [
+      'date',
+      'location_id',
+      'status',
+      'opening_balance',
+      'cash_in',
+      'cash_out',
+      'expected_balance',
+      'closing_balance',
+      'variance',
+    ],
+    '/reports/income-expense': [
+      'day',
+      'sales_total',
+      'expenses_total',
+      'net_income',
+    ],
+    '/reports/general-ledger': [
+      'date',
+      'account_code',
+      'account_name',
+      'debit',
+      'credit',
+      'transaction_type',
+      'transaction_id',
+      'reference',
+      'description',
+      'voucher_id',
+      'entry_id',
+      'account_id',
+    ],
+    '/reports/trial-balance': [
+      'account_code',
+      'account_name',
+      'account_type',
+      'total_debit',
+      'total_credit',
+      'balance',
+    ],
+    '/reports/profit-loss': [
+      'section',
+      'account_code',
+      'account_name',
+      'amount',
+    ],
+    '/reports/balance-sheet': [
+      'section',
+      'account_code',
+      'account_name',
+      'amount',
+    ],
+    '/reports/outstanding': [
+      'type',
+      'amount',
+    ],
+    '/reports/top-performers': [
+      'category',
+      'name',
+      'total_sales',
+      'transactions',
+    ],
+    '/reports/stock-summary': [
+      'product_id',
+      'location_id',
+      'quantity',
+      'stock_value',
+    ],
+    '/reports/item-movement': [
+      'product_id',
+      'product_name',
+      'purchased_qty',
+      'purchase_return_qty',
+      'sold_qty',
+      'sale_return_qty',
+      'adjustment_qty',
+      'net_movement',
+    ],
+    '/reports/valuation': [
+      'product_id',
+      'product_name',
+      'quantity',
+      'stock_value',
+    ],
+  };
+
+  static const Map<String, String> _globalLabels = {
+    'id': 'ID',
+    'account_id': 'Account ID',
+    'account_code': 'Account Code',
+    'account_name': 'Account Name',
+    'account_type': 'Account Type',
+    'amount': 'Amount',
+    'balance': 'Balance',
+    'cash_in': 'Cash In',
+    'cash_out': 'Cash Out',
+    'closing_balance': 'Closing Balance',
+    'closing_count': 'Closing Count',
+    'credit': 'Credit',
+    'customer_id': 'Customer ID',
+    'date': 'Date',
+    'day': 'Day',
+    'debit': 'Debit',
+    'description': 'Description',
+    'entry_id': 'Entry ID',
+    'expected_balance': 'Expected Balance',
+    'expenses_total': 'Expenses',
+    'location_id': 'Location ID',
+    'name': 'Name',
+    'net_income': 'Net Income',
+    'net_movement': 'Net Movement',
+    'net_purchases': 'Net Purchases',
+    'opening_balance': 'Opening Balance',
+    'outstanding': 'Outstanding Balance',
+    'period': 'Period',
+    'product_id': 'Product ID',
+    'product_name': 'Product Name',
+    'purchased_qty': 'Purchased Quantity',
+    'purchase_return_qty': 'Purchase Return Quantity',
+    'purchases_outstanding': 'Outstanding Payables',
+    'purchases_paid': 'Payments Made',
+    'purchases_total': 'Purchases',
+    'quantity': 'Quantity',
+    'quantity_sold': 'Quantity Sold',
+    'reference': 'Reference',
+    'returns_total': 'Purchase Returns',
+    'revenue': 'Sales Revenue',
+    'sale_return_qty': 'Sales Return Quantity',
+    'sales_total': 'Sales',
+    'section': 'Section',
+    'status': 'Status',
+    'stock_value': 'Stock Value',
+    'supplier_id': 'Supplier ID',
+    'supplier_name': 'Supplier Name',
+    'tax_amount': 'Tax Amount',
+    'tax_name': 'Tax Code',
+    'tax_rate': 'Tax Rate',
+    'taxable_amount': 'Taxable Amount',
+    'total_credit': 'Total Credit',
+    'total_debit': 'Total Debit',
+    'total_due': 'Outstanding Balance',
+    'total_sales': 'Sales Total',
+    'transactions': 'Transactions',
+    'transaction_id': 'Transaction ID',
+    'transaction_type': 'Source Type',
+    'type': 'Type',
+    'variance': 'Variance',
+    'voucher_id': 'Voucher ID',
+  };
+
+  static const Map<String, String> _sectionValueLabels = {
+    'ASSET': 'Assets',
+    'LIABILITY': 'Liabilities',
+    'EQUITY': 'Equity',
+    'REVENUE': 'Revenue',
+    'EXPENSE': 'Expenses',
+    'TOTAL_ASSETS': 'Total Assets',
+    'TOTAL_LIABILITIES': 'Total Liabilities',
+    'TOTAL_EQUITY': 'Total Equity',
+    'TOTAL_REVENUE': 'Total Revenue',
+    'TOTAL_EXPENSE': 'Total Expenses',
+    'NET_PROFIT': 'Net Profit',
+    'ASSETS_MINUS_LIABILITIES_EQUITY': 'Balance Sheet Difference',
+  };
+
+  static const Map<String, String> _typeValueLabels = {
+    'sales': 'Accounts Receivable',
+    'purchases': 'Accounts Payable',
+  };
+
+  static List<String> orderColumns(String endpoint, List<String> columns) {
+    final remaining = [...columns]..sort();
+    final ordered = <String>[];
+    final preferred = _columnOrderByEndpoint[endpoint] ?? const <String>[];
+    for (final column in preferred) {
+      if (remaining.remove(column)) {
+        ordered.add(column);
+      }
+    }
+    ordered.addAll(remaining);
+    return ordered;
+  }
+
+  static String labelForKey(String endpoint, String key) {
+    final normalized = key.trim();
+    return _globalLabels[normalized] ?? _humanizeKey(normalized);
+  }
+
+  static String formatValue(String endpoint, String key, dynamic value) {
+    if (value == null) return '—';
+
+    if (key == 'section') {
+      final raw = value.toString();
+      return _sectionValueLabels[raw] ?? _humanizeKey(raw);
+    }
+    if (key == 'type') {
+      final raw = value.toString();
+      return _typeValueLabels[raw] ?? _humanizeKey(raw);
+    }
+    if (key == 'status') {
+      return _humanizeKey(value.toString());
+    }
+    if (value is DateTime) {
+      return _dateTimeFormat.format(value.toLocal());
+    }
+    if (_looksLikeDateKey(key)) {
+      final parsed = DateTime.tryParse(value.toString());
+      if (parsed != null) {
+        return _dateFormat.format(parsed.toLocal());
+      }
+    }
+    if (value is num) {
+      if (_looksLikePercentKey(key)) {
+        return '${value.toStringAsFixed(2)}%';
+      }
+      if (_looksLikeQuantityKey(key)) {
+        return value.toStringAsFixed(value % 1 == 0 ? 0 : 3);
+      }
+      return value.toStringAsFixed(2);
+    }
+    return value.toString();
+  }
+
+  static bool _looksLikeDateKey(String key) =>
+      key == 'date' ||
+      key == 'day' ||
+      key.endsWith('_date') ||
+      key.endsWith('_at');
+
+  static bool _looksLikePercentKey(String key) =>
+      key.contains('rate') || key.contains('percent');
+
+  static bool _looksLikeQuantityKey(String key) =>
+      key == 'quantity' || key.endsWith('_qty') || key == 'transactions';
+
+  static String _humanizeKey(String raw) {
+    if (raw.isEmpty) return raw;
+    final parts = raw
+        .replaceAll('-', '_')
+        .split('_')
+        .where((part) => part.trim().isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return raw;
+    return parts
+        .map((part) => part[0].toUpperCase() + part.substring(1).toLowerCase())
+        .join(' ');
   }
 }

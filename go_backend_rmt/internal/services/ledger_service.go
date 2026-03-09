@@ -26,6 +26,7 @@ const (
 	accountCodeTaxPayable    = "2100"
 	accountCodeTaxReceivable = "2200"
 	accountCodeSalesRevenue  = "4000"
+	accountCodeCOGS          = "5000"
 	accountCodeExpenses      = "6000"
 )
 
@@ -99,6 +100,66 @@ func (s *LedgerService) insertEntryIfMissing(companyID int, reference string, ac
 	return nil
 }
 
+func (s *LedgerService) saleCOGSAmount(companyID, saleID int) (float64, error) {
+	var amount float64
+	if err := s.db.QueryRow(`
+		SELECT COALESCE(SUM(sd.quantity * COALESCE(sd.cost_price, 0)), 0)::float8
+		FROM sale_details sd
+		JOIN sales s ON s.sale_id = sd.sale_id
+		JOIN locations l ON l.location_id = s.location_id
+		WHERE sd.sale_id = $1 AND l.company_id = $2 AND s.is_deleted = FALSE
+	`, saleID, companyID).Scan(&amount); err != nil {
+		return 0, fmt.Errorf("failed to load sale cost for ledger posting: %w", err)
+	}
+	return amount, nil
+}
+
+func (s *LedgerService) saleReturnAmounts(companyID, returnID int) (float64, float64, float64, time.Time, error) {
+	var total, tax, cogs float64
+	var returnDate time.Time
+	if err := s.db.QueryRow(`
+		SELECT
+			sr.total_amount,
+			sr.return_date,
+			COALESCE(SUM(COALESCE(srd.tax_amount, 0)), 0)::float8 AS tax_amount,
+			COALESCE(SUM(srd.quantity * COALESCE(srd.cost_price, 0)), 0)::float8 AS cogs_reversal
+		FROM sale_returns sr
+		JOIN locations l ON l.location_id = sr.location_id
+		LEFT JOIN sale_return_details srd ON srd.return_id = sr.return_id
+		WHERE sr.return_id = $1 AND l.company_id = $2 AND sr.is_deleted = FALSE
+		GROUP BY sr.return_id, sr.total_amount, sr.return_date
+	`, returnID, companyID).Scan(&total, &returnDate, &tax, &cogs); err != nil {
+		return 0, 0, 0, time.Time{}, fmt.Errorf("failed to load sale return for ledger posting: %w", err)
+	}
+	return total, tax, cogs, returnDate, nil
+}
+
+func (s *LedgerService) purchaseReturnAmounts(companyID, returnID int) (float64, float64, time.Time, error) {
+	var total, tax float64
+	var returnDate time.Time
+	if err := s.db.QueryRow(`
+		SELECT
+			pr.total_amount,
+			pr.return_date,
+			COALESCE(SUM(
+				CASE
+					WHEN prd.purchase_detail_id IS NOT NULL AND COALESCE(pd.quantity, 0) <> 0
+						THEN (COALESCE(pd.tax_amount, 0) / pd.quantity) * prd.quantity
+					ELSE 0
+				END
+			), 0)::float8 AS tax_amount
+		FROM purchase_returns pr
+		JOIN locations l ON l.location_id = pr.location_id
+		LEFT JOIN purchase_return_details prd ON prd.return_id = pr.return_id
+		LEFT JOIN purchase_details pd ON pd.purchase_detail_id = prd.purchase_detail_id
+		WHERE pr.return_id = $1 AND l.company_id = $2 AND pr.is_deleted = FALSE
+		GROUP BY pr.return_id, pr.total_amount, pr.return_date
+	`, returnID, companyID).Scan(&total, &returnDate, &tax); err != nil {
+		return 0, 0, time.Time{}, fmt.Errorf("failed to load purchase return for ledger posting: %w", err)
+	}
+	return total, tax, returnDate, nil
+}
+
 // RecordSale posts minimal double-entry ledger lines for a completed sale.
 func (s *LedgerService) RecordSale(companyID, saleID, userID int) error {
 	var total, tax, paid float64
@@ -137,6 +198,18 @@ func (s *LedgerService) RecordSale(companyID, saleID, userID int) error {
 	if err != nil {
 		return err
 	}
+	cogsID, err := s.ensureDefaultAccountID(companyID, accountCodeCOGS)
+	if err != nil {
+		return err
+	}
+	inventoryID, err := s.ensureDefaultAccountID(companyID, accountCodeInventory)
+	if err != nil {
+		return err
+	}
+	cogsAmount, err := s.saleCOGSAmount(companyID, saleID)
+	if err != nil {
+		return err
+	}
 
 	if paid > 0 {
 		ref := fmt.Sprintf("sale:%d:%s", saleID, accountCodeCash)
@@ -159,6 +232,16 @@ func (s *LedgerService) RecordSale(companyID, saleID, userID int) error {
 	if tax > 0 {
 		ref := fmt.Sprintf("sale:%d:%s", saleID, accountCodeTaxPayable)
 		if err := s.insertEntryIfMissing(companyID, ref, taxPayableID, saleDate, 0, tax, "sale", saleID, nil, nil, userID); err != nil {
+			return err
+		}
+	}
+	if cogsAmount > 0 {
+		ref := fmt.Sprintf("sale:%d:%s", saleID, accountCodeCOGS)
+		if err := s.insertEntryIfMissing(companyID, ref, cogsID, saleDate, cogsAmount, 0, "sale", saleID, nil, nil, userID); err != nil {
+			return err
+		}
+		ref = fmt.Sprintf("sale:%d:%s", saleID, accountCodeInventory)
+		if err := s.insertEntryIfMissing(companyID, ref, inventoryID, saleDate, 0, cogsAmount, "sale", saleID, nil, nil, userID); err != nil {
 			return err
 		}
 	}
@@ -575,18 +658,16 @@ func (s *LedgerService) GetAccountEntries(companyID, accountID int, filters map[
 
 // RecordPurchaseReturn posts minimal ledger lines for a purchase return.
 func (s *LedgerService) RecordPurchaseReturn(companyID, returnID, userID int) error {
-	var amount float64
-	var returnDate time.Time
-	if err := s.db.QueryRow(`
-		SELECT pr.total_amount, pr.return_date
-		FROM purchase_returns pr
-		JOIN locations l ON l.location_id = pr.location_id
-		WHERE pr.return_id = $1 AND l.company_id = $2 AND pr.is_deleted = FALSE
-	`, returnID, companyID).Scan(&amount, &returnDate); err != nil {
-		return fmt.Errorf("failed to load purchase return for ledger posting: %w", err)
+	totalAmount, taxAmount, returnDate, err := s.purchaseReturnAmounts(companyID, returnID)
+	if err != nil {
+		return err
 	}
-	if amount <= 0 {
+	if totalAmount <= 0 {
 		return nil
+	}
+	netInventory := totalAmount - taxAmount
+	if netInventory < 0 {
+		netInventory = 0
 	}
 
 	apID, err := s.ensureDefaultAccountID(companyID, accountCodeAP)
@@ -597,14 +678,92 @@ func (s *LedgerService) RecordPurchaseReturn(companyID, returnID, userID int) er
 	if err != nil {
 		return err
 	}
-
-	ref1 := fmt.Sprintf("purchase_return:%d:%s", returnID, accountCodeAP)
-	if err := s.insertEntryIfMissing(companyID, ref1, apID, returnDate, amount, 0, "purchase_return", returnID, nil, nil, userID); err != nil {
+	taxRecID, err := s.ensureDefaultAccountID(companyID, accountCodeTaxReceivable)
+	if err != nil {
 		return err
 	}
-	ref2 := fmt.Sprintf("purchase_return:%d:%s", returnID, accountCodeInventory)
-	if err := s.insertEntryIfMissing(companyID, ref2, invID, returnDate, 0, amount, "purchase_return", returnID, nil, nil, userID); err != nil {
+
+	ref1 := fmt.Sprintf("purchase_return:%d:%s", returnID, accountCodeAP)
+	if err := s.insertEntryIfMissing(companyID, ref1, apID, returnDate, totalAmount, 0, "purchase_return", returnID, nil, nil, userID); err != nil {
 		return err
+	}
+	if netInventory > 0 {
+		ref2 := fmt.Sprintf("purchase_return:%d:%s", returnID, accountCodeInventory)
+		if err := s.insertEntryIfMissing(companyID, ref2, invID, returnDate, 0, netInventory, "purchase_return", returnID, nil, nil, userID); err != nil {
+			return err
+		}
+	}
+	if taxAmount > 0 {
+		ref3 := fmt.Sprintf("purchase_return:%d:%s", returnID, accountCodeTaxReceivable)
+		if err := s.insertEntryIfMissing(companyID, ref3, taxRecID, returnDate, 0, taxAmount, "purchase_return", returnID, nil, nil, userID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RecordSaleReturn posts a credit-note style reversal for a completed sale return.
+// Debit: Sales revenue + tax payable + inventory
+// Credit: Accounts receivable + cost of goods sold reversal
+func (s *LedgerService) RecordSaleReturn(companyID, returnID, userID int) error {
+	totalAmount, taxAmount, cogsAmount, returnDate, err := s.saleReturnAmounts(companyID, returnID)
+	if err != nil {
+		return err
+	}
+	if totalAmount <= 0 {
+		return nil
+	}
+	netRevenue := totalAmount - taxAmount
+	if netRevenue < 0 {
+		netRevenue = 0
+	}
+
+	arID, err := s.ensureDefaultAccountID(companyID, accountCodeAR)
+	if err != nil {
+		return err
+	}
+	salesID, err := s.ensureDefaultAccountID(companyID, accountCodeSalesRevenue)
+	if err != nil {
+		return err
+	}
+	taxPayableID, err := s.ensureDefaultAccountID(companyID, accountCodeTaxPayable)
+	if err != nil {
+		return err
+	}
+	inventoryID, err := s.ensureDefaultAccountID(companyID, accountCodeInventory)
+	if err != nil {
+		return err
+	}
+	cogsID, err := s.ensureDefaultAccountID(companyID, accountCodeCOGS)
+	if err != nil {
+		return err
+	}
+
+	if netRevenue > 0 {
+		ref := fmt.Sprintf("sale_return:%d:%s", returnID, accountCodeSalesRevenue)
+		if err := s.insertEntryIfMissing(companyID, ref, salesID, returnDate, netRevenue, 0, "sale_return", returnID, nil, nil, userID); err != nil {
+			return err
+		}
+	}
+	if taxAmount > 0 {
+		ref := fmt.Sprintf("sale_return:%d:%s", returnID, accountCodeTaxPayable)
+		if err := s.insertEntryIfMissing(companyID, ref, taxPayableID, returnDate, taxAmount, 0, "sale_return", returnID, nil, nil, userID); err != nil {
+			return err
+		}
+	}
+	ref := fmt.Sprintf("sale_return:%d:%s", returnID, accountCodeAR)
+	if err := s.insertEntryIfMissing(companyID, ref, arID, returnDate, 0, totalAmount, "sale_return", returnID, nil, nil, userID); err != nil {
+		return err
+	}
+	if cogsAmount > 0 {
+		ref = fmt.Sprintf("sale_return:%d:%s", returnID, accountCodeInventory)
+		if err := s.insertEntryIfMissing(companyID, ref, inventoryID, returnDate, cogsAmount, 0, "sale_return", returnID, nil, nil, userID); err != nil {
+			return err
+		}
+		ref = fmt.Sprintf("sale_return:%d:%s", returnID, accountCodeCOGS)
+		if err := s.insertEntryIfMissing(companyID, ref, cogsID, returnDate, 0, cogsAmount, "sale_return", returnID, nil, nil, userID); err != nil {
+			return err
+		}
 	}
 	return nil
 }

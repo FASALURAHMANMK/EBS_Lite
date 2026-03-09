@@ -9,41 +9,44 @@ const salesReports = <ReportConfig>[
   ReportConfig(
     title: 'Sales Summary',
     endpoint: '/reports/sales-summary',
-    description: 'Grouped sales totals and outstanding balances.',
+    description:
+        'Sales totals, transaction counts, and unpaid balances by period.',
     supportsGroupBy: true,
   ),
   ReportConfig(
-    title: 'Top Products',
+    title: 'Top-Selling Products',
     endpoint: '/reports/top-products',
-    description: 'Best-selling products by revenue.',
+    description: 'Products ranked by sales revenue and quantity sold.',
     supportsLimit: true,
     supportsLocation: false,
   ),
   ReportConfig(
-    title: 'Customer Balances',
+    title: 'Customer Outstanding Balances',
     endpoint: '/reports/customer-balances',
-    description: 'Outstanding balances by customer.',
+    description: 'Accounts receivable balances by customer.',
     supportsDateRange: false,
     supportsLocation: false,
   ),
   ReportConfig(
     title: 'Tax Report',
     endpoint: '/reports/tax',
-    description: 'Taxable sales and tax amount by tax type.',
+    description: 'Taxable turnover and output tax by tax code or rate.',
     supportsLocation: false,
   ),
 ];
 
 const purchaseReports = <ReportConfig>[
   ReportConfig(
-    title: 'Purchase vs Returns',
+    title: 'Purchases and Purchase Returns',
     endpoint: '/reports/purchase-vs-returns',
-    description: 'Compare purchases against returns.',
+    description:
+        'Purchases, returns, net purchases, and unpaid supplier balances.',
   ),
   ReportConfig(
-    title: 'Supplier Report',
+    title: 'Supplier Purchases and Balances',
     endpoint: '/reports/supplier',
-    description: 'Supplier performance and totals.',
+    description:
+        'Purchases, payments, returns, and outstanding balances by supplier.',
     supportsDateRange: false,
     supportsLocation: false,
   ),
@@ -51,70 +54,76 @@ const purchaseReports = <ReportConfig>[
 
 const accountsReports = <ReportConfig>[
   ReportConfig(
-    title: 'Daily Cash',
+    title: 'Cash Register Summary',
     endpoint: '/reports/daily-cash',
-    description: 'Daily cash activity overview.',
+    description:
+        'Opening, movement, expected, closing, and variance values by day.',
   ),
   ReportConfig(
     title: 'Expenses Summary',
     endpoint: '/reports/expenses-summary',
-    description: 'Expenses grouped by category or period.',
+    description:
+        'Operating expenses grouped by category and, optionally, by period.',
     supportsExpensesGroupBy: true,
     supportsDateRange: false,
     supportsLocation: false,
   ),
   ReportConfig(
-    title: 'Income vs Expense',
+    title: 'Income and Expense Summary',
     endpoint: '/reports/income-expense',
-    description: 'Income and expense comparison.',
+    description: 'Sales, expenses, and net operating result by day.',
   ),
   ReportConfig(
     title: 'General Ledger',
     endpoint: '/reports/general-ledger',
-    description: 'General ledger report.',
+    description:
+        'Detailed ledger transactions with account and source references.',
   ),
   ReportConfig(
     title: 'Trial Balance',
     endpoint: '/reports/trial-balance',
-    description: 'Trial balance summary.',
+    description:
+        'Trial balance showing debits, credits, and net balances by ledger.',
   ),
   ReportConfig(
     title: 'Profit & Loss',
     endpoint: '/reports/profit-loss',
-    description: 'Profit and loss statement.',
+    description: 'Revenue, expenses, and net profit for the selected period.',
   ),
   ReportConfig(
     title: 'Balance Sheet',
     endpoint: '/reports/balance-sheet',
-    description: 'Balance sheet overview.',
+    description: 'Assets, liabilities, and equity as of the selected date.',
   ),
   ReportConfig(
-    title: 'Outstanding',
+    title: 'Receivables and Payables Summary',
     endpoint: '/reports/outstanding',
-    description: 'Outstanding invoices or payments.',
+    description:
+        'Summary of outstanding customer receivables and supplier payables.',
   ),
   ReportConfig(
     title: 'Top Performers',
     endpoint: '/reports/top-performers',
-    description: 'Top performing employees or products.',
+    description: 'Top-performing staff or products by sales value.',
   ),
 ];
 
 const inventoryReports = <ReportConfig>[
   ReportConfig(
-    title: 'Stock Summary',
+    title: 'Stock on Hand Summary',
     endpoint: '/reports/stock-summary',
-    description: 'Stock levels and valuation by location.',
+    description:
+        'Stock quantities and carrying values by product and location.',
     supportsProductId: true,
   ),
   ReportConfig(
     title: 'Item Movement',
     endpoint: '/reports/item-movement',
-    description: 'Stock movement report.',
+    description: 'Purchases, sales, returns, and adjustments by product.',
   ),
   ReportConfig(
-    title: 'Valuation Report',
+    title: 'Inventory Valuation',
     endpoint: '/reports/valuation',
-    description: 'Inventory valuation summary.',
+    description: 'Inventory quantities and carrying values by product.',
   ),
 ];

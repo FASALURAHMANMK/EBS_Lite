@@ -6,15 +6,179 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/xuri/excelize/v2"
 )
 
+type reportExportSchema struct {
+	Title         string
+	PreferredCols []string
+}
+
+var reportExportSchemas = map[string]reportExportSchema{
+	"/reports/sales-summary": {
+		Title:         "Sales Summary",
+		PreferredCols: []string{"period", "transactions", "total_sales", "outstanding"},
+	},
+	"/reports/top-products": {
+		Title:         "Top-Selling Products",
+		PreferredCols: []string{"product_id", "product_name", "quantity_sold", "revenue"},
+	},
+	"/reports/customer-balances": {
+		Title:         "Customer Outstanding Balances",
+		PreferredCols: []string{"customer_id", "name", "total_due"},
+	},
+	"/reports/tax": {
+		Title:         "Tax Report",
+		PreferredCols: []string{"tax_name", "tax_rate", "taxable_amount", "tax_amount"},
+	},
+	"/reports/purchase-vs-returns": {
+		Title:         "Purchases and Purchase Returns",
+		PreferredCols: []string{"purchases_total", "returns_total", "net_purchases", "purchases_outstanding"},
+	},
+	"/reports/supplier": {
+		Title:         "Supplier Purchases and Balances",
+		PreferredCols: []string{"supplier_id", "supplier_name", "purchases_total", "purchases_paid", "purchases_outstanding", "returns_total"},
+	},
+	"/reports/daily-cash": {
+		Title:         "Cash Register Summary",
+		PreferredCols: []string{"date", "location_id", "status", "opening_balance", "cash_in", "cash_out", "expected_balance", "closing_balance", "variance"},
+	},
+	"/reports/income-expense": {
+		Title:         "Income and Expense Summary",
+		PreferredCols: []string{"day", "sales_total", "expenses_total", "net_income"},
+	},
+	"/reports/general-ledger": {
+		Title:         "General Ledger",
+		PreferredCols: []string{"date", "account_code", "account_name", "debit", "credit", "transaction_type", "transaction_id", "reference", "description", "voucher_id", "entry_id", "account_id"},
+	},
+	"/reports/trial-balance": {
+		Title:         "Trial Balance",
+		PreferredCols: []string{"account_code", "account_name", "account_type", "total_debit", "total_credit", "balance"},
+	},
+	"/reports/profit-loss": {
+		Title:         "Profit & Loss",
+		PreferredCols: []string{"section", "account_code", "account_name", "amount"},
+	},
+	"/reports/balance-sheet": {
+		Title:         "Balance Sheet",
+		PreferredCols: []string{"section", "account_code", "account_name", "amount"},
+	},
+	"/reports/outstanding": {
+		Title:         "Receivables and Payables Summary",
+		PreferredCols: []string{"type", "amount"},
+	},
+	"/reports/top-performers": {
+		Title:         "Top Performers",
+		PreferredCols: []string{"category", "name", "total_sales", "transactions"},
+	},
+	"/reports/stock-summary": {
+		Title:         "Stock on Hand Summary",
+		PreferredCols: []string{"product_id", "location_id", "quantity", "stock_value"},
+	},
+	"/reports/item-movement": {
+		Title:         "Item Movement",
+		PreferredCols: []string{"product_id", "product_name", "purchased_qty", "purchase_return_qty", "sold_qty", "sale_return_qty", "adjustment_qty", "net_movement"},
+	},
+	"/reports/valuation": {
+		Title:         "Inventory Valuation",
+		PreferredCols: []string{"product_id", "product_name", "quantity", "stock_value"},
+	},
+}
+
+var reportExportLabels = map[string]string{
+	"account_id":            "Account ID",
+	"account_code":          "Account Code",
+	"account_name":          "Account Name",
+	"account_type":          "Account Type",
+	"amount":                "Amount",
+	"balance":               "Balance",
+	"cash_in":               "Cash In",
+	"cash_out":              "Cash Out",
+	"category":              "Category",
+	"closing_balance":       "Closing Balance",
+	"credit":                "Credit",
+	"customer_id":           "Customer ID",
+	"date":                  "Date",
+	"day":                   "Day",
+	"debit":                 "Debit",
+	"description":           "Description",
+	"entry_id":              "Entry ID",
+	"expected_balance":      "Expected Balance",
+	"expenses_total":        "Expenses",
+	"field":                 "Field",
+	"location_id":           "Location ID",
+	"name":                  "Name",
+	"net_income":            "Net Income",
+	"net_movement":          "Net Movement",
+	"net_purchases":         "Net Purchases",
+	"opening_balance":       "Opening Balance",
+	"outstanding":           "Outstanding Balance",
+	"period":                "Period",
+	"product_id":            "Product ID",
+	"product_name":          "Product Name",
+	"purchased_qty":         "Purchased Quantity",
+	"purchase_return_qty":   "Purchase Return Quantity",
+	"purchases_outstanding": "Outstanding Payables",
+	"purchases_paid":        "Payments Made",
+	"purchases_total":       "Purchases",
+	"quantity":              "Quantity",
+	"quantity_sold":         "Quantity Sold",
+	"reference":             "Reference",
+	"returns_total":         "Purchase Returns",
+	"revenue":               "Sales Revenue",
+	"sale_return_qty":       "Sales Return Quantity",
+	"sales_total":           "Sales",
+	"section":               "Section",
+	"status":                "Status",
+	"stock_value":           "Stock Value",
+	"supplier_id":           "Supplier ID",
+	"supplier_name":         "Supplier Name",
+	"tax_amount":            "Tax Amount",
+	"tax_name":              "Tax Code",
+	"tax_rate":              "Tax Rate",
+	"taxable_amount":        "Taxable Amount",
+	"total_credit":          "Total Credit",
+	"total_debit":           "Total Debit",
+	"total_due":             "Outstanding Balance",
+	"total_sales":           "Sales Total",
+	"transactions":          "Transactions",
+	"transaction_id":        "Transaction ID",
+	"transaction_type":      "Source Type",
+	"type":                  "Type",
+	"value":                 "Value",
+	"variance":              "Variance",
+	"voucher_id":            "Voucher ID",
+}
+
+var reportExportValueLabels = map[string]map[string]string{
+	"section": {
+		"ASSET":                           "Assets",
+		"LIABILITY":                       "Liabilities",
+		"EQUITY":                          "Equity",
+		"REVENUE":                         "Revenue",
+		"EXPENSE":                         "Expenses",
+		"TOTAL_ASSETS":                    "Total Assets",
+		"TOTAL_LIABILITIES":               "Total Liabilities",
+		"TOTAL_EQUITY":                    "Total Equity",
+		"TOTAL_REVENUE":                   "Total Revenue",
+		"TOTAL_EXPENSE":                   "Total Expenses",
+		"NET_PROFIT":                      "Net Profit",
+		"ASSETS_MINUS_LIABILITIES_EQUITY": "Balance Sheet Difference",
+	},
+	"type": {
+		"sales":     "Accounts Receivable",
+		"purchases": "Accounts Payable",
+	},
+}
+
 // GenerateExcel creates an Excel file from the provided data.
-func GenerateExcel(data interface{}) ([]byte, error) {
+func GenerateExcel(endpoint string, data interface{}) ([]byte, error) {
 	file := excelize.NewFile()
 
-	sheet := "Sheet1"
+	schema := lookupReportSchema(endpoint)
+	sheet := sanitizeSheetName(schema.Title)
 	_ = file.SetSheetName(file.GetSheetName(0), sheet)
 
 	normalized, err := normalizeForTabular(data)
@@ -24,20 +188,20 @@ func GenerateExcel(data interface{}) ([]byte, error) {
 
 	switch v := normalized.(type) {
 	case []interface{}:
-		if err := writeListAsTable(file, sheet, v); err != nil {
+		if err := writeListAsTable(file, sheet, schema, v); err != nil {
 			return nil, err
 		}
 	case map[string]interface{}:
-		if err := writeMapAsPairs(file, sheet, v); err != nil {
+		if err := writeMapAsPairs(file, sheet, schema, v); err != nil {
 			return nil, err
 		}
 	default:
-		// Fallback: write pretty JSON into a single cell so exports never fail.
-		jsonData, err := json.MarshalIndent(normalized, "", "  ")
+		jsonData, err := json.MarshalIndent(relabelNormalizedData(schema, normalized), "", "  ")
 		if err != nil {
 			return nil, err
 		}
-		file.SetCellValue(sheet, "A1", string(jsonData))
+		file.SetCellValue(sheet, "A1", schema.Title)
+		file.SetCellValue(sheet, "A3", string(jsonData))
 	}
 
 	var buf bytes.Buffer
@@ -48,7 +212,6 @@ func GenerateExcel(data interface{}) ([]byte, error) {
 }
 
 func normalizeForTabular(data interface{}) (interface{}, error) {
-	// Use JSON round-trip to normalize structs/sql types into plain maps/slices.
 	b, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -60,111 +223,109 @@ func normalizeForTabular(data interface{}) (interface{}, error) {
 	return out, nil
 }
 
-func writeMapAsPairs(file *excelize.File, sheet string, m map[string]interface{}) error {
-	file.SetCellValue(sheet, "A1", "Field")
-	file.SetCellValue(sheet, "B1", "Value")
+func writeMapAsPairs(file *excelize.File, sheet string, schema reportExportSchema, m map[string]interface{}) error {
+	file.SetCellValue(sheet, "A1", schema.Title)
+	file.SetCellValue(sheet, "A3", "Field")
+	file.SetCellValue(sheet, "B3", "Value")
 
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := orderedColumns(schema, mapKeys(m))
 
-	row := 2
-	for _, k := range keys {
-		file.SetCellValue(sheet, fmt.Sprintf("A%d", row), k)
-		file.SetCellValue(sheet, fmt.Sprintf("B%d", row), formatCellValue(m[k]))
+	row := 4
+	for _, key := range keys {
+		file.SetCellValue(sheet, fmt.Sprintf("A%d", row), labelForKey(key))
+		file.SetCellValue(sheet, fmt.Sprintf("B%d", row), formatDisplayValue(key, m[key]))
 		row++
 	}
 
-	if err := styleHeaderRow(file, sheet, 2); err != nil {
+	if err := styleTitleRow(file, sheet, "A1:B1"); err != nil {
 		return err
 	}
-	_, _ = file.NewStyle(&excelize.Style{Alignment: &excelize.Alignment{WrapText: true}})
-	_ = file.AutoFilter(sheet, fmt.Sprintf("A1:B%d", row-1), []excelize.AutoFilterOptions{})
-	_ = file.SetPanes(sheet, &excelize.Panes{Freeze: true, Split: true, XSplit: 0, YSplit: 1})
+	if err := styleHeaderRow(file, sheet, 2, 3); err != nil {
+		return err
+	}
+	_ = file.AutoFilter(sheet, fmt.Sprintf("A3:B%d", row-1), []excelize.AutoFilterOptions{})
+	_ = file.SetPanes(sheet, &excelize.Panes{Freeze: true, Split: true, XSplit: 0, YSplit: 3, TopLeftCell: "A4"})
 	_ = file.SetColWidth(sheet, "A", "A", 28)
 	_ = file.SetColWidth(sheet, "B", "B", 60)
 	return nil
 }
 
-func writeListAsTable(file *excelize.File, sheet string, list []interface{}) error {
+func writeListAsTable(file *excelize.File, sheet string, schema reportExportSchema, list []interface{}) error {
 	if len(list) == 0 {
-		file.SetCellValue(sheet, "A1", "No data")
+		file.SetCellValue(sheet, "A1", schema.Title)
+		file.SetCellValue(sheet, "A3", "No data")
+		_ = styleTitleRow(file, sheet, "A1:B1")
 		return nil
 	}
 
-	// Determine columns from maps; fallback to JSON column.
 	columnSet := map[string]struct{}{}
-	ordered := []string{}
-	addCol := func(k string) {
-		if _, ok := columnSet[k]; ok {
-			return
-		}
-		columnSet[k] = struct{}{}
-		ordered = append(ordered, k)
-	}
-
 	for i := 0; i < len(list) && i < 200; i++ {
 		if rowMap, ok := list[i].(map[string]interface{}); ok {
-			// stable: first row keys alphabetical, then any new keys appended alphabetical
-			keys := make([]string, 0, len(rowMap))
-			for k := range rowMap {
-				keys = append(keys, k)
-			}
-			sort.Strings(keys)
-			for _, k := range keys {
-				addCol(k)
+			for _, key := range mapKeys(rowMap) {
+				columnSet[key] = struct{}{}
 			}
 		} else {
-			addCol("value")
+			columnSet["value"] = struct{}{}
 		}
 	}
-	if len(ordered) == 0 {
-		ordered = []string{"value"}
+	if len(columnSet) == 0 {
+		columnSet["value"] = struct{}{}
 	}
 
-	// Header row
-	for i, col := range ordered {
-		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
-		file.SetCellValue(sheet, cell, col)
+	ordered := make([]string, 0, len(columnSet))
+	for key := range columnSet {
+		ordered = append(ordered, key)
 	}
-	if err := styleHeaderRow(file, sheet, len(ordered)); err != nil {
+	ordered = orderedColumns(schema, ordered)
+
+	file.SetCellValue(sheet, "A1", schema.Title)
+	for i, col := range ordered {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 3)
+		file.SetCellValue(sheet, cell, labelForKey(col))
+	}
+	if err := styleTitleRow(file, sheet, fmt.Sprintf("A1:%s1", mustColumnName(max(1, len(ordered))))); err != nil {
 		return err
 	}
-	_ = file.SetPanes(sheet, &excelize.Panes{Freeze: true, Split: true, XSplit: 0, YSplit: 1})
+	if err := styleHeaderRow(file, sheet, len(ordered), 3); err != nil {
+		return err
+	}
+	_ = file.SetPanes(sheet, &excelize.Panes{Freeze: true, Split: true, XSplit: 0, YSplit: 3, TopLeftCell: "A4"})
 
-	// Data rows
 	for r, raw := range list {
-		rowIdx := r + 2
+		rowIdx := r + 4
 		rowMap, isMap := raw.(map[string]interface{})
 		for c, col := range ordered {
 			cell, _ := excelize.CoordinatesToCellName(c+1, rowIdx)
 			if isMap {
-				file.SetCellValue(sheet, cell, formatCellValue(rowMap[col]))
+				file.SetCellValue(sheet, cell, formatDisplayValue(col, rowMap[col]))
 			} else if col == "value" {
-				file.SetCellValue(sheet, cell, formatCellValue(raw))
+				file.SetCellValue(sheet, cell, formatDisplayValue(col, raw))
 			}
 		}
 	}
 
-	lastCol, _ := excelize.ColumnNumberToName(len(ordered))
-	lastRow := len(list) + 1
-	_ = file.AutoFilter(
-		sheet,
-		fmt.Sprintf("A1:%s%d", lastCol, lastRow),
-		[]excelize.AutoFilterOptions{},
-	)
-
-	// Basic column widths
+	lastCol := mustColumnName(len(ordered))
+	lastRow := len(list) + 3
+	_ = file.AutoFilter(sheet, fmt.Sprintf("A3:%s%d", lastCol, lastRow), []excelize.AutoFilterOptions{})
 	for i := 1; i <= len(ordered); i++ {
-		colName, _ := excelize.ColumnNumberToName(i)
+		colName := mustColumnName(i)
 		_ = file.SetColWidth(sheet, colName, colName, 18)
 	}
 	return nil
 }
 
-func styleHeaderRow(file *excelize.File, sheet string, columnCount int) error {
+func styleTitleRow(file *excelize.File, sheet, cellRange string) error {
+	styleID, err := file.NewStyle(&excelize.Style{
+		Font:      &excelize.Font{Bold: true, Size: 14},
+		Alignment: &excelize.Alignment{Horizontal: "left", Vertical: "center"},
+	})
+	if err != nil {
+		return err
+	}
+	return file.SetCellStyle(sheet, strings.Split(cellRange, ":")[0], strings.Split(cellRange, ":")[1], styleID)
+}
+
+func styleHeaderRow(file *excelize.File, sheet string, columnCount int, row int) error {
 	styleID, err := file.NewStyle(&excelize.Style{
 		Font:      &excelize.Font{Bold: true},
 		Fill:      excelize.Fill{Type: "pattern", Color: []string{"#EEEEEE"}, Pattern: 1},
@@ -173,8 +334,8 @@ func styleHeaderRow(file *excelize.File, sheet string, columnCount int) error {
 	if err != nil {
 		return err
 	}
-	lastCol, _ := excelize.ColumnNumberToName(columnCount)
-	return file.SetCellStyle(sheet, "A1", fmt.Sprintf("%s1", lastCol), styleID)
+	lastCol := mustColumnName(columnCount)
+	return file.SetCellStyle(sheet, fmt.Sprintf("A%d", row), fmt.Sprintf("%s%d", lastCol, row), styleID)
 }
 
 func formatCellValue(v interface{}) interface{} {
@@ -195,17 +356,21 @@ func formatCellValue(v interface{}) interface{} {
 	}
 }
 
-// GeneratePDF creates a minimal PDF file containing the JSON representation
-// of the provided data. This implementation avoids external dependencies and
-// writes a simple single-page PDF with the text content.
-func GeneratePDF(data interface{}) ([]byte, error) {
-	jsonData, err := json.MarshalIndent(data, "", "  ")
+// GeneratePDF creates a minimal PDF file containing a labeled JSON-style
+// representation of the provided report data.
+func GeneratePDF(endpoint string, data interface{}) ([]byte, error) {
+	schema := lookupReportSchema(endpoint)
+	normalized, err := normalizeForTabular(data)
+	if err != nil {
+		return nil, err
+	}
+	labeled := relabelNormalizedData(schema, normalized)
+	jsonData, err := json.MarshalIndent(labeled, "", "  ")
 	if err != nil {
 		return nil, err
 	}
 
-	// Escape characters that are special in PDF syntax
-	text := string(jsonData)
+	text := schema.Title + "\n\n" + string(jsonData)
 	text = strings.ReplaceAll(text, "\\", "\\\\")
 	text = strings.ReplaceAll(text, "(", "\\(")
 	text = strings.ReplaceAll(text, ")", "\\)")
@@ -277,4 +442,269 @@ func splitPdfLines(s string, maxWidth int, maxLines int) []string {
 		}
 	}
 	return out
+}
+
+func lookupReportSchema(endpoint string) reportExportSchema {
+	normalized := normalizeReportEndpoint(endpoint)
+	if schema, ok := reportExportSchemas[normalized]; ok {
+		return schema
+	}
+	return reportExportSchema{
+		Title:         "Report",
+		PreferredCols: nil,
+	}
+}
+
+func ReportExportFilename(endpoint, ext string) string {
+	schema := lookupReportSchema(endpoint)
+	base := slugifyReportTitle(schema.Title)
+	if base == "" {
+		base = "report"
+	}
+	ext = strings.TrimSpace(strings.TrimPrefix(ext, "."))
+	if ext == "" {
+		return base
+	}
+	return base + "." + ext
+}
+
+func normalizeReportEndpoint(endpoint string) string {
+	if endpoint == "" {
+		return ""
+	}
+	if idx := strings.Index(endpoint, "/reports/"); idx >= 0 {
+		return endpoint[idx:]
+	}
+	return endpoint
+}
+
+func orderedColumns(schema reportExportSchema, columns []string) []string {
+	sorted := append([]string(nil), columns...)
+	sort.Strings(sorted)
+	if len(schema.PreferredCols) == 0 {
+		return sorted
+	}
+
+	remaining := make(map[string]struct{}, len(sorted))
+	for _, col := range sorted {
+		remaining[col] = struct{}{}
+	}
+
+	out := make([]string, 0, len(sorted))
+	for _, col := range schema.PreferredCols {
+		if _, ok := remaining[col]; ok {
+			out = append(out, col)
+			delete(remaining, col)
+		}
+	}
+	for _, col := range sorted {
+		if _, ok := remaining[col]; ok {
+			out = append(out, col)
+		}
+	}
+	return out
+}
+
+func labelForKey(key string) string {
+	key = strings.TrimSpace(key)
+	if label, ok := reportExportLabels[key]; ok {
+		return label
+	}
+	return humanizeKey(key)
+}
+
+func formatDisplayValue(key string, value interface{}) interface{} {
+	if value == nil {
+		return ""
+	}
+
+	if mapped := mapLabeledValue(key, value); mapped != nil {
+		return mapped
+	}
+
+	switch v := value.(type) {
+	case string:
+		if looksLikeDateKey(key) {
+			if parsed, err := time.Parse(time.RFC3339, v); err == nil {
+				return parsed.Format("2006-01-02")
+			}
+			if parsed, err := time.Parse("2006-01-02", v); err == nil {
+				return parsed.Format("2006-01-02")
+			}
+		}
+		return v
+	case float64:
+		if looksLikePercentKey(key) {
+			return fmt.Sprintf("%.2f%%", v)
+		}
+		if looksLikeQuantityKey(key) {
+			if v == float64(int64(v)) {
+				return fmt.Sprintf("%.0f", v)
+			}
+			return fmt.Sprintf("%.3f", v)
+		}
+		return fmt.Sprintf("%.2f", v)
+	case bool, int, int64, int32, uint, uint64:
+		return formatCellValue(v)
+	case map[string]interface{}:
+		return relabelMap(v, reportExportSchema{})
+	case []interface{}:
+		return relabelSlice(v, reportExportSchema{})
+	default:
+		return formatCellValue(v)
+	}
+}
+
+func mapLabeledValue(key string, value interface{}) interface{} {
+	val, ok := value.(string)
+	if !ok {
+		return nil
+	}
+	if labelMap, ok := reportExportValueLabels[key]; ok {
+		if label, ok := labelMap[val]; ok {
+			return label
+		}
+		return humanizeKey(val)
+	}
+	if key == "status" || key == "transaction_type" {
+		return humanizeKey(val)
+	}
+	return nil
+}
+
+func looksLikeDateKey(key string) bool {
+	return key == "date" || key == "day" || strings.HasSuffix(key, "_date") || strings.HasSuffix(key, "_at")
+}
+
+func looksLikePercentKey(key string) bool {
+	return strings.Contains(key, "rate") || strings.Contains(key, "percent")
+}
+
+func looksLikeQuantityKey(key string) bool {
+	return key == "quantity" || strings.HasSuffix(key, "_qty") || key == "transactions"
+}
+
+func relabelNormalizedData(schema reportExportSchema, data interface{}) interface{} {
+	switch v := data.(type) {
+	case map[string]interface{}:
+		return relabelMap(v, schema)
+	case []interface{}:
+		return relabelSlice(v, schema)
+	default:
+		return formatDisplayValue("value", v)
+	}
+}
+
+func relabelMap(m map[string]interface{}, schema reportExportSchema) map[string]interface{} {
+	keys := orderedColumns(schema, mapKeys(m))
+	out := make(map[string]interface{}, len(m))
+	for _, key := range keys {
+		out[labelForKey(key)] = relabelValue(key, m[key], schema)
+	}
+	return out
+}
+
+func relabelSlice(list []interface{}, schema reportExportSchema) []interface{} {
+	out := make([]interface{}, 0, len(list))
+	for _, item := range list {
+		switch v := item.(type) {
+		case map[string]interface{}:
+			out = append(out, relabelMap(v, schema))
+		case []interface{}:
+			out = append(out, relabelSlice(v, schema))
+		default:
+			out = append(out, formatDisplayValue("value", v))
+		}
+	}
+	return out
+}
+
+func relabelValue(key string, value interface{}, schema reportExportSchema) interface{} {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		return relabelMap(v, reportExportSchema{})
+	case []interface{}:
+		return relabelSlice(v, reportExportSchema{})
+	default:
+		return formatDisplayValue(key, v)
+	}
+}
+
+func mapKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func humanizeKey(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return raw
+	}
+	parts := strings.FieldsFunc(strings.ReplaceAll(raw, "-", "_"), func(r rune) bool {
+		return r == '_'
+	})
+	if len(parts) == 0 {
+		return raw
+	}
+	for i, part := range parts {
+		lower := strings.ToLower(part)
+		parts[i] = strings.ToUpper(lower[:1]) + lower[1:]
+	}
+	return strings.Join(parts, " ")
+}
+
+func sanitizeSheetName(name string) string {
+	if strings.TrimSpace(name) == "" {
+		return "Report"
+	}
+	replacer := strings.NewReplacer(":", " ", "/", " ", "\\", " ", "?", "", "*", "", "[", "", "]", "")
+	name = replacer.Replace(strings.TrimSpace(name))
+	if len(name) > 31 {
+		name = name[:31]
+	}
+	if name == "" {
+		return "Report"
+	}
+	return name
+}
+
+func slugifyReportTitle(title string) string {
+	title = strings.TrimSpace(strings.ToLower(title))
+	if title == "" {
+		return ""
+	}
+	var out strings.Builder
+	prevDash := false
+	for _, r := range title {
+		switch {
+		case r >= 'a' && r <= 'z':
+			out.WriteRune(r)
+			prevDash = false
+		case r >= '0' && r <= '9':
+			out.WriteRune(r)
+			prevDash = false
+		default:
+			if !prevDash && out.Len() > 0 {
+				out.WriteRune('-')
+				prevDash = true
+			}
+		}
+	}
+	slug := strings.Trim(out.String(), "-")
+	return slug
+}
+
+func mustColumnName(n int) string {
+	col, _ := excelize.ColumnNumberToName(max(1, n))
+	return col
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

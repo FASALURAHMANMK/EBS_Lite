@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -26,22 +27,23 @@ func NewReportsHandler() *ReportsHandler {
 // the requested format.
 func (h *ReportsHandler) handleReportResponse(c *gin.Context, message string, data interface{}) {
 	format := c.Query("format")
+	endpoint := c.FullPath()
 	switch format {
 	case "excel":
-		content, err := utils.GenerateExcel(data)
+		content, err := utils.GenerateExcel(endpoint, data)
 		if err != nil {
 			utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate Excel", err)
 			return
 		}
-		c.Header("Content-Disposition", "attachment; filename=report.xlsx")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", utils.ReportExportFilename(endpoint, "xlsx")))
 		c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", content)
 	case "pdf":
-		content, err := utils.GeneratePDF(data)
+		content, err := utils.GeneratePDF(endpoint, data)
 		if err != nil {
 			utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate PDF", err)
 			return
 		}
-		c.Header("Content-Disposition", "attachment; filename=report.pdf")
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", utils.ReportExportFilename(endpoint, "pdf")))
 		c.Data(http.StatusOK, "application/pdf", content)
 	default:
 		utils.SuccessResponse(c, message, data)

@@ -146,7 +146,6 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
                   items: const [
                     DropdownMenuItem(value: 'payment', child: Text('Payment')),
                     DropdownMenuItem(value: 'receipt', child: Text('Receipt')),
-                    DropdownMenuItem(value: 'journal', child: Text('Journal')),
                   ],
                   onChanged: (v) => setInner(() => type = v ?? type),
                 ),

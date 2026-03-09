@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
@@ -17,10 +18,19 @@ func NewVoucherService() *VoucherService {
 }
 
 func (s *VoucherService) CreateVoucher(companyID, userID int, vType string, req *models.CreateVoucherRequest) (int, error) {
+	normalizedType := strings.ToLower(strings.TrimSpace(vType))
+	switch normalizedType {
+	case "payment", "receipt":
+	case "journal":
+		return 0, fmt.Errorf("journal vouchers require balanced multi-line entries and are not supported by this API")
+	default:
+		return 0, fmt.Errorf("invalid voucher type")
+	}
+
 	var id int
 	err := s.db.QueryRow(`INSERT INTO vouchers (company_id, type, account_id, amount, reference, description, created_by, updated_by)
                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING voucher_id`,
-		companyID, vType, req.AccountID, req.Amount, req.Reference, req.Description, userID, userID).Scan(&id)
+		companyID, normalizedType, req.AccountID, req.Amount, req.Reference, req.Description, userID, userID).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create voucher: %w", err)
 	}
