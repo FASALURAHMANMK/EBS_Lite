@@ -51,6 +51,14 @@ _FILE_TRANSFER_DOWNLOAD_RE = re.compile(
     re.MULTILINE,
 )
 
+_NAMED_ENDPOINT_LITERAL_RE = re.compile(
+    # Catch helper patterns like:
+    #   _downloadAndShare(endpoint: '/customers/export', ...)
+    #   someFn(endpoint: "/inventory/import-template")
+    r"\bendpoint\s*:\s*['\"]([^'\"]+)['\"]",
+    re.MULTILINE,
+)
+
 
 def _norm_path_param_syntax(path: str) -> str:
     # Normalize both OpenAPI `{id}` and Dart `$id` / `${id}` to a common token.
@@ -89,6 +97,16 @@ def read_flutter_calls(flutter_lib_dir: Path) -> list[FlutterCall]:
             )
         # Also detect endpoints called via shared download helper (exports).
         for m in _FILE_TRANSFER_DOWNLOAD_RE.finditer(text):
+            raw_path = m.group(1)
+            calls.append(
+                FlutterCall(
+                    method="GET",
+                    path=_norm_flutter_path(raw_path),
+                    file=str(dart_file.as_posix()),
+                )
+            )
+        # Also detect literal endpoints passed into helper methods.
+        for m in _NAMED_ENDPOINT_LITERAL_RE.finditer(text):
             raw_path = m.group(1)
             calls.append(
                 FlutterCall(

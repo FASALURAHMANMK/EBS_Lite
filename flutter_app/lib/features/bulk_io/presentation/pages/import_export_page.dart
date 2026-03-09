@@ -93,6 +93,16 @@ class _ImportExportPageState extends ConsumerState<ImportExportPage> {
                     .read(importExportRepositoryProvider)
                     .exportCustomers();
               }),
+              onTemplate: () => _run(() async {
+                await ref
+                    .read(importExportRepositoryProvider)
+                    .downloadCustomersTemplate();
+              }),
+              onExample: () => _run(() async {
+                await ref
+                    .read(importExportRepositoryProvider)
+                    .downloadCustomersExample();
+              }),
             ),
             const SizedBox(height: 12),
             _CardSection(
@@ -125,6 +135,16 @@ class _ImportExportPageState extends ConsumerState<ImportExportPage> {
                     .read(importExportRepositoryProvider)
                     .exportSuppliers();
               }),
+              onTemplate: () => _run(() async {
+                await ref
+                    .read(importExportRepositoryProvider)
+                    .downloadSuppliersTemplate();
+              }),
+              onExample: () => _run(() async {
+                await ref
+                    .read(importExportRepositoryProvider)
+                    .downloadSuppliersExample();
+              }),
             ),
             const SizedBox(height: 12),
             _CardSection(
@@ -141,20 +161,42 @@ class _ImportExportPageState extends ConsumerState<ImportExportPage> {
                 if (path == null || path.isEmpty) {
                   throw Exception('File path unavailable');
                 }
-                await ref
+                final counts = await ref
                     .read(importExportRepositoryProvider)
                     .importInventory(filePath: path, filename: f.name);
                 if (!mounted) return;
+
+                var msg = 'Inventory import completed';
+                if (counts != null && counts.isNotEmpty) {
+                  final parts = <String>[];
+                  final created = counts['created'];
+                  final updated = counts['updated'];
+                  final skipped = counts['skipped'];
+                  final errors = counts['errors'];
+                  if (created != null) parts.add('$created created');
+                  if (updated != null) parts.add('$updated updated');
+                  if (skipped != null) parts.add('$skipped skipped');
+                  if (errors != null) parts.add('$errors errors');
+                  if (parts.isNotEmpty) msg = '$msg (${parts.join(', ')})';
+                }
                 messenger
                   ..hideCurrentSnackBar()
-                  ..showSnackBar(const SnackBar(
-                    content: Text('Inventory import completed'),
-                  ));
+                  ..showSnackBar(SnackBar(content: Text(msg)));
               }),
               onExport: () => _run(() async {
                 await ref
                     .read(importExportRepositoryProvider)
                     .exportInventory();
+              }),
+              onTemplate: () => _run(() async {
+                await ref
+                    .read(importExportRepositoryProvider)
+                    .downloadInventoryTemplate();
+              }),
+              onExample: () => _run(() async {
+                await ref
+                    .read(importExportRepositoryProvider)
+                    .downloadInventoryExample();
               }),
             ),
             const SizedBox(height: 16),
@@ -193,6 +235,8 @@ class _CardSection extends StatelessWidget {
     required this.canExport,
     required this.onImport,
     required this.onExport,
+    required this.onTemplate,
+    required this.onExample,
   });
 
   final String title;
@@ -202,6 +246,8 @@ class _CardSection extends StatelessWidget {
   final bool canExport;
   final VoidCallback onImport;
   final VoidCallback onExport;
+  final VoidCallback onTemplate;
+  final VoidCallback onExample;
 
   @override
   Widget build(BuildContext context) {
@@ -248,6 +294,26 @@ class _CardSection extends StatelessWidget {
                     onPressed: canExport ? onExport : null,
                     icon: const Icon(Icons.download_rounded),
                     label: const Text('Export'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: canImport ? onTemplate : null,
+                    icon: const Icon(Icons.description_outlined),
+                    label: const Text('Template'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: canImport ? onExample : null,
+                    icon: const Icon(Icons.verified_outlined),
+                    label: const Text('Example'),
                   ),
                 ),
               ],

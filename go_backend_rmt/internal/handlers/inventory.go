@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"io"
 	"net/http"
 	"strconv"
 
@@ -315,6 +316,7 @@ func (h *InventoryHandler) ImportInventory(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
+	userID := c.GetInt("user_id")
 	file, err := c.FormFile("file")
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "File is required", err)
@@ -326,11 +328,17 @@ func (h *InventoryHandler) ImportInventory(c *gin.Context) {
 		return
 	}
 	defer f.Close()
-	if err := h.inventoryService.ImportInventory(companyID, f); err != nil {
+	data, err := io.ReadAll(f)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to read file", err)
+		return
+	}
+	res, err := h.inventoryService.ImportInventory(companyID, userID, data)
+	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to import inventory", err)
 		return
 	}
-	utils.SuccessResponse(c, "Inventory imported successfully", nil)
+	utils.SuccessResponse(c, "Inventory import completed", res)
 }
 
 // GET /inventory/export
@@ -345,7 +353,42 @@ func (h *InventoryHandler) ExportInventory(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to export inventory", err)
 		return
 	}
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	c.Header("Content-Disposition", "attachment; filename=inventory.xlsx")
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+}
+
+// GET /inventory/import-template
+func (h *InventoryHandler) InventoryImportTemplate(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	data, err := h.inventoryService.InventoryImportTemplateXLSX(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate template", err)
+		return
+	}
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", "attachment; filename=inventory_template.xlsx")
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+}
+
+// GET /inventory/import-example
+func (h *InventoryHandler) InventoryImportExample(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	data, err := h.inventoryService.InventoryImportExampleXLSX(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate example", err)
+		return
+	}
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", "attachment; filename=inventory_example.xlsx")
 	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }
 

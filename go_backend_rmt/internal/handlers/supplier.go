@@ -238,13 +238,13 @@ func (h *SupplierHandler) ImportSuppliers(c *gin.Context) {
 		return
 	}
 
-	count, err := h.supplierService.ImportSuppliers(companyID, userID, data)
+	res, err := h.supplierService.ImportSuppliersXLSX(companyID, userID, data)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to import suppliers", err)
 		return
 	}
 
-	utils.SuccessResponse(c, "Suppliers imported successfully", map[string]int{"count": count})
+	utils.SuccessResponse(c, "Suppliers import completed", res)
 }
 
 // GET /suppliers/export
@@ -263,5 +263,43 @@ func (h *SupplierHandler) ExportSuppliers(c *gin.Context) {
 
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	c.Header("Content-Disposition", "attachment; filename=suppliers.xlsx")
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+}
+
+// GET /suppliers/import-template
+func (h *SupplierHandler) SuppliersImportTemplate(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	data, err := h.supplierService.SuppliersImportTemplateXLSX()
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate template", err)
+		return
+	}
+
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", "attachment; filename=suppliers_template.xlsx")
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+}
+
+// GET /suppliers/import-example
+func (h *SupplierHandler) SuppliersImportExample(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	data, err := h.supplierService.SuppliersImportExampleXLSX()
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate example", err)
+		return
+	}
+
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", "attachment; filename=suppliers_example.xlsx")
 	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }

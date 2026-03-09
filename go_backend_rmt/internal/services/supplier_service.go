@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
+	"erp-backend/internal/utils"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -348,57 +348,89 @@ func (s *SupplierService) DeleteSupplier(supplierID, companyID, userID int) erro
 
 // ImportSuppliers processes supplier data from an uploaded Excel file
 func (s *SupplierService) ImportSuppliers(companyID, userID int, data []byte) (int, error) {
+	res, err := s.ImportSuppliersXLSX(companyID, userID, data)
+	if err != nil {
+		return 0, err
+	}
+	return res.Created, nil
+}
+
+// ImportSuppliersXLSX returns a detailed import result for bulk onboarding.
+func (s *SupplierService) ImportSuppliersXLSX(companyID, userID int, data []byte) (*models.ImportResult, error) {
 	xl, err := excelize.OpenReader(bytes.NewReader(data))
 	if err != nil {
-		return 0, fmt.Errorf("invalid Excel file: %w", err)
+		return nil, fmt.Errorf("invalid Excel file: %w", err)
 	}
 
 	sheetName := xl.GetSheetName(0)
 	rows, err := xl.GetRows(sheetName)
 	if err != nil {
-		return 0, fmt.Errorf("failed to read sheet: %w", err)
+		return nil, fmt.Errorf("failed to read sheet: %w", err)
+	}
+	if len(rows) == 0 {
+		return &models.ImportResult{}, nil
 	}
 
-	created := 0
-	for i, row := range rows {
-		if i == 0 || len(row) == 0 {
+	hdr := headerIndex(rows[0])
+	nameIdx, ok := firstHeaderMatch(hdr, "name")
+	if !ok {
+		return nil, fmt.Errorf("missing required column: Name")
+	}
+	contactIdx, _ := firstHeaderMatch(hdr, "contact person", "contact_person")
+	phoneIdx, _ := firstHeaderMatch(hdr, "phone")
+	emailIdx, _ := firstHeaderMatch(hdr, "email")
+	addressIdx, _ := firstHeaderMatch(hdr, "address")
+	taxIdx, _ := firstHeaderMatch(hdr, "tax number", "tax_number", "tax")
+	termsIdx, _ := firstHeaderMatch(hdr, "payment terms", "payment_terms")
+	creditIdx, _ := firstHeaderMatch(hdr, "credit limit", "credit_limit")
+	activeIdx, hasActive := firstHeaderMatch(hdr, "is active", "is_active", "active")
+
+	res := &models.ImportResult{Errors: make([]models.ImportRowError, 0)}
+	for i, row := range rows[1:] {
+		rowNum := i + 2
+		name := cell(row, nameIdx)
+		if name == "" {
+			res.Skipped++
 			continue
 		}
-		req := models.CreateSupplierRequest{Name: row[0]}
-		if len(row) > 1 && row[1] != "" {
-			req.ContactPerson = &row[1]
+		req := models.CreateSupplierRequest{
+			Name:          name,
+			ContactPerson: utils.EmptyToNil(cell(row, contactIdx)),
+			Phone:         utils.EmptyToNil(cell(row, phoneIdx)),
+			Email:         utils.EmptyToNil(cell(row, emailIdx)),
+			Address:       utils.EmptyToNil(cell(row, addressIdx)),
+			TaxNumber:     utils.EmptyToNil(cell(row, taxIdx)),
 		}
-		if len(row) > 2 && row[2] != "" {
-			req.Phone = &row[2]
+		if v, ok := parseIntLoose(cell(row, termsIdx)); ok {
+			req.PaymentTerms = &v
 		}
-		if len(row) > 3 && row[3] != "" {
-			req.Email = &row[3]
+		if v, ok := parseFloatLoose(cell(row, creditIdx)); ok {
+			req.CreditLimit = &v
 		}
-		if len(row) > 4 && row[4] != "" {
-			req.Address = &row[4]
-		}
-		if len(row) > 5 && row[5] != "" {
-			req.TaxNumber = &row[5]
-		}
-		if len(row) > 6 && row[6] != "" {
-			if v, err := strconv.Atoi(row[6]); err == nil {
-				req.PaymentTerms = &v
-			}
-		}
-		if len(row) > 7 && row[7] != "" {
-			if v, err := strconv.ParseFloat(row[7], 64); err == nil {
-				req.CreditLimit = &v
-			}
-		}
-		if req.Name == "" {
+
+		if err := utils.ValidateStruct(&req); err != nil {
+			res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Message: "validation failed"})
+			res.Skipped++
 			continue
 		}
-		if _, err := s.CreateSupplier(companyID, userID, &req); err == nil {
-			created++
+
+		sup, err := s.CreateSupplier(companyID, userID, &req)
+		if err != nil {
+			res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Message: err.Error()})
+			res.Skipped++
+			continue
+		}
+		res.Created++
+
+		if hasActive {
+			if b, ok := parseBoolLoose(cell(row, activeIdx)); ok && b == false {
+				_, _ = s.UpdateSupplier(sup.SupplierID, companyID, userID, &models.UpdateSupplierRequest{IsActive: &b})
+			}
 		}
 	}
 
-	return created, nil
+	res.Count = res.Created
+	return res, nil
 }
 
 // ExportSuppliers returns supplier data as an Excel file
@@ -412,11 +444,13 @@ func (s *SupplierService) ExportSuppliers(companyID int) ([]byte, error) {
 	sheet := "Suppliers"
 	f.SetSheetName("Sheet1", sheet)
 
-	headers := []string{"Name", "Contact Person", "Phone", "Email", "Address", "Tax Number", "Payment Terms", "Credit Limit"}
+	headers := []string{"Name", "Contact Person", "Phone", "Email", "Address", "Tax Number", "Payment Terms", "Credit Limit", "Is Active"}
 	for i, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		f.SetCellValue(sheet, cell, h)
 	}
+	_ = f.SetPanes(sheet, &excelize.Panes{Freeze: true, Split: true, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"})
+	_ = f.AutoFilter(sheet, "A1:I1", nil)
 
 	for idx, sup := range suppliers {
 		row := idx + 2
@@ -446,6 +480,8 @@ func (s *SupplierService) ExportSuppliers(companyID int) ([]byte, error) {
 		f.SetCellValue(sheet, cell, sup.PaymentTerms)
 		cell, _ = excelize.CoordinatesToCellName(8, row)
 		f.SetCellValue(sheet, cell, sup.CreditLimit)
+		cell, _ = excelize.CoordinatesToCellName(9, row)
+		f.SetCellValue(sheet, cell, sup.IsActive)
 	}
 
 	buf, err := f.WriteToBuffer()
@@ -453,6 +489,50 @@ func (s *SupplierService) ExportSuppliers(companyID int) ([]byte, error) {
 		return nil, fmt.Errorf("failed to generate file: %w", err)
 	}
 
+	return buf.Bytes(), nil
+}
+
+func (s *SupplierService) SuppliersImportTemplateXLSX() ([]byte, error) {
+	f := excelize.NewFile()
+	sheet := "Suppliers"
+	f.SetSheetName("Sheet1", sheet)
+	headers := []string{"Name", "Contact Person", "Phone", "Email", "Address", "Tax Number", "Payment Terms", "Credit Limit", "Is Active"}
+	for i, h := range headers {
+		cellName, _ := excelize.CoordinatesToCellName(i+1, 1)
+		f.SetCellValue(sheet, cellName, h)
+	}
+	_ = f.SetPanes(sheet, &excelize.Panes{Freeze: true, Split: true, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"})
+	_ = f.AutoFilter(sheet, "A1:I1", nil)
+	buf, err := f.WriteToBuffer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate file: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func (s *SupplierService) SuppliersImportExampleXLSX() ([]byte, error) {
+	b, err := s.SuppliersImportTemplateXLSX()
+	if err != nil {
+		return nil, err
+	}
+	f, err := excelize.OpenReader(bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+	sheet := "Suppliers"
+	f.SetCellValue(sheet, "A2", "ABC Trading")
+	f.SetCellValue(sheet, "B2", "Mr. Ali")
+	f.SetCellValue(sheet, "C2", "5551000")
+	f.SetCellValue(sheet, "D2", "supplier@example.com")
+	f.SetCellValue(sheet, "E2", "Muscat")
+	f.SetCellValue(sheet, "F2", "TAX-999")
+	f.SetCellValue(sheet, "G2", 15)
+	f.SetCellValue(sheet, "H2", 0)
+	f.SetCellValue(sheet, "I2", true)
+	buf, err := f.WriteToBuffer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate file: %w", err)
+	}
 	return buf.Bytes(), nil
 }
 

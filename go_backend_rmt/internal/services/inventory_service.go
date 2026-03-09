@@ -1,14 +1,18 @@
 package services
 
 import (
+	"bytes"
 	"database/sql"
-	"encoding/csv"
 	"fmt"
-	"io"
+	"strings"
 	"time"
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
+	"erp-backend/internal/utils"
+
+	"github.com/lib/pq"
+	"github.com/xuri/excelize/v2"
 )
 
 type InventoryService struct {
@@ -882,39 +886,799 @@ func (s *InventoryService) GetProductSummary(companyID, productID int) (*models.
 	return summary, nil
 }
 
-// ImportInventory processes inventory data from an uploaded file stream
-func (s *InventoryService) ImportInventory(companyID int, r io.Reader) error {
-	reader := csv.NewReader(r)
+var inventoryImportHeaders = []string{
+	"SKU",
+	"Name",
+	"Description",
+	"Category",
+	"Brand",
+	"Unit",
+	"Tax",
+	"Default Supplier",
+	"Cost Price",
+	"Selling Price",
+	"Reorder Level",
+	"Weight",
+	"Dimensions",
+	"Is Serialized",
+	"Is Active",
+	"Barcode",
+	"Pack Size",
+	"Barcode Cost Price",
+	"Barcode Selling Price",
+	"Is Primary Barcode",
+}
 
-	// Attempt to read header row; if file is empty just return
-	if _, err := reader.Read(); err != nil {
-		if err == io.EOF {
-			return nil
-		}
-		return fmt.Errorf("failed to read header: %w", err)
+type inventoryGroup struct {
+	SKU             string
+	Name            string
+	Description     *string
+	Category        *string
+	Brand           *string
+	Unit            *string
+	Tax             string
+	DefaultSupplier *string
+	CostPrice       *float64
+	SellingPrice    *float64
+	ReorderLevel    *int
+	Weight          *float64
+	Dimensions      *string
+	IsSerialized    *bool
+	IsActive        *bool
+	Barcodes        []models.ProductBarcode
+}
+
+// ImportInventory imports product master data and barcodes via Excel (.xlsx).
+// If a product already exists (SKU or barcode match), it updates the product and replaces its barcodes.
+func (s *InventoryService) ImportInventory(companyID, userID int, data []byte) (*models.ImportResult, error) {
+	xl, err := excelize.OpenReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("invalid Excel file: %w", err)
 	}
 
-	for {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
+	sheetName := xl.GetSheetName(0)
+	rows, err := xl.GetRows(sheetName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read sheet: %w", err)
+	}
+	if len(rows) == 0 {
+		return &models.ImportResult{}, nil
+	}
+
+	hdr := headerIndex(rows[0])
+	skuIdx, _ := firstHeaderMatch(hdr, "sku")
+	nameIdx, ok := firstHeaderMatch(hdr, "name")
+	if !ok {
+		return nil, fmt.Errorf("missing required column: Name")
+	}
+	taxIdx, ok := firstHeaderMatch(hdr, "tax", "tax name", "tax id", "tax_id")
+	if !ok {
+		return nil, fmt.Errorf("missing required column: Tax")
+	}
+	barcodeIdx, ok := firstHeaderMatch(hdr, "barcode")
+	if !ok {
+		return nil, fmt.Errorf("missing required column: Barcode")
+	}
+
+	descIdx, _ := firstHeaderMatch(hdr, "description")
+	categoryIdx, _ := firstHeaderMatch(hdr, "category", "category name", "category_name")
+	brandIdx, _ := firstHeaderMatch(hdr, "brand", "brand name", "brand_name")
+	unitIdx, _ := firstHeaderMatch(hdr, "unit", "unit symbol", "unit name", "unit_name")
+	supplierIdx, _ := firstHeaderMatch(hdr, "default supplier", "supplier", "default_supplier")
+	costIdx, _ := firstHeaderMatch(hdr, "cost price", "cost_price")
+	sellIdx, _ := firstHeaderMatch(hdr, "selling price", "selling_price")
+	reorderIdx, _ := firstHeaderMatch(hdr, "reorder level", "reorder_level")
+	weightIdx, _ := firstHeaderMatch(hdr, "weight")
+	dimIdx, _ := firstHeaderMatch(hdr, "dimensions")
+	serializedIdx, _ := firstHeaderMatch(hdr, "is serialized", "is_serialized", "serialized")
+	activeIdx, _ := firstHeaderMatch(hdr, "is active", "is_active", "active")
+	packIdx, _ := firstHeaderMatch(hdr, "pack size", "pack_size")
+	bcCostIdx, _ := firstHeaderMatch(hdr, "barcode cost price", "barcode_cost_price")
+	bcSellIdx, _ := firstHeaderMatch(hdr, "barcode selling price", "barcode_selling_price")
+	primaryIdx, _ := firstHeaderMatch(hdr, "is primary barcode", "is_primary", "primary")
+
+	groups := make(map[string]*inventoryGroup)
+	skus := make([]string, 0)
+	barcodes := make([]string, 0)
+
+	res := &models.ImportResult{Errors: make([]models.ImportRowError, 0)}
+	for i, row := range rows[1:] {
+		rowNum := i + 2
+		name := cell(row, nameIdx)
+		if name == "" {
+			res.Skipped++
+			continue
 		}
+
+		sku := cell(row, skuIdx)
+		key := sku
+		if key == "" {
+			key = "name:" + strings.ToLower(name)
+		}
+
+		g, exists := groups[key]
+		if !exists {
+			g = &inventoryGroup{Name: name}
+			if sku != "" {
+				g.SKU = sku
+				skus = append(skus, sku)
+			}
+			groups[key] = g
+		} else if g.Name != name && name != "" {
+			res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Name", Message: "conflicting values for the same SKU/group"})
+			res.Skipped++
+			continue
+		}
+
+		if v := cell(row, descIdx); v != "" {
+			if g.Description != nil && *g.Description != v {
+				res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Description", Message: "conflicting values for the same SKU/group"})
+				res.Skipped++
+				continue
+			}
+			g.Description = &v
+		}
+		if v := cell(row, categoryIdx); v != "" {
+			if g.Category != nil && *g.Category != v {
+				res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Category", Message: "conflicting values for the same SKU/group"})
+				res.Skipped++
+				continue
+			}
+			g.Category = &v
+		}
+		if v := cell(row, brandIdx); v != "" {
+			if g.Brand != nil && *g.Brand != v {
+				res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Brand", Message: "conflicting values for the same SKU/group"})
+				res.Skipped++
+				continue
+			}
+			g.Brand = &v
+		}
+		if v := cell(row, unitIdx); v != "" {
+			if g.Unit != nil && *g.Unit != v {
+				res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Unit", Message: "conflicting values for the same SKU/group"})
+				res.Skipped++
+				continue
+			}
+			g.Unit = &v
+		}
+
+		tax := cell(row, taxIdx)
+		if tax == "" {
+			res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Tax", Message: "tax is required"})
+			res.Skipped++
+			continue
+		}
+		if g.Tax != "" && g.Tax != tax {
+			res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Tax", Message: "conflicting values for the same SKU/group"})
+			res.Skipped++
+			continue
+		}
+		g.Tax = tax
+
+		if v := cell(row, supplierIdx); v != "" {
+			if g.DefaultSupplier != nil && *g.DefaultSupplier != v {
+				res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Default Supplier", Message: "conflicting values for the same SKU/group"})
+				res.Skipped++
+				continue
+			}
+			g.DefaultSupplier = &v
+		}
+
+		if v := cell(row, costIdx); v != "" {
+			if f, ok := parseFloatLoose(v); ok {
+				if g.CostPrice != nil && *g.CostPrice != f {
+					res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Cost Price", Message: "conflicting values for the same SKU/group"})
+					res.Skipped++
+					continue
+				}
+				g.CostPrice = &f
+			} else {
+				res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Cost Price", Message: "invalid number"})
+				res.Skipped++
+				continue
+			}
+		}
+		if v := cell(row, sellIdx); v != "" {
+			if f, ok := parseFloatLoose(v); ok {
+				if g.SellingPrice != nil && *g.SellingPrice != f {
+					res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Selling Price", Message: "conflicting values for the same SKU/group"})
+					res.Skipped++
+					continue
+				}
+				g.SellingPrice = &f
+			} else {
+				res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Selling Price", Message: "invalid number"})
+				res.Skipped++
+				continue
+			}
+		}
+		if v := cell(row, reorderIdx); v != "" {
+			if n, ok := parseIntLoose(v); ok {
+				if g.ReorderLevel != nil && *g.ReorderLevel != n {
+					res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Reorder Level", Message: "conflicting values for the same SKU/group"})
+					res.Skipped++
+					continue
+				}
+				g.ReorderLevel = &n
+			} else {
+				res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Reorder Level", Message: "invalid number"})
+				res.Skipped++
+				continue
+			}
+		}
+		if v := cell(row, weightIdx); v != "" {
+			if f, ok := parseFloatLoose(v); ok {
+				if g.Weight != nil && *g.Weight != f {
+					res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Weight", Message: "conflicting values for the same SKU/group"})
+					res.Skipped++
+					continue
+				}
+				g.Weight = &f
+			} else {
+				res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Weight", Message: "invalid number"})
+				res.Skipped++
+				continue
+			}
+		}
+		if v := cell(row, dimIdx); v != "" {
+			if g.Dimensions != nil && *g.Dimensions != v {
+				res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Dimensions", Message: "conflicting values for the same SKU/group"})
+				res.Skipped++
+				continue
+			}
+			g.Dimensions = &v
+		}
+		if v := cell(row, serializedIdx); v != "" {
+			if b, ok := parseBoolLoose(v); ok {
+				if g.IsSerialized != nil && *g.IsSerialized != b {
+					res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Is Serialized", Message: "conflicting values for the same SKU/group"})
+					res.Skipped++
+					continue
+				}
+				g.IsSerialized = &b
+			} else {
+				res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Is Serialized", Message: "invalid boolean (use true/false)"})
+				res.Skipped++
+				continue
+			}
+		}
+		if v := cell(row, activeIdx); v != "" {
+			if b, ok := parseBoolLoose(v); ok {
+				if g.IsActive != nil && *g.IsActive != b {
+					res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Is Active", Message: "conflicting values for the same SKU/group"})
+					res.Skipped++
+					continue
+				}
+				g.IsActive = &b
+			} else {
+				res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Is Active", Message: "invalid boolean (use true/false)"})
+				res.Skipped++
+				continue
+			}
+		}
+
+		barcode := cell(row, barcodeIdx)
+		if barcode == "" {
+			res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Barcode", Message: "barcode is required"})
+			res.Skipped++
+			continue
+		}
+		barcodes = append(barcodes, barcode)
+
+		packSize := 1
+		if v := cell(row, packIdx); v != "" {
+			if n, ok := parseIntLoose(v); ok && n >= 1 {
+				packSize = n
+			} else {
+				res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Pack Size", Message: "invalid number (min 1)"})
+				res.Skipped++
+				continue
+			}
+		}
+
+		var bcCost *float64
+		if v := cell(row, bcCostIdx); v != "" {
+			if f, ok := parseFloatLoose(v); ok {
+				bcCost = &f
+			} else {
+				res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Barcode Cost Price", Message: "invalid number"})
+				res.Skipped++
+				continue
+			}
+		}
+		var bcSell *float64
+		if v := cell(row, bcSellIdx); v != "" {
+			if f, ok := parseFloatLoose(v); ok {
+				bcSell = &f
+			} else {
+				res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Barcode Selling Price", Message: "invalid number"})
+				res.Skipped++
+				continue
+			}
+		}
+
+		isPrimary := false
+		if v := cell(row, primaryIdx); v != "" {
+			if b, ok := parseBoolLoose(v); ok {
+				isPrimary = b
+			} else {
+				res.Errors = append(res.Errors, models.ImportRowError{Row: rowNum, Column: "Is Primary Barcode", Message: "invalid boolean (use true/false)"})
+				res.Skipped++
+				continue
+			}
+		}
+
+		g.Barcodes = append(g.Barcodes, models.ProductBarcode{
+			Barcode:      barcode,
+			PackSize:     packSize,
+			CostPrice:    bcCost,
+			SellingPrice: bcSell,
+			IsPrimary:    isPrimary,
+		})
+	}
+
+	if len(groups) == 0 {
+		res.Count = 0
+		return res, nil
+	}
+
+	// Build lookup maps for IDs
+	catByName := map[string]int{}
+	brandByName := map[string]int{}
+	unitByName := map[string]int{}
+	taxByName := map[string]int{}
+	supByName := map[string]int{}
+
+	if rows, err := s.db.Query(`SELECT category_id, name FROM categories WHERE company_id=$1 AND is_active=TRUE`, companyID); err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var id int
+			var name string
+			if err := rows.Scan(&id, &name); err == nil {
+				catByName[normalizeHeader(name)] = id
+			}
+		}
+	}
+	if rows, err := s.db.Query(`SELECT brand_id, name FROM brands WHERE company_id=$1 AND is_active=TRUE`, companyID); err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var id int
+			var name string
+			if err := rows.Scan(&id, &name); err == nil {
+				brandByName[normalizeHeader(name)] = id
+			}
+		}
+	}
+	if rows, err := s.db.Query(`SELECT unit_id, name, COALESCE(symbol,'') FROM units`); err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var id int
+			var name string
+			var sym string
+			if err := rows.Scan(&id, &name, &sym); err == nil {
+				if name != "" {
+					unitByName[normalizeHeader(name)] = id
+				}
+				if sym != "" {
+					unitByName[normalizeHeader(sym)] = id
+				}
+			}
+		}
+	}
+	if rows, err := s.db.Query(`SELECT tax_id, name FROM taxes WHERE company_id=$1 AND is_active=TRUE`, companyID); err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var id int
+			var name string
+			if err := rows.Scan(&id, &name); err == nil {
+				taxByName[normalizeHeader(name)] = id
+			}
+		}
+	}
+	if rows, err := s.db.Query(`SELECT supplier_id, name FROM suppliers WHERE company_id=$1 AND is_active=TRUE`, companyID); err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var id int
+			var name string
+			if err := rows.Scan(&id, &name); err == nil {
+				supByName[normalizeHeader(name)] = id
+			}
+		}
+	}
+
+	resolveID := func(raw *string, byName map[string]int) (*int, error) {
+		if raw == nil {
+			return nil, nil
+		}
+		v := strings.TrimSpace(*raw)
+		if v == "" {
+			return nil, nil
+		}
+		if id, ok := parseIntLoose(v); ok && id > 0 {
+			return &id, nil
+		}
+		if id, ok := byName[normalizeHeader(v)]; ok {
+			return &id, nil
+		}
+		return nil, fmt.Errorf("unknown value: %s", v)
+	}
+	resolveTaxID := func(raw string) (int, error) {
+		v := strings.TrimSpace(raw)
+		if v == "" {
+			return 0, fmt.Errorf("tax is required")
+		}
+		if id, ok := parseIntLoose(v); ok && id > 0 {
+			return id, nil
+		}
+		if id, ok := taxByName[normalizeHeader(v)]; ok {
+			return id, nil
+		}
+		return 0, fmt.Errorf("unknown tax: %s", v)
+	}
+
+	skuToProductID := map[string]int{}
+	if len(skus) > 0 {
+		rows, err := s.db.Query(`SELECT product_id, sku FROM products WHERE company_id=$1 AND is_deleted=FALSE AND sku = ANY($2)`, companyID, pq.Array(skus))
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var id int
+				var sku sql.NullString
+				if err := rows.Scan(&id, &sku); err == nil && sku.Valid {
+					skuToProductID[sku.String] = id
+				}
+			}
+		}
+	}
+	barcodeToProductID := map[string]int{}
+	if len(barcodes) > 0 {
+		rows, err := s.db.Query(`
+			SELECT p.product_id, pb.barcode
+			FROM products p
+			JOIN product_barcodes pb ON pb.product_id = p.product_id
+			WHERE p.company_id=$1 AND p.is_deleted=FALSE AND pb.barcode = ANY($2)
+		`, companyID, pq.Array(barcodes))
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var id int
+				var bc string
+				if err := rows.Scan(&id, &bc); err == nil {
+					barcodeToProductID[bc] = id
+				}
+			}
+		}
+	}
+
+	ps := NewProductService()
+	for _, g := range groups {
+		if len(g.Barcodes) == 0 {
+			res.Errors = append(res.Errors, models.ImportRowError{Message: fmt.Sprintf("product '%s': no barcodes provided", g.Name)})
+			res.Skipped++
+			continue
+		}
+
+		primaryCount := 0
+		for i := range g.Barcodes {
+			if g.Barcodes[i].IsPrimary {
+				primaryCount++
+			}
+			if g.Barcodes[i].PackSize <= 0 {
+				g.Barcodes[i].PackSize = 1
+			}
+		}
+		if primaryCount == 0 {
+			g.Barcodes[0].IsPrimary = true
+		} else if primaryCount > 1 {
+			res.Errors = append(res.Errors, models.ImportRowError{Message: fmt.Sprintf("product '%s': multiple primary barcodes", g.Name)})
+			res.Skipped++
+			continue
+		}
+
+		taxID, err := resolveTaxID(g.Tax)
 		if err != nil {
-			return fmt.Errorf("failed to read record: %w", err)
+			res.Errors = append(res.Errors, models.ImportRowError{Message: fmt.Sprintf("product '%s': %s", g.Name, err.Error())})
+			res.Skipped++
+			continue
+		}
+		catID, err := resolveID(g.Category, catByName)
+		if err != nil {
+			res.Errors = append(res.Errors, models.ImportRowError{Message: fmt.Sprintf("product '%s': category %s", g.Name, err.Error())})
+			res.Skipped++
+			continue
+		}
+		brandID, err := resolveID(g.Brand, brandByName)
+		if err != nil {
+			res.Errors = append(res.Errors, models.ImportRowError{Message: fmt.Sprintf("product '%s': brand %s", g.Name, err.Error())})
+			res.Skipped++
+			continue
+		}
+		unitID, err := resolveID(g.Unit, unitByName)
+		if err != nil {
+			res.Errors = append(res.Errors, models.ImportRowError{Message: fmt.Sprintf("product '%s': unit %s", g.Name, err.Error())})
+			res.Skipped++
+			continue
+		}
+		supID, err := resolveID(g.DefaultSupplier, supByName)
+		if err != nil {
+			res.Errors = append(res.Errors, models.ImportRowError{Message: fmt.Sprintf("product '%s': default supplier %s", g.Name, err.Error())})
+			res.Skipped++
+			continue
 		}
 
-		// Process each record here. Actual implementation would map
-		// CSV columns to inventory fields and persist them.
-		_ = record
+		var productID int
+		if g.SKU != "" {
+			productID = skuToProductID[g.SKU]
+		}
+		barcodeIDs := make(map[int]struct{})
+		for _, bc := range g.Barcodes {
+			if id := barcodeToProductID[bc.Barcode]; id != 0 {
+				barcodeIDs[id] = struct{}{}
+			}
+		}
+		if len(barcodeIDs) > 1 {
+			res.Errors = append(res.Errors, models.ImportRowError{Message: fmt.Sprintf("product '%s': barcodes match multiple existing products", g.Name)})
+			res.Skipped++
+			continue
+		}
+		var barcodeProductID int
+		for id := range barcodeIDs {
+			barcodeProductID = id
+		}
+		if productID != 0 && barcodeProductID != 0 && productID != barcodeProductID {
+			res.Errors = append(res.Errors, models.ImportRowError{Message: fmt.Sprintf("product '%s': SKU and barcode refer to different products", g.Name)})
+			res.Skipped++
+			continue
+		}
+		if productID == 0 {
+			productID = barcodeProductID
+		}
+
+		if productID == 0 {
+			req := &models.CreateProductRequest{
+				CategoryID:        catID,
+				BrandID:           brandID,
+				UnitID:            unitID,
+				TaxID:             taxID,
+				Name:              g.Name,
+				SKU:               nil,
+				Description:       g.Description,
+				CostPrice:         g.CostPrice,
+				SellingPrice:      g.SellingPrice,
+				ReorderLevel:      0,
+				Weight:            g.Weight,
+				Dimensions:        g.Dimensions,
+				IsSerialized:      false,
+				Barcodes:          g.Barcodes,
+				DefaultSupplierID: supID,
+			}
+			if g.SKU != "" {
+				req.SKU = &g.SKU
+			}
+			if g.ReorderLevel != nil {
+				req.ReorderLevel = *g.ReorderLevel
+			}
+			if g.IsSerialized != nil {
+				req.IsSerialized = *g.IsSerialized
+			}
+
+			if err := utils.ValidateStruct(req); err != nil {
+				res.Errors = append(res.Errors, models.ImportRowError{Message: fmt.Sprintf("product '%s': validation failed", g.Name)})
+				res.Skipped++
+				continue
+			}
+
+			p, err := ps.CreateProduct(companyID, userID, req)
+			if err != nil {
+				res.Errors = append(res.Errors, models.ImportRowError{Message: fmt.Sprintf("product '%s': %s", g.Name, err.Error())})
+				res.Skipped++
+				continue
+			}
+			res.Created++
+
+			if g.IsActive != nil && *g.IsActive == false {
+				_, _ = ps.UpdateProduct(p.ProductID, companyID, userID, &models.UpdateProductRequest{IsActive: g.IsActive})
+			}
+			continue
+		}
+
+		req := &models.UpdateProductRequest{
+			CategoryID:        catID,
+			BrandID:           brandID,
+			UnitID:            unitID,
+			TaxID:             &taxID,
+			Barcodes:          g.Barcodes,
+			DefaultSupplierID: supID,
+		}
+		name := g.Name
+		req.Name = &name
+		if g.SKU != "" {
+			req.SKU = &g.SKU
+		}
+		req.Description = g.Description
+		req.CostPrice = g.CostPrice
+		req.SellingPrice = g.SellingPrice
+		req.ReorderLevel = g.ReorderLevel
+		req.Weight = g.Weight
+		req.Dimensions = g.Dimensions
+		req.IsSerialized = g.IsSerialized
+		req.IsActive = g.IsActive
+
+		if _, err := ps.UpdateProduct(productID, companyID, userID, req); err != nil {
+			res.Errors = append(res.Errors, models.ImportRowError{Message: fmt.Sprintf("product '%s': %s", g.Name, err.Error())})
+			res.Skipped++
+			continue
+		}
+		res.Updated++
 	}
 
-	return nil
+	res.Count = res.Created + res.Updated
+	return res, nil
 }
 
 // ExportInventory returns inventory data as an Excel file
 func (s *InventoryService) ExportInventory(companyID int) ([]byte, error) {
-	// Placeholder - return empty content
-	return []byte{}, nil
+	type prod struct {
+		ID           int
+		SKU          sql.NullString
+		Name         string
+		Description  sql.NullString
+		Category     sql.NullString
+		Brand        sql.NullString
+		Unit         sql.NullString
+		Tax          sql.NullString
+		Supplier     sql.NullString
+		CostPrice    sql.NullFloat64
+		SellingPrice sql.NullFloat64
+		ReorderLevel int
+		Weight       sql.NullFloat64
+		Dimensions   sql.NullString
+		IsSerialized bool
+		IsActive     bool
+	}
+
+	rows, err := s.db.Query(`
+		SELECT p.product_id, p.sku, p.name,
+		       COALESCE(p.description,''), COALESCE(c.name,''), COALESCE(b.name,''),
+		       COALESCE(NULLIF(u.symbol,''), u.name, ''), COALESCE(t.name,''), COALESCE(sup.name,''),
+		       p.cost_price, p.selling_price, p.reorder_level, p.weight, p.dimensions, p.is_serialized, p.is_active
+		FROM products p
+		LEFT JOIN categories c ON p.category_id = c.category_id
+		LEFT JOIN brands b ON p.brand_id = b.brand_id
+		LEFT JOIN units u ON p.unit_id = u.unit_id
+		LEFT JOIN taxes t ON p.tax_id = t.tax_id
+		LEFT JOIN suppliers sup ON p.default_supplier_id = sup.supplier_id
+		WHERE p.company_id=$1 AND p.is_deleted=FALSE
+		ORDER BY p.name
+	`, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch products: %w", err)
+	}
+	defer rows.Close()
+
+	products := make([]prod, 0)
+	productIDs := make([]int, 0)
+	for rows.Next() {
+		var p prod
+		if err := rows.Scan(
+			&p.ID, &p.SKU, &p.Name, &p.Description, &p.Category, &p.Brand, &p.Unit, &p.Tax, &p.Supplier,
+			&p.CostPrice, &p.SellingPrice, &p.ReorderLevel, &p.Weight, &p.Dimensions, &p.IsSerialized, &p.IsActive,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan product: %w", err)
+		}
+		products = append(products, p)
+		productIDs = append(productIDs, p.ID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read products: %w", err)
+	}
+
+	type bc struct {
+		ProductID    int
+		Barcode      string
+		PackSize     int
+		CostPrice    sql.NullFloat64
+		SellingPrice sql.NullFloat64
+		IsPrimary    bool
+	}
+	barcodesByProduct := make(map[int][]bc)
+	if len(productIDs) > 0 {
+		bRows, err := s.db.Query(`
+			SELECT product_id, barcode, pack_size, cost_price, selling_price, is_primary
+			FROM product_barcodes
+			WHERE product_id = ANY($1)
+			ORDER BY product_id, is_primary DESC, barcode_id
+		`, pq.Array(productIDs))
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch barcodes: %w", err)
+		}
+		defer bRows.Close()
+		for bRows.Next() {
+			var b bc
+			if err := bRows.Scan(&b.ProductID, &b.Barcode, &b.PackSize, &b.CostPrice, &b.SellingPrice, &b.IsPrimary); err != nil {
+				return nil, fmt.Errorf("failed to scan barcode: %w", err)
+			}
+			barcodesByProduct[b.ProductID] = append(barcodesByProduct[b.ProductID], b)
+		}
+		if err := bRows.Err(); err != nil {
+			return nil, fmt.Errorf("failed to read barcodes: %w", err)
+		}
+	}
+
+	f := excelize.NewFile()
+	sheet := "Inventory"
+	f.SetSheetName("Sheet1", sheet)
+	for i, h := range inventoryImportHeaders {
+		cellName, _ := excelize.CoordinatesToCellName(i+1, 1)
+		f.SetCellValue(sheet, cellName, h)
+	}
+	_ = f.SetPanes(sheet, &excelize.Panes{Freeze: true, Split: true, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"})
+	_ = f.AutoFilter(sheet, "A1:T1", nil)
+
+	rowNum := 2
+	for _, p := range products {
+		bcs := barcodesByProduct[p.ID]
+		if len(bcs) == 0 {
+			bcs = []bc{{ProductID: p.ID, Barcode: "", PackSize: 1, IsPrimary: true}}
+		}
+		for _, b := range bcs {
+			if p.SKU.Valid {
+				f.SetCellValue(sheet, fmt.Sprintf("A%d", rowNum), p.SKU.String)
+			}
+			f.SetCellValue(sheet, fmt.Sprintf("B%d", rowNum), p.Name)
+			if p.Description.Valid && p.Description.String != "" {
+				f.SetCellValue(sheet, fmt.Sprintf("C%d", rowNum), p.Description.String)
+			}
+			if p.Category.Valid && p.Category.String != "" {
+				f.SetCellValue(sheet, fmt.Sprintf("D%d", rowNum), p.Category.String)
+			}
+			if p.Brand.Valid && p.Brand.String != "" {
+				f.SetCellValue(sheet, fmt.Sprintf("E%d", rowNum), p.Brand.String)
+			}
+			if p.Unit.Valid && p.Unit.String != "" {
+				f.SetCellValue(sheet, fmt.Sprintf("F%d", rowNum), p.Unit.String)
+			}
+			if p.Tax.Valid && p.Tax.String != "" {
+				f.SetCellValue(sheet, fmt.Sprintf("G%d", rowNum), p.Tax.String)
+			}
+			if p.Supplier.Valid && p.Supplier.String != "" {
+				f.SetCellValue(sheet, fmt.Sprintf("H%d", rowNum), p.Supplier.String)
+			}
+			if p.CostPrice.Valid {
+				f.SetCellValue(sheet, fmt.Sprintf("I%d", rowNum), p.CostPrice.Float64)
+			}
+			if p.SellingPrice.Valid {
+				f.SetCellValue(sheet, fmt.Sprintf("J%d", rowNum), p.SellingPrice.Float64)
+			}
+			f.SetCellValue(sheet, fmt.Sprintf("K%d", rowNum), p.ReorderLevel)
+			if p.Weight.Valid {
+				f.SetCellValue(sheet, fmt.Sprintf("L%d", rowNum), p.Weight.Float64)
+			}
+			if p.Dimensions.Valid && p.Dimensions.String != "" {
+				f.SetCellValue(sheet, fmt.Sprintf("M%d", rowNum), p.Dimensions.String)
+			}
+			f.SetCellValue(sheet, fmt.Sprintf("N%d", rowNum), p.IsSerialized)
+			f.SetCellValue(sheet, fmt.Sprintf("O%d", rowNum), p.IsActive)
+
+			f.SetCellValue(sheet, fmt.Sprintf("P%d", rowNum), b.Barcode)
+			f.SetCellValue(sheet, fmt.Sprintf("Q%d", rowNum), b.PackSize)
+			if b.CostPrice.Valid {
+				f.SetCellValue(sheet, fmt.Sprintf("R%d", rowNum), b.CostPrice.Float64)
+			}
+			if b.SellingPrice.Valid {
+				f.SetCellValue(sheet, fmt.Sprintf("S%d", rowNum), b.SellingPrice.Float64)
+			}
+			f.SetCellValue(sheet, fmt.Sprintf("T%d", rowNum), b.IsPrimary)
+			rowNum++
+		}
+	}
+
+	buf, err := f.WriteToBuffer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate file: %w", err)
+	}
+	return buf.Bytes(), nil
 }
 
 // GenerateBarcode creates barcode labels for the provided products

@@ -1062,20 +1062,50 @@ paths:
               schema:
                 $ref: '#/components/schemas/APIResponse'
       requestBody:
+        required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+  /inventory/import-template:
+    get:
+      summary: GET /api/v1/inventory/import-template
+      responses:
+        '200':
+          description: Excel template download
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+  /inventory/import-example:
+    get:
+      summary: GET /api/v1/inventory/import-example
+      responses:
+        '200':
+          description: Excel example download
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
   /inventory/export:
     get:
       summary: GET /api/v1/inventory/export
       responses:
         '200':
-          description: Successful response
+          description: Excel export download
           content:
-            application/json:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                type: string
+                format: binary
   /inventory/barcode:
     post:
       summary: POST /api/v1/inventory/barcode
@@ -2515,20 +2545,50 @@ paths:
               schema:
                 $ref: '#/components/schemas/APIResponse'
       requestBody:
+        required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+  /customers/import-template:
+    get:
+      summary: GET /api/v1/customers/import-template
+      responses:
+        '200':
+          description: Excel template download
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+  /customers/import-example:
+    get:
+      summary: GET /api/v1/customers/import-example
+      responses:
+        '200':
+          description: Excel example download
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
   /customers/export:
     get:
       summary: GET /api/v1/customers/export
       responses:
         '200':
-          description: Successful response
+          description: Excel export download
           content:
-            application/json:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                type: string
+                format: binary
   /customers/{id}:
     get:
       summary: GET /api/v1/customers/{id}
@@ -3798,20 +3858,50 @@ paths:
               schema:
                 $ref: '#/components/schemas/APIResponse'
       requestBody:
+        required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+  /suppliers/import-template:
+    get:
+      summary: GET /api/v1/suppliers/import-template
+      responses:
+        '200':
+          description: Excel template download
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+  /suppliers/import-example:
+    get:
+      summary: GET /api/v1/suppliers/import-example
+      responses:
+        '200':
+          description: Excel example download
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
   /suppliers/export:
     get:
       summary: GET /api/v1/suppliers/export
       responses:
         '200':
-          description: Successful response
+          description: Excel export download
           content:
-            application/json:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                type: string
+                format: binary
   /suppliers/{id}/summary:
     get:
       summary: GET /api/v1/suppliers/{id}/summary
