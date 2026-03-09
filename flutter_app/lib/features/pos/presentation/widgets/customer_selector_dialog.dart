@@ -138,8 +138,10 @@ class _CustomerSelectorDialogState
               prefixIcon: Icon(Icons.phone_rounded),
             ),
           ),
+          const SizedBox(height: 12),
         ],
       ),
+      
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
