@@ -5,6 +5,11 @@ class PosProductDto {
   final double stock;
   final String? barcode;
   final String? categoryName;
+  final bool isWeighable;
+  final String sellingUomMode;
+  final int? sellingUnitId;
+  final String? sellingUnitName;
+  final String? sellingUnitSymbol;
 
   PosProductDto({
     required this.productId,
@@ -13,6 +18,11 @@ class PosProductDto {
     required this.stock,
     this.barcode,
     this.categoryName,
+    this.isWeighable = false,
+    this.sellingUomMode = 'LOOSE',
+    this.sellingUnitId,
+    this.sellingUnitName,
+    this.sellingUnitSymbol,
   });
 
   factory PosProductDto.fromJson(Map<String, dynamic> json) => PosProductDto(
@@ -22,6 +32,11 @@ class PosProductDto {
         stock: (json['stock'] as num?)?.toDouble() ?? 0.0,
         barcode: json['barcode'] as String?,
         categoryName: json['category_name'] as String?,
+        isWeighable: json['is_weighable'] as bool? ?? false,
+        sellingUomMode: json['selling_uom_mode'] as String? ?? 'LOOSE',
+        sellingUnitId: json['selling_unit_id'] as int?,
+        sellingUnitName: json['selling_unit_name'] as String?,
+        sellingUnitSymbol: json['selling_unit_symbol'] as String?,
       );
 }
 

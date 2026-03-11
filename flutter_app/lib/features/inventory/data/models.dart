@@ -295,7 +295,14 @@ class ProductDto {
   final int companyId;
   final int? categoryId;
   final int? brandId;
-  final int? unitId;
+  final int? unitId; // stock keeping UOM
+  final int? purchaseUnitId;
+  final int? sellingUnitId;
+  final String purchaseUomMode;
+  final String sellingUomMode;
+  final double purchaseToStockFactor;
+  final double sellingToStockFactor;
+  final bool isWeighable;
   final int taxId;
   final String name;
   final String? sku;
@@ -317,6 +324,13 @@ class ProductDto {
     this.categoryId,
     this.brandId,
     this.unitId,
+    this.purchaseUnitId,
+    this.sellingUnitId,
+    this.purchaseUomMode = 'LOOSE',
+    this.sellingUomMode = 'LOOSE',
+    this.purchaseToStockFactor = 1.0,
+    this.sellingToStockFactor = 1.0,
+    this.isWeighable = false,
     required this.taxId,
     required this.name,
     this.sku,
@@ -339,6 +353,15 @@ class ProductDto {
         categoryId: json['category_id'] as int?,
         brandId: json['brand_id'] as int?,
         unitId: json['unit_id'] as int?,
+        purchaseUnitId: json['purchase_unit_id'] as int?,
+        sellingUnitId: json['selling_unit_id'] as int?,
+        purchaseUomMode: json['purchase_uom_mode'] as String? ?? 'LOOSE',
+        sellingUomMode: json['selling_uom_mode'] as String? ?? 'LOOSE',
+        purchaseToStockFactor:
+            (json['purchase_to_stock_factor'] as num?)?.toDouble() ?? 1.0,
+        sellingToStockFactor:
+            (json['selling_to_stock_factor'] as num?)?.toDouble() ?? 1.0,
+        isWeighable: json['is_weighable'] as bool? ?? false,
         taxId: json['tax_id'] as int? ?? 0,
         name: json['name'] as String? ?? '',
         sku: json['sku'] as String?,
@@ -384,6 +407,13 @@ class ProductDto {
         if (categoryId != null) 'category_id': categoryId,
         if (brandId != null) 'brand_id': brandId,
         if (unitId != null) 'unit_id': unitId,
+        if (purchaseUnitId != null) 'purchase_unit_id': purchaseUnitId,
+        if (sellingUnitId != null) 'selling_unit_id': sellingUnitId,
+        'purchase_uom_mode': purchaseUomMode,
+        'selling_uom_mode': sellingUomMode,
+        'purchase_to_stock_factor': purchaseToStockFactor,
+        'selling_to_stock_factor': sellingToStockFactor,
+        'is_weighable': isWeighable,
         'tax_id': taxId,
         'name': name,
         if (sku != null) 'sku': sku,
@@ -406,7 +436,14 @@ class ProductDto {
 class CreateProductPayload {
   final int? categoryId;
   final int? brandId;
-  final int? unitId;
+  final int? unitId; // stock keeping UOM
+  final int? purchaseUnitId;
+  final int? sellingUnitId;
+  final String purchaseUomMode;
+  final String sellingUomMode;
+  final double purchaseToStockFactor;
+  final double sellingToStockFactor;
+  final bool isWeighable;
   final int taxId;
   final String name;
   final String? sku;
@@ -425,6 +462,13 @@ class CreateProductPayload {
     this.categoryId,
     this.brandId,
     this.unitId,
+    this.purchaseUnitId,
+    this.sellingUnitId,
+    this.purchaseUomMode = 'LOOSE',
+    this.sellingUomMode = 'LOOSE',
+    this.purchaseToStockFactor = 1.0,
+    this.sellingToStockFactor = 1.0,
+    this.isWeighable = false,
     required this.taxId,
     required this.name,
     this.sku,
@@ -444,6 +488,13 @@ class CreateProductPayload {
         if (categoryId != null) 'category_id': categoryId,
         if (brandId != null) 'brand_id': brandId,
         if (unitId != null) 'unit_id': unitId,
+        if (purchaseUnitId != null) 'purchase_unit_id': purchaseUnitId,
+        if (sellingUnitId != null) 'selling_unit_id': sellingUnitId,
+        'purchase_uom_mode': purchaseUomMode,
+        'selling_uom_mode': sellingUomMode,
+        'purchase_to_stock_factor': purchaseToStockFactor,
+        'selling_to_stock_factor': sellingToStockFactor,
+        'is_weighable': isWeighable,
         'tax_id': taxId,
         'name': name,
         if (sku != null) 'sku': sku,

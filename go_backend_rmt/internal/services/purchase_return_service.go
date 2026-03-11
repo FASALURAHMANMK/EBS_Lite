@@ -14,6 +14,18 @@ type PurchaseReturnService struct {
 	db *sql.DB
 }
 
+type purchaseReturnAllocation struct {
+	PurchaseDetailID int
+	ProductID        int
+	Quantity         float64
+	UnitPrice        float64
+	StockQuantity    float64
+	StockUnitID      *int
+	PurchaseUnitID   *int
+	PurchaseUOMMode  string
+	PurchaseToStock  float64
+}
+
 func NewPurchaseReturnService() *PurchaseReturnService {
 	return &PurchaseReturnService{
 		db: database.GetDB(),
@@ -266,28 +278,6 @@ func (s *PurchaseReturnService) CreatePurchaseReturn(companyID, locationID, user
 		return nil, fmt.Errorf("failed to generate return number: %w", err)
 	}
 
-	// Calculate total amount
-	var totalAmount float64
-	for _, item := range req.Items {
-		// Verify product exists
-		var productCompanyID int
-		err = tx.QueryRow("SELECT company_id FROM products WHERE product_id = $1 AND is_deleted = FALSE",
-			item.ProductID).Scan(&productCompanyID)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				return nil, fmt.Errorf("product with ID %d not found", item.ProductID)
-			}
-			return nil, fmt.Errorf("failed to verify product: %w", err)
-		}
-
-		if productCompanyID != companyID {
-			return nil, fmt.Errorf("product with ID %d does not belong to company", item.ProductID)
-		}
-
-		lineTotal := item.Quantity * item.UnitPrice
-		totalAmount += lineTotal
-	}
-
 	// Insert purchase return
 	insertQuery := `
                INSERT INTO purchase_returns (return_number, purchase_id, location_id, supplier_id,
@@ -297,6 +287,7 @@ func (s *PurchaseReturnService) CreatePurchaseReturn(companyID, locationID, user
        `
 
 	var returnData models.PurchaseReturn
+	var totalAmount float64
 	now := time.Now()
 	err = tx.QueryRow(insertQuery,
 		returnNumber, req.PurchaseID, locationID, supplierID,
@@ -305,31 +296,46 @@ func (s *PurchaseReturnService) CreatePurchaseReturn(companyID, locationID, user
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert purchase return: %w", err)
 	}
-
 	// Insert return details and update stock
 	for _, item := range req.Items {
-		lineTotal := item.Quantity * item.UnitPrice
-
-		_, err = tx.Exec(`
-			INSERT INTO purchase_return_details (return_id, purchase_detail_id, product_id,
-											   quantity, unit_price, line_total)
-			VALUES ($1, $2, $3, $4, $5, $6)
-		`,
-			returnData.ReturnID, item.PurchaseDetailID, item.ProductID,
-			item.Quantity, item.UnitPrice, lineTotal,
-		)
+		allocations, err := s.allocatePurchaseReturnLines(tx, companyID, req.PurchaseID, item.ProductID, item.Quantity, item.PurchaseDetailID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to insert purchase return detail: %w", err)
+			return nil, fmt.Errorf("failed to allocate purchase return item %d: %w", item.ProductID, err)
 		}
+		for _, allocation := range allocations {
+			lineTotal := allocation.Quantity * item.UnitPrice
+			totalAmount += lineTotal
 
-		// Update stock - reduce quantity
-		_, err = tx.Exec(`
-			UPDATE stock SET quantity = quantity - $1, last_updated = CURRENT_TIMESTAMP
-			WHERE location_id = $2 AND product_id = $3
-		`, item.Quantity, locationID, item.ProductID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to update stock: %w", err)
+			_, err = tx.Exec(`
+				INSERT INTO purchase_return_details (return_id, purchase_detail_id, product_id,
+												   quantity, unit_price, line_total,
+												   stock_unit_id, purchase_unit_id, purchase_uom_mode, purchase_to_stock_factor, stock_quantity)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			`,
+				returnData.ReturnID, allocation.PurchaseDetailID, allocation.ProductID,
+				allocation.Quantity, item.UnitPrice, lineTotal,
+				allocation.StockUnitID, allocation.PurchaseUnitID, allocation.PurchaseUOMMode, allocation.PurchaseToStock, allocation.StockQuantity,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to insert purchase return detail: %w", err)
+			}
+
+			_, err = tx.Exec(`
+				UPDATE stock SET quantity = quantity - $1, last_updated = CURRENT_TIMESTAMP
+				WHERE location_id = $2 AND product_id = $3
+			`, allocation.StockQuantity, locationID, allocation.ProductID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to update stock: %w", err)
+			}
 		}
+	}
+
+	if _, err := tx.Exec(`
+		UPDATE purchase_returns
+		SET total_amount = $1, updated_at = CURRENT_TIMESTAMP, updated_by = $2
+		WHERE return_id = $3
+	`, totalAmount, userID, returnData.ReturnID); err != nil {
+		return nil, fmt.Errorf("failed to update purchase return total: %w", err)
 	}
 
 	// Commit transaction
@@ -483,4 +489,100 @@ func (s *PurchaseReturnService) verifyReturnInCompany(returnID, companyID int) e
 	}
 
 	return nil
+}
+
+func (s *PurchaseReturnService) allocatePurchaseReturnLines(tx *sql.Tx, companyID, purchaseID, productID int, requestedQty float64, preferredDetailID *int) ([]purchaseReturnAllocation, error) {
+	query := `
+		SELECT
+			pd.purchase_detail_id,
+			pd.product_id,
+			pd.received_quantity::float8,
+			pd.unit_price::float8,
+			COALESCE(pd.purchase_to_stock_factor, 1.0)::float8,
+			COALESCE(pd.purchase_uom_mode, 'LOOSE'),
+			pd.stock_unit_id,
+			pd.purchase_unit_id,
+			COALESCE(ret.returned_qty, 0)::float8 AS returned_qty
+		FROM purchase_details pd
+		JOIN purchases p ON p.purchase_id = pd.purchase_id
+		JOIN locations l ON l.location_id = p.location_id
+		LEFT JOIN (
+			SELECT
+				prd.purchase_detail_id,
+				COALESCE(SUM(prd.quantity), 0)::float8 AS returned_qty
+			FROM purchase_return_details prd
+			JOIN purchase_returns pr ON pr.return_id = prd.return_id
+			WHERE pr.purchase_id = $1 AND pr.status = 'COMPLETED' AND prd.purchase_detail_id IS NOT NULL
+			GROUP BY prd.purchase_detail_id
+		) ret ON ret.purchase_detail_id = pd.purchase_detail_id
+		WHERE pd.purchase_id = $1
+		  AND pd.product_id = $2
+		  AND l.company_id = $3
+	`
+	args := []interface{}{purchaseID, productID, companyID}
+	if preferredDetailID != nil && *preferredDetailID > 0 {
+		query += " AND pd.purchase_detail_id = $4"
+		args = append(args, *preferredDetailID)
+	}
+	query += " ORDER BY pd.purchase_detail_id FOR UPDATE"
+
+	rows, err := tx.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	remaining := requestedQty
+	allocations := make([]purchaseReturnAllocation, 0)
+	found := false
+	for rows.Next() {
+		found = true
+		var purchaseDetailID int
+		var receivedQty float64
+		var unitPrice float64
+		var purchaseToStock float64
+		var purchaseUOMMode string
+		var stockUnitID *int
+		var purchaseUnitID *int
+		var returnedQty float64
+		if err := rows.Scan(&purchaseDetailID, &productID, &receivedQty, &unitPrice, &purchaseToStock, &purchaseUOMMode, &stockUnitID, &purchaseUnitID, &returnedQty); err != nil {
+			return nil, err
+		}
+		available := receivedQty - returnedQty
+		if available <= 0 {
+			continue
+		}
+		allocatedQty := available
+		if allocatedQty > remaining {
+			allocatedQty = remaining
+		}
+		if allocatedQty <= 0 {
+			continue
+		}
+		allocations = append(allocations, purchaseReturnAllocation{
+			PurchaseDetailID: purchaseDetailID,
+			ProductID:        productID,
+			Quantity:         allocatedQty,
+			UnitPrice:        unitPrice,
+			StockQuantity:    quantityInStockUOM(allocatedQty, purchaseToStock),
+			StockUnitID:      stockUnitID,
+			PurchaseUnitID:   purchaseUnitID,
+			PurchaseUOMMode:  purchaseUOMMode,
+			PurchaseToStock:  purchaseToStock,
+		})
+		remaining -= allocatedQty
+		if remaining <= 0.000001 {
+			break
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("product %d not found in original purchase", productID)
+	}
+	if remaining > 0.000001 {
+		return nil, fmt.Errorf("invalid return quantity for product %d", productID)
+	}
+	return allocations, nil
 }

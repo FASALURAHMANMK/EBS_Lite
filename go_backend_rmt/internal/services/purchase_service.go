@@ -406,6 +406,15 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 		return nil, fmt.Errorf("failed to insert purchase: %w", err)
 	}
 
+	productIDs := make([]int, 0, len(req.Items))
+	for _, item := range req.Items {
+		productIDs = append(productIDs, item.ProductID)
+	}
+	productMetaByID, err := fetchProductMeta(tx, companyID, productIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	// Insert purchase details
 	for _, item := range req.Items {
 		lineTotal := item.Quantity * item.UnitPrice
@@ -435,19 +444,17 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 		finalLineTotal := lineTotal + taxAmount
 
 		// Validate serial numbers if product is serialized
-		var isSerialized bool
-		if err = tx.QueryRow("SELECT is_serialized FROM products WHERE product_id = $1 AND company_id = $2 AND is_deleted = FALSE", item.ProductID, companyID).Scan(&isSerialized); err != nil {
-			if err == sql.ErrNoRows {
-				return nil, fmt.Errorf("product with ID %d not found", item.ProductID)
-			}
-			return nil, fmt.Errorf("failed to verify product: %w", err)
+		meta, ok := productMetaByID[item.ProductID]
+		if !ok {
+			return nil, fmt.Errorf("product with ID %d not found", item.ProductID)
 		}
-		if isSerialized {
+		lineSnapshot := newPurchaseLineSnapshot(meta, item.Quantity, item.UnitPrice)
+		if meta.IsSerialized {
 			// quantity must be whole number and equal to serial count
-			if item.Quantity != float64(int(item.Quantity)) {
+			if lineSnapshot.StockQuantity != float64(int(lineSnapshot.StockQuantity)) {
 				return nil, fmt.Errorf("quantity must be a whole number for serialized products (product_id=%d)", item.ProductID)
 			}
-			if len(item.SerialNumbers) != int(item.Quantity) {
+			if len(item.SerialNumbers) != int(lineSnapshot.StockQuantity) {
 				return nil, fmt.Errorf("serial numbers count must equal quantity for serialized products (product_id=%d)", item.ProductID)
 			}
 			seen := make(map[string]struct{}, len(item.SerialNumbers))
@@ -467,12 +474,14 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 		_, err = tx.Exec(`
             INSERT INTO purchase_details (purchase_id, product_id, quantity, unit_price,
                                        discount_percentage, discount_amount, tax_id, tax_amount,
-                                       line_total, received_quantity, serial_numbers, expiry_date, batch_number)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                                       line_total, received_quantity, serial_numbers, expiry_date, batch_number,
+                                       stock_unit_id, purchase_unit_id, purchase_uom_mode, purchase_to_stock_factor, stock_quantity)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
         `,
 			purchase.PurchaseID, item.ProductID, item.Quantity, item.UnitPrice,
 			item.DiscountPercentage, discountAmount, item.TaxID, taxAmount,
 			finalLineTotal, 0, pq.Array(item.SerialNumbers), item.ExpiryDate, item.BatchNumber,
+			lineSnapshot.StockUnitID, lineSnapshot.PurchaseUnitID, lineSnapshot.PurchaseUOMMode, lineSnapshot.PurchaseToStock, lineSnapshot.StockQuantity,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to insert purchase detail: %w", err)
@@ -627,6 +636,15 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 		}
 	}
 
+	detailIDs := make([]int, 0, len(req.Items))
+	for _, item := range req.Items {
+		detailIDs = append(detailIDs, item.PurchaseDetailID)
+	}
+	detailSnapshots, err := fetchPurchaseDetailSnapshots(tx, companyID, detailIDs)
+	if err != nil {
+		return err
+	}
+
 	// Update purchase details with received quantities
 	for _, item := range req.Items {
 		// Verify purchase detail exists and get current state
@@ -667,19 +685,13 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 			return fmt.Errorf("failed to update received quantity: %w", err)
 		}
 
-		// Get product ID for stock update
-		var productID int
-		var costPrice float64
-		err = tx.QueryRow(`
-			SELECT pd.product_id, pd.unit_price
-			FROM purchase_details pd
-			JOIN purchases p ON pd.purchase_id = p.purchase_id
-			JOIN suppliers s ON p.supplier_id = s.supplier_id
-			WHERE pd.purchase_detail_id = $1 AND s.company_id = $2
-		`, item.PurchaseDetailID, companyID).Scan(&productID, &costPrice)
-		if err != nil {
-			return fmt.Errorf("failed to get product details: %w", err)
+		detailSnapshot, ok := detailSnapshots[item.PurchaseDetailID]
+		if !ok {
+			return fmt.Errorf("purchase detail with ID %d not found", item.PurchaseDetailID)
 		}
+		productID := detailSnapshot.ProductID
+		costPrice := detailSnapshot.UnitPrice
+		costPricePerStock := detailSnapshot.CostPricePerStock
 
 		// Validate serial numbers for serialized products
 		var isSerialized bool
@@ -689,11 +701,12 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 			}
 			return fmt.Errorf("failed to verify product: %w", err)
 		}
+		receivedStockQuantity := quantityInStockUOM(item.ReceivedQuantity, detailSnapshot.PurchaseToStock)
 		if isSerialized {
-			if item.ReceivedQuantity != float64(int(item.ReceivedQuantity)) {
+			if receivedStockQuantity != float64(int(receivedStockQuantity)) {
 				return fmt.Errorf("received quantity must be a whole number for serialized products")
 			}
-			if len(item.SerialNumbers) != int(item.ReceivedQuantity) {
+			if len(item.SerialNumbers) != int(receivedStockQuantity) {
 				return fmt.Errorf("serial numbers count must equal received quantity for serialized products")
 			}
 			seen := make(map[string]struct{}, len(item.SerialNumbers))
@@ -733,13 +746,13 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
             DO UPDATE SET 
                 quantity = stock.quantity + $3,
                 last_updated = CURRENT_TIMESTAMP
-        `, locationID, productID, item.ReceivedQuantity)
+        `, locationID, productID, receivedStockQuantity)
 		if err != nil {
 			return fmt.Errorf("failed to update stock: %w", err)
 		}
 
 		// Create stock lot entry for FIFO tracking
-		if item.ReceivedQuantity > 0 {
+		if receivedStockQuantity > 0 {
 			// Try inserting with goods_receipt_id if supported; otherwise fallback to legacy columns
 			if grSupported {
 				_, err = tx.Exec(`
@@ -747,12 +760,12 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
                                            quantity, remaining_quantity, cost_price, received_date,
                                            expiry_date, batch_number, serial_numbers)
                     SELECT pd.product_id, $1, p.supplier_id, p.purchase_id, $2,
-                           $3, $3, pd.unit_price, CURRENT_DATE,
-                           $4, $5, $6
+                           $3, $3, $4, CURRENT_DATE,
+                           $5, $6, $7
                     FROM purchase_details pd
                     JOIN purchases p ON pd.purchase_id = p.purchase_id
-                    WHERE pd.purchase_detail_id = $7
-                `, locationID, goodsReceiptID, item.ReceivedQuantity, item.ExpiryDate, item.BatchNumber,
+                    WHERE pd.purchase_detail_id = $8
+                `, locationID, goodsReceiptID, receivedStockQuantity, costPricePerStock, item.ExpiryDate, item.BatchNumber,
 					pq.Array(item.SerialNumbers), item.PurchaseDetailID)
 				if err != nil {
 					if pqErr, ok := err.(*pq.Error); ok && string(pqErr.Code) == "42703" {
@@ -762,12 +775,12 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
                                                    quantity, remaining_quantity, cost_price, received_date,
                                                    expiry_date, batch_number, serial_numbers)
                             SELECT pd.product_id, $1, p.supplier_id, p.purchase_id,
-                                   $2, $2, pd.unit_price, CURRENT_DATE,
-                                   $3, $4, $5
+                                   $2, $2, $3, CURRENT_DATE,
+                                   $4, $5, $6
                             FROM purchase_details pd
                             JOIN purchases p ON pd.purchase_id = p.purchase_id
-                            WHERE pd.purchase_detail_id = $6
-                        `, locationID, item.ReceivedQuantity, item.ExpiryDate, item.BatchNumber,
+                            WHERE pd.purchase_detail_id = $7
+                        `, locationID, receivedStockQuantity, costPricePerStock, item.ExpiryDate, item.BatchNumber,
 							pq.Array(item.SerialNumbers), item.PurchaseDetailID)
 						if err != nil {
 							return fmt.Errorf("failed to create stock lot: %w", err)
@@ -782,12 +795,12 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
                                            quantity, remaining_quantity, cost_price, received_date,
                                            expiry_date, batch_number, serial_numbers)
                     SELECT pd.product_id, $1, p.supplier_id, p.purchase_id,
-                           $2, $2, pd.unit_price, CURRENT_DATE,
-                           $3, $4, $5
+                           $2, $2, $3, CURRENT_DATE,
+                           $4, $5, $6
                     FROM purchase_details pd
                     JOIN purchases p ON pd.purchase_id = p.purchase_id
-                    WHERE pd.purchase_detail_id = $6
-                `, locationID, item.ReceivedQuantity, item.ExpiryDate, item.BatchNumber,
+                    WHERE pd.purchase_detail_id = $7
+                `, locationID, receivedStockQuantity, costPricePerStock, item.ExpiryDate, item.BatchNumber,
 					pq.Array(item.SerialNumbers), item.PurchaseDetailID)
 				if err != nil {
 					return fmt.Errorf("failed to create stock lot: %w", err)
@@ -800,7 +813,7 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 			UPDATE products 
 			SET cost_price = $1, updated_at = CURRENT_TIMESTAMP
 			WHERE product_id = $2 AND company_id = $3 AND (cost_price IS NULL OR cost_price = 0)
-		`, costPrice, productID, companyID)
+		`, costPricePerStock, productID, companyID)
 		if err != nil {
 			return fmt.Errorf("failed to update product cost price: %w", err)
 		}
@@ -1069,6 +1082,15 @@ func (s *PurchaseService) UpdatePurchase(purchaseID, companyID, userID int, req 
 		}
 
 		// Insert new items
+		productIDs := make([]int, 0, len(req.Items))
+		for _, item := range req.Items {
+			productIDs = append(productIDs, item.ProductID)
+		}
+		productMetaByID, err := fetchProductMeta(tx, companyID, productIDs)
+		if err != nil {
+			return err
+		}
+
 		for _, item := range req.Items {
 			lineTotal := item.Quantity * item.UnitPrice
 
@@ -1097,18 +1119,16 @@ func (s *PurchaseService) UpdatePurchase(purchaseID, companyID, userID int, req 
 			finalLineTotal := lineTotal + taxAmount
 
 			// Validate serial numbers if product is serialized
-			var isSerialized bool
-			if err = tx.QueryRow("SELECT is_serialized FROM products WHERE product_id = $1 AND company_id = $2 AND is_deleted = FALSE", item.ProductID, companyID).Scan(&isSerialized); err != nil {
-				if err == sql.ErrNoRows {
-					return fmt.Errorf("product with ID %d not found", item.ProductID)
-				}
-				return fmt.Errorf("failed to verify product: %w", err)
+			meta, ok := productMetaByID[item.ProductID]
+			if !ok {
+				return fmt.Errorf("product with ID %d not found", item.ProductID)
 			}
-			if isSerialized {
-				if item.Quantity != float64(int(item.Quantity)) {
+			lineSnapshot := newPurchaseLineSnapshot(meta, item.Quantity, item.UnitPrice)
+			if meta.IsSerialized {
+				if lineSnapshot.StockQuantity != float64(int(lineSnapshot.StockQuantity)) {
 					return fmt.Errorf("quantity must be a whole number for serialized products (product_id=%d)", item.ProductID)
 				}
-				if len(item.SerialNumbers) != int(item.Quantity) {
+				if len(item.SerialNumbers) != int(lineSnapshot.StockQuantity) {
 					return fmt.Errorf("serial numbers count must equal quantity for serialized products (product_id=%d)", item.ProductID)
 				}
 				seen := make(map[string]struct{}, len(item.SerialNumbers))
@@ -1128,12 +1148,14 @@ func (s *PurchaseService) UpdatePurchase(purchaseID, companyID, userID int, req 
 			_, err = tx.Exec(`
 				INSERT INTO purchase_details (purchase_id, product_id, quantity, unit_price,
 											discount_percentage, discount_amount, tax_id, tax_amount,
-											line_total, received_quantity, serial_numbers, expiry_date, batch_number)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+											line_total, received_quantity, serial_numbers, expiry_date, batch_number,
+											stock_unit_id, purchase_unit_id, purchase_uom_mode, purchase_to_stock_factor, stock_quantity)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 			`,
 				purchaseID, item.ProductID, item.Quantity, item.UnitPrice,
 				item.DiscountPercentage, discountAmount, item.TaxID, taxAmount,
 				finalLineTotal, 0, pq.Array(item.SerialNumbers), item.ExpiryDate, item.BatchNumber,
+				lineSnapshot.StockUnitID, lineSnapshot.PurchaseUnitID, lineSnapshot.PurchaseUOMMode, lineSnapshot.PurchaseToStock, lineSnapshot.StockQuantity,
 			)
 			if err != nil {
 				return fmt.Errorf("failed to insert purchase detail: %w", err)

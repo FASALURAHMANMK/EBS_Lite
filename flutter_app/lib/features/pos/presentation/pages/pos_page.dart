@@ -198,6 +198,17 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
     _setScannerVisible(false);
   }
 
+  Future<void> _addProductWithQty(
+      PosProductDto product, PosNotifier notifier) async {
+    double qty = 1;
+    if (product.isWeighable) {
+      final picked = await _promptWeighableQuantity(context, product);
+      if (picked == null || picked <= 0) return;
+      qty = picked;
+    }
+    notifier.addProduct(product, qty: qty);
+  }
+
   Widget _buildTextField(
     BuildContext context,
     List<PosProductDto> suggestions,
@@ -237,7 +248,7 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
         onChanged: notifier.setQuery,
         onSubmitted: (_) {
           if (suggestions.isNotEmpty) {
-            notifier.addProduct(suggestions.first);
+            unawaited(_addProductWithQty(suggestions.first, notifier));
           }
         },
       ),
@@ -362,12 +373,13 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
                           dense: true,
                           title: Text(p.name),
                           subtitle: Text(
-                              'Price: ${p.price.toStringAsFixed(2)}  •  Stock: ${p.stock.toStringAsFixed(2)}'),
+                              'Price: ${p.price.toStringAsFixed(2)}  •  Stock: ${p.stock.toStringAsFixed(2)}${_posUnitSuffix(p)}'),
                           trailing: IconButton(
                             icon: const Icon(Icons.add_circle_rounded),
-                            onPressed: () => notifier.addProduct(p),
+                            onPressed: () async =>
+                                _addProductWithQty(p, notifier),
                           ),
-                          onTap: () => notifier.addProduct(p),
+                          onTap: () async => _addProductWithQty(p, notifier),
                         ))
                     .toList(),
               ),
@@ -410,7 +422,8 @@ class _CartList extends ConsumerWidget {
                   ]),
               ],
             ),
-            subtitle: Text('Unit: ${item.unitPrice.toStringAsFixed(2)}'),
+            subtitle: Text(
+                'Unit: ${item.unitPrice.toStringAsFixed(2)}${_posUnitSuffix(item.product)}'),
             leading: IconButton(
               icon: const Icon(Icons.remove_circle_outline_rounded),
               onPressed: () {
@@ -425,10 +438,20 @@ class _CartList extends ConsumerWidget {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('x ${item.quantity.toStringAsFixed(0)}  '),
+                Text(
+                    'x ${item.quantity.toStringAsFixed(item.product.isWeighable ? 3 : 0)}  '),
                 IconButton(
                   icon: const Icon(Icons.add_circle_outline_rounded),
-                  onPressed: () => notifier.updateQty(item, item.quantity + 1),
+                  onPressed: () async {
+                    if (item.product.isWeighable) {
+                      final extra =
+                          await _promptWeighableQuantity(context, item.product);
+                      if (extra == null || extra <= 0) return;
+                      notifier.updateQty(item, item.quantity + extra);
+                      return;
+                    }
+                    notifier.updateQty(item, item.quantity + 1);
+                  },
                 ),
                 const SizedBox(width: 8),
                 Text(item.lineTotal.toStringAsFixed(2),
@@ -454,6 +477,57 @@ class _CartList extends ConsumerWidget {
       itemCount: state.cart.length,
     );
   }
+}
+
+String _posUnitSuffix(PosProductDto product) {
+  final symbol = (product.sellingUnitSymbol ?? '').trim();
+  if (symbol.isNotEmpty) return ' / $symbol';
+  final name = (product.sellingUnitName ?? '').trim();
+  if (name.isNotEmpty) return ' / $name';
+  return '';
+}
+
+Future<double?> _promptWeighableQuantity(
+    BuildContext context, PosProductDto product) async {
+  final controller = TextEditingController(text: '1');
+  final unitLabel = _posUnitSuffix(product).replaceFirst(' / ', '');
+  return showDialog<double>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title:
+          Text('Enter Quantity${unitLabel.isNotEmpty ? ' ($unitLabel)' : ''}'),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: InputDecoration(
+          labelText: 'Quantity for ${product.name}',
+          prefixIcon: const Icon(Icons.scale_outlined),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final qty = double.tryParse(controller.text.trim());
+            if (qty == null || qty <= 0) {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  const SnackBar(content: Text('Enter a quantity above 0')),
+                );
+              return;
+            }
+            Navigator.of(context).pop(qty);
+          },
+          child: const Text('Add'),
+        ),
+      ],
+    ),
+  );
 }
 
 class _BottomBar extends ConsumerWidget {

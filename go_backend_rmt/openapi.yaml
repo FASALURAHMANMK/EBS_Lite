@@ -5381,6 +5381,24 @@ components:
         unit_id:
           type: integer
           nullable: true
+        purchase_unit_id:
+          type: integer
+          nullable: true
+        selling_unit_id:
+          type: integer
+          nullable: true
+        purchase_uom_mode:
+          type: string
+        selling_uom_mode:
+          type: string
+        purchase_to_stock_factor:
+          type: number
+          format: float
+        selling_to_stock_factor:
+          type: number
+          format: float
+        is_weighable:
+          type: boolean
         name:
           type: string
         sku:
@@ -5422,6 +5440,28 @@ components:
         unit_id:
           type: integer
           nullable: true
+        purchase_unit_id:
+          type: integer
+          nullable: true
+        selling_unit_id:
+          type: integer
+          nullable: true
+        purchase_uom_mode:
+          type: string
+          nullable: true
+        selling_uom_mode:
+          type: string
+          nullable: true
+        purchase_to_stock_factor:
+          type: number
+          format: float
+          nullable: true
+        selling_to_stock_factor:
+          type: number
+          format: float
+          nullable: true
+        is_weighable:
+          type: boolean
         name:
           type: string
         sku:
@@ -5460,6 +5500,29 @@ components:
           nullable: true
         unit_id:
           type: integer
+          nullable: true
+        purchase_unit_id:
+          type: integer
+          nullable: true
+        selling_unit_id:
+          type: integer
+          nullable: true
+        purchase_uom_mode:
+          type: string
+          nullable: true
+        selling_uom_mode:
+          type: string
+          nullable: true
+        purchase_to_stock_factor:
+          type: number
+          format: float
+          nullable: true
+        selling_to_stock_factor:
+          type: number
+          format: float
+          nullable: true
+        is_weighable:
+          type: boolean
           nullable: true
         name:
           type: string

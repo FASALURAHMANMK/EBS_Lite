@@ -6,6 +6,13 @@ type Product struct {
 	CategoryID        *int                    `json:"category_id,omitempty" db:"category_id"`
 	BrandID           *int                    `json:"brand_id,omitempty" db:"brand_id"`
 	UnitID            *int                    `json:"unit_id,omitempty" db:"unit_id"`
+	PurchaseUnitID    *int                    `json:"purchase_unit_id,omitempty" db:"purchase_unit_id"`
+	SellingUnitID     *int                    `json:"selling_unit_id,omitempty" db:"selling_unit_id"`
+	PurchaseUOMMode   string                  `json:"purchase_uom_mode" db:"purchase_uom_mode"`
+	SellingUOMMode    string                  `json:"selling_uom_mode" db:"selling_uom_mode"`
+	PurchaseToStock   float64                 `json:"purchase_to_stock_factor" db:"purchase_to_stock_factor"`
+	SellingToStock    float64                 `json:"selling_to_stock_factor" db:"selling_to_stock_factor"`
+	IsWeighable       bool                    `json:"is_weighable" db:"is_weighable"`
 	TaxID             int                     `json:"tax_id" db:"tax_id"`
 	Name              string                  `json:"name" db:"name" validate:"required,min=2,max=255"`
 	SKU               *string                 `json:"sku,omitempty" db:"sku"`
@@ -29,6 +36,13 @@ type CreateProductRequest struct {
 	CategoryID        *int             `json:"category_id,omitempty"`
 	BrandID           *int             `json:"brand_id,omitempty"`
 	UnitID            *int             `json:"unit_id,omitempty"`
+	PurchaseUnitID    *int             `json:"purchase_unit_id,omitempty"`
+	SellingUnitID     *int             `json:"selling_unit_id,omitempty"`
+	PurchaseUOMMode   *string          `json:"purchase_uom_mode,omitempty"`
+	SellingUOMMode    *string          `json:"selling_uom_mode,omitempty"`
+	PurchaseToStock   *float64         `json:"purchase_to_stock_factor,omitempty"`
+	SellingToStock    *float64         `json:"selling_to_stock_factor,omitempty"`
+	IsWeighable       bool             `json:"is_weighable"`
 	TaxID             int              `json:"tax_id" validate:"required"`
 	Name              string           `json:"name" validate:"required,min=2,max=255"`
 	SKU               *string          `json:"sku,omitempty"`
@@ -48,6 +62,13 @@ type UpdateProductRequest struct {
 	CategoryID        *int             `json:"category_id,omitempty"`
 	BrandID           *int             `json:"brand_id,omitempty"`
 	UnitID            *int             `json:"unit_id,omitempty"`
+	PurchaseUnitID    *int             `json:"purchase_unit_id,omitempty"`
+	SellingUnitID     *int             `json:"selling_unit_id,omitempty"`
+	PurchaseUOMMode   *string          `json:"purchase_uom_mode,omitempty"`
+	SellingUOMMode    *string          `json:"selling_uom_mode,omitempty"`
+	PurchaseToStock   *float64         `json:"purchase_to_stock_factor,omitempty"`
+	SellingToStock    *float64         `json:"selling_to_stock_factor,omitempty"`
+	IsWeighable       *bool            `json:"is_weighable,omitempty"`
 	TaxID             *int             `json:"tax_id,omitempty"`
 	Name              *string          `json:"name,omitempty" validate:"omitempty,min=2,max=255"`
 	SKU               *string          `json:"sku,omitempty"`

@@ -33,11 +33,17 @@ func (s *POSService) GetPOSProducts(companyID, locationID int) ([]models.POSProd
                            COALESCE(pb.selling_price, p.selling_price, 0) as price,
                            COALESCE(st.quantity, 0) as stock,
                            pb.barcode,
-                           c.name as category_name
+                           c.name as category_name,
+                           COALESCE(p.is_weighable, FALSE) as is_weighable,
+                           COALESCE(p.selling_uom_mode, 'LOOSE') as selling_uom_mode,
+                           p.selling_unit_id,
+                           su.name as selling_unit_name,
+                           su.symbol as selling_unit_symbol
                 FROM products p
                 LEFT JOIN product_barcodes pb ON p.product_id = pb.product_id AND pb.is_primary = TRUE
                 LEFT JOIN stock st ON p.product_id = st.product_id AND st.location_id = $2
                 LEFT JOIN categories c ON p.category_id = c.category_id
+                LEFT JOIN units su ON COALESCE(p.selling_unit_id, p.unit_id) = su.unit_id
                 WHERE p.company_id = $1 AND p.is_active = TRUE AND p.is_deleted = FALSE
                 ORDER BY p.name
         `
@@ -53,7 +59,8 @@ func (s *POSService) GetPOSProducts(companyID, locationID int) ([]models.POSProd
 		var product models.POSProductResponse
 		err := rows.Scan(
 			&product.ProductID, &product.Name, &product.Price, &product.Stock,
-			&product.Barcode, &product.CategoryName,
+			&product.Barcode, &product.CategoryName, &product.IsWeighable, &product.SellingUOMMode,
+			&product.SellingUnitID, &product.SellingUnitName, &product.SellingUnitSymbol,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan POS product: %w", err)
@@ -104,10 +111,24 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 	}
 
 	if !trainingEnabled {
+		productIDs := make([]int, 0, len(req.Items))
+		for _, item := range req.Items {
+			if item.ProductID != nil {
+				productIDs = append(productIDs, *item.ProductID)
+			}
+		}
+		metaByID, err := fetchProductMeta(s.db, companyID, productIDs)
+		if err != nil {
+			return nil, err
+		}
 		// Validate stock availability for all items
 		for _, item := range req.Items {
 			if item.ProductID != nil {
-				available, err := s.checkStockAvailability(companyID, locationID, *item.ProductID, item.Quantity)
+				meta, ok := metaByID[*item.ProductID]
+				if !ok {
+					return nil, fmt.Errorf("product not found")
+				}
+				available, err := s.checkStockAvailability(companyID, locationID, *item.ProductID, saleQuantityToStock(meta, item.Quantity))
 				if err != nil {
 					return nil, fmt.Errorf("failed to check stock for product %d: %w", *item.ProductID, err)
 				}
@@ -449,11 +470,17 @@ func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string
                            COALESCE(pb.selling_price, p.selling_price, 0) as price,
                            COALESCE(st.quantity, 0) as stock,
                            pb.barcode,
-                           c.name as category_name
+                           c.name as category_name,
+                           COALESCE(p.is_weighable, FALSE) as is_weighable,
+                           COALESCE(p.selling_uom_mode, 'LOOSE') as selling_uom_mode,
+                           p.selling_unit_id,
+                           su.name as selling_unit_name,
+                           su.symbol as selling_unit_symbol
                 FROM products p
                 LEFT JOIN product_barcodes pb ON p.product_id = pb.product_id AND pb.is_primary = TRUE
                 LEFT JOIN stock st ON p.product_id = st.product_id AND st.location_id = $2
                 LEFT JOIN categories c ON p.category_id = c.category_id
+                LEFT JOIN units su ON COALESCE(p.selling_unit_id, p.unit_id) = su.unit_id
                 WHERE p.company_id = $1 AND p.is_active = TRUE AND p.is_deleted = FALSE
                 AND (
                         LOWER(p.name) LIKE LOWER($3) OR
@@ -487,7 +514,8 @@ func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string
 		var product models.POSProductResponse
 		err := rows.Scan(
 			&product.ProductID, &product.Name, &product.Price, &product.Stock,
-			&product.Barcode, &product.CategoryName,
+			&product.Barcode, &product.CategoryName, &product.IsWeighable, &product.SellingUOMMode,
+			&product.SellingUnitID, &product.SellingUnitName, &product.SellingUnitSymbol,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan search result: %w", err)
@@ -822,18 +850,32 @@ func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int,
 			taxAmount = lineTotal * (pct / 100)
 		}
 
+		lineSnapshot := saleLineSnapshot{}
+		if item.ProductID != nil {
+			meta, ok := metaByID[*item.ProductID]
+			if !ok {
+				return nil, fmt.Errorf("product not found")
+			}
+			lineSnapshot = newSaleLineSnapshot(meta, item.Quantity)
+		}
+
 		if _, err := tx.Exec(`
             INSERT INTO sale_details (sale_id, product_id, product_name, quantity, unit_price,
                                       discount_percentage, discount_amount, tax_id, tax_amount,
-                                      line_total, serial_numbers, notes)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-        `, saleID, item.ProductID, item.ProductName, item.Quantity, item.UnitPrice, item.DiscountPercent, discountAmount, effectiveTaxID, taxAmount, lineTotal, pq.Array(item.SerialNumbers), item.Notes); err != nil {
+                                      line_total, serial_numbers, notes, cost_price,
+                                      stock_unit_id, selling_unit_id, selling_uom_mode, selling_to_stock_factor, stock_quantity)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+        `, saleID, item.ProductID, item.ProductName, item.Quantity, item.UnitPrice, item.DiscountPercent, discountAmount, effectiveTaxID, taxAmount, lineTotal, pq.Array(item.SerialNumbers), item.Notes, lineSnapshot.CostPricePerUnit, lineSnapshot.StockUnitID, lineSnapshot.SellingUnitID, lineSnapshot.SellingUOMMode, lineSnapshot.SellingToStock, lineSnapshot.StockQuantity); err != nil {
 			return nil, fmt.Errorf("failed to insert sale detail: %w", err)
 		}
 
 		if item.ProductID != nil {
 			if !isTraining {
-				if err := s.salesService.updateStock(tx, locationID, *item.ProductID, -item.Quantity); err != nil {
+				meta, ok := metaByID[*item.ProductID]
+				if !ok {
+					return nil, fmt.Errorf("product not found")
+				}
+				if err := s.salesService.updateStock(tx, locationID, *item.ProductID, -saleQuantityToStock(meta, item.Quantity)); err != nil {
 					return nil, fmt.Errorf("failed to update stock: %w", err)
 				}
 			}
@@ -1006,7 +1048,11 @@ func (s *POSService) VoidSale(companyID, locationID, userID, originalSaleID int,
 	if status == "COMPLETED" {
 		// Copy items as negatives and adjust stock back
 		rows, err := tx.Query(`
-            SELECT product_id, product_name, quantity, unit_price, discount_percentage, discount_amount, tax_id, tax_amount, line_total, serial_numbers, notes
+            SELECT product_id, product_name, quantity, unit_price, discount_percentage, discount_amount, tax_id, tax_amount, line_total, serial_numbers, notes,
+                   COALESCE(cost_price, 0)::float8,
+                   stock_unit_id, selling_unit_id, COALESCE(selling_uom_mode, 'LOOSE'),
+                   COALESCE(selling_to_stock_factor, 1.0)::float8,
+                   COALESCE(NULLIF(stock_quantity, 0), quantity * COALESCE(selling_to_stock_factor, 1.0))::float8
             FROM sale_details WHERE sale_id=$1
         `, originalSaleID)
 		if err != nil {
@@ -1020,24 +1066,31 @@ func (s *POSService) VoidSale(companyID, locationID, userID, originalSaleID int,
 			var taxID *int
 			var serials []string
 			var notes *string
-			if err := rows.Scan(&productID, &productName, &quantity, &unitPrice, &discPct, &discAmt, &taxID, &taxAmt, &lineTotal, pq.Array(&serials), &notes); err != nil {
+			var costPrice float64
+			var stockUnitID *int
+			var sellingUnitID *int
+			var sellingUOMMode string
+			var sellingToStock float64
+			var stockQuantity float64
+			if err := rows.Scan(&productID, &productName, &quantity, &unitPrice, &discPct, &discAmt, &taxID, &taxAmt, &lineTotal, pq.Array(&serials), &notes, &costPrice, &stockUnitID, &sellingUnitID, &sellingUOMMode, &sellingToStock, &stockQuantity); err != nil {
 				return nil, fmt.Errorf("failed to scan original item: %w", err)
 			}
 			nQty := -quantity
 			nDiscAmt := -discAmt
 			nTaxAmt := -taxAmt
 			nLineTotal := -lineTotal
+			nStockQuantity := -stockQuantity
 			if _, err := tx.Exec(`
                 INSERT INTO sale_details (sale_id, product_id, product_name, quantity, unit_price,
                                           discount_percentage, discount_amount, tax_id, tax_amount,
-                                          line_total, serial_numbers, notes)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-            `, voidSaleID, productID, productName, nQty, unitPrice, discPct, nDiscAmt, taxID, nTaxAmt, nLineTotal, pq.Array(serials), notes); err != nil {
+                                          line_total, serial_numbers, notes, cost_price,
+                                          stock_unit_id, selling_unit_id, selling_uom_mode, selling_to_stock_factor, stock_quantity)
+                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+            `, voidSaleID, productID, productName, nQty, unitPrice, discPct, nDiscAmt, taxID, nTaxAmt, nLineTotal, pq.Array(serials), notes, costPrice, stockUnitID, sellingUnitID, sellingUOMMode, sellingToStock, nStockQuantity); err != nil {
 				return nil, fmt.Errorf("failed to insert void item: %w", err)
 			}
 			if !origTraining && productID != nil {
-				// For sale, stock change was -quantity; for void we add back +quantity
-				if err := s.salesService.updateStock(tx, locationID, *productID, quantity); err != nil { // add back
+				if err := s.salesService.updateStock(tx, locationID, *productID, stockQuantity); err != nil {
 					return nil, fmt.Errorf("failed to revert stock: %w", err)
 				}
 			}
@@ -1163,17 +1216,18 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 
 	// We'll also compute discount per line for persistence
 	type lineComputed struct {
-		qty     float64
-		unit    float64
-		discPct float64
-		discAmt float64
-		taxID   *int
-		taxAmt  float64
-		total   float64
-		pid     *int
-		pname   *string
-		serials []string
-		notes   *string
+		qty      float64
+		unit     float64
+		discPct  float64
+		discAmt  float64
+		taxID    *int
+		taxAmt   float64
+		total    float64
+		pid      *int
+		pname    *string
+		serials  []string
+		notes    *string
+		snapshot saleLineSnapshot
 	}
 	lines := make([]lineComputed, 0, len(req.Items))
 
@@ -1201,18 +1255,27 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 		}
 		subtotal += lineTotal
 		totalTax += taxAmount
+		lineSnapshot := saleLineSnapshot{}
+		if item.ProductID != nil {
+			meta, ok := metaByID[*item.ProductID]
+			if !ok {
+				return nil, fmt.Errorf("product not found")
+			}
+			lineSnapshot = newSaleLineSnapshot(meta, item.Quantity)
+		}
 		lines = append(lines, lineComputed{
-			qty:     item.Quantity,
-			unit:    item.UnitPrice,
-			discPct: item.DiscountPercent,
-			discAmt: discountAmount,
-			taxID:   effectiveTaxID,
-			taxAmt:  taxAmount,
-			total:   lineTotal,
-			pid:     item.ProductID,
-			pname:   item.ProductName,
-			serials: item.SerialNumbers,
-			notes:   item.Notes,
+			qty:      item.Quantity,
+			unit:     item.UnitPrice,
+			discPct:  item.DiscountPercent,
+			discAmt:  discountAmount,
+			taxID:    effectiveTaxID,
+			taxAmt:   taxAmount,
+			total:    lineTotal,
+			pid:      item.ProductID,
+			pname:    item.ProductName,
+			serials:  item.SerialNumbers,
+			notes:    item.Notes,
+			snapshot: lineSnapshot,
 		})
 	}
 
@@ -1239,9 +1302,10 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 		if _, err := tx.Exec(`
             INSERT INTO sale_details (sale_id, product_id, product_name, quantity, unit_price,
                                       discount_percentage, discount_amount, tax_id, tax_amount,
-                                      line_total, serial_numbers, notes)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-        `, saleID, lc.pid, lc.pname, lc.qty, lc.unit, lc.discPct, lc.discAmt, lc.taxID, lc.taxAmt, lc.total, pq.Array(lc.serials), lc.notes); err != nil {
+                                      line_total, serial_numbers, notes, cost_price,
+                                      stock_unit_id, selling_unit_id, selling_uom_mode, selling_to_stock_factor, stock_quantity)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+        `, saleID, lc.pid, lc.pname, lc.qty, lc.unit, lc.discPct, lc.discAmt, lc.taxID, lc.taxAmt, lc.total, pq.Array(lc.serials), lc.notes, lc.snapshot.CostPricePerUnit, lc.snapshot.StockUnitID, lc.snapshot.SellingUnitID, lc.snapshot.SellingUOMMode, lc.snapshot.SellingToStock, lc.snapshot.StockQuantity); err != nil {
 			return nil, fmt.Errorf("failed to create held sale item: %w", err)
 		}
 	}

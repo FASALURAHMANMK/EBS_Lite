@@ -460,6 +460,10 @@ func (h *ProductHandler) CreateUnit(c *gin.Context) {
 
 	unit, err := h.productService.CreateUnit(&req)
 	if err != nil {
+		if err.Error() == "unit already exists" {
+			utils.ConflictResponse(c, "Unit already exists")
+			return
+		}
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create unit", err)
 		return
 	}

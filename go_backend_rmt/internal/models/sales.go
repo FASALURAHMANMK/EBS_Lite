@@ -162,12 +162,17 @@ type POSPrintDataResponse struct {
 }
 
 type POSProductResponse struct {
-	ProductID    int     `json:"product_id"`
-	Name         string  `json:"name"`
-	Price        float64 `json:"price"`
-	Stock        float64 `json:"stock"`
-	Barcode      *string `json:"barcode,omitempty"`
-	CategoryName *string `json:"category_name,omitempty"`
+	ProductID         int     `json:"product_id"`
+	Name              string  `json:"name"`
+	Price             float64 `json:"price"`
+	Stock             float64 `json:"stock"`
+	Barcode           *string `json:"barcode,omitempty"`
+	CategoryName      *string `json:"category_name,omitempty"`
+	IsWeighable       bool    `json:"is_weighable"`
+	SellingUOMMode    string  `json:"selling_uom_mode"`
+	SellingUnitID     *int    `json:"selling_unit_id,omitempty"`
+	SellingUnitName   *string `json:"selling_unit_name,omitempty"`
+	SellingUnitSymbol *string `json:"selling_unit_symbol,omitempty"`
 }
 
 // POSPaymentLine represents an individual payment used in POS checkout, which

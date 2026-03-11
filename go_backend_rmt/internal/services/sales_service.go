@@ -29,9 +29,17 @@ type sqlQueryer interface {
 }
 
 type productMeta struct {
-	TaxID        *int
-	IsSerialized bool
-	CostPrice    float64
+	StockUnitID     *int
+	PurchaseUnitID  *int
+	SellingUnitID   *int
+	TaxID           *int
+	IsSerialized    bool
+	CostPrice       float64
+	PurchaseToStock float64
+	SellingToStock  float64
+	IsWeighable     bool
+	PurchaseUOMMode string
+	SellingUOMMode  string
 }
 
 func uniqueInts(in []int) []int {
@@ -59,7 +67,12 @@ func fetchProductMeta(q sqlQueryer, companyID int, productIDs []int) (map[int]pr
 		return map[int]productMeta{}, nil
 	}
 	rows, err := q.Query(`
-		SELECT product_id, tax_id, is_serialized, COALESCE(cost_price, 0)::float8
+		SELECT product_id, unit_id, purchase_unit_id, selling_unit_id, tax_id, is_serialized, COALESCE(cost_price, 0)::float8,
+		       COALESCE(purchase_to_stock_factor, 1.0)::float8,
+		       COALESCE(selling_to_stock_factor, 1.0)::float8,
+		       COALESCE(is_weighable, FALSE),
+		       COALESCE(purchase_uom_mode, 'LOOSE'),
+		       COALESCE(selling_uom_mode, 'LOOSE')
 		FROM products
 		WHERE company_id = $1 AND is_deleted = FALSE AND product_id = ANY($2)
 	`, companyID, pq.Array(ids))
@@ -71,10 +84,18 @@ func fetchProductMeta(q sqlQueryer, companyID int, productIDs []int) (map[int]pr
 	out := make(map[int]productMeta, len(ids))
 	for rows.Next() {
 		var pid int
+		var stockUnitID sql.NullInt64
+		var purchaseUnitID sql.NullInt64
+		var sellingUnitID sql.NullInt64
 		var taxID sql.NullInt64
 		var isSerialized bool
 		var costPrice float64
-		if err := rows.Scan(&pid, &taxID, &isSerialized, &costPrice); err != nil {
+		var purchaseToStock float64
+		var sellingToStock float64
+		var isWeighable bool
+		var purchaseUOMMode string
+		var sellingUOMMode string
+		if err := rows.Scan(&pid, &stockUnitID, &purchaseUnitID, &sellingUnitID, &taxID, &isSerialized, &costPrice, &purchaseToStock, &sellingToStock, &isWeighable, &purchaseUOMMode, &sellingUOMMode); err != nil {
 			return nil, fmt.Errorf("failed to scan product: %w", err)
 		}
 		var tid *int
@@ -83,9 +104,17 @@ func fetchProductMeta(q sqlQueryer, companyID int, productIDs []int) (map[int]pr
 			tid = &v
 		}
 		out[pid] = productMeta{
-			TaxID:        tid,
-			IsSerialized: isSerialized,
-			CostPrice:    costPrice,
+			StockUnitID:     intPtrFromNullInt64(stockUnitID),
+			PurchaseUnitID:  intPtrFromNullInt64(purchaseUnitID),
+			SellingUnitID:   intPtrFromNullInt64(sellingUnitID),
+			TaxID:           tid,
+			IsSerialized:    isSerialized,
+			CostPrice:       costPrice,
+			PurchaseToStock: normalizeProductUOMFactor(&purchaseToStock),
+			SellingToStock:  normalizeProductUOMFactor(&sellingToStock),
+			IsWeighable:     isWeighable,
+			PurchaseUOMMode: purchaseUOMMode,
+			SellingUOMMode:  sellingUOMMode,
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -889,11 +918,12 @@ func (s *SalesService) CreateSaleWithOptions(
 			if !ok {
 				return nil, fmt.Errorf("product not found")
 			}
+			stockQuantity := saleQuantityToStock(meta, item.Quantity)
 			if meta.IsSerialized {
-				if item.Quantity != float64(int(item.Quantity)) {
+				if stockQuantity != float64(int(stockQuantity)) {
 					return nil, fmt.Errorf("quantity must be a whole number for serialized products")
 				}
-				if len(item.SerialNumbers) != int(item.Quantity) {
+				if len(item.SerialNumbers) != int(stockQuantity) {
 					return nil, fmt.Errorf("serial numbers count must equal quantity for serialized products")
 				}
 				seen := make(map[string]struct{}, len(item.SerialNumbers))
@@ -914,23 +944,25 @@ func (s *SalesService) CreateSaleWithOptions(
 		}
 
 		// Insert sale detail
-		costPrice := 0.0
+		lineSnapshot := saleLineSnapshot{}
 		if item.ProductID != nil {
 			meta, ok := productMetaByID[*item.ProductID]
 			if !ok {
 				return nil, fmt.Errorf("product not found")
 			}
-			costPrice = meta.CostPrice
+			lineSnapshot = newSaleLineSnapshot(meta, item.Quantity)
 		}
 
 		_, err = tx.Exec(`
 			INSERT INTO sale_details (sale_id, product_id, product_name, quantity, unit_price,
 									 discount_percentage, discount_amount, tax_id, tax_amount,
-									 line_total, serial_numbers, notes, cost_price)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+									 line_total, serial_numbers, notes, cost_price,
+									 stock_unit_id, selling_unit_id, selling_uom_mode, selling_to_stock_factor, stock_quantity)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 		`, saleID, item.ProductID, item.ProductName, item.Quantity, item.UnitPrice,
 			item.DiscountPercent, discountAmount, effectiveTaxID, taxAmount, lineTotal,
-			pq.Array(item.SerialNumbers), item.Notes, costPrice)
+			pq.Array(item.SerialNumbers), item.Notes, lineSnapshot.CostPricePerUnit,
+			lineSnapshot.StockUnitID, lineSnapshot.SellingUnitID, lineSnapshot.SellingUOMMode, lineSnapshot.SellingToStock, lineSnapshot.StockQuantity)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to create sale item: %w", err)
@@ -938,7 +970,11 @@ func (s *SalesService) CreateSaleWithOptions(
 
 		// Update stock if product_id is provided (skip in training mode).
 		if !opts.IsTraining && item.ProductID != nil {
-			err = s.updateStock(tx, locationID, *item.ProductID, -item.Quantity)
+			meta, ok := productMetaByID[*item.ProductID]
+			if !ok {
+				return nil, fmt.Errorf("product not found")
+			}
+			err = s.updateStock(tx, locationID, *item.ProductID, -saleQuantityToStock(meta, item.Quantity))
 			if err != nil {
 				return nil, fmt.Errorf("failed to update stock: %w", err)
 			}

@@ -26,6 +26,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   final _itemCode = TextEditingController();
   final _reorder = TextEditingController(text: '0');
   final _initialStock = TextEditingController(text: '0');
+  final _purchaseFactor = TextEditingController(text: '1');
+  final _sellingFactor = TextEditingController(text: '1');
 
   bool _saving = false;
   bool _serialized = false;
@@ -44,6 +46,11 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   int? _categoryId;
   int? _brandId;
   int? _unitId;
+  int? _purchaseUnitId;
+  int? _sellingUnitId;
+  String _purchaseUomMode = 'LOOSE';
+  String _sellingUomMode = 'LOOSE';
+  bool _weighable = false;
   int? _defaultSupplierId;
   int? _taxId;
   String? _taxName;
@@ -62,6 +69,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _itemCode.dispose();
     _reorder.dispose();
     _initialStock.dispose();
+    _purchaseFactor.dispose();
+    _sellingFactor.dispose();
     for (final c in _attrText.values) {
       c.dispose();
     }
@@ -183,6 +192,15 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         categoryId: _categoryId,
         brandId: _brandId,
         unitId: _unitId,
+        purchaseUnitId: _purchaseUnitId,
+        sellingUnitId: _sellingUnitId,
+        purchaseUomMode: _purchaseUomMode,
+        sellingUomMode: _sellingUomMode,
+        purchaseToStockFactor:
+            double.tryParse(_purchaseFactor.text.trim()) ?? 1.0,
+        sellingToStockFactor:
+            double.tryParse(_sellingFactor.text.trim()) ?? 1.0,
+        isWeighable: _weighable,
         defaultSupplierId: _defaultSupplierId,
         description: null,
         weight: null,
@@ -241,238 +259,56 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('New Product')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: Form(
-                key: _formKey,
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    TextFormField(
-                      controller: _name,
-                      decoration: const InputDecoration(labelText: 'Name'),
-                      validator: _req,
-                      textInputAction: TextInputAction.next,
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _supplierController,
-                      readOnly: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Default Supplier',
-                        suffixIcon: Icon(Icons.search_rounded),
-                      ),
-                      onTap: () async {
-                        final picked = await _openSupplierPicker();
-                        if (picked != null) {
-                          setState(() {
-                            _defaultSupplierId = picked.supplierId;
-                            _supplierController.text = picked.name;
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _itemCode,
-                            decoration: const InputDecoration(
-                                labelText: 'Item Code (12-digit if auto)'),
-                            keyboardType: TextInputType.number,
-                            validator: (v) {
-                              if (v == null || v.trim().isEmpty) {
-                                return 'Required';
-                              }
-                              final s = v.trim();
-                              if (!RegExp(r'^\d+$').hasMatch(s)) {
-                                return 'Digits only';
-                              }
-                              if (_autoItemCode && s.length != 12) {
-                                return 'Must be 12 digits when auto';
-                              }
-                              return null;
-                            },
-                            readOnly: _autoItemCode,
-                            onFieldSubmitted: (_) => _submit(),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Column(
-                          children: [
-                            const Text('Auto'),
-                            Switch(
-                              value: _autoItemCode,
-                              onChanged: (v) => setState(() {
-                                _autoItemCode = v;
-                                if (v) _itemCode.text = _generate12DigitCode();
-                              }),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final added = await _showBarcodeDialog(context);
-                          if (added != null) {
-                            setState(() => _barcodes.add(added));
-                          }
-                        },
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Add Barcode'),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (_barcodes.isNotEmpty)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: _barcodes.asMap().entries.map((entry) {
-                          final i = entry.key;
-                          final b = entry.value;
-                          return Card(
-                            elevation: 0,
-                            child: ListTile(
-                              title: Text(b.barcode),
-                              subtitle: Text(
-                                  'Conversion: ${b.packSize ?? 1} • Selling: ${b.sellingPrice?.toStringAsFixed(2) ?? '-'}'),
-                              trailing: Wrap(
-                                spacing: 8,
-                                children: [
-                                  IconButton(
-                                    tooltip: 'Edit',
-                                    icon: const Icon(Icons.edit_outlined),
-                                    onPressed: () async {
-                                      final edited = await _showBarcodeDialog(
-                                          context,
-                                          initial: b);
-                                      if (edited != null) {
-                                        setState(() => _barcodes[i] = edited);
-                                      }
-                                    },
-                                  ),
-                                  IconButton(
-                                    tooltip: 'Delete',
-                                    icon: const Icon(
-                                        Icons.delete_outline_rounded),
-                                    onPressed: () =>
-                                        setState(() => _barcodes.removeAt(i)),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _sku,
-                      decoration: const InputDecoration(labelText: 'SKU'),
-                      textInputAction: TextInputAction.next,
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _price,
-                            decoration: const InputDecoration(
-                                labelText: 'Selling Price'),
-                            keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true),
-                            textInputAction: TextInputAction.next,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _cost,
-                            decoration:
-                                const InputDecoration(labelText: 'Cost Price'),
-                            keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true),
-                            textInputAction: TextInputAction.next,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _reorder,
-                      decoration:
-                          const InputDecoration(labelText: 'Reorder Level'),
-                      keyboardType: TextInputType.number,
-                      textInputAction: TextInputAction.next,
-                    ),
-                    const SizedBox(height: 12),
-                    SwitchListTile.adaptive(
-                      value: _serialized,
-                      onChanged: (v) => setState(() => _serialized = v),
-                      title: const Text('Serialized'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    const SizedBox(height: 12),
-                    _categoryBrandUnitPickers(),
-                    const SizedBox(height: 12),
-                    _SelectField(
-                      label: 'Tax Type',
-                      valueText: _taxName ?? 'None',
-                      icon: Icons.percent_rounded,
-                      onTap: () async {
-                        final picked = await _openTaxPicker();
-                        if (picked != null) {
-                          setState(() {
-                            _taxId = picked.taxId;
-                            final pct = (picked.percentage % 1 == 0)
-                                ? picked.percentage.toStringAsFixed(0)
-                                : picked.percentage.toStringAsFixed(2);
-                            _taxName = '${picked.name} ($pct%)';
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _initialStock,
-                      decoration: const InputDecoration(
-                          labelText: 'Initial Stock (optional)'),
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                    const Divider(height: 24),
-                    if (_attrDefs.isNotEmpty) ...[
-                      Text('Attributes', style: theme.textTheme.titleMedium),
-                      const SizedBox(height: 8),
-                      ..._attrDefs.map((d) => _buildAttrField(d)),
-                      const SizedBox(height: 8),
-                      const Divider(height: 24),
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('New Product'),
+          bottom: const TabBar(
+            isScrollable: true,
+            tabs: [
+              Tab(text: 'General'),
+              Tab(text: 'UOM'),
+              Tab(text: 'Barcodes'),
+              Tab(text: 'Attributes'),
+            ],
+          ),
+        ),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : SafeArea(
+                child: Form(
+                  key: _formKey,
+                  child: TabBarView(
+                    children: [
+                      _buildGeneralTab(),
+                      _buildUomTab(),
+                      _buildBarcodeTab(),
+                      _buildAttributesTab(),
                     ],
-                    SizedBox(
-                      height: 52,
-                      child: FilledButton(
-                        onPressed: _saving ? null : _submit,
-                        child: _saving
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2.4),
-                              )
-                            : const Text('Create'),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: SizedBox(
+              height: 52,
+              child: FilledButton(
+                onPressed: _saving ? null : _submit,
+                child: _saving
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2.4),
+                      )
+                    : const Text('Create'),
+              ),
             ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -836,6 +672,358 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     }
   }
 
+  String _unitLabel(int? unitId) {
+    final u = _units.firstWhere(
+      (e) => e.unitId == unitId,
+      orElse: () => UnitDto(unitId: -1, name: ''),
+    );
+    if (u.unitId == -1) return '';
+    return '${u.name}${u.symbol != null ? ' (${u.symbol})' : ''}';
+  }
+
+  Widget _buildGeneralTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        TextFormField(
+          controller: _name,
+          decoration: const InputDecoration(labelText: 'Name'),
+          validator: _req,
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _supplierController,
+          readOnly: true,
+          decoration: const InputDecoration(
+            labelText: 'Default Supplier',
+            suffixIcon: Icon(Icons.search_rounded),
+          ),
+          onTap: () async {
+            final picked = await _openSupplierPicker();
+            if (picked != null) {
+              setState(() {
+                _defaultSupplierId = picked.supplierId;
+                _supplierController.text = picked.name;
+              });
+            }
+          },
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _itemCode,
+                decoration: const InputDecoration(
+                    labelText: 'Item Code (12-digit if auto)'),
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Required';
+                  final s = v.trim();
+                  if (!RegExp(r'^\d+$').hasMatch(s)) return 'Digits only';
+                  if (_autoItemCode && s.length != 12) {
+                    return 'Must be 12 digits when auto';
+                  }
+                  return null;
+                },
+                readOnly: _autoItemCode,
+                onFieldSubmitted: (_) => _submit(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              children: [
+                const Text('Auto'),
+                Switch(
+                  value: _autoItemCode,
+                  onChanged: (v) => setState(() {
+                    _autoItemCode = v;
+                    if (v) _itemCode.text = _generate12DigitCode();
+                  }),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _sku,
+          decoration: const InputDecoration(labelText: 'SKU'),
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _price,
+                decoration: const InputDecoration(labelText: 'Selling Price'),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                textInputAction: TextInputAction.next,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextFormField(
+                controller: _cost,
+                decoration: const InputDecoration(labelText: 'Cost Price'),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                textInputAction: TextInputAction.next,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _reorder,
+          decoration: const InputDecoration(labelText: 'Reorder Level'),
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 12),
+        SwitchListTile.adaptive(
+          value: _serialized,
+          onChanged: (v) => setState(() => _serialized = v),
+          title: const Text('Serialized'),
+          contentPadding: EdgeInsets.zero,
+        ),
+        SwitchListTile.adaptive(
+          value: _weighable,
+          onChanged: (v) => setState(() => _weighable = v),
+          title: const Text('Weighable'),
+          subtitle: const Text('Prompt quantity entry when selected in POS'),
+          contentPadding: EdgeInsets.zero,
+        ),
+        const SizedBox(height: 12),
+        _categoryBrandUnitPickers(),
+        const SizedBox(height: 12),
+        _SelectField(
+          label: 'Tax Type',
+          valueText: _taxName ?? 'None',
+          icon: Icons.percent_rounded,
+          onTap: () async {
+            final picked = await _openTaxPicker();
+            if (picked != null) {
+              setState(() {
+                _taxId = picked.taxId;
+                final pct = (picked.percentage % 1 == 0)
+                    ? picked.percentage.toStringAsFixed(0)
+                    : picked.percentage.toStringAsFixed(2);
+                _taxName = '${picked.name} ($pct%)';
+              });
+            }
+          },
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _initialStock,
+          decoration:
+              const InputDecoration(labelText: 'Initial Stock (optional)'),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUomTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _SelectField(
+          label: 'Stock Keeping UOM',
+          valueText: _unitLabel(_unitId),
+          icon: Icons.inventory_2_outlined,
+          onTap: () async {
+            final picked = await _openSingleUnitDialog();
+            if (picked != null) {
+              setState(() {
+                _unitId = picked.unitId;
+                _purchaseUnitId ??= picked.unitId;
+                _sellingUnitId ??= picked.unitId;
+              });
+            }
+          },
+        ),
+        const SizedBox(height: 16),
+        _SelectField(
+          label: 'Purchase UOM',
+          valueText: _unitLabel(_purchaseUnitId),
+          icon: Icons.shopping_bag_outlined,
+          onTap: () async {
+            final picked = await _openSingleUnitDialog();
+            if (picked != null) {
+              setState(() => _purchaseUnitId = picked.unitId);
+            }
+          },
+        ),
+        const SizedBox(height: 12),
+        _buildModeSelector(
+          label: 'Purchase Mode',
+          value: _purchaseUomMode,
+          onChanged: (value) => setState(() => _purchaseUomMode = value),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _purchaseFactor,
+          decoration: const InputDecoration(
+            labelText: 'Stock Qty per Purchase UOM',
+            helperText: 'Example: 12 means 1 purchase UOM = 12 stock units',
+          ),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          validator: (v) {
+            final value = double.tryParse((v ?? '').trim());
+            if (value == null || value <= 0) return 'Enter a value above 0';
+            return null;
+          },
+        ),
+        const SizedBox(height: 20),
+        _SelectField(
+          label: 'Selling UOM',
+          valueText: _unitLabel(_sellingUnitId),
+          icon: Icons.point_of_sale_outlined,
+          onTap: () async {
+            final picked = await _openSingleUnitDialog();
+            if (picked != null) {
+              setState(() => _sellingUnitId = picked.unitId);
+            }
+          },
+        ),
+        const SizedBox(height: 12),
+        _buildModeSelector(
+          label: 'Selling Mode',
+          value: _sellingUomMode,
+          onChanged: (value) => setState(() => _sellingUomMode = value),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _sellingFactor,
+          decoration: const InputDecoration(
+            labelText: 'Stock Qty per Selling UOM',
+            helperText:
+                'Example: 0.5 for half-kg, 1 for loose, 6 for half-dozen',
+          ),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          validator: (v) {
+            final value = double.tryParse((v ?? '').trim());
+            if (value == null || value <= 0) return 'Enter a value above 0';
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBarcodeTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              final added = await _showBarcodeDialog(context);
+              if (added != null) {
+                setState(() => _barcodes.add(added));
+              }
+            },
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Add Barcode'),
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (_barcodes.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 24),
+            child: Center(child: Text('No barcodes added')),
+          )
+        else
+          ..._barcodes.asMap().entries.map((entry) {
+            final i = entry.key;
+            final b = entry.value;
+            return Card(
+              elevation: 0,
+              child: ListTile(
+                title: Text(b.barcode),
+                subtitle: Text(
+                    'Conversion: ${b.packSize ?? 1} • Selling: ${b.sellingPrice?.toStringAsFixed(2) ?? '-'}'),
+                trailing: Wrap(
+                  spacing: 8,
+                  children: [
+                    IconButton(
+                      tooltip: 'Edit',
+                      icon: const Icon(Icons.edit_outlined),
+                      onPressed: () async {
+                        final edited =
+                            await _showBarcodeDialog(context, initial: b);
+                        if (edited != null) {
+                          setState(() => _barcodes[i] = edited);
+                        }
+                      },
+                    ),
+                    IconButton(
+                      tooltip: 'Delete',
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      onPressed: () => setState(() => _barcodes.removeAt(i)),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  Widget _buildAttributesTab() {
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (_attrDefs.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 24),
+            child: Center(child: Text('No attribute definitions')),
+          )
+        else ...[
+          Text('Attributes', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          ..._attrDefs.map(_buildAttrField),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildModeSelector({
+    required String label,
+    required String value,
+    required ValueChanged<String> onChanged,
+  }) {
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+      ),
+      child: RadioGroup<String>(
+        groupValue: value,
+        onChanged: (next) {
+          if (next != null) onChanged(next);
+        },
+        child: const Row(
+          children: [
+            Radio<String>(value: 'LOOSE'),
+            Text('Loose'),
+            SizedBox(width: 16),
+            Radio<String>(value: 'PACK'),
+            Text('Pack'),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _categoryBrandUnitPickers() {
     return Column(
       children: [
@@ -885,25 +1073,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 12),
-        _SelectField(
-          label: 'Unit',
-          valueText: () {
-            final u = _units.firstWhere(
-              (e) => e.unitId == _unitId,
-              orElse: () => UnitDto(unitId: -1, name: ''),
-            );
-            if (u.unitId == -1) return '';
-            return '${u.name}${u.symbol != null ? ' (${u.symbol})' : ''}';
-          }(),
-          icon: Icons.straighten_rounded,
-          onTap: () async {
-            final picked = await _openSingleUnitDialog();
-            if (picked != null) {
-              setState(() => _unitId = picked.unitId);
-            }
-          },
         ),
       ],
     );

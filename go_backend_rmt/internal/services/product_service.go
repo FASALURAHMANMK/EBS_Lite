@@ -30,6 +30,49 @@ func NewProductService() *ProductService {
 	}
 }
 
+func normalizeUnitName(name string) string {
+	return strings.TrimSpace(name)
+}
+
+func normalizeUnitSymbol(symbol *string) *string {
+	if symbol == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*symbol)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
+func normalizeUnitConversionFactor(factor *float64) *float64 {
+	if factor != nil {
+		return factor
+	}
+	defaultFactor := 1.0
+	return &defaultFactor
+}
+
+func unitDedupKey(name string, symbol *string, baseUnitID *int, conversionFactor *float64) string {
+	normalizedName := strings.ToLower(strings.TrimSpace(name))
+	normalizedSymbol := ""
+	if symbol != nil {
+		normalizedSymbol = strings.ToLower(strings.TrimSpace(*symbol))
+	}
+
+	baseID := 0
+	if baseUnitID != nil {
+		baseID = *baseUnitID
+	}
+
+	factor := 1.0
+	if conversionFactor != nil {
+		factor = *conversionFactor
+	}
+
+	return fmt.Sprintf("%s|%s|%d|%.6f", normalizedName, normalizedSymbol, baseID, factor)
+}
+
 // validateSinglePrimaryBarcode ensures exactly one barcode is marked as primary.
 func validateSinglePrimaryBarcode(barcodes []models.ProductBarcode) error {
 	count := 0
@@ -46,7 +89,8 @@ func validateSinglePrimaryBarcode(barcodes []models.ProductBarcode) error {
 
 func (s *ProductService) GetProducts(companyID int, filters map[string]string) ([]models.Product, error) {
 	query := `
-                SELECT product_id, company_id, category_id, brand_id, unit_id, name, sku,
+                SELECT product_id, company_id, category_id, brand_id, unit_id, purchase_unit_id, selling_unit_id,
+                           purchase_uom_mode, selling_uom_mode, purchase_to_stock_factor, selling_to_stock_factor, is_weighable, name, sku,
                            description, cost_price, selling_price, reorder_level, weight, dimensions,
                            is_serialized, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted
                 FROM products
@@ -89,7 +133,9 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 		var product models.Product
 		err := rows.Scan(
 			&product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
-			&product.UnitID, &product.Name, &product.SKU, &product.Description,
+			&product.UnitID, &product.PurchaseUnitID, &product.SellingUnitID,
+			&product.PurchaseUOMMode, &product.SellingUOMMode, &product.PurchaseToStock, &product.SellingToStock, &product.IsWeighable,
+			&product.Name, &product.SKU, &product.Description,
 			&product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
 			&product.Dimensions, &product.IsSerialized, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
 			&product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
@@ -127,7 +173,8 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 
 func (s *ProductService) GetProductByID(productID, companyID int) (*models.Product, error) {
 	query := `
-                SELECT product_id, company_id, category_id, brand_id, unit_id, name, sku,
+                SELECT product_id, company_id, category_id, brand_id, unit_id, purchase_unit_id, selling_unit_id,
+                           purchase_uom_mode, selling_uom_mode, purchase_to_stock_factor, selling_to_stock_factor, is_weighable, name, sku,
                            description, cost_price, selling_price, reorder_level, weight, dimensions,
                            is_serialized, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted,
                            default_supplier_id, tax_id
@@ -138,7 +185,9 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
 	var product models.Product
 	err := s.db.QueryRow(query, productID, companyID).Scan(
 		&product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
-		&product.UnitID, &product.Name, &product.SKU, &product.Description,
+		&product.UnitID, &product.PurchaseUnitID, &product.SellingUnitID,
+		&product.PurchaseUOMMode, &product.SellingUOMMode, &product.PurchaseToStock, &product.SellingToStock, &product.IsWeighable,
+		&product.Name, &product.SKU, &product.Description,
 		&product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
 		&product.Dimensions, &product.IsSerialized, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
 		&product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
@@ -169,6 +218,24 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 	if err := validateSinglePrimaryBarcode(req.Barcodes); err != nil {
 		return nil, err
 	}
+	purchaseMode, err := normalizeProductUOMMode(req.PurchaseUOMMode)
+	if err != nil {
+		return nil, err
+	}
+	sellingMode, err := normalizeProductUOMMode(req.SellingUOMMode)
+	if err != nil {
+		return nil, err
+	}
+	purchaseFactor := normalizeProductUOMFactor(req.PurchaseToStock)
+	sellingFactor := normalizeProductUOMFactor(req.SellingToStock)
+	purchaseUnitID := req.PurchaseUnitID
+	if purchaseUnitID == nil {
+		purchaseUnitID = req.UnitID
+	}
+	sellingUnitID := req.SellingUnitID
+	if sellingUnitID == nil {
+		sellingUnitID = req.UnitID
+	}
 	if req.SKU != nil {
 		exists, err := s.checkProductExists(companyID, req.SKU, nil, 0)
 		if err != nil {
@@ -197,16 +264,18 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 
 	query := `
                 INSERT INTO products (
-                        company_id, category_id, brand_id, unit_id, tax_id, name, sku, description,
-                        cost_price, selling_price, reorder_level, weight, dimensions, is_serialized,
-                        created_by, updated_by, default_supplier_id
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+                        company_id, category_id, brand_id, unit_id, purchase_unit_id, selling_unit_id,
+                        purchase_uom_mode, selling_uom_mode, purchase_to_stock_factor, selling_to_stock_factor,
+                        is_weighable, tax_id, name, sku, description, cost_price, selling_price, reorder_level,
+                        weight, dimensions, is_serialized, created_by, updated_by, default_supplier_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
                 RETURNING product_id, created_at
         `
 
 	var product models.Product
 	err = tx.QueryRow(query,
-		companyID, req.CategoryID, req.BrandID, req.UnitID, req.TaxID, req.Name, req.SKU,
+		companyID, req.CategoryID, req.BrandID, req.UnitID, purchaseUnitID, sellingUnitID,
+		purchaseMode, sellingMode, purchaseFactor, sellingFactor, req.IsWeighable, req.TaxID, req.Name, req.SKU,
 		req.Description, req.CostPrice, req.SellingPrice, req.ReorderLevel, req.Weight,
 		req.Dimensions, req.IsSerialized, userID, userID, req.DefaultSupplierID,
 	).Scan(&product.ProductID, &product.CreatedAt)
@@ -236,6 +305,13 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 	product.CategoryID = req.CategoryID
 	product.BrandID = req.BrandID
 	product.UnitID = req.UnitID
+	product.PurchaseUnitID = purchaseUnitID
+	product.SellingUnitID = sellingUnitID
+	product.PurchaseUOMMode = purchaseMode
+	product.SellingUOMMode = sellingMode
+	product.PurchaseToStock = purchaseFactor
+	product.SellingToStock = sellingFactor
+	product.IsWeighable = req.IsWeighable
 	product.Name = req.Name
 	product.TaxID = req.TaxID
 	product.SKU = req.SKU
@@ -312,6 +388,58 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 		setParts = append(setParts, fmt.Sprintf("unit_id = $%d", argCount))
 		args = append(args, *req.UnitID)
 		changes["unit_id"] = *req.UnitID
+	}
+	if req.PurchaseUnitID != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("purchase_unit_id = $%d", argCount))
+		args = append(args, *req.PurchaseUnitID)
+		changes["purchase_unit_id"] = *req.PurchaseUnitID
+	}
+	if req.SellingUnitID != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("selling_unit_id = $%d", argCount))
+		args = append(args, *req.SellingUnitID)
+		changes["selling_unit_id"] = *req.SellingUnitID
+	}
+	if req.PurchaseUOMMode != nil {
+		mode, err := normalizeProductUOMMode(req.PurchaseUOMMode)
+		if err != nil {
+			return nil, err
+		}
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("purchase_uom_mode = $%d", argCount))
+		args = append(args, mode)
+		changes["purchase_uom_mode"] = mode
+	}
+	if req.SellingUOMMode != nil {
+		mode, err := normalizeProductUOMMode(req.SellingUOMMode)
+		if err != nil {
+			return nil, err
+		}
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("selling_uom_mode = $%d", argCount))
+		args = append(args, mode)
+		changes["selling_uom_mode"] = mode
+	}
+	if req.PurchaseToStock != nil {
+		factor := normalizeProductUOMFactor(req.PurchaseToStock)
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("purchase_to_stock_factor = $%d", argCount))
+		args = append(args, factor)
+		changes["purchase_to_stock_factor"] = factor
+	}
+	if req.SellingToStock != nil {
+		factor := normalizeProductUOMFactor(req.SellingToStock)
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("selling_to_stock_factor = $%d", argCount))
+		args = append(args, factor)
+		changes["selling_to_stock_factor"] = factor
+	}
+	if req.IsWeighable != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("is_weighable = $%d", argCount))
+		args = append(args, *req.IsWeighable)
+		changes["is_weighable"] = *req.IsWeighable
 	}
 	if req.Name != nil {
 		argCount++
@@ -726,7 +854,7 @@ func (s *ProductService) GetUnits() ([]models.Unit, error) {
 	query := `
 		SELECT unit_id, name, symbol, base_unit_id, conversion_factor
 		FROM units 
-		ORDER BY name
+		ORDER BY LOWER(TRIM(name)), LOWER(TRIM(COALESCE(symbol, ''))), unit_id
 	`
 
 	rows, err := s.db.Query(query)
@@ -736,6 +864,7 @@ func (s *ProductService) GetUnits() ([]models.Unit, error) {
 	defer rows.Close()
 
 	var units []models.Unit
+	seen := make(map[string]struct{})
 	for rows.Next() {
 		var unit models.Unit
 		err := rows.Scan(
@@ -744,13 +873,54 @@ func (s *ProductService) GetUnits() ([]models.Unit, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan unit: %w", err)
 		}
+		unit.Name = normalizeUnitName(unit.Name)
+		unit.Symbol = normalizeUnitSymbol(unit.Symbol)
+		unit.ConversionFactor = normalizeUnitConversionFactor(unit.ConversionFactor)
+		key := unitDedupKey(unit.Name, unit.Symbol, unit.BaseUnitID, unit.ConversionFactor)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
 		units = append(units, unit)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read units: %w", err)
 	}
 
 	return units, nil
 }
 
 func (s *ProductService) CreateUnit(req *models.CreateUnitRequest) (*models.Unit, error) {
+	name := normalizeUnitName(req.Name)
+	if name == "" {
+		return nil, fmt.Errorf("unit name is required")
+	}
+	symbol := normalizeUnitSymbol(req.Symbol)
+	conversionFactor := normalizeUnitConversionFactor(req.ConversionFactor)
+
+	existingQuery := `
+		SELECT unit_id, name, symbol, base_unit_id, conversion_factor
+		FROM units
+		WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))
+		  AND LOWER(TRIM(COALESCE(symbol, ''))) = LOWER(TRIM(COALESCE($2, '')))
+		  AND COALESCE(base_unit_id, 0) = COALESCE($3, 0)
+		  AND COALESCE(conversion_factor, 1.0) = COALESCE($4, 1.0)
+		ORDER BY unit_id
+		LIMIT 1
+	`
+
+	var existing models.Unit
+	err := s.db.QueryRow(existingQuery, name, symbol, req.BaseUnitID, conversionFactor).Scan(
+		&existing.UnitID, &existing.Name, &existing.Symbol, &existing.BaseUnitID, &existing.ConversionFactor,
+	)
+	if err == nil {
+		return nil, fmt.Errorf("unit already exists")
+	}
+	if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("failed to check existing unit: %w", err)
+	}
+
 	query := `
 		INSERT INTO units (name, symbol, base_unit_id, conversion_factor)
 		VALUES ($1, $2, $3, $4)
@@ -758,16 +928,16 @@ func (s *ProductService) CreateUnit(req *models.CreateUnitRequest) (*models.Unit
 	`
 
 	var unit models.Unit
-	err := s.db.QueryRow(query, req.Name, req.Symbol, req.BaseUnitID, req.ConversionFactor).Scan(&unit.UnitID)
+	err = s.db.QueryRow(query, name, symbol, req.BaseUnitID, conversionFactor).Scan(&unit.UnitID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create unit: %w", err)
 	}
 
-	unit.Name = req.Name
-	unit.Symbol = req.Symbol
+	unit.Name = name
+	unit.Symbol = symbol
 	unit.BaseUnitID = req.BaseUnitID
-	unit.ConversionFactor = req.ConversionFactor
+	unit.ConversionFactor = conversionFactor
 
 	return &unit, nil
 }

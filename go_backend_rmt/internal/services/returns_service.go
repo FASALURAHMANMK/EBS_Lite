@@ -14,11 +14,16 @@ type ReturnsService struct {
 }
 
 type saleReturnAllocation struct {
-	SaleDetailID int
-	Quantity     float64
-	UnitPrice    float64
-	TaxAmount    float64
-	CostPrice    float64
+	SaleDetailID   int
+	Quantity       float64
+	UnitPrice      float64
+	TaxAmount      float64
+	CostPrice      float64
+	StockQuantity  float64
+	StockUnitID    *int
+	SellingUnitID  *int
+	SellingUOMMode string
+	SellingToStock float64
 }
 
 func NewReturnsService() *ReturnsService {
@@ -282,21 +287,20 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 
 			_, err = tx.Exec(`
 				INSERT INTO sale_return_details (
-					return_id, sale_detail_id, product_id, quantity, unit_price, line_total, tax_amount, cost_price
+					return_id, sale_detail_id, product_id, quantity, unit_price, line_total, tax_amount, cost_price,
+					stock_unit_id, selling_unit_id, selling_uom_mode, selling_to_stock_factor, stock_quantity
 				)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-			`, returnID, allocation.SaleDetailID, item.ProductID, allocation.Quantity, item.UnitPrice, lineTotal, allocation.TaxAmount, allocation.CostPrice)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+			`, returnID, allocation.SaleDetailID, item.ProductID, allocation.Quantity, item.UnitPrice, lineTotal, allocation.TaxAmount, allocation.CostPrice, allocation.StockUnitID, allocation.SellingUnitID, allocation.SellingUOMMode, allocation.SellingToStock, allocation.StockQuantity)
 
 			if err != nil {
 				return nil, fmt.Errorf("failed to create return item: %w", err)
 			}
-		}
-
-		// Update stock (add back returned quantity) - skip in training mode.
-		if !isTraining {
-			err = s.updateStock(tx, locationID, item.ProductID, item.Quantity)
-			if err != nil {
-				return nil, fmt.Errorf("failed to update stock: %w", err)
+			if !isTraining {
+				err = s.updateStock(tx, locationID, item.ProductID, allocation.StockQuantity)
+				if err != nil {
+					return nil, fmt.Errorf("failed to update stock: %w", err)
+				}
 			}
 		}
 	}
@@ -756,6 +760,11 @@ func (s *ReturnsService) allocateSaleReturnLines(tx *sql.Tx, companyID, saleID, 
 			sd.unit_price,
 			COALESCE(sd.tax_amount, 0)::float8 AS tax_amount,
 			COALESCE(sd.cost_price, 0)::float8 AS cost_price,
+			COALESCE(sd.selling_to_stock_factor, 1.0)::float8 AS selling_to_stock_factor,
+			COALESCE(NULLIF(sd.stock_quantity, 0), sd.quantity * COALESCE(sd.selling_to_stock_factor, 1.0))::float8 AS stock_quantity,
+			COALESCE(sd.selling_uom_mode, 'LOOSE') AS selling_uom_mode,
+			sd.stock_unit_id,
+			sd.selling_unit_id,
 			COALESCE(ret.returned_qty, 0)::float8 AS returned_qty
 		FROM sale_details sd
 		JOIN sales s ON s.sale_id = sd.sale_id
@@ -791,8 +800,13 @@ func (s *ReturnsService) allocateSaleReturnLines(tx *sql.Tx, companyID, saleID, 
 		var unitPrice float64
 		var taxAmount float64
 		var costPrice float64
+		var sellingToStock float64
+		var stockQuantity float64
+		var sellingUOMMode string
+		var stockUnitID *int
+		var sellingUnitID *int
 		var returnedQty float64
-		if err := rows.Scan(&saleDetailID, &quantity, &unitPrice, &taxAmount, &costPrice, &returnedQty); err != nil {
+		if err := rows.Scan(&saleDetailID, &quantity, &unitPrice, &taxAmount, &costPrice, &sellingToStock, &stockQuantity, &sellingUOMMode, &stockUnitID, &sellingUnitID, &returnedQty); err != nil {
 			return nil, err
 		}
 		available := quantity - returnedQty
@@ -811,12 +825,21 @@ func (s *ReturnsService) allocateSaleReturnLines(tx *sql.Tx, companyID, saleID, 
 		if quantity > 0 {
 			perUnitTax = taxAmount / quantity
 		}
+		perUnitStock := 0.0
+		if quantity != 0 {
+			perUnitStock = stockQuantity / quantity
+		}
 		allocations = append(allocations, saleReturnAllocation{
-			SaleDetailID: saleDetailID,
-			Quantity:     allocatedQty,
-			UnitPrice:    unitPrice,
-			TaxAmount:    perUnitTax * allocatedQty,
-			CostPrice:    costPrice,
+			SaleDetailID:   saleDetailID,
+			Quantity:       allocatedQty,
+			UnitPrice:      unitPrice,
+			TaxAmount:      perUnitTax * allocatedQty,
+			CostPrice:      costPrice,
+			StockQuantity:  perUnitStock * allocatedQty,
+			StockUnitID:    stockUnitID,
+			SellingUnitID:  sellingUnitID,
+			SellingUOMMode: sellingUOMMode,
+			SellingToStock: sellingToStock,
 		})
 		remaining -= allocatedQty
 		if remaining <= 0.000001 {

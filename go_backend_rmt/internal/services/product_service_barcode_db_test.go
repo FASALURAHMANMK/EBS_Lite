@@ -75,13 +75,13 @@ func (c *barcodeMockConn) QueryContext(ctx context.Context, query string, args [
 	}
 	if strings.Contains(lower, "from products") {
 		if strings.Contains(lower, "default_supplier_id") || strings.Contains(lower, "tax_id") {
-			cols := []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted", "default_supplier_id", "tax_id"}
-			vals := []driver.Value{int64(1), int64(1), nil, nil, nil, "name", "sku", "desc", float64(0), float64(0), int64(0), nil, nil, false, true, int64(1), nil, "synced", time.Now(), time.Now(), false, nil, int64(1)}
+			cols := []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "purchase_unit_id", "selling_unit_id", "purchase_uom_mode", "selling_uom_mode", "purchase_to_stock_factor", "selling_to_stock_factor", "is_weighable", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted", "default_supplier_id", "tax_id"}
+			vals := []driver.Value{int64(1), int64(1), nil, nil, nil, nil, nil, "LOOSE", "LOOSE", float64(1), float64(1), false, "name", "sku", "desc", float64(0), float64(0), int64(0), nil, nil, false, true, int64(1), nil, "synced", time.Now(), time.Now(), false, nil, int64(1)}
 			return &barcodeMockRows{cols: cols, vals: [][]driver.Value{vals}}, nil
 		}
 
-		cols := []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted"}
-		vals := []driver.Value{int64(1), int64(1), nil, nil, nil, "name", "sku", "desc", float64(0), float64(0), int64(0), nil, nil, false, true, int64(1), nil, "synced", time.Now(), time.Now(), false}
+		cols := []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "purchase_unit_id", "selling_unit_id", "purchase_uom_mode", "selling_uom_mode", "purchase_to_stock_factor", "selling_to_stock_factor", "is_weighable", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted"}
+		vals := []driver.Value{int64(1), int64(1), nil, nil, nil, nil, nil, "LOOSE", "LOOSE", float64(1), float64(1), false, "name", "sku", "desc", float64(0), float64(0), int64(0), nil, nil, false, true, int64(1), nil, "synced", time.Now(), time.Now(), false}
 		return &barcodeMockRows{cols: cols, vals: [][]driver.Value{vals}}, nil
 	}
 	if strings.Contains(lower, "from product_barcodes") {
