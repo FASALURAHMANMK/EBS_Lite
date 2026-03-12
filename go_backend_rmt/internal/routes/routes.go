@@ -257,6 +257,9 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			inventory.Use(middleware.RequireCompanyAccess())
 			{
 				inventory.GET("/stock", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStock)
+				inventory.GET("/variants", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockVariants)
+				inventory.GET("/batches", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockBatches)
+				inventory.GET("/serials", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetAvailableSerials)
 				inventory.POST("/stock-adjustment", middleware.RequirePermission("ADJUST_STOCK"), inventoryHandler.AdjustStock)
 				inventory.GET("/stock-adjustments", middleware.RequirePermission("VIEW_INVENTORY"), inventoryHandler.GetStockAdjustments)
 				// Stock adjustment documents
@@ -663,6 +666,9 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 
 				settings.GET("/company", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetCompanySettings)
 				settings.PUT("/company", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.UpdateCompanySettings)
+
+				settings.GET("/inventory", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetInventorySettings)
+				settings.PUT("/inventory", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.UpdateInventorySettings)
 
 				settings.GET("/invoice", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetInvoiceSettings)
 				settings.PUT("/invoice", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.UpdateInvoiceSettings)

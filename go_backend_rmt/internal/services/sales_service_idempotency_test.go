@@ -87,15 +87,15 @@ func TestSalesService_CreateSale_IdempotencyUniqueViolationReturnsExisting(t *te
 			nil, nil,
 		))
 
-	mock.ExpectQuery("(?s)SELECT sd.sale_detail_id, sd.sale_id, sd.product_id, sd.product_name, sd.quantity,.*FROM sale_details sd.*WHERE sd.sale_id = \\$1 AND l.company_id = \\$2.*ORDER BY sd.sale_detail_id").
+	mock.ExpectQuery("(?s)SELECT sd.sale_detail_id, sd.sale_id, sd.product_id, sd.barcode_id, sd.product_name, sd.quantity,.*FROM sale_details sd.*WHERE sd.sale_id = \\$1 AND l.company_id = \\$2.*ORDER BY sd.sale_detail_id").
 		WithArgs(99, companyID).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"sale_detail_id", "sale_id", "product_id", "product_name", "quantity",
+			"sale_detail_id", "sale_id", "product_id", "barcode_id", "product_name", "quantity",
 			"unit_price", "discount_percentage", "discount_amount", "tax_id",
 			"tax_amount", "line_total", "serial_numbers", "notes",
 			"product_name_from_table",
 		}).AddRow(
-			1, 99, nil, productName, 1.0,
+			1, 99, nil, nil, productName, 1.0,
 			10.0, 0.0, 0.0, nil,
 			0.0, 10.0, "{}", nil,
 			nil,

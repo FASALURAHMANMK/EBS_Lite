@@ -26,6 +26,15 @@ class SettingsRepository {
     await _dio.put('/settings/company', data: cfg.toJson());
   }
 
+  Future<InventorySettingsDto> getInventorySettings() async {
+    final res = await _dio.get('/settings/inventory');
+    return InventorySettingsDto.fromJson(_extractDataMap(res.data));
+  }
+
+  Future<void> updateInventorySettings(UpdateInventorySettingsDto cfg) async {
+    await _dio.put('/settings/inventory', data: cfg.toJson());
+  }
+
   Future<InvoiceSettingsDto> getInvoiceSettings() async {
     final res = await _dio.get('/settings/invoice');
     return InvoiceSettingsDto.fromJson(_extractDataMap(res.data));

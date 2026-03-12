@@ -5,6 +5,7 @@ import '../../../../core/error_handler.dart';
 import '../../../../shared/widgets/app_selection_dialog.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
+import '../widgets/inventory_tracking_selector.dart';
 import '../../../suppliers/data/supplier_repository.dart';
 import '../../../dashboard/data/taxes_repository.dart';
 
@@ -31,6 +32,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
 
   bool _saving = false;
   bool _serialized = false;
+  String _trackingType = 'VARIANT';
   bool _loading = true;
   bool _autoItemCode = false;
 
@@ -160,6 +162,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             sellingPrice: barcodes[idx].sellingPrice ??
                 double.tryParse(_price.text.trim()),
             isPrimary: true,
+            variantName: barcodes[idx].variantName,
+            variantAttributes: barcodes[idx].variantAttributes,
+            isActive: barcodes[idx].isActive,
           );
         } else {
           barcodes.insert(
@@ -170,6 +175,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               costPrice: double.tryParse(_cost.text.trim()),
               sellingPrice: double.tryParse(_price.text.trim()),
               isPrimary: true,
+              isActive: true,
             ),
           );
         }
@@ -187,6 +193,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         costPrice: double.tryParse(_cost.text.trim()),
         reorderLevel: int.tryParse(_reorder.text.trim()) ?? 0,
         isSerialized: _serialized,
+        trackingType: _trackingType,
         barcodes: barcodes,
         attributes: attrs,
         categoryId: _categoryId,
@@ -208,12 +215,47 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         taxId: _taxId!,
       );
       final created = await repo.createProduct(payload);
+      if (!mounted) return;
       final initQty = double.tryParse(_initialStock.text.trim()) ?? 0;
       if (initQty != 0) {
+        InventoryTrackingSelection? trackingSelection;
+        if (initQty > 0 &&
+            (_trackingType == 'SERIAL' || _trackingType == 'BATCH')) {
+          trackingSelection = await showInventoryTrackingSelector(
+            context: context,
+            ref: ref,
+            productId: created.productId,
+            productName: created.name,
+            quantity: initQty,
+            mode: InventoryTrackingMode.receive,
+          );
+          if (trackingSelection == null) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Product created without initial stock. Add the tracked stock later from inventory adjustments.',
+                  ),
+                ),
+              );
+            Navigator.of(context).pop(true);
+            return;
+          }
+        }
+
         await repo.adjustStock(
           productId: created.productId,
           adjustment: initQty,
           reason: 'Initial stock',
+          barcodeId: trackingSelection?.barcodeId,
+          serialNumbers: trackingSelection?.serialNumbers,
+          batchAllocations: trackingSelection?.batchAllocations
+              .map((e) => e.toJson())
+              .toList(),
+          batchNumber: trackingSelection?.batchNumber,
+          expiryDate: trackingSelection?.expiryDate,
         );
       }
       if (!mounted) return;
@@ -784,12 +826,44 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: 12),
-        SwitchListTile.adaptive(
-          value: _serialized,
-          onChanged: (v) => setState(() => _serialized = v),
-          title: const Text('Serialized'),
-          contentPadding: EdgeInsets.zero,
+        DropdownButtonFormField<String>(
+          initialValue: _trackingType,
+          decoration: const InputDecoration(
+            labelText: 'Inventory Tracking',
+            border: OutlineInputBorder(),
+          ),
+          items: const [
+            DropdownMenuItem(
+              value: 'VARIANT',
+              child: Text('Variation / Barcode'),
+            ),
+            DropdownMenuItem(
+              value: 'SERIAL',
+              child: Text('Serial Number'),
+            ),
+            DropdownMenuItem(
+              value: 'BATCH',
+              child: Text('Batch / Expiry'),
+            ),
+          ],
+          onChanged: (value) {
+            if (value == null) return;
+            setState(() {
+              _trackingType = value;
+              _serialized = value == 'SERIAL';
+            });
+          },
         ),
+        const SizedBox(height: 8),
+        Text(
+          _trackingType == 'SERIAL'
+              ? 'Every stock unit requires a unique serial number.'
+              : _trackingType == 'BATCH'
+                  ? 'Stock-out operations will consume selected batches.'
+                  : 'Stock is tracked by barcode variation.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 8),
         SwitchListTile.adaptive(
           value: _weighable,
           onChanged: (v) => setState(() => _weighable = v),
@@ -948,7 +1022,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               child: ListTile(
                 title: Text(b.barcode),
                 subtitle: Text(
-                    'Conversion: ${b.packSize ?? 1} • Selling: ${b.sellingPrice?.toStringAsFixed(2) ?? '-'}'),
+                    '${(b.variantName ?? '').isEmpty ? '' : '${b.variantName} • '}Conversion: ${b.packSize ?? 1} • Selling: ${b.sellingPrice?.toStringAsFixed(2) ?? '-'}'),
                 trailing: Wrap(
                   spacing: 8,
                   children: [
@@ -1371,6 +1445,7 @@ class _BarcodeRowState extends State<_BarcodeRow> {
 Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context,
     {ProductBarcodeDto? initial}) async {
   final code = TextEditingController(text: initial?.barcode ?? '');
+  final variant = TextEditingController(text: initial?.variantName ?? '');
   final pack = TextEditingController(text: (initial?.packSize ?? 1).toString());
   final sell =
       TextEditingController(text: initial?.sellingPrice?.toString() ?? '');
@@ -1387,6 +1462,11 @@ Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context,
               controller: code,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(labelText: 'Barcode'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: variant,
+              decoration: const InputDecoration(labelText: 'Variation Name'),
             ),
             const SizedBox(height: 8),
             Row(
@@ -1442,6 +1522,8 @@ Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context,
               barcode: s,
               packSize: p,
               sellingPrice: sp,
+              variantName:
+                  variant.text.trim().isEmpty ? null : variant.text.trim(),
               isPrimary: false,
             ));
           },

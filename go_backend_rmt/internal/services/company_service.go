@@ -144,6 +144,19 @@ func (s *CompanyService) CreateCompany(req *models.CreateCompanyRequest, userID 
 		return nil, fmt.Errorf("failed to seed default payment method: %w", err)
 	}
 
+	inventorySettings := models.JSONB{
+		"inventory_costing_method": normalizeCostingMethod(req.InventoryCostingMethod),
+		"negative_stock_policy":    negativeStockPolicyDisallow,
+	}
+	if _, err = tx.Exec(`
+		INSERT INTO settings (company_id, key, value)
+		VALUES ($1, 'inventory', $2)
+		ON CONFLICT (company_id, key) DO UPDATE
+		SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
+	`, company.CompanyID, inventorySettings); err != nil {
+		return nil, fmt.Errorf("failed to initialize inventory settings: %w", err)
+	}
+
 	// Seed minimal chart of accounts (needed for ledgers + reports).
 	if err := seedMinimalChartOfAccountsTx(tx, company.CompanyID); err != nil {
 		return nil, err

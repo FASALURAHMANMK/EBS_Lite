@@ -36,6 +36,7 @@ type PurchaseDetail struct {
 	PurchaseDetailID   int        `json:"purchase_detail_id" db:"purchase_detail_id"`
 	PurchaseID         int        `json:"purchase_id" db:"purchase_id"`
 	ProductID          int        `json:"product_id" db:"product_id"`
+	BarcodeID          *int       `json:"barcode_id,omitempty" db:"barcode_id"`
 	Quantity           float64    `json:"quantity" db:"quantity"`
 	UnitPrice          float64    `json:"unit_price" db:"unit_price"`
 	DiscountPercentage float64    `json:"discount_percentage" db:"discount_percentage"`
@@ -80,6 +81,7 @@ type PurchaseReturnDetail struct {
 	ReturnID         int      `json:"return_id" db:"return_id"`
 	PurchaseDetailID *int     `json:"purchase_detail_id,omitempty" db:"purchase_detail_id"`
 	ProductID        int      `json:"product_id" db:"product_id"`
+	BarcodeID        *int     `json:"barcode_id,omitempty" db:"barcode_id"`
 	Quantity         float64  `json:"quantity" db:"quantity"`
 	UnitPrice        float64  `json:"unit_price" db:"unit_price"`
 	LineTotal        float64  `json:"line_total" db:"line_total"`
@@ -101,6 +103,7 @@ type CreatePurchaseRequest struct {
 
 type CreatePurchaseDetailRequest struct {
 	ProductID          int        `json:"product_id" validate:"required"`
+	BarcodeID          *int       `json:"barcode_id,omitempty"`
 	Quantity           float64    `json:"quantity" validate:"required,gt=0"`
 	UnitPrice          float64    `json:"unit_price" validate:"required,gte=0"`
 	DiscountPercentage *float64   `json:"discount_percentage,omitempty" validate:"omitempty,gte=0,lte=100"`
@@ -120,16 +123,20 @@ type UpdatePurchaseRequest struct {
 }
 
 type CreatePurchaseReturnRequest struct {
-	PurchaseID int                                 `json:"purchase_id" validate:"required"`
-	Reason     *string                             `json:"reason,omitempty"`
-	Items      []CreatePurchaseReturnDetailRequest `json:"items" validate:"required,min=1"`
+	PurchaseID       int                                 `json:"purchase_id" validate:"required"`
+	Reason           *string                             `json:"reason,omitempty"`
+	Items            []CreatePurchaseReturnDetailRequest `json:"items" validate:"required,min=1"`
+	OverridePassword *string                             `json:"override_password,omitempty"`
 }
 
 type CreatePurchaseReturnDetailRequest struct {
-	PurchaseDetailID *int    `json:"purchase_detail_id,omitempty"`
-	ProductID        int     `json:"product_id" validate:"required"`
-	Quantity         float64 `json:"quantity" validate:"required,gt=0"`
-	UnitPrice        float64 `json:"unit_price" validate:"required,gte=0"`
+	PurchaseDetailID *int                           `json:"purchase_detail_id,omitempty"`
+	ProductID        int                            `json:"product_id" validate:"required"`
+	BarcodeID        *int                           `json:"barcode_id,omitempty"`
+	Quantity         float64                        `json:"quantity" validate:"required,gt=0"`
+	UnitPrice        float64                        `json:"unit_price" validate:"required,gte=0"`
+	SerialNumbers    []string                       `json:"serial_numbers,omitempty"`
+	BatchAllocations []InventoryBatchSelectionInput `json:"batch_allocations,omitempty"`
 }
 
 // Purchase Receiving Models
@@ -139,6 +146,7 @@ type ReceivePurchaseRequest struct {
 
 type ReceivePurchaseItemRequest struct {
 	PurchaseDetailID int        `json:"purchase_detail_id" validate:"required"`
+	BarcodeID        *int       `json:"barcode_id,omitempty"`
 	ReceivedQuantity float64    `json:"received_quantity" validate:"required,gt=0"`
 	ExpiryDate       *time.Time `json:"expiry_date,omitempty"`
 	BatchNumber      *string    `json:"batch_number,omitempty"`

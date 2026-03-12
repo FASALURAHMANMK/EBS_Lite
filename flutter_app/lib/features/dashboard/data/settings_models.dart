@@ -4,7 +4,12 @@ class CompanySettingsDto {
   final String? phone;
   final String? email;
 
-  CompanySettingsDto({this.name, this.address, this.phone, this.email});
+  CompanySettingsDto({
+    this.name,
+    this.address,
+    this.phone,
+    this.email,
+  });
 
   factory CompanySettingsDto.fromJson(Map<String, dynamic> json) =>
       CompanySettingsDto(
@@ -19,6 +24,45 @@ class CompanySettingsDto {
         if (address != null) 'address': address,
         if (phone != null) 'phone': phone,
         if (email != null) 'email': email,
+      };
+}
+
+class InventorySettingsDto {
+  final String inventoryCostingMethod;
+  final String negativeStockPolicy;
+  final bool hasNegativeStockApprovalPassword;
+
+  const InventorySettingsDto({
+    this.inventoryCostingMethod = 'FIFO',
+    this.negativeStockPolicy = 'DONT_ALLOW',
+    this.hasNegativeStockApprovalPassword = false,
+  });
+
+  factory InventorySettingsDto.fromJson(Map<String, dynamic> json) =>
+      InventorySettingsDto(
+        inventoryCostingMethod:
+            json['inventory_costing_method'] as String? ?? 'FIFO',
+        negativeStockPolicy:
+            json['negative_stock_policy'] as String? ?? 'DONT_ALLOW',
+        hasNegativeStockApprovalPassword:
+            json['has_negative_stock_approval_password'] as bool? ?? false,
+      );
+}
+
+class UpdateInventorySettingsDto {
+  final String negativeStockPolicy;
+  final String? negativeStockApprovalPassword;
+
+  const UpdateInventorySettingsDto({
+    required this.negativeStockPolicy,
+    this.negativeStockApprovalPassword,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'negative_stock_policy': negativeStockPolicy,
+        if ((negativeStockApprovalPassword ?? '').trim().isNotEmpty)
+          'negative_stock_approval_password':
+              negativeStockApprovalPassword!.trim(),
       };
 }
 

@@ -17,6 +17,7 @@ type PurchaseReturnService struct {
 type purchaseReturnAllocation struct {
 	PurchaseDetailID int
 	ProductID        int
+	BarcodeID        *int
 	Quantity         float64
 	UnitPrice        float64
 	StockQuantity    float64
@@ -249,6 +250,7 @@ func (s *PurchaseReturnService) CreatePurchaseReturn(companyID, locationID, user
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback()
+	trackingSvc := newInventoryTrackingService(s.db)
 
 	// Verify purchase exists and belongs to company
 	var supplierID int
@@ -298,33 +300,41 @@ func (s *PurchaseReturnService) CreatePurchaseReturn(companyID, locationID, user
 	}
 	// Insert return details and update stock
 	for _, item := range req.Items {
-		allocations, err := s.allocatePurchaseReturnLines(tx, companyID, req.PurchaseID, item.ProductID, item.Quantity, item.PurchaseDetailID)
+		allocations, err := s.allocatePurchaseReturnLines(tx, companyID, req.PurchaseID, item.ProductID, item.BarcodeID, item.Quantity, item.PurchaseDetailID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to allocate purchase return item %d: %w", item.ProductID, err)
+		}
+		if len(allocations) > 1 && (len(item.SerialNumbers) > 0 || len(item.BatchAllocations) > 0) {
+			return nil, fmt.Errorf("split purchase returns for tracked items require separate lines")
 		}
 		for _, allocation := range allocations {
 			lineTotal := allocation.Quantity * item.UnitPrice
 			totalAmount += lineTotal
 
-			_, err = tx.Exec(`
-				INSERT INTO purchase_return_details (return_id, purchase_detail_id, product_id,
+			var returnDetailID int
+			err = tx.QueryRow(`
+				INSERT INTO purchase_return_details (return_id, purchase_detail_id, product_id, barcode_id,
 												   quantity, unit_price, line_total,
 												   stock_unit_id, purchase_unit_id, purchase_uom_mode, purchase_to_stock_factor, stock_quantity)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+				RETURNING return_detail_id
 			`,
-				returnData.ReturnID, allocation.PurchaseDetailID, allocation.ProductID,
+				returnData.ReturnID, allocation.PurchaseDetailID, allocation.ProductID, firstNonNilInt(item.BarcodeID, allocation.BarcodeID),
 				allocation.Quantity, item.UnitPrice, lineTotal,
 				allocation.StockUnitID, allocation.PurchaseUnitID, allocation.PurchaseUOMMode, allocation.PurchaseToStock, allocation.StockQuantity,
-			)
+			).Scan(&returnDetailID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to insert purchase return detail: %w", err)
 			}
 
-			_, err = tx.Exec(`
-				UPDATE stock SET quantity = quantity - $1, last_updated = CURRENT_TIMESTAMP
-				WHERE location_id = $2 AND product_id = $3
-			`, allocation.StockQuantity, locationID, allocation.ProductID)
-			if err != nil {
+			if _, err := trackingSvc.IssueStockTx(tx, companyID, locationID, userID, "PURCHASE_RETURN", "purchase_return_detail", &returnDetailID, nil, inventorySelection{
+				ProductID:        allocation.ProductID,
+				BarcodeID:        firstNonNilInt(item.BarcodeID, allocation.BarcodeID),
+				Quantity:         allocation.StockQuantity,
+				SerialNumbers:    item.SerialNumbers,
+				BatchAllocations: item.BatchAllocations,
+				OverridePassword: req.OverridePassword,
+			}); err != nil {
 				return nil, fmt.Errorf("failed to update stock: %w", err)
 			}
 		}
@@ -491,11 +501,12 @@ func (s *PurchaseReturnService) verifyReturnInCompany(returnID, companyID int) e
 	return nil
 }
 
-func (s *PurchaseReturnService) allocatePurchaseReturnLines(tx *sql.Tx, companyID, purchaseID, productID int, requestedQty float64, preferredDetailID *int) ([]purchaseReturnAllocation, error) {
+func (s *PurchaseReturnService) allocatePurchaseReturnLines(tx *sql.Tx, companyID, purchaseID, productID int, barcodeID *int, requestedQty float64, preferredDetailID *int) ([]purchaseReturnAllocation, error) {
 	query := `
 		SELECT
 			pd.purchase_detail_id,
 			pd.product_id,
+			pd.barcode_id,
 			pd.received_quantity::float8,
 			pd.unit_price::float8,
 			COALESCE(pd.purchase_to_stock_factor, 1.0)::float8,
@@ -520,8 +531,14 @@ func (s *PurchaseReturnService) allocatePurchaseReturnLines(tx *sql.Tx, companyI
 		  AND l.company_id = $3
 	`
 	args := []interface{}{purchaseID, productID, companyID}
+	nextArg := 4
+	if barcodeID != nil && *barcodeID > 0 {
+		query += fmt.Sprintf(" AND pd.barcode_id = $%d", nextArg)
+		args = append(args, *barcodeID)
+		nextArg++
+	}
 	if preferredDetailID != nil && *preferredDetailID > 0 {
-		query += " AND pd.purchase_detail_id = $4"
+		query += fmt.Sprintf(" AND pd.purchase_detail_id = $%d", nextArg)
 		args = append(args, *preferredDetailID)
 	}
 	query += " ORDER BY pd.purchase_detail_id FOR UPDATE"
@@ -538,6 +555,7 @@ func (s *PurchaseReturnService) allocatePurchaseReturnLines(tx *sql.Tx, companyI
 	for rows.Next() {
 		found = true
 		var purchaseDetailID int
+		var barcodeID sql.NullInt64
 		var receivedQty float64
 		var unitPrice float64
 		var purchaseToStock float64
@@ -545,7 +563,7 @@ func (s *PurchaseReturnService) allocatePurchaseReturnLines(tx *sql.Tx, companyI
 		var stockUnitID *int
 		var purchaseUnitID *int
 		var returnedQty float64
-		if err := rows.Scan(&purchaseDetailID, &productID, &receivedQty, &unitPrice, &purchaseToStock, &purchaseUOMMode, &stockUnitID, &purchaseUnitID, &returnedQty); err != nil {
+		if err := rows.Scan(&purchaseDetailID, &productID, &barcodeID, &receivedQty, &unitPrice, &purchaseToStock, &purchaseUOMMode, &stockUnitID, &purchaseUnitID, &returnedQty); err != nil {
 			return nil, err
 		}
 		available := receivedQty - returnedQty
@@ -562,6 +580,7 @@ func (s *PurchaseReturnService) allocatePurchaseReturnLines(tx *sql.Tx, companyI
 		allocations = append(allocations, purchaseReturnAllocation{
 			PurchaseDetailID: purchaseDetailID,
 			ProductID:        productID,
+			BarcodeID:        intPtrFromNullInt64(barcodeID),
 			Quantity:         allocatedQty,
 			UnitPrice:        unitPrice,
 			StockQuantity:    quantityInStockUOM(allocatedQty, purchaseToStock),

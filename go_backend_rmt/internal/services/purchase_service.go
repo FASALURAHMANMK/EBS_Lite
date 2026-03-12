@@ -142,7 +142,7 @@ func (s *PurchaseService) GetPurchaseByID(purchaseID, companyID int) (*models.Pu
 
 	// Get purchase details
 	detailsQuery := `
-                SELECT pd.purchase_detail_id, pd.purchase_id, pd.product_id, pd.quantity,
+                SELECT pd.purchase_detail_id, pd.purchase_id, pd.product_id, pd.barcode_id, pd.quantity,
                            pd.unit_price, COALESCE(pd.discount_percentage, 0), COALESCE(pd.discount_amount, 0), pd.tax_id,
                            pd.tax_amount, pd.line_total, pd.received_quantity, pd.serial_numbers,
                            pd.expiry_date, pd.batch_number,
@@ -166,7 +166,7 @@ func (s *PurchaseService) GetPurchaseByID(purchaseID, companyID int) (*models.Pu
 		var productName, sku sql.NullString
 
 		err := rows.Scan(
-			&detail.PurchaseDetailID, &detail.PurchaseID, &detail.ProductID, &detail.Quantity,
+			&detail.PurchaseDetailID, &detail.PurchaseID, &detail.ProductID, &detail.BarcodeID, &detail.Quantity,
 			&detail.UnitPrice, &detail.DiscountPercentage, &detail.DiscountAmount, &detail.TaxID,
 			&detail.TaxAmount, &detail.LineTotal, &detail.ReceivedQuantity, pq.Array(&detail.SerialNumbers),
 			&detail.ExpiryDate, &detail.BatchNumber,
@@ -472,13 +472,13 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 		}
 
 		_, err = tx.Exec(`
-            INSERT INTO purchase_details (purchase_id, product_id, quantity, unit_price,
+            INSERT INTO purchase_details (purchase_id, product_id, barcode_id, quantity, unit_price,
                                        discount_percentage, discount_amount, tax_id, tax_amount,
                                        line_total, received_quantity, serial_numbers, expiry_date, batch_number,
                                        stock_unit_id, purchase_unit_id, purchase_uom_mode, purchase_to_stock_factor, stock_quantity)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
         `,
-			purchase.PurchaseID, item.ProductID, item.Quantity, item.UnitPrice,
+			purchase.PurchaseID, item.ProductID, item.BarcodeID, item.Quantity, item.UnitPrice,
 			item.DiscountPercentage, discountAmount, item.TaxID, taxAmount,
 			finalLineTotal, 0, pq.Array(item.SerialNumbers), item.ExpiryDate, item.BatchNumber,
 			lineSnapshot.StockUnitID, lineSnapshot.PurchaseUnitID, lineSnapshot.PurchaseUOMMode, lineSnapshot.PurchaseToStock, lineSnapshot.StockQuantity,
@@ -584,6 +584,7 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback()
+	trackingSvc := newInventoryTrackingService(s.db)
 
 	// Verify purchase exists and can be received
 	var currentStatus string
@@ -650,13 +651,14 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 		// Verify purchase detail exists and get current state
 		var orderedQty float64
 		var receivedSoFar float64
+		var existingBarcode sql.NullInt64
 		err = tx.QueryRow(`
-            SELECT pd.quantity, pd.received_quantity
+            SELECT pd.quantity, pd.received_quantity, pd.barcode_id
             FROM purchase_details pd
             JOIN purchases p ON pd.purchase_id = p.purchase_id
             JOIN suppliers s ON p.supplier_id = s.supplier_id
             WHERE pd.purchase_detail_id = $1 AND pd.purchase_id = $2 AND s.company_id = $3
-        `, item.PurchaseDetailID, purchaseID, companyID).Scan(&orderedQty, &receivedSoFar)
+        `, item.PurchaseDetailID, purchaseID, companyID).Scan(&orderedQty, &receivedSoFar, &existingBarcode)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				return fmt.Errorf("purchase detail with ID %d not found", item.PurchaseDetailID)
@@ -692,6 +694,13 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 		productID := detailSnapshot.ProductID
 		costPrice := detailSnapshot.UnitPrice
 		costPricePerStock := detailSnapshot.CostPricePerStock
+		existingBarcodeID := intPtrFromNullInt64(existingBarcode)
+		if item.BarcodeID != nil && *item.BarcodeID > 0 &&
+			existingBarcodeID != nil && *existingBarcodeID != *item.BarcodeID &&
+			receivedSoFar > 1e-9 {
+			return fmt.Errorf("cannot change variation for detail ID %d after receiving has started", item.PurchaseDetailID)
+		}
+		effectiveBarcodeID := firstNonNilInt(item.BarcodeID, existingBarcodeID, detailSnapshot.BarcodeID)
 
 		// Validate serial numbers for serialized products
 		var isSerialized bool
@@ -738,84 +747,26 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 			}
 		}
 
-		// Update or insert stock
-		_, err = tx.Exec(`
-            INSERT INTO stock (location_id, product_id, quantity, last_updated)
-            VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-            ON CONFLICT (location_id, product_id)
-            DO UPDATE SET 
-                quantity = stock.quantity + $3,
-                last_updated = CURRENT_TIMESTAMP
-        `, locationID, productID, receivedStockQuantity)
-		if err != nil {
-			return fmt.Errorf("failed to update stock: %w", err)
-		}
-
-		// Create stock lot entry for FIFO tracking
 		if receivedStockQuantity > 0 {
-			// Try inserting with goods_receipt_id if supported; otherwise fallback to legacy columns
-			if grSupported {
-				_, err = tx.Exec(`
-                    INSERT INTO stock_lots (product_id, location_id, supplier_id, purchase_id, goods_receipt_id,
-                                           quantity, remaining_quantity, cost_price, received_date,
-                                           expiry_date, batch_number, serial_numbers)
-                    SELECT pd.product_id, $1, p.supplier_id, p.purchase_id, $2,
-                           $3, $3, $4, CURRENT_DATE,
-                           $5, $6, $7
-                    FROM purchase_details pd
-                    JOIN purchases p ON pd.purchase_id = p.purchase_id
-                    WHERE pd.purchase_detail_id = $8
-                `, locationID, goodsReceiptID, receivedStockQuantity, costPricePerStock, item.ExpiryDate, item.BatchNumber,
-					pq.Array(item.SerialNumbers), item.PurchaseDetailID)
-				if err != nil {
-					if pqErr, ok := err.(*pq.Error); ok && string(pqErr.Code) == "42703" {
-						// Column goods_receipt_id missing; fallback to legacy insert
-						_, err = tx.Exec(`
-                            INSERT INTO stock_lots (product_id, location_id, supplier_id, purchase_id,
-                                                   quantity, remaining_quantity, cost_price, received_date,
-                                                   expiry_date, batch_number, serial_numbers)
-                            SELECT pd.product_id, $1, p.supplier_id, p.purchase_id,
-                                   $2, $2, $3, CURRENT_DATE,
-                                   $4, $5, $6
-                            FROM purchase_details pd
-                            JOIN purchases p ON pd.purchase_id = p.purchase_id
-                            WHERE pd.purchase_detail_id = $7
-                        `, locationID, receivedStockQuantity, costPricePerStock, item.ExpiryDate, item.BatchNumber,
-							pq.Array(item.SerialNumbers), item.PurchaseDetailID)
-						if err != nil {
-							return fmt.Errorf("failed to create stock lot: %w", err)
-						}
-					} else if err != nil {
-						return fmt.Errorf("failed to create stock lot: %w", err)
-					}
-				}
-			} else {
-				_, err = tx.Exec(`
-                    INSERT INTO stock_lots (product_id, location_id, supplier_id, purchase_id,
-                                           quantity, remaining_quantity, cost_price, received_date,
-                                           expiry_date, batch_number, serial_numbers)
-                    SELECT pd.product_id, $1, p.supplier_id, p.purchase_id,
-                           $2, $2, $3, CURRENT_DATE,
-                           $4, $5, $6
-                    FROM purchase_details pd
-                    JOIN purchases p ON pd.purchase_id = p.purchase_id
-                    WHERE pd.purchase_detail_id = $7
-                `, locationID, receivedStockQuantity, costPricePerStock, item.ExpiryDate, item.BatchNumber,
-					pq.Array(item.SerialNumbers), item.PurchaseDetailID)
-				if err != nil {
-					return fmt.Errorf("failed to create stock lot: %w", err)
-				}
+			variant, err := trackingSvc.ReceiveStockTx(tx, companyID, locationID, userID, "PURCHASE_RECEIPT", "purchase_detail", &item.PurchaseDetailID, nil, inventorySelection{
+				ProductID:     productID,
+				BarcodeID:     effectiveBarcodeID,
+				Quantity:      receivedStockQuantity,
+				SerialNumbers: item.SerialNumbers,
+				BatchNumber:   item.BatchNumber,
+				ExpiryDate:    item.ExpiryDate,
+				UnitCost:      costPricePerStock,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to receive inventory: %w", err)
 			}
-		}
-
-		// Update product cost price if this is a newer purchase
-		_, err = tx.Exec(`
-			UPDATE products 
-			SET cost_price = $1, updated_at = CURRENT_TIMESTAMP
-			WHERE product_id = $2 AND company_id = $3 AND (cost_price IS NULL OR cost_price = 0)
-		`, costPricePerStock, productID, companyID)
-		if err != nil {
-			return fmt.Errorf("failed to update product cost price: %w", err)
+			if _, err := tx.Exec(`
+				UPDATE purchase_details
+				SET barcode_id = $1
+				WHERE purchase_detail_id = $2
+			`, variant.BarcodeID, item.PurchaseDetailID); err != nil {
+				return fmt.Errorf("failed to update purchase detail variation: %w", err)
+			}
 		}
 	}
 
@@ -1146,13 +1097,13 @@ func (s *PurchaseService) UpdatePurchase(purchaseID, companyID, userID int, req 
 			}
 
 			_, err = tx.Exec(`
-				INSERT INTO purchase_details (purchase_id, product_id, quantity, unit_price,
+				INSERT INTO purchase_details (purchase_id, product_id, barcode_id, quantity, unit_price,
 											discount_percentage, discount_amount, tax_id, tax_amount,
 											line_total, received_quantity, serial_numbers, expiry_date, batch_number,
 											stock_unit_id, purchase_unit_id, purchase_uom_mode, purchase_to_stock_factor, stock_quantity)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 			`,
-				purchaseID, item.ProductID, item.Quantity, item.UnitPrice,
+				purchaseID, item.ProductID, item.BarcodeID, item.Quantity, item.UnitPrice,
 				item.DiscountPercentage, discountAmount, item.TaxID, taxAmount,
 				finalLineTotal, 0, pq.Array(item.SerialNumbers), item.ExpiryDate, item.BatchNumber,
 				lineSnapshot.StockUnitID, lineSnapshot.PurchaseUnitID, lineSnapshot.PurchaseUOMMode, lineSnapshot.PurchaseToStock, lineSnapshot.StockQuantity,

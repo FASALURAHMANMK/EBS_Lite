@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -431,6 +432,13 @@ func (h *PurchaseHandler) CreatePurchaseReturn(c *gin.Context) {
 
 	returnData, err := h.purchaseReturnService.CreatePurchaseReturn(companyID, locationID, userID, &req)
 	if err != nil {
+		var approvalErr *services.NegativeStockApprovalRequiredError
+		if errors.As(err, &approvalErr) {
+			utils.JSONResponse(c, http.StatusForbidden, false, approvalErr.Error(), gin.H{
+				"code": "NEGATIVE_STOCK_APPROVAL_REQUIRED",
+			}, nil)
+			return
+		}
 		if err.Error() == "purchase not found" {
 			utils.NotFoundResponse(c, "Purchase not found")
 			return

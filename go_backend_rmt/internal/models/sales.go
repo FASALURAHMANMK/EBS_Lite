@@ -35,6 +35,7 @@ type SaleDetail struct {
 	SaleDetailID    int      `json:"sale_detail_id" db:"sale_detail_id"`
 	SaleID          int      `json:"sale_id" db:"sale_id"`
 	ProductID       *int     `json:"product_id,omitempty" db:"product_id"`
+	BarcodeID       *int     `json:"barcode_id,omitempty" db:"barcode_id"`
 	ProductName     *string  `json:"product_name,omitempty" db:"product_name"`
 	Quantity        float64  `json:"quantity" db:"quantity"`
 	UnitPrice       float64  `json:"unit_price" db:"unit_price"`
@@ -68,6 +69,7 @@ type SaleReturnDetail struct {
 	ReturnID       int     `json:"return_id" db:"return_id"`
 	SaleDetailID   *int    `json:"sale_detail_id,omitempty" db:"sale_detail_id"`
 	ProductID      *int    `json:"product_id,omitempty" db:"product_id"`
+	BarcodeID      *int    `json:"barcode_id,omitempty" db:"barcode_id"`
 	Quantity       float64 `json:"quantity" db:"quantity"`
 	UnitPrice      float64 `json:"unit_price" db:"unit_price"`
 	LineTotal      float64 `json:"line_total" db:"line_total"`
@@ -86,24 +88,27 @@ type PaymentMethod struct {
 type CreateSaleRequest struct {
 	// SaleNumber is optional. When provided (e.g. offline-first POS), the server
 	// will persist it as-is instead of allocating from numbering sequences.
-	SaleNumber      *string                   `json:"sale_number,omitempty"`
-	CustomerID      *int                      `json:"customer_id,omitempty"`
-	Items           []CreateSaleDetailRequest `json:"items" validate:"required,min=1"`
-	PaymentMethodID *int                      `json:"payment_method_id,omitempty"`
-	PaidAmount      float64                   `json:"paid_amount" validate:"gte=0"`
-	DiscountAmount  float64                   `json:"discount_amount"`
-	Notes           *string                   `json:"notes,omitempty"`
+	SaleNumber       *string                   `json:"sale_number,omitempty"`
+	CustomerID       *int                      `json:"customer_id,omitempty"`
+	Items            []CreateSaleDetailRequest `json:"items" validate:"required,min=1"`
+	PaymentMethodID  *int                      `json:"payment_method_id,omitempty"`
+	PaidAmount       float64                   `json:"paid_amount" validate:"gte=0"`
+	DiscountAmount   float64                   `json:"discount_amount"`
+	Notes            *string                   `json:"notes,omitempty"`
+	OverridePassword *string                   `json:"override_password,omitempty"`
 }
 
 type CreateSaleDetailRequest struct {
-	ProductID       *int     `json:"product_id,omitempty"`
-	ProductName     *string  `json:"product_name,omitempty"` // For quick sales
-	Quantity        float64  `json:"quantity" validate:"required,gt=0"`
-	UnitPrice       float64  `json:"unit_price" validate:"required,gt=0"`
-	DiscountPercent float64  `json:"discount_percentage"`
-	TaxID           *int     `json:"tax_id,omitempty"`
-	SerialNumbers   []string `json:"serial_numbers,omitempty"`
-	Notes           *string  `json:"notes,omitempty"`
+	ProductID        *int                           `json:"product_id,omitempty"`
+	BarcodeID        *int                           `json:"barcode_id,omitempty"`
+	ProductName      *string                        `json:"product_name,omitempty"` // For quick sales
+	Quantity         float64                        `json:"quantity" validate:"required,gt=0"`
+	UnitPrice        float64                        `json:"unit_price" validate:"required,gt=0"`
+	DiscountPercent  float64                        `json:"discount_percentage"`
+	TaxID            *int                           `json:"tax_id,omitempty"`
+	SerialNumbers    []string                       `json:"serial_numbers,omitempty"`
+	BatchAllocations []InventoryBatchSelectionInput `json:"batch_allocations,omitempty"`
+	Notes            *string                        `json:"notes,omitempty"`
 }
 
 type UpdateSaleRequest struct {
@@ -113,15 +118,21 @@ type UpdateSaleRequest struct {
 }
 
 type CreateSaleReturnRequest struct {
-	SaleID int                           `json:"sale_id" validate:"required"`
-	Items  []CreateSaleReturnItemRequest `json:"items" validate:"required,min=1"`
-	Reason *string                       `json:"reason,omitempty" validate:"required"`
+	SaleID           int                           `json:"sale_id" validate:"required"`
+	Items            []CreateSaleReturnItemRequest `json:"items" validate:"required,min=1"`
+	Reason           *string                       `json:"reason,omitempty" validate:"required"`
+	OverridePassword *string                       `json:"override_password,omitempty"`
 }
 
 type CreateSaleReturnItemRequest struct {
-	ProductID int     `json:"product_id" validate:"required"`
-	Quantity  float64 `json:"quantity" validate:"required,gt=0"`
-	UnitPrice float64 `json:"unit_price" validate:"required,gt=0"`
+	ProductID        int                            `json:"product_id" validate:"required"`
+	BarcodeID        *int                           `json:"barcode_id,omitempty"`
+	Quantity         float64                        `json:"quantity" validate:"required,gt=0"`
+	UnitPrice        float64                        `json:"unit_price" validate:"required,gt=0"`
+	BatchNumber      *string                        `json:"batch_number,omitempty"`
+	ExpiryDate       *time.Time                     `json:"expiry_date,omitempty"`
+	SerialNumbers    []string                       `json:"serial_numbers,omitempty"`
+	BatchAllocations []InventoryBatchSelectionInput `json:"batch_allocations,omitempty"`
 }
 
 type QuickSaleRequest struct {
@@ -142,6 +153,7 @@ type POSCheckoutRequest struct {
 	RedeemPoints         *float64                  `json:"redeem_points,omitempty"`
 	ManagerOverrideToken *string                   `json:"manager_override_token,omitempty"`
 	OverrideReason       *string                   `json:"override_reason,omitempty"`
+	OverridePassword     *string                   `json:"override_password,omitempty"`
 }
 
 type POSPrintRequest struct {
@@ -163,12 +175,15 @@ type POSPrintDataResponse struct {
 
 type POSProductResponse struct {
 	ProductID         int     `json:"product_id"`
+	BarcodeID         int     `json:"barcode_id"`
 	Name              string  `json:"name"`
 	Price             float64 `json:"price"`
 	Stock             float64 `json:"stock"`
 	Barcode           *string `json:"barcode,omitempty"`
+	VariantName       *string `json:"variant_name,omitempty"`
 	CategoryName      *string `json:"category_name,omitempty"`
 	IsWeighable       bool    `json:"is_weighable"`
+	TrackingType      string  `json:"tracking_type"`
 	SellingUOMMode    string  `json:"selling_uom_mode"`
 	SellingUnitID     *int    `json:"selling_unit_id,omitempty"`
 	SellingUnitName   *string `json:"selling_unit_name,omitempty"`

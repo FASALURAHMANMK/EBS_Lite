@@ -148,6 +148,13 @@ func (h *POSHandler) ProcessCheckout(c *gin.Context) {
 			}, nil)
 			return
 		}
+		var approvalErr *services.NegativeStockApprovalRequiredError
+		if errors.As(err, &approvalErr) {
+			utils.JSONResponse(c, http.StatusForbidden, false, approvalErr.Error(), gin.H{
+				"code": "NEGATIVE_STOCK_APPROVAL_REQUIRED",
+			}, nil)
+			return
+		}
 		var cl *services.CreditLimitExceededError
 		if errors.As(err, &cl) {
 			utils.JSONResponse(c, http.StatusBadRequest, false, "Credit limit exceeded", gin.H{

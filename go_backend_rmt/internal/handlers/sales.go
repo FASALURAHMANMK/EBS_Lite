@@ -150,6 +150,13 @@ func (h *SalesHandler) CreateSale(c *gin.Context) {
 
 	sale, err := h.salesService.CreateSale(companyID, locationID, userID, &req, nil)
 	if err != nil {
+		var approvalErr *services.NegativeStockApprovalRequiredError
+		if errors.As(err, &approvalErr) {
+			utils.JSONResponse(c, http.StatusForbidden, false, approvalErr.Error(), gin.H{
+				"code": "NEGATIVE_STOCK_APPROVAL_REQUIRED",
+			}, nil)
+			return
+		}
 		if err.Error() == "customer not found" {
 			utils.NotFoundResponse(c, "Customer not found")
 			return

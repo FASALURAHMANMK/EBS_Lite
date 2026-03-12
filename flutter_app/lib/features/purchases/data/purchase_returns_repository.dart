@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/negative_stock_override.dart';
 import '../../dashboard/controllers/location_notifier.dart';
 
 class PurchaseReturnsRepository {
@@ -47,17 +48,27 @@ class PurchaseReturnsRepository {
     required List<Map<String, dynamic>>
         items, // {purchase_detail_id?, product_id, quantity, unit_price}
     String? reason,
+    String? overridePassword,
   }) async {
     final body = <String, dynamic>{
       'purchase_id': purchaseId,
       if (reason != null && reason.isNotEmpty) 'reason': reason,
       'items': items,
+      if ((overridePassword ?? '').trim().isNotEmpty)
+        'override_password': overridePassword!.trim(),
     };
     final qp = <String, dynamic>{};
     final loc = _locationId;
     if (loc != null) qp['location_id'] = loc;
-    final res = await _dio.post('/purchase-returns',
-        data: body, queryParameters: qp.isEmpty ? null : qp);
+    Response res;
+    try {
+      res = await _dio.post('/purchase-returns',
+          data: body, queryParameters: qp.isEmpty ? null : qp);
+    } on DioException catch (e) {
+      final approval = parseNegativeStockApprovalRequired(e);
+      if (approval != null) throw approval;
+      rethrow;
+    }
     final data = res.data is Map && (res.data['data'] != null)
         ? res.data['data'] as Map<String, dynamic>
         : res.data as Map<String, dynamic>;

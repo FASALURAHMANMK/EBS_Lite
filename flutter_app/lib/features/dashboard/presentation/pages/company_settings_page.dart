@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ebs_lite/l10n/app_localizations.dart';
 
 import '../../data/settings_repository.dart';
+import '../../data/settings_models.dart';
 import '../../data/currency_repository.dart';
 import '../../data/company_repository.dart';
 import 'taxes_management_page.dart';
@@ -83,13 +84,6 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
         _taxNumber.text = comp.taxNumber ?? '';
         _currencyId = comp.currencyId;
         _logoPath = comp.logo;
-      } else {
-        final cfg =
-            await ref.read(settingsRepositoryProvider).getCompanySettings();
-        _name.text = cfg.name ?? '';
-        _address.text = cfg.address ?? '';
-        _phone.text = cfg.phone ?? '';
-        _email.text = cfg.email ?? '';
       }
     } catch (e) {
       if (!mounted) return;
@@ -130,6 +124,15 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                 _taxNumber.text.trim().isEmpty ? null : _taxNumber.text.trim(),
             currencyId: _currencyId,
             logo: _logoPath,
+          );
+      await ref.read(settingsRepositoryProvider).updateCompanySettings(
+            CompanySettingsDto(
+              name: _name.text.trim().isEmpty ? null : _name.text.trim(),
+              address:
+                  _address.text.trim().isEmpty ? null : _address.text.trim(),
+              phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
+              email: _email.text.trim().isEmpty ? null : _email.text.trim(),
+            ),
           );
       // Refresh auth state to propagate changes (logo/name)
       final me = await ref.read(authRepositoryProvider).me();

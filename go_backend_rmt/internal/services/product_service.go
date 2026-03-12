@@ -92,7 +92,7 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
                 SELECT product_id, company_id, category_id, brand_id, unit_id, purchase_unit_id, selling_unit_id,
                            purchase_uom_mode, selling_uom_mode, purchase_to_stock_factor, selling_to_stock_factor, is_weighable, name, sku,
                            description, cost_price, selling_price, reorder_level, weight, dimensions,
-                           is_serialized, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted
+                           is_serialized, tracking_type, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted
                 FROM products
                 WHERE company_id = $1 AND is_deleted = FALSE
         `
@@ -137,7 +137,7 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 			&product.PurchaseUOMMode, &product.SellingUOMMode, &product.PurchaseToStock, &product.SellingToStock, &product.IsWeighable,
 			&product.Name, &product.SKU, &product.Description,
 			&product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
-			&product.Dimensions, &product.IsSerialized, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
+			&product.Dimensions, &product.IsSerialized, &product.TrackingType, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
 			&product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
 		)
 		if err != nil {
@@ -176,7 +176,7 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
                 SELECT product_id, company_id, category_id, brand_id, unit_id, purchase_unit_id, selling_unit_id,
                            purchase_uom_mode, selling_uom_mode, purchase_to_stock_factor, selling_to_stock_factor, is_weighable, name, sku,
                            description, cost_price, selling_price, reorder_level, weight, dimensions,
-                           is_serialized, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted,
+                           is_serialized, tracking_type, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted,
                            default_supplier_id, tax_id
                 FROM products
                 WHERE product_id = $1 AND company_id = $2 AND is_deleted = FALSE
@@ -189,7 +189,7 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
 		&product.PurchaseUOMMode, &product.SellingUOMMode, &product.PurchaseToStock, &product.SellingToStock, &product.IsWeighable,
 		&product.Name, &product.SKU, &product.Description,
 		&product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
-		&product.Dimensions, &product.IsSerialized, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
+		&product.Dimensions, &product.IsSerialized, &product.TrackingType, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
 		&product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
 		&product.DefaultSupplierID, &product.TaxID,
 	)
@@ -228,6 +228,8 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 	}
 	purchaseFactor := normalizeProductUOMFactor(req.PurchaseToStock)
 	sellingFactor := normalizeProductUOMFactor(req.SellingToStock)
+	trackingType := normalizeTrackingType(req.TrackingType)
+	isSerialized := trackingType == trackingTypeSerial || req.IsSerialized
 	purchaseUnitID := req.PurchaseUnitID
 	if purchaseUnitID == nil {
 		purchaseUnitID = req.UnitID
@@ -267,8 +269,8 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
                         company_id, category_id, brand_id, unit_id, purchase_unit_id, selling_unit_id,
                         purchase_uom_mode, selling_uom_mode, purchase_to_stock_factor, selling_to_stock_factor,
                         is_weighable, tax_id, name, sku, description, cost_price, selling_price, reorder_level,
-                        weight, dimensions, is_serialized, created_by, updated_by, default_supplier_id
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+                        weight, dimensions, is_serialized, tracking_type, created_by, updated_by, default_supplier_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
                 RETURNING product_id, created_at
         `
 
@@ -277,7 +279,7 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 		companyID, req.CategoryID, req.BrandID, req.UnitID, purchaseUnitID, sellingUnitID,
 		purchaseMode, sellingMode, purchaseFactor, sellingFactor, req.IsWeighable, req.TaxID, req.Name, req.SKU,
 		req.Description, req.CostPrice, req.SellingPrice, req.ReorderLevel, req.Weight,
-		req.Dimensions, req.IsSerialized, userID, userID, req.DefaultSupplierID,
+		req.Dimensions, isSerialized, trackingType, userID, userID, req.DefaultSupplierID,
 	).Scan(&product.ProductID, &product.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create product: %w", err)
@@ -285,8 +287,9 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 
 	// insert barcodes
 	for _, bc := range req.Barcodes {
-		_, err = tx.Exec(`INSERT INTO product_barcodes (product_id, barcode, pack_size, cost_price, selling_price, is_primary) VALUES ($1,$2,$3,$4,$5,$6)`,
-			product.ProductID, bc.Barcode, bc.PackSize, bc.CostPrice, bc.SellingPrice, bc.IsPrimary)
+		attrs := normalizeVariantAttributes(bc.VariantAttributes)
+		_, err = tx.Exec(`INSERT INTO product_barcodes (product_id, barcode, pack_size, cost_price, selling_price, is_primary, variant_name, variant_attributes, is_active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+			product.ProductID, bc.Barcode, bc.PackSize, bc.CostPrice, bc.SellingPrice, bc.IsPrimary, bc.VariantName, attrs, true)
 		if err != nil {
 			return nil, fmt.Errorf("failed to insert product barcode: %w", err)
 		}
@@ -322,7 +325,8 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 	product.ReorderLevel = req.ReorderLevel
 	product.Weight = req.Weight
 	product.Dimensions = req.Dimensions
-	product.IsSerialized = req.IsSerialized
+	product.IsSerialized = isSerialized
+	product.TrackingType = trackingType
 	product.IsActive = true
 	product.CreatedBy = userID
 	product.UpdatedBy = &userID
@@ -495,6 +499,19 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 		args = append(args, *req.IsSerialized)
 		changes["is_serialized"] = *req.IsSerialized
 	}
+	if req.TrackingType != nil {
+		trackingType := normalizeTrackingType(*req.TrackingType)
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("tracking_type = $%d", argCount))
+		args = append(args, trackingType)
+		changes["tracking_type"] = trackingType
+		if trackingType == trackingTypeSerial {
+			argCount++
+			setParts = append(setParts, fmt.Sprintf("is_serialized = $%d", argCount))
+			args = append(args, true)
+			changes["is_serialized"] = true
+		}
+	}
 	if req.IsActive != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("is_active = $%d", argCount))
@@ -549,8 +566,13 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 			return nil, fmt.Errorf("failed to clear product barcodes: %w", err)
 		}
 		for _, bc := range req.Barcodes {
-			if _, err := tx.Exec(`INSERT INTO product_barcodes (product_id, barcode, pack_size, cost_price, selling_price, is_primary) VALUES ($1,$2,$3,$4,$5,$6)`,
-				productID, bc.Barcode, bc.PackSize, bc.CostPrice, bc.SellingPrice, bc.IsPrimary); err != nil {
+			attrs := normalizeVariantAttributes(bc.VariantAttributes)
+			isActive := bc.IsActive
+			if !isActive {
+				isActive = true
+			}
+			if _, err := tx.Exec(`INSERT INTO product_barcodes (product_id, barcode, pack_size, cost_price, selling_price, is_primary, variant_name, variant_attributes, is_active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+				productID, bc.Barcode, bc.PackSize, bc.CostPrice, bc.SellingPrice, bc.IsPrimary, bc.VariantName, attrs, isActive); err != nil {
 				return nil, fmt.Errorf("failed to insert product barcode: %w", err)
 			}
 		}
@@ -980,7 +1002,7 @@ func (s *ProductService) checkProductExists(companyID int, sku, barcode *string,
 }
 
 func (s *ProductService) getProductBarcodes(productID int) ([]models.ProductBarcode, error) {
-	rows, err := s.db.Query(`SELECT barcode_id, product_id, barcode, pack_size, cost_price, selling_price, is_primary FROM product_barcodes WHERE product_id = $1`, productID)
+	rows, err := s.db.Query(`SELECT barcode_id, product_id, barcode, pack_size, cost_price, selling_price, is_primary, variant_name, COALESCE(variant_attributes, '{}'::jsonb), COALESCE(is_active, TRUE) FROM product_barcodes WHERE product_id = $1 ORDER BY is_primary DESC, barcode_id`, productID)
 	if err != nil {
 		return nil, err
 	}
@@ -989,7 +1011,7 @@ func (s *ProductService) getProductBarcodes(productID int) ([]models.ProductBarc
 	var barcodes []models.ProductBarcode
 	for rows.Next() {
 		var bc models.ProductBarcode
-		if err := rows.Scan(&bc.BarcodeID, &bc.ProductID, &bc.Barcode, &bc.PackSize, &bc.CostPrice, &bc.SellingPrice, &bc.IsPrimary); err != nil {
+		if err := rows.Scan(&bc.BarcodeID, &bc.ProductID, &bc.Barcode, &bc.PackSize, &bc.CostPrice, &bc.SellingPrice, &bc.IsPrimary, &bc.VariantName, &bc.VariantAttributes, &bc.IsActive); err != nil {
 			return nil, err
 		}
 		barcodes = append(barcodes, bc)
@@ -1022,7 +1044,7 @@ func (s *ProductService) getProductBarcodesByProductIDs(productIDs []int) (map[i
 		return result, nil
 	}
 
-	rows, err := s.db.Query(`SELECT barcode_id, product_id, barcode, pack_size, cost_price, selling_price, is_primary FROM product_barcodes WHERE product_id = ANY($1)`, pq.Array(productIDs))
+	rows, err := s.db.Query(`SELECT barcode_id, product_id, barcode, pack_size, cost_price, selling_price, is_primary, variant_name, COALESCE(variant_attributes, '{}'::jsonb), COALESCE(is_active, TRUE) FROM product_barcodes WHERE product_id = ANY($1) ORDER BY is_primary DESC, barcode_id`, pq.Array(productIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -1030,7 +1052,7 @@ func (s *ProductService) getProductBarcodesByProductIDs(productIDs []int) (map[i
 
 	for rows.Next() {
 		var bc models.ProductBarcode
-		if err := rows.Scan(&bc.BarcodeID, &bc.ProductID, &bc.Barcode, &bc.PackSize, &bc.CostPrice, &bc.SellingPrice, &bc.IsPrimary); err != nil {
+		if err := rows.Scan(&bc.BarcodeID, &bc.ProductID, &bc.Barcode, &bc.PackSize, &bc.CostPrice, &bc.SellingPrice, &bc.IsPrimary, &bc.VariantName, &bc.VariantAttributes, &bc.IsActive); err != nil {
 			return nil, err
 		}
 		result[bc.ProductID] = append(result[bc.ProductID], bc)

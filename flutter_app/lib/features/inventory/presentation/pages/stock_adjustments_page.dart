@@ -5,8 +5,10 @@ import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 import 'package:ebs_lite/shared/widgets/app_selection_dialog.dart';
 
 import '../../../../core/error_handler.dart';
+import '../../../../core/negative_stock_override.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
+import '../widgets/inventory_tracking_selector.dart';
 import 'stock_adjustment_document_detail_page.dart';
 import '../../../dashboard/controllers/location_notifier.dart';
 
@@ -299,6 +301,23 @@ class _AdjustmentDocumentFormPageState
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _configureTracking(_lines[i]),
+                    icon: const Icon(Icons.qr_code_2_rounded),
+                    label: Text(
+                      _lines[i].tracking == null
+                          ? 'Configure Variation / Tracking'
+                          : _lines[i].tracking!.summary(
+                                (double.tryParse(_lines[i].qty.text.trim()) ??
+                                        0)
+                                    .abs(),
+                              ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 6),
                 Align(
                   alignment: Alignment.centerLeft,
@@ -357,15 +376,40 @@ class _AdjustmentDocumentFormPageState
     setState(() => _saving = true);
     try {
       final repo = ref.read(inventoryRepositoryProvider);
-      final items = [
-        for (final l in validLines)
-          {
-            'product_id': l.product!.productId,
-            'adjustment': double.tryParse(l.qty.text.trim()) ?? 0,
-          }
-      ];
-      final doc = await repo.createStockAdjustmentDocument(
-          reason: docReason, items: items);
+      final items = <Map<String, dynamic>>[];
+      for (final l in validLines) {
+        final qty = double.tryParse(l.qty.text.trim()) ?? 0;
+        final tracking = l.tracking;
+        if (tracking == null) {
+          throw StateError(
+            'Configure variation / tracking for ${l.product!.name}',
+          );
+        }
+        items.add({
+          'product_id': l.product!.productId,
+          'adjustment': qty,
+          ...qty > 0 ? tracking.toReceiveJson() : tracking.toIssueJson(),
+        });
+      }
+      StockAdjustmentDocumentDto doc;
+      try {
+        doc = await repo.createStockAdjustmentDocument(
+          reason: docReason,
+          items: items,
+        );
+      } on NegativeStockApprovalRequiredException catch (e) {
+        if (!mounted) return;
+        final password = await showNegativeStockApprovalDialog(
+          context,
+          message: e.message,
+        );
+        if (password == null || password.isEmpty) return;
+        doc = await repo.createStockAdjustmentDocument(
+          reason: docReason,
+          items: items,
+          overridePassword: password,
+        );
+      }
       if (!mounted) return;
       Navigator.of(context).pop(doc.documentId.toString());
     } catch (e) {
@@ -377,10 +421,45 @@ class _AdjustmentDocumentFormPageState
       if (mounted) setState(() => _saving = false);
     }
   }
+
+  Future<void> _configureTracking(_AdjLine line) async {
+    final product = line.product;
+    if (product == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Select a product first')),
+        );
+      return;
+    }
+    final qty = double.tryParse(line.qty.text.trim()) ?? 0;
+    if (qty == 0) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Enter a non-zero adjustment first')),
+        );
+      return;
+    }
+    final selection = await showInventoryTrackingSelector(
+      context: context,
+      ref: ref,
+      productId: product.productId,
+      productName: product.name,
+      quantity: qty.abs(),
+      mode:
+          qty > 0 ? InventoryTrackingMode.receive : InventoryTrackingMode.issue,
+      initialSelection: line.tracking,
+    );
+    if (selection != null && mounted) {
+      setState(() => line.tracking = selection);
+    }
+  }
 }
 
 class _AdjLine {
   InventoryListItem? product;
+  InventoryTrackingSelection? tracking;
   final qty = TextEditingController();
 
   void dispose() {
@@ -403,9 +482,13 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
     return InkWell(
       onTap: () async {
         final picked = await _openProductPicker(context);
-        if (picked != null) setState(() => widget.line.product = picked);
+        if (picked != null) {
+          setState(() {
+            widget.line.product = picked;
+            widget.line.tracking = null;
+          });
+        }
       },
-      borderRadius: BorderRadius.circular(8),
       child: InputDecorator(
         decoration: const InputDecoration(
           labelText: 'Product',
@@ -418,7 +501,11 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
               child: Text(
                 p == null
                     ? 'Tap to select a product'
-                    : '${p.name}${(p.sku ?? '').isNotEmpty ? ' • SKU: ${p.sku}' : ''}',
+                    : [
+                        p.name,
+                        if ((p.variantName ?? '').isNotEmpty) p.variantName!,
+                        if ((p.sku ?? '').isNotEmpty) 'SKU: ${p.sku}',
+                      ].join(' • '),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -474,6 +561,8 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
                         value: it.productId,
                         title: Text(it.name),
                         subtitle: Text([
+                          if ((it.variantName ?? '').isNotEmpty)
+                            'Var: ${it.variantName}',
                           if ((it.sku ?? '').isNotEmpty) 'SKU: ${it.sku}',
                           'Stock: ${it.stock.toStringAsFixed(2)}'
                         ].join(' • ')),

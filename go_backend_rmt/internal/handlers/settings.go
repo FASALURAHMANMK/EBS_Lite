@@ -96,6 +96,38 @@ func (h *SettingsHandler) UpdateCompanySettings(c *gin.Context) {
 	utils.SuccessResponse(c, "Company settings updated successfully", nil)
 }
 
+func (h *SettingsHandler) GetInventorySettings(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	settings, err := h.service.GetInventorySettings(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get inventory settings", err)
+		return
+	}
+	utils.SuccessResponse(c, "Inventory settings retrieved successfully", settings)
+}
+
+func (h *SettingsHandler) UpdateInventorySettings(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	var req models.UpdateInventorySettingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := h.service.UpdateInventorySettings(companyID, req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update inventory settings", err)
+		return
+	}
+	utils.SuccessResponse(c, "Inventory settings updated successfully", nil)
+}
+
 // Invoice settings
 func (h *SettingsHandler) GetInvoiceSettings(c *gin.Context) {
 	companyID := c.GetInt("company_id")

@@ -7,6 +7,7 @@ import '../../../../shared/widgets/app_selection_dialog.dart';
 import '../../../suppliers/data/supplier_repository.dart';
 import '../../../suppliers/data/models.dart';
 import '../../../inventory/data/inventory_repository.dart';
+import '../../../inventory/presentation/widgets/inventory_variant_selector.dart';
 import '../../data/purchases_repository.dart';
 
 class PoFormPage extends ConsumerStatefulWidget {
@@ -137,6 +138,21 @@ class _PoFormPageState extends ConsumerState<PoFormPage> {
                 icon: const Icon(Icons.delete_outline_rounded),
               ),
             ]),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: () => _configureVariation(_lines[i]),
+                icon: const Icon(Icons.qr_code_2_rounded),
+                label: Text(
+                  _lines[i].variation == null
+                      ? 'Select Variation'
+                      : _lines[i].variation!.summary(
+                            double.tryParse(_lines[i].qty.text.trim()) ?? 0,
+                          ),
+                ),
+              ),
+            ),
           ]),
         ),
       ));
@@ -170,6 +186,8 @@ class _PoFormPageState extends ConsumerState<PoFormPage> {
         for (final l in lines)
           {
             'product_id': l.product!.productId,
+            if (l.variation?.barcodeId != null && l.variation!.barcodeId! > 0)
+              'barcode_id': l.variation!.barcodeId,
             'quantity': double.tryParse(l.qty.text.trim()) ?? 0,
             'unit_price': double.tryParse(l.price.text.trim()) ?? 0,
           }
@@ -191,10 +209,33 @@ class _PoFormPageState extends ConsumerState<PoFormPage> {
       if (mounted) setState(() => _saving = false);
     }
   }
+
+  Future<void> _configureVariation(_PoLine line) async {
+    final product = line.product;
+    if (product == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Select a product first')),
+        );
+      return;
+    }
+    final selection = await showInventoryVariantSelector(
+      context: context,
+      ref: ref,
+      productId: product.productId,
+      productName: product.name,
+      initialSelection: line.variation,
+    );
+    if (selection != null && mounted) {
+      setState(() => line.variation = selection);
+    }
+  }
 }
 
 class _PoLine {
   InventoryListItem? product;
+  InventoryTrackingSelection? variation;
   final qty = TextEditingController();
   final price = TextEditingController();
   void dispose() {
@@ -218,7 +259,27 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
     return InkWell(
       onTap: () async {
         final picked = await _openProductPicker(context);
-        if (picked != null) setState(() => widget.line.product = picked);
+        if (picked != null) {
+          InventoryTrackingSelection? variation;
+          try {
+            final variants = await ref
+                .read(inventoryRepositoryProvider)
+                .getStockVariants(picked.productId);
+            if (variants.isNotEmpty) {
+              final v = variants.first;
+              variation = InventoryTrackingSelection(
+                barcodeId: v.barcodeId,
+                trackingType: v.trackingType,
+                barcode: v.barcode,
+                variantName: v.variantName,
+              );
+            }
+          } catch (_) {}
+          setState(() {
+            widget.line.product = picked;
+            widget.line.variation = variation;
+          });
+        }
       },
       borderRadius: BorderRadius.circular(8),
       child: InputDecorator(
@@ -232,7 +293,14 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
               child: Text(
                   p == null
                       ? 'Tap to select a product'
-                      : '${p.name}${(p.sku ?? '').isNotEmpty ? ' • SKU: ${p.sku}' : ''}',
+                      : [
+                          p.name,
+                          if ((widget.line.variation?.variantName ?? '')
+                              .trim()
+                              .isNotEmpty)
+                            widget.line.variation!.variantName!.trim(),
+                          if ((p.sku ?? '').isNotEmpty) 'SKU: ${p.sku}',
+                        ].join(' • '),
                   overflow: TextOverflow.ellipsis)),
           const Icon(Icons.arrow_drop_down_rounded),
         ]),

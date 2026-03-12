@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
@@ -17,6 +19,12 @@ import (
 
 type SettingsService struct {
 	db *sql.DB
+}
+
+type inventorySettingsRecord struct {
+	InventoryCostingMethod            string `json:"inventory_costing_method,omitempty"`
+	NegativeStockPolicy               string `json:"negative_stock_policy,omitempty"`
+	NegativeStockApprovalPasswordHash string `json:"negative_stock_approval_password_hash,omitempty"`
 }
 
 // NewSettingsService creates a new SettingsService
@@ -148,11 +156,81 @@ func (s *SettingsService) GetCompanySettings(companyID int) (*models.CompanySett
 	if err := s.getJSONSetting(companyID, "company", &cfg); err != nil {
 		return nil, err
 	}
+	cfg.InventoryCostingMethod = normalizeCostingMethod(cfg.InventoryCostingMethod)
 	return &cfg, nil
 }
 
 func (s *SettingsService) UpdateCompanySettings(companyID int, cfg models.CompanySettings) error {
+	existing, err := s.GetCompanySettings(companyID)
+	if err != nil {
+		return err
+	}
+	// Costing is immutable after company creation; company settings must not
+	// become an alternate write path for it.
+	cfg.InventoryCostingMethod = existing.InventoryCostingMethod
+	cfg.InventoryCostingMethod = normalizeCostingMethod(cfg.InventoryCostingMethod)
 	return s.updateJSONSetting(companyID, "company", cfg)
+}
+
+func (s *SettingsService) GetInventorySettings(companyID int) (*models.InventorySettings, error) {
+	var record inventorySettingsRecord
+	if err := s.getJSONSetting(companyID, "inventory", &record); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(record.InventoryCostingMethod) == "" {
+		companyCfg, err := s.GetCompanySettings(companyID)
+		if err != nil {
+			return nil, err
+		}
+		record.InventoryCostingMethod = companyCfg.InventoryCostingMethod
+	}
+	record.InventoryCostingMethod = normalizeCostingMethod(record.InventoryCostingMethod)
+	record.NegativeStockPolicy = normalizeNegativeStockPolicy(record.NegativeStockPolicy)
+	return &models.InventorySettings{
+		InventoryCostingMethod:           record.InventoryCostingMethod,
+		NegativeStockPolicy:              record.NegativeStockPolicy,
+		HasNegativeStockApprovalPassword: strings.TrimSpace(record.NegativeStockApprovalPasswordHash) != "",
+	}, nil
+}
+
+func (s *SettingsService) UpdateInventorySettings(companyID int, req models.UpdateInventorySettingsRequest) error {
+	existing := inventorySettingsRecord{}
+	if err := s.getJSONSetting(companyID, "inventory", &existing); err != nil {
+		return err
+	}
+	if strings.TrimSpace(existing.InventoryCostingMethod) == "" {
+		companyCfg, err := s.GetCompanySettings(companyID)
+		if err != nil {
+			return err
+		}
+		existing.InventoryCostingMethod = companyCfg.InventoryCostingMethod
+	}
+	existing.InventoryCostingMethod = normalizeCostingMethod(existing.InventoryCostingMethod)
+	existing.NegativeStockPolicy = normalizeNegativeStockPolicy(req.NegativeStockPolicy)
+	if existing.NegativeStockPolicy == "" {
+		existing.NegativeStockPolicy = negativeStockPolicyDisallow
+	}
+
+	if existing.NegativeStockPolicy == negativeStockPolicyApproval {
+		password := ""
+		if req.NegativeStockApprovalPassword != nil {
+			password = strings.TrimSpace(*req.NegativeStockApprovalPassword)
+		}
+		if password == "" && strings.TrimSpace(existing.NegativeStockApprovalPasswordHash) == "" {
+			return fmt.Errorf("negative stock approval password is required")
+		}
+		if password != "" {
+			hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+			if err != nil {
+				return fmt.Errorf("failed to hash negative stock approval password: %w", err)
+			}
+			existing.NegativeStockApprovalPasswordHash = string(hash)
+		}
+	} else {
+		existing.NegativeStockApprovalPasswordHash = ""
+	}
+
+	return s.updateJSONSetting(companyID, "inventory", existing)
 }
 
 // Invoice settings

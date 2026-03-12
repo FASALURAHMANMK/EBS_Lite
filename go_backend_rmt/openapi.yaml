@@ -949,7 +949,101 @@ paths:
                     data:
                       type: array
                       items:
-                        $ref: '#/components/schemas/Stock'
+                        $ref: '#/components/schemas/StockWithProduct'
+  /inventory/variants:
+    get:
+      summary: Get stock variations for a product at a location
+      parameters:
+      - name: location_id
+        in: query
+        required: true
+        schema:
+          type: integer
+      - name: product_id
+        in: query
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Variant stock list
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/StockVariant'
+  /inventory/batches:
+    get:
+      summary: Get available stock batches for a product variation
+      parameters:
+      - name: location_id
+        in: query
+        required: true
+        schema:
+          type: integer
+      - name: product_id
+        in: query
+        required: true
+        schema:
+          type: integer
+      - name: barcode_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Available stock batches
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/StockLot'
+  /inventory/serials:
+    get:
+      summary: Get available serial numbers for a product variation
+      parameters:
+      - name: location_id
+        in: query
+        required: true
+        schema:
+          type: integer
+      - name: product_id
+        in: query
+        required: true
+        schema:
+          type: integer
+      - name: barcode_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Available serial numbers
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ProductSerial'
   /inventory/stock-adjustment:
     post:
       summary: Adjust stock levels
@@ -1040,7 +1134,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/StockAdjustmentDocument'
   /inventory/summary:
     get:
       summary: GET /api/v1/inventory/summary
@@ -1130,7 +1229,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/StockTransferWithItems'
     post:
       summary: POST /api/v1/inventory/transfers
       responses:
@@ -1144,7 +1250,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreateStockTransferRequest'
   /inventory/transfers/{id}:
     get:
       summary: GET /api/v1/inventory/transfers/{id}
@@ -1479,7 +1585,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/StockTransferWithDetails'
       parameters:
       - name: id
         in: path
@@ -2745,7 +2856,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreatePurchaseReturnRequest'
   /departments:
     get:
       summary: GET /api/v1/departments
@@ -2769,7 +2880,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/ApproveStockTransferRequest'
   /departments/{id}:
     put:
       summary: PUT /api/v1/departments/{id}
@@ -2790,7 +2901,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreateSaleRequest'
     delete:
       summary: DELETE /api/v1/departments/{id}
       responses:
@@ -2810,7 +2921,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/ReceivePurchaseRequest'
   /employee-roles:
     get:
       summary: GET /api/v1/employee-roles
@@ -2834,7 +2945,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/RecordGoodsReceiptRequest'
   /designations:
     get:
       summary: GET /api/v1/designations
@@ -2864,7 +2975,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreatePurchaseReturnRequest'
   /employee-roles/{id}:
     put:
       summary: PUT /api/v1/employee-roles/{id}
@@ -2885,7 +2996,31 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CompanySettings'
+  /settings/inventory:
+    get:
+      summary: GET /api/v1/settings/inventory
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+    put:
+      summary: PUT /api/v1/settings/inventory
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInventorySettingsRequest'
     delete:
       summary: DELETE /api/v1/employee-roles/{id}
       responses:
@@ -4830,6 +4965,47 @@ components:
         meta:
           type: object
           additionalProperties: true
+    CompanySettings:
+      type: object
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        inventory_costing_method:
+          type: string
+    InventorySettings:
+      type: object
+      properties:
+        inventory_costing_method:
+          type: string
+        negative_stock_policy:
+          type: string
+        has_negative_stock_approval_password:
+          type: boolean
+    UpdateInventorySettingsRequest:
+      type: object
+      required:
+        - negative_stock_policy
+      properties:
+        negative_stock_policy:
+          type: string
+        negative_stock_approval_password:
+          type: string
+          nullable: true
+    ApproveStockTransferRequest:
+      type: object
+      properties:
+        override_password:
+          type: string
+          nullable: true
     DashboardMetrics:
       type: object
       properties:
@@ -4988,6 +5164,9 @@ components:
       properties:
         product_id:
           type: integer
+        barcode_id:
+          type: integer
+          nullable: true
         quantity:
           type: number
           format: float
@@ -5017,6 +5196,62 @@ components:
         batch_number:
           type: string
           nullable: true
+    ReceivePurchaseRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReceivePurchaseItemRequest'
+    ReceivePurchaseItemRequest:
+      type: object
+      required:
+        - purchase_detail_id
+        - received_quantity
+      properties:
+        purchase_detail_id:
+          type: integer
+        barcode_id:
+          type: integer
+          nullable: true
+        received_quantity:
+          type: number
+          format: float
+        expiry_date:
+          type: string
+          format: date-time
+          nullable: true
+        batch_number:
+          type: string
+          nullable: true
+        serial_numbers:
+          type: array
+          items:
+            type: string
+    RecordGoodsReceiptRequest:
+      type: object
+      required:
+        - purchase_id
+        - items
+      properties:
+        purchase_id:
+          type: integer
+        receipt_number:
+          type: string
+          nullable: true
+        receipt_date:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReceivePurchaseItemRequest'
     LoginRequest:
       type: object
       properties:
@@ -5191,6 +5426,75 @@ components:
         override_reason:
           type: string
           nullable: true
+        override_password:
+          type: string
+          nullable: true
+    CreateSaleRequest:
+      type: object
+      required:
+        - items
+      properties:
+        sale_number:
+          type: string
+          nullable: true
+        customer_id:
+          type: integer
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateSaleDetailRequest'
+        payment_method_id:
+          type: integer
+          nullable: true
+        paid_amount:
+          type: number
+        discount_amount:
+          type: number
+        notes:
+          type: string
+          nullable: true
+        override_password:
+          type: string
+          nullable: true
+    CreateSaleDetailRequest:
+      type: object
+      required:
+        - quantity
+        - unit_price
+      properties:
+        product_id:
+          type: integer
+          nullable: true
+        barcode_id:
+          type: integer
+          nullable: true
+        product_name:
+          type: string
+          nullable: true
+        quantity:
+          type: number
+          format: float
+        unit_price:
+          type: number
+          format: float
+        discount_percentage:
+          type: number
+          format: float
+        tax_id:
+          type: integer
+          nullable: true
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        batch_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryBatchSelectionInput'
+        notes:
+          type: string
+          nullable: true
     ReserveNumberBlockRequest:
       type: object
       properties:
@@ -5218,13 +5522,45 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/GenericObject'
+            $ref: '#/components/schemas/CreateSaleReturnItemRequest'
         reason:
           type: string
+        override_password:
+          type: string
+          nullable: true
       required:
         - sale_id
         - items
         - reason
+    CreateSaleReturnItemRequest:
+      type: object
+      properties:
+        product_id:
+          type: integer
+        barcode_id:
+          type: integer
+          nullable: true
+        quantity:
+          type: number
+          format: float
+        unit_price:
+          type: number
+          format: float
+        batch_number:
+          type: string
+          nullable: true
+        expiry_date:
+          type: string
+          format: date-time
+          nullable: true
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        batch_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryBatchSelectionInput'
     CreateSaleReturnByCustomerRequest:
       type: object
       properties:
@@ -5575,16 +5911,68 @@ components:
         last_updated:
           type: string
           format: date-time
+    StockWithProduct:
+      allOf:
+      - $ref: '#/components/schemas/Stock'
+      - type: object
+        properties:
+          product_name:
+            type: string
+          product_sku:
+            type: string
+            nullable: true
+          barcode_id:
+            type: integer
+            nullable: true
+          tracking_type:
+            type: string
+          category_id:
+            type: integer
+            nullable: true
+          category_name:
+            type: string
+            nullable: true
+          brand_name:
+            type: string
+            nullable: true
+          unit_symbol:
+            type: string
+            nullable: true
+          reorder_level:
+            type: integer
+          is_low_stock:
+            type: boolean
     CreateStockAdjustmentRequest:
       type: object
       properties:
         product_id:
           type: integer
+        barcode_id:
+          type: integer
+          nullable: true
         adjustment:
           type: number
           format: float
         reason:
           type: string
+        batch_number:
+          type: string
+          nullable: true
+        expiry_date:
+          type: string
+          format: date-time
+          nullable: true
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        batch_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryBatchSelectionInput'
+        override_password:
+          type: string
+          nullable: true
     StockAdjustment:
       type: object
       properties:
@@ -5627,6 +6015,9 @@ components:
           nullable: true
         currency_id:
           type: integer
+          nullable: true
+        inventory_costing_method:
+          type: string
           nullable: true
 
     UpdateCompanyRequest:
@@ -5843,14 +6234,35 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CreateStockAdjustmentDocumentItem'
+        override_password:
+          type: string
+          nullable: true
     CreateStockAdjustmentDocumentItem:
       type: object
       properties:
         product_id:
           type: integer
+        barcode_id:
+          type: integer
+          nullable: true
         adjustment:
           type: number
           format: float
+        batch_number:
+          type: string
+          nullable: true
+        expiry_date:
+          type: string
+          format: date-time
+          nullable: true
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        batch_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryBatchSelectionInput'
     StockAdjustmentDocument:
       type: object
       properties:
@@ -5880,6 +6292,346 @@ components:
           type: integer
         product_id:
           type: integer
+        barcode_id:
+          type: integer
+          nullable: true
         adjustment:
           type: number
           format: float
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        batch_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryBatchSelectionInput'
+    InventoryBatchSelectionInput:
+      type: object
+      properties:
+        lot_id:
+          type: integer
+        quantity:
+          type: number
+          format: float
+    StockVariant:
+      type: object
+      properties:
+        stock_variant_id:
+          type: integer
+        location_id:
+          type: integer
+        product_id:
+          type: integer
+        barcode_id:
+          type: integer
+        barcode:
+          type: string
+          nullable: true
+        variant_name:
+          type: string
+          nullable: true
+        variant_attributes:
+          type: object
+          additionalProperties: true
+        quantity:
+          type: number
+          format: float
+        reserved_quantity:
+          type: number
+          format: float
+        average_cost:
+          type: number
+          format: float
+        selling_price:
+          type: number
+          format: float
+          nullable: true
+        tracking_type:
+          type: string
+        last_updated:
+          type: string
+          format: date-time
+    StockLot:
+      type: object
+      properties:
+        lot_id:
+          type: integer
+        company_id:
+          type: integer
+        product_id:
+          type: integer
+        barcode_id:
+          type: integer
+        location_id:
+          type: integer
+        batch_number:
+          type: string
+          nullable: true
+        expiry_date:
+          type: string
+          format: date-time
+          nullable: true
+        received_date:
+          type: string
+          format: date-time
+        quantity:
+          type: number
+          format: float
+        remaining_quantity:
+          type: number
+          format: float
+        cost_price:
+          type: number
+          format: float
+        barcode:
+          type: string
+          nullable: true
+        variant_name:
+          type: string
+          nullable: true
+        variant_attributes:
+          type: object
+          additionalProperties: true
+    ProductSerial:
+      type: object
+      properties:
+        product_serial_id:
+          type: integer
+        company_id:
+          type: integer
+        product_id:
+          type: integer
+        barcode_id:
+          type: integer
+        stock_lot_id:
+          type: integer
+          nullable: true
+        serial_number:
+          type: string
+        location_id:
+          type: integer
+          nullable: true
+        status:
+          type: string
+        cost_price:
+          type: number
+          format: float
+        received_at:
+          type: string
+          format: date-time
+        sold_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_movement_at:
+          type: string
+          format: date-time
+        barcode:
+          type: string
+          nullable: true
+        variant_name:
+          type: string
+          nullable: true
+        tracking_type:
+          type: string
+    CreateStockTransferRequest:
+      type: object
+      properties:
+        to_location_id:
+          type: integer
+        notes:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateStockTransferItemRequest'
+    CreateStockTransferItemRequest:
+      type: object
+      properties:
+        product_id:
+          type: integer
+        barcode_id:
+          type: integer
+          nullable: true
+        quantity:
+          type: number
+          format: float
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        batch_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryBatchSelectionInput'
+    StockTransferItemSummary:
+      type: object
+      properties:
+        product_id:
+          type: integer
+        product_name:
+          type: string
+        quantity:
+          type: number
+          format: float
+    StockTransferWithItems:
+      type: object
+      properties:
+        transfer_id:
+          type: integer
+        transfer_number:
+          type: string
+        from_location_id:
+          type: integer
+        to_location_id:
+          type: integer
+        from_location_name:
+          type: string
+        to_location_name:
+          type: string
+        transfer_date:
+          type: string
+          format: date-time
+        status:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        created_by:
+          type: integer
+        approved_by:
+          type: integer
+          nullable: true
+        approved_at:
+          type: string
+          format: date-time
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockTransferItemSummary'
+    StockTransferDetailItem:
+      type: object
+      properties:
+        transfer_detail_id:
+          type: integer
+        transfer_id:
+          type: integer
+        product_id:
+          type: integer
+        barcode_id:
+          type: integer
+          nullable: true
+        product_name:
+          type: string
+        product_sku:
+          type: string
+          nullable: true
+        unit_symbol:
+          type: string
+          nullable: true
+        barcode:
+          type: string
+          nullable: true
+        variant_name:
+          type: string
+          nullable: true
+        tracking_type:
+          type: string
+        quantity:
+          type: number
+          format: float
+        received_quantity:
+          type: number
+          format: float
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        batch_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryBatchSelectionInput'
+    StockTransferWithDetails:
+      type: object
+      properties:
+        transfer_id:
+          type: integer
+        transfer_number:
+          type: string
+        from_location_id:
+          type: integer
+        to_location_id:
+          type: integer
+        from_location_name:
+          type: string
+        to_location_name:
+          type: string
+        transfer_date:
+          type: string
+          format: date-time
+        status:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        created_by:
+          type: integer
+        created_by_name:
+          type: string
+        approved_by:
+          type: integer
+          nullable: true
+        approved_at:
+          type: string
+          format: date-time
+          nullable: true
+        approved_by_name:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockTransferDetailItem'
+    CreatePurchaseReturnRequest:
+      type: object
+      properties:
+        purchase_id:
+          type: integer
+        reason:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreatePurchaseReturnDetailRequest'
+        override_password:
+          type: string
+          nullable: true
+    CreatePurchaseReturnDetailRequest:
+      type: object
+      properties:
+        purchase_detail_id:
+          type: integer
+          nullable: true
+        product_id:
+          type: integer
+        barcode_id:
+          type: integer
+          nullable: true
+        quantity:
+          type: number
+          format: float
+        unit_price:
+          type: number
+          format: float
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        batch_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryBatchSelectionInput'

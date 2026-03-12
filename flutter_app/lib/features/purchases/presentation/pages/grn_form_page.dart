@@ -9,6 +9,7 @@ import '../../../../shared/widgets/app_selection_dialog.dart';
 import '../../../suppliers/data/supplier_repository.dart';
 import '../../../suppliers/data/models.dart';
 import '../../../inventory/data/inventory_repository.dart';
+import '../../../inventory/presentation/widgets/inventory_tracking_selector.dart';
 import '../../data/grn_repository.dart';
 import '../../data/models.dart';
 import '../../../pos/data/pos_repository.dart';
@@ -328,6 +329,21 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _configureTracking(_lines[i]),
+                    icon: const Icon(Icons.qr_code_2_rounded),
+                    label: Text(
+                      _lines[i].tracking == null
+                          ? 'Configure Variation / Tracking'
+                          : _lines[i].tracking!.summary(
+                                double.tryParse(_lines[i].qty.text.trim()) ?? 0,
+                              ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -370,6 +386,29 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
     setState(() => _saving = true);
     try {
       final total = _computeTotal();
+      for (final line in validLines) {
+        final tracking = line.tracking;
+        final qty = double.tryParse(line.qty.text.trim()) ?? 0;
+        if (tracking == null || (tracking.barcodeId ?? 0) <= 0) {
+          throw StateError(
+            'Configure variation / tracking for ${line.product!.name}',
+          );
+        }
+        if (tracking.trackingType == 'SERIAL') {
+          if (qty != qty.roundToDouble() ||
+              tracking.serialNumbers.length != qty.round()) {
+            throw StateError(
+              'Serial count must match quantity for ${line.product!.name}',
+            );
+          }
+        }
+        if (tracking.trackingType == 'BATCH' &&
+            (tracking.batchNumber ?? '').trim().isEmpty) {
+          throw StateError(
+            'Batch / expiry details are required for ${line.product!.name}',
+          );
+        }
+      }
       double? paidAmount;
       int? methodId;
       if (_paidNow) {
@@ -392,6 +431,10 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
             productId: l.product!.productId,
             quantity: double.tryParse(l.qty.text.trim()) ?? 0,
             unitPrice: double.tryParse(l.price.text.trim()) ?? 0,
+            barcodeId: l.tracking?.barcodeId,
+            serialNumbers: l.tracking?.serialNumbers ?? const [],
+            batchNumber: l.tracking?.batchNumber,
+            expiryDate: l.tracking?.expiryDate,
           )
       ];
       await repo.createGrnWithoutPo(
@@ -420,6 +463,39 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
         ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _configureTracking(_GrnLine line) async {
+    final product = line.product;
+    if (product == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Select a product first')),
+        );
+      return;
+    }
+    final qty = double.tryParse(line.qty.text.trim()) ?? 0;
+    if (qty <= 0) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Enter quantity first')),
+        );
+      return;
+    }
+    final selection = await showInventoryTrackingSelector(
+      context: context,
+      ref: ref,
+      productId: product.productId,
+      productName: product.name,
+      quantity: qty,
+      mode: InventoryTrackingMode.receive,
+      initialSelection: line.tracking,
+    );
+    if (selection != null && mounted) {
+      setState(() => line.tracking = selection);
     }
   }
 }
@@ -551,6 +627,7 @@ class _SupplierPicker extends ConsumerWidget {
 
 class _GrnLine {
   InventoryListItem? product;
+  InventoryTrackingSelection? tracking;
   final qty = TextEditingController();
   final price = TextEditingController();
   void dispose() {
@@ -574,7 +651,27 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
     return InkWell(
       onTap: () async {
         final picked = await _openProductPicker(context);
-        if (picked != null) setState(() => widget.line.product = picked);
+        if (picked != null) {
+          InventoryTrackingSelection? tracking;
+          try {
+            final variants = await ref
+                .read(inventoryRepositoryProvider)
+                .getStockVariants(picked.productId);
+            if (variants.isNotEmpty) {
+              final v = variants.first;
+              tracking = InventoryTrackingSelection(
+                barcodeId: v.barcodeId,
+                trackingType: v.trackingType,
+                barcode: v.barcode,
+                variantName: v.variantName,
+              );
+            }
+          } catch (_) {}
+          setState(() {
+            widget.line.product = picked;
+            widget.line.tracking = tracking;
+          });
+        }
       },
       borderRadius: BorderRadius.circular(8),
       child: InputDecorator(
@@ -589,7 +686,14 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
               child: Text(
                 p == null
                     ? 'Tap to select a product'
-                    : '${p.name}${(p.sku ?? '').isNotEmpty ? ' • SKU: ${p.sku}' : ''}',
+                    : [
+                        p.name,
+                        if ((widget.line.tracking?.variantName ?? '')
+                            .trim()
+                            .isNotEmpty)
+                          widget.line.tracking!.variantName!.trim(),
+                        if ((p.sku ?? '').isNotEmpty) 'SKU: ${p.sku}',
+                      ].join(' • '),
                 overflow: TextOverflow.ellipsis,
               ),
             ),

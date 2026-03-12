@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/negative_stock_override.dart';
 import '../../../core/offline_cache/offline_cache_providers.dart';
 import '../../../core/outbox/outbox_notifier.dart';
 import '../../dashboard/controllers/location_notifier.dart';
@@ -74,6 +75,60 @@ class InventoryRepository {
     final data = _extractList(res);
     if (data.isEmpty) return null;
     return InventoryListItem.fromStockJson(data.first as Map<String, dynamic>);
+  }
+
+  Future<List<InventoryVariantStockDto>> getStockVariants(int productId) async {
+    final loc = _requireLocation();
+    final res = await _dio.get(
+      '/inventory/variants',
+      queryParameters: {
+        'location_id': loc,
+        'product_id': productId,
+      },
+    );
+    final data = _extractList(res);
+    return data
+        .map(
+            (e) => InventoryVariantStockDto.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<InventoryBatchStockDto>> getStockBatches({
+    required int productId,
+    int? barcodeId,
+  }) async {
+    final loc = _requireLocation();
+    final qp = <String, dynamic>{
+      'location_id': loc,
+      'product_id': productId,
+    };
+    if (barcodeId != null && barcodeId > 0) {
+      qp['barcode_id'] = barcodeId;
+    }
+    final res = await _dio.get('/inventory/batches', queryParameters: qp);
+    final data = _extractList(res);
+    return data
+        .map((e) => InventoryBatchStockDto.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<InventorySerialStockDto>> getAvailableSerials({
+    required int productId,
+    int? barcodeId,
+  }) async {
+    final loc = _requireLocation();
+    final qp = <String, dynamic>{
+      'location_id': loc,
+      'product_id': productId,
+    };
+    if (barcodeId != null && barcodeId > 0) {
+      qp['barcode_id'] = barcodeId;
+    }
+    final res = await _dio.get('/inventory/serials', queryParameters: qp);
+    final data = _extractList(res);
+    return data
+        .map((e) => InventorySerialStockDto.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<InventoryListItem>> searchProducts(String term) async {
@@ -255,18 +310,40 @@ class InventoryRepository {
     required int productId,
     required double adjustment,
     required String reason,
+    int? barcodeId,
+    List<String>? serialNumbers,
+    List<Map<String, dynamic>>? batchAllocations,
+    String? batchNumber,
+    DateTime? expiryDate,
+    String? overridePassword,
   }) async {
     final loc = _requireLocation();
     final qp = <String, dynamic>{'location_id': loc};
-    await _dio.post(
-      '/inventory/stock-adjustment',
-      queryParameters: qp.isEmpty ? null : qp,
-      data: {
-        'product_id': productId,
-        'adjustment': adjustment,
-        'reason': reason,
-      },
-    );
+    try {
+      await _dio.post(
+        '/inventory/stock-adjustment',
+        queryParameters: qp.isEmpty ? null : qp,
+        data: {
+          'product_id': productId,
+          if (barcodeId != null && barcodeId > 0) 'barcode_id': barcodeId,
+          'adjustment': adjustment,
+          'reason': reason,
+          if (serialNumbers != null && serialNumbers.isNotEmpty)
+            'serial_numbers': serialNumbers,
+          if (batchAllocations != null && batchAllocations.isNotEmpty)
+            'batch_allocations': batchAllocations,
+          if (batchNumber != null && batchNumber.isNotEmpty)
+            'batch_number': batchNumber,
+          if (expiryDate != null) 'expiry_date': expiryDate.toIso8601String(),
+          if ((overridePassword ?? '').trim().isNotEmpty)
+            'override_password': overridePassword!.trim(),
+        },
+      );
+    } on DioException catch (e) {
+      final approval = parseNegativeStockApprovalRequired(e);
+      if (approval != null) throw approval;
+      rethrow;
+    }
   }
 
   Future<List<StockAdjustmentDto>> getStockAdjustments() async {
@@ -285,17 +362,27 @@ class InventoryRepository {
   Future<StockAdjustmentDocumentDto> createStockAdjustmentDocument({
     required String reason,
     required List<Map<String, dynamic>> items,
+    String? overridePassword,
   }) async {
     final loc = _requireLocation();
     final qp = <String, dynamic>{'location_id': loc};
-    final res = await _dio.post(
-      '/inventory/stock-adjustment-documents',
-      queryParameters: qp.isEmpty ? null : qp,
-      data: {
-        'reason': reason,
-        'items': items,
-      },
-    );
+    Response res;
+    try {
+      res = await _dio.post(
+        '/inventory/stock-adjustment-documents',
+        queryParameters: qp.isEmpty ? null : qp,
+        data: {
+          'reason': reason,
+          'items': items,
+          if ((overridePassword ?? '').trim().isNotEmpty)
+            'override_password': overridePassword!.trim(),
+        },
+      );
+    } on DioException catch (e) {
+      final approval = parseNegativeStockApprovalRequired(e);
+      if (approval != null) throw approval;
+      rethrow;
+    }
     final body = res.data is Map<String, dynamic> ? res.data['data'] : res.data;
     return StockAdjustmentDocumentDto.fromJson(body as Map<String, dynamic>);
   }
@@ -388,9 +475,22 @@ class InventoryRepository {
     return (body as Map<String, dynamic>)['transfer_id'] as int? ?? 0;
   }
 
-  Future<void> approveStockTransfer(int id) async {
+  Future<void> approveStockTransfer(int id, {String? overridePassword}) async {
     final qp = <String, dynamic>{'location_id': _requireLocation()};
-    await _dio.put('/inventory/transfers/$id/approve', queryParameters: qp);
+    try {
+      await _dio.put(
+        '/inventory/transfers/$id/approve',
+        queryParameters: qp,
+        data: {
+          if ((overridePassword ?? '').trim().isNotEmpty)
+            'override_password': overridePassword!.trim(),
+        },
+      );
+    } on DioException catch (e) {
+      final approval = parseNegativeStockApprovalRequired(e);
+      if (approval != null) throw approval;
+      rethrow;
+    }
   }
 
   Future<void> completeStockTransfer(int id) async {

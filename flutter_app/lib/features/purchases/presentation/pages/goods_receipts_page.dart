@@ -9,6 +9,7 @@ import '../../data/purchases_repository.dart';
 import '../../data/models.dart';
 import 'grn_form_page.dart';
 import 'grn_detail_page.dart';
+import 'purchase_receipt_page.dart';
 
 class GoodsReceiptsPage extends ConsumerStatefulWidget {
   const GoodsReceiptsPage({super.key});
@@ -161,7 +162,8 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
       if (picked != null) {
         await Navigator.of(context).push(
           MaterialPageRoute(
-              builder: (_) => _ReceiveAgainstPoPage(purchaseId: picked)),
+            builder: (_) => PurchaseReceiptPage(purchaseId: picked),
+          ),
         );
         if (!mounted) return;
         _load();

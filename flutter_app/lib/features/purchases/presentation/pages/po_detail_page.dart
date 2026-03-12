@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../data/purchases_repository.dart';
+import 'purchase_receipt_page.dart';
 
 class PoDetailPage extends ConsumerStatefulWidget {
   const PoDetailPage({super.key, required this.purchaseId});
@@ -122,47 +123,24 @@ class _PoDetailPageState extends ConsumerState<PoDetailPage> {
     }
     final items =
         (po['items'] as List? ?? const []).cast<Map<String, dynamic>>();
-    final remaining = items
-        .map((it) {
-          final qty = (it['quantity'] as num?)?.toDouble() ?? 0;
-          final rec = (it['received_quantity'] as num?)?.toDouble() ?? 0;
-          final left = (qty - rec);
-          return {
-            'purchase_detail_id': it['purchase_detail_id'] as int,
-            'product_name': it['product']?['name']?.toString() ??
-                'Product #${it['product_id']}',
-            'remaining': left > 0 ? left : 0,
-          };
-        })
-        .where((e) => (e['remaining'] as double) > 0)
-        .toList();
-    if (remaining.isEmpty) {
+    final hasRemaining = items.any((it) {
+      final qty = (it['quantity'] as num?)?.toDouble() ?? 0;
+      final rec = (it['received_quantity'] as num?)?.toDouble() ?? 0;
+      return qty - rec > 0.000001;
+    });
+    if (!hasRemaining) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(const SnackBar(content: Text('Nothing to receive')));
       return;
     }
-    final payload = await showDialog<List<Map<String, dynamic>>>(
-      context: context,
-      builder: (context) => _ReceiveDialog(lines: remaining),
+    final recorded = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => PurchaseReceiptPage(purchaseId: widget.purchaseId),
+      ),
     );
-    if (payload == null || payload.isEmpty) return;
-    try {
-      setState(() => _loading = true);
-      final repo = ref.read(purchasesRepositoryProvider);
-      await repo.receiveAgainstPO(
-          purchaseId: widget.purchaseId, items: payload);
+    if (recorded == true) {
       await _load();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Received successfully')));
-    } catch (e) {
-      setState(() => _loading = false);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
     }
   }
 }

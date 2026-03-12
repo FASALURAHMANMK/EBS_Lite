@@ -42,12 +42,20 @@ class GrnCreateItem {
       {required this.productId,
       required this.quantity,
       required this.unitPrice,
+      this.barcodeId,
+      this.serialNumbers = const [],
+      this.batchNumber,
+      this.expiryDate,
       this.taxId,
       this.discountPercent,
       this.discountAmount});
   final int productId;
   final double quantity;
   final double unitPrice;
+  final int? barcodeId;
+  final List<String> serialNumbers;
+  final String? batchNumber;
+  final DateTime? expiryDate;
   final int? taxId;
   final double? discountPercent;
   final double? discountAmount;

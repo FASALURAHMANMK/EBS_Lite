@@ -810,6 +810,7 @@ func (s *SalesService) CreateSaleWithOptions(
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback()
+	trackingSvc := newInventoryTrackingService(s.db)
 
 	// Use client-provided sale number when present (offline-first). Otherwise,
 	// allocate via numbering sequences.
@@ -953,16 +954,18 @@ func (s *SalesService) CreateSaleWithOptions(
 			lineSnapshot = newSaleLineSnapshot(meta, item.Quantity)
 		}
 
-		_, err = tx.Exec(`
-			INSERT INTO sale_details (sale_id, product_id, product_name, quantity, unit_price,
+		var saleDetailID int
+		err = tx.QueryRow(`
+			INSERT INTO sale_details (sale_id, product_id, barcode_id, product_name, quantity, unit_price,
 									 discount_percentage, discount_amount, tax_id, tax_amount,
 									 line_total, serial_numbers, notes, cost_price,
 									 stock_unit_id, selling_unit_id, selling_uom_mode, selling_to_stock_factor, stock_quantity)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-		`, saleID, item.ProductID, item.ProductName, item.Quantity, item.UnitPrice,
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+			RETURNING sale_detail_id
+		`, saleID, item.ProductID, item.BarcodeID, item.ProductName, item.Quantity, item.UnitPrice,
 			item.DiscountPercent, discountAmount, effectiveTaxID, taxAmount, lineTotal,
 			pq.Array(item.SerialNumbers), item.Notes, lineSnapshot.CostPricePerUnit,
-			lineSnapshot.StockUnitID, lineSnapshot.SellingUnitID, lineSnapshot.SellingUOMMode, lineSnapshot.SellingToStock, lineSnapshot.StockQuantity)
+			lineSnapshot.StockUnitID, lineSnapshot.SellingUnitID, lineSnapshot.SellingUOMMode, lineSnapshot.SellingToStock, lineSnapshot.StockQuantity).Scan(&saleDetailID)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to create sale item: %w", err)
@@ -970,13 +973,25 @@ func (s *SalesService) CreateSaleWithOptions(
 
 		// Update stock if product_id is provided (skip in training mode).
 		if !opts.IsTraining && item.ProductID != nil {
-			meta, ok := productMetaByID[*item.ProductID]
-			if !ok {
-				return nil, fmt.Errorf("product not found")
-			}
-			err = s.updateStock(tx, locationID, *item.ProductID, -saleQuantityToStock(meta, item.Quantity))
+			issue, err := trackingSvc.IssueStockTx(tx, companyID, locationID, userID, "SALE", "sale_detail", &saleDetailID, nil, inventorySelection{
+				ProductID:        *item.ProductID,
+				BarcodeID:        item.BarcodeID,
+				Quantity:         lineSnapshot.StockQuantity,
+				SerialNumbers:    item.SerialNumbers,
+				BatchAllocations: item.BatchAllocations,
+				Notes:            item.Notes,
+				OverridePassword: req.OverridePassword,
+			})
 			if err != nil {
 				return nil, fmt.Errorf("failed to update stock: %w", err)
+			}
+			if _, err := tx.Exec(`
+				UPDATE sale_details
+				SET barcode_id = COALESCE($1, barcode_id),
+				    cost_price = $2
+				WHERE sale_detail_id = $3
+			`, issue.BarcodeID, issue.UnitCost, saleDetailID); err != nil {
+				return nil, fmt.Errorf("failed to update sale item cost snapshot: %w", err)
 			}
 		}
 	}
@@ -1285,7 +1300,7 @@ func (s *SalesService) CreateQuickSale(companyID, locationID, userID int, req *m
 // Helper methods
 func (s *SalesService) getSaleItems(saleID, companyID int) ([]models.SaleDetail, error) {
 	query := `
-		SELECT sd.sale_detail_id, sd.sale_id, sd.product_id, sd.product_name, sd.quantity,
+		SELECT sd.sale_detail_id, sd.sale_id, sd.product_id, sd.barcode_id, sd.product_name, sd.quantity,
 			   sd.unit_price, sd.discount_percentage, sd.discount_amount, sd.tax_id,
 			   sd.tax_amount, sd.line_total, sd.serial_numbers, sd.notes,
 			   p.name as product_name_from_table
@@ -1310,7 +1325,7 @@ func (s *SalesService) getSaleItems(saleID, companyID int) ([]models.SaleDetail,
 		var productNameFromTable sql.NullString
 
 		err := rows.Scan(
-			&item.SaleDetailID, &item.SaleID, &item.ProductID, &item.ProductName,
+			&item.SaleDetailID, &item.SaleID, &item.ProductID, &item.BarcodeID, &item.ProductName,
 			&item.Quantity, &item.UnitPrice, &item.DiscountPercent, &item.DiscountAmount,
 			&item.TaxID, &item.TaxAmount, &item.LineTotal, &serialNumbers, &item.Notes,
 			&productNameFromTable,

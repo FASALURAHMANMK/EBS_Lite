@@ -100,7 +100,7 @@ func mockDB(responses map[string]stubResp) *sql.DB {
 }
 
 func productRow() []driver.Value {
-	return []driver.Value{1, 1, nil, nil, nil, nil, nil, "LOOSE", "LOOSE", 1.0, 1.0, false, "Test", nil, nil, nil, nil, 0, nil, nil, false, true, 1, nil, 1, time.Now(), time.Now(), false}
+	return []driver.Value{1, 1, nil, nil, nil, nil, nil, "LOOSE", "LOOSE", 1.0, 1.0, false, "Test", nil, nil, nil, nil, 0, nil, nil, false, "VARIANT", true, 1, nil, 1, time.Now(), time.Now(), false}
 }
 
 func productRowWithSupplierAndTax() []driver.Value {
@@ -110,7 +110,7 @@ func productRowWithSupplierAndTax() []driver.Value {
 func TestGetProducts_BarcodesError(t *testing.T) {
 	db := mockDB(map[string]stubResp{
 		"FROM products": {
-			columns: []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "purchase_unit_id", "selling_unit_id", "purchase_uom_mode", "selling_uom_mode", "purchase_to_stock_factor", "selling_to_stock_factor", "is_weighable", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted"},
+			columns: []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "purchase_unit_id", "selling_unit_id", "purchase_uom_mode", "selling_uom_mode", "purchase_to_stock_factor", "selling_to_stock_factor", "is_weighable", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "tracking_type", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted"},
 			rows:    [][]driver.Value{productRow()},
 		},
 		"FROM product_barcodes": {err: errors.New("barcode failure")},
@@ -124,11 +124,11 @@ func TestGetProducts_BarcodesError(t *testing.T) {
 func TestGetProducts_AttributesError(t *testing.T) {
 	db := mockDB(map[string]stubResp{
 		"FROM products": {
-			columns: []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "purchase_unit_id", "selling_unit_id", "purchase_uom_mode", "selling_uom_mode", "purchase_to_stock_factor", "selling_to_stock_factor", "is_weighable", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted"},
+			columns: []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "purchase_unit_id", "selling_unit_id", "purchase_uom_mode", "selling_uom_mode", "purchase_to_stock_factor", "selling_to_stock_factor", "is_weighable", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "tracking_type", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted"},
 			rows:    [][]driver.Value{productRow()},
 		},
 		"FROM product_barcodes": {
-			columns: []string{"barcode_id", "product_id", "barcode", "pack_size", "cost_price", "selling_price", "is_primary"},
+			columns: []string{"barcode_id", "product_id", "barcode", "pack_size", "cost_price", "selling_price", "is_primary", "variant_name", "variant_attributes", "is_active"},
 			rows:    [][]driver.Value{},
 		},
 		"FROM product_attribute_values": {err: errors.New("attr failure")},
@@ -142,7 +142,7 @@ func TestGetProducts_AttributesError(t *testing.T) {
 func TestGetProductByID_BarcodesError(t *testing.T) {
 	db := mockDB(map[string]stubResp{
 		"default_supplier_id, tax_id": {
-			columns: []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "purchase_unit_id", "selling_unit_id", "purchase_uom_mode", "selling_uom_mode", "purchase_to_stock_factor", "selling_to_stock_factor", "is_weighable", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted", "default_supplier_id", "tax_id"},
+			columns: []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "purchase_unit_id", "selling_unit_id", "purchase_uom_mode", "selling_uom_mode", "purchase_to_stock_factor", "selling_to_stock_factor", "is_weighable", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "tracking_type", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted", "default_supplier_id", "tax_id"},
 			rows:    [][]driver.Value{productRowWithSupplierAndTax()},
 		},
 		"FROM product_barcodes": {err: errors.New("barcode failure")},
@@ -156,11 +156,11 @@ func TestGetProductByID_BarcodesError(t *testing.T) {
 func TestGetProductByID_AttributesError(t *testing.T) {
 	db := mockDB(map[string]stubResp{
 		"default_supplier_id, tax_id": {
-			columns: []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "purchase_unit_id", "selling_unit_id", "purchase_uom_mode", "selling_uom_mode", "purchase_to_stock_factor", "selling_to_stock_factor", "is_weighable", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted", "default_supplier_id", "tax_id"},
+			columns: []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "purchase_unit_id", "selling_unit_id", "purchase_uom_mode", "selling_uom_mode", "purchase_to_stock_factor", "selling_to_stock_factor", "is_weighable", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "tracking_type", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted", "default_supplier_id", "tax_id"},
 			rows:    [][]driver.Value{productRowWithSupplierAndTax()},
 		},
 		"FROM product_barcodes": {
-			columns: []string{"barcode_id", "product_id", "barcode", "pack_size", "cost_price", "selling_price", "is_primary"},
+			columns: []string{"barcode_id", "product_id", "barcode", "pack_size", "cost_price", "selling_price", "is_primary", "variant_name", "variant_attributes", "is_active"},
 			rows:    [][]driver.Value{},
 		},
 		"FROM product_attribute_values": {err: errors.New("attr failure")},

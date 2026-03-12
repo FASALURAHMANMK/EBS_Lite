@@ -8,25 +8,25 @@ import (
 
 func productRowWithID(id int, name string) []driver.Value {
 	return []driver.Value{
-		id, 1, nil, nil, nil, nil, nil, "LOOSE", "LOOSE", 1.0, 1.0, false, name, nil, nil, nil, nil, 0, nil, nil, false, true, 1, nil, 1, time.Now(), time.Now(), false,
+		id, 1, nil, nil, nil, nil, nil, "LOOSE", "LOOSE", 1.0, 1.0, false, name, nil, nil, nil, nil, 0, nil, nil, false, "VARIANT", true, 1, nil, 1, time.Now(), time.Now(), false,
 	}
 }
 
 func TestGetProducts_BatchedBarcodesAndAttributes(t *testing.T) {
 	db := mockDB(map[string]stubResp{
 		"FROM products": {
-			columns: []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "purchase_unit_id", "selling_unit_id", "purchase_uom_mode", "selling_uom_mode", "purchase_to_stock_factor", "selling_to_stock_factor", "is_weighable", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted"},
+			columns: []string{"product_id", "company_id", "category_id", "brand_id", "unit_id", "purchase_unit_id", "selling_unit_id", "purchase_uom_mode", "selling_uom_mode", "purchase_to_stock_factor", "selling_to_stock_factor", "is_weighable", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "tracking_type", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted"},
 			rows: [][]driver.Value{
 				productRowWithID(1, "First"),
 				productRowWithID(2, "Second"),
 			},
 		},
 		"FROM product_barcodes": {
-			columns: []string{"barcode_id", "product_id", "barcode", "pack_size", "cost_price", "selling_price", "is_primary"},
+			columns: []string{"barcode_id", "product_id", "barcode", "pack_size", "cost_price", "selling_price", "is_primary", "variant_name", "variant_attributes", "is_active"},
 			rows: [][]driver.Value{
-				{1, 1, "ABC", 1, 10.0, 12.0, true},
-				{2, 1, "ABC-2", 2, 9.5, 11.5, false},
-				{3, 2, "DEF", 1, 20.0, 25.0, true},
+				{1, 1, "ABC", 1, 10.0, 12.0, true, "Base", []byte(`{}`), true},
+				{2, 1, "ABC-2", 2, 9.5, 11.5, false, "Pack", []byte(`{}`), true},
+				{3, 2, "DEF", 1, 20.0, 25.0, true, "Std", []byte(`{}`), true},
 			},
 		},
 		"FROM product_attribute_values": {

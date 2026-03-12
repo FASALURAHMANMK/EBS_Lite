@@ -10,6 +10,7 @@ import '../../data/printer_settings_repository.dart';
 import '../../utils/escpos.dart';
 import '../../../../core/api_client.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/negative_stock_override.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/widgets/manager_override_dialog.dart';
@@ -482,6 +483,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                         Future<PosCheckoutResult> runCheckout({
                                           String? overrideToken,
                                           String? overrideReason,
+                                          String? overridePassword,
                                         }) {
                                           return ref
                                               .read(
@@ -494,6 +496,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                                 managerOverrideToken:
                                                     overrideToken,
                                                 overrideReason: overrideReason,
+                                                overridePassword:
+                                                    overridePassword,
                                               );
                                         }
 
@@ -546,6 +550,22 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                           } else {
                                             rethrow;
                                           }
+                                        } on NegativeStockApprovalRequiredException catch (e) {
+                                          if (!context.mounted) return;
+                                          final password =
+                                              await showNegativeStockApprovalDialog(
+                                            context,
+                                            message: e.message,
+                                          );
+                                          if (!context.mounted) return;
+                                          if (password == null ||
+                                              password.isEmpty) {
+                                            setState(() => _submitting = false);
+                                            return;
+                                          }
+                                          result = await runCheckout(
+                                            overridePassword: password,
+                                          );
                                         }
                                         if (!mounted) return;
                                         setState(() => _submitting = false);

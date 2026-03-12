@@ -13,6 +13,7 @@ import '../../../../core/outbox/outbox_notifier.dart';
 import '../../../../shared/widgets/app_confirm_dialog.dart';
 import 'company_settings_page.dart';
 import 'dashboard_customization_page.dart';
+import 'inventory_settings_page.dart';
 import 'sync_health_page.dart';
 import 'invoice_settings_page.dart';
 import 'printer_profiles_page.dart';
@@ -201,6 +202,22 @@ class SettingsPage extends ConsumerWidget {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const CompanySettingsPage()),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          ListTile(
+            leading: const Icon(Icons.inventory_2_rounded),
+            title: const Text('Inventory Configuration'),
+            subtitle: const Text('Costing policy and negative stock control'),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            tileColor: theme.colorScheme.surface,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const InventorySettingsPage(),
+                ),
               );
             },
           ),

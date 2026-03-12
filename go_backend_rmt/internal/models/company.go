@@ -14,13 +14,14 @@ type Company struct {
 }
 
 type CreateCompanyRequest struct {
-	Name       string  `json:"name" validate:"required,min=2,max=255"`
-	Logo       *string `json:"logo,omitempty"`
-	Address    *string `json:"address,omitempty"`
-	Phone      *string `json:"phone,omitempty"`
-	Email      *string `json:"email,omitempty" validate:"omitempty,email"`
-	TaxNumber  *string `json:"tax_number,omitempty"`
-	CurrencyID *int    `json:"currency_id,omitempty"`
+	Name                   string  `json:"name" validate:"required,min=2,max=255"`
+	Logo                   *string `json:"logo,omitempty"`
+	Address                *string `json:"address,omitempty"`
+	Phone                  *string `json:"phone,omitempty"`
+	Email                  *string `json:"email,omitempty" validate:"omitempty,email"`
+	TaxNumber              *string `json:"tax_number,omitempty"`
+	CurrencyID             *int    `json:"currency_id,omitempty"`
+	InventoryCostingMethod string  `json:"inventory_costing_method,omitempty"`
 }
 
 type UpdateCompanyRequest struct {

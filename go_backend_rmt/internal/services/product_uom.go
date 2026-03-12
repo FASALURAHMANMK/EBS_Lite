@@ -92,6 +92,7 @@ func newPurchaseLineSnapshot(meta productMeta, quantity, unitPrice float64) purc
 type saleDetailSnapshot struct {
 	SaleDetailID   int
 	ProductID      int
+	BarcodeID      *int
 	Quantity       float64
 	UnitPrice      float64
 	TaxAmount      float64
@@ -106,6 +107,7 @@ type saleDetailSnapshot struct {
 type purchaseDetailSnapshot struct {
 	PurchaseDetailID  int
 	ProductID         int
+	BarcodeID         *int
 	Quantity          float64
 	UnitPrice         float64
 	TaxAmount         float64
@@ -134,6 +136,7 @@ func fetchSaleDetailSnapshots(q sqlQueryer, companyID int, saleDetailIDs []int) 
 		SELECT
 			sd.sale_detail_id,
 			COALESCE(sd.product_id, 0),
+			sd.barcode_id,
 			sd.quantity::float8,
 			sd.unit_price::float8,
 			COALESCE(sd.tax_amount, 0)::float8,
@@ -156,11 +159,13 @@ func fetchSaleDetailSnapshots(q sqlQueryer, companyID int, saleDetailIDs []int) 
 	out := make(map[int]saleDetailSnapshot, len(ids))
 	for rows.Next() {
 		var snap saleDetailSnapshot
+		var barcodeID sql.NullInt64
 		var stockUnitID sql.NullInt64
 		var sellingUnitID sql.NullInt64
 		if err := rows.Scan(
 			&snap.SaleDetailID,
 			&snap.ProductID,
+			&barcodeID,
 			&snap.Quantity,
 			&snap.UnitPrice,
 			&snap.TaxAmount,
@@ -173,6 +178,7 @@ func fetchSaleDetailSnapshots(q sqlQueryer, companyID int, saleDetailIDs []int) 
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan sale detail snapshot: %w", err)
 		}
+		snap.BarcodeID = intPtrFromNullInt64(barcodeID)
 		snap.StockUnitID = intPtrFromNullInt64(stockUnitID)
 		snap.SellingUnitID = intPtrFromNullInt64(sellingUnitID)
 		out[snap.SaleDetailID] = snap
@@ -192,6 +198,7 @@ func fetchPurchaseDetailSnapshots(q sqlQueryer, companyID int, purchaseDetailIDs
 		SELECT
 			pd.purchase_detail_id,
 			pd.product_id,
+			pd.barcode_id,
 			pd.quantity::float8,
 			pd.unit_price::float8,
 			COALESCE(pd.tax_amount, 0)::float8,
@@ -213,11 +220,13 @@ func fetchPurchaseDetailSnapshots(q sqlQueryer, companyID int, purchaseDetailIDs
 	out := make(map[int]purchaseDetailSnapshot, len(ids))
 	for rows.Next() {
 		var snap purchaseDetailSnapshot
+		var barcodeID sql.NullInt64
 		var stockUnitID sql.NullInt64
 		var purchaseUnitID sql.NullInt64
 		if err := rows.Scan(
 			&snap.PurchaseDetailID,
 			&snap.ProductID,
+			&barcodeID,
 			&snap.Quantity,
 			&snap.UnitPrice,
 			&snap.TaxAmount,
@@ -229,6 +238,7 @@ func fetchPurchaseDetailSnapshots(q sqlQueryer, companyID int, purchaseDetailIDs
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan purchase detail snapshot: %w", err)
 		}
+		snap.BarcodeID = intPtrFromNullInt64(barcodeID)
 		snap.StockUnitID = intPtrFromNullInt64(stockUnitID)
 		snap.PurchaseUnitID = intPtrFromNullInt64(purchaseUnitID)
 		snap.CostPricePerStock = stockUnitCost(snap.UnitPrice, snap.PurchaseToStock)

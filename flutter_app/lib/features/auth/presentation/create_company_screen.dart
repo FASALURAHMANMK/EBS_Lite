@@ -19,6 +19,7 @@ class _CreateCompanyScreenState extends ConsumerState<CreateCompanyScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  String _inventoryCostingMethod = 'FIFO';
 
   final _nameFocus = FocusNode();
   final _emailFocus = FocusNode();
@@ -64,6 +65,7 @@ class _CreateCompanyScreenState extends ConsumerState<CreateCompanyScreen> {
           email: _emailController.text.trim().isEmpty
               ? null
               : _emailController.text.trim(),
+          inventoryCostingMethod: _inventoryCostingMethod,
         );
 
     if (!mounted) return;
@@ -187,6 +189,33 @@ class _CreateCompanyScreenState extends ConsumerState<CreateCompanyScreen> {
                         ),
                         validator: _validateEmail,
                         onFieldSubmitted: (_) => _submit(),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: _inventoryCostingMethod,
+                        decoration: const InputDecoration(
+                          hintText: 'Inventory costing',
+                          prefixIcon: Icon(Icons.inventory_2_rounded),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'FIFO',
+                            child: Text('FIFO'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'WAC',
+                            child: Text('Weighted Average Cost'),
+                          ),
+                        ],
+                        onChanged: state.isLoading
+                            ? null
+                            : (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  _inventoryCostingMethod =
+                                      value == 'WAC' ? 'WAC' : 'FIFO';
+                                });
+                              },
                       ),
                       const SizedBox(height: 24),
                       if (state.error != null) ...[

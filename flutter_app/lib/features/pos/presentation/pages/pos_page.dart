@@ -413,7 +413,7 @@ class _CartList extends ConsumerWidget {
           child: ListTile(
             title: Row(
               children: [
-                Expanded(child: Text(item.product.name)),
+                Expanded(child: Text(item.product.displayLabel)),
                 if (item.discountPercent > 0)
                   Row(children: [
                     const Icon(Icons.local_offer_outlined, size: 16),

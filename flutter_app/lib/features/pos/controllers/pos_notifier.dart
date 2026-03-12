@@ -151,7 +151,7 @@ class PosNotifier extends StateNotifier<PosState> {
 
   void addProduct(PosProductDto p, {double qty = 1}) {
     final items = [...state.cart];
-    final idx = items.indexWhere((i) => i.product.productId == p.productId);
+    final idx = items.indexWhere((i) => i.identityKey == p.identityKey);
     if (idx >= 0) {
       items[idx] = items[idx].copyWith(quantity: items[idx].quantity + qty);
     } else {
@@ -196,6 +196,7 @@ class PosNotifier extends StateNotifier<PosState> {
     double? redeemPoints,
     String? managerOverrideToken,
     String? overrideReason,
+    String? overridePassword,
   }) async {
     _checkoutIdemKey ??= const Uuid().v4();
     try {
@@ -211,6 +212,7 @@ class PosNotifier extends StateNotifier<PosState> {
         idempotencyKey: _checkoutIdemKey,
         managerOverrideToken: managerOverrideToken,
         overrideReason: overrideReason,
+        overridePassword: overridePassword,
       );
       _checkoutIdemKey = null;
       final nextPreview = await _repo.getNextReceiptPreview();
@@ -290,9 +292,13 @@ class PosNotifier extends StateNotifier<PosState> {
         .map((si) => PosCartItem(
               product: PosProductDto(
                 productId: si.productId ?? 0,
+                barcodeId: si.barcodeId ?? 0,
                 name: si.productName ?? 'Item',
                 price: si.unitPrice,
                 stock: 0,
+                barcode: si.barcode,
+                variantName: si.variantName,
+                trackingType: si.trackingType,
               ),
               quantity: si.quantity,
               unitPrice: si.unitPrice,

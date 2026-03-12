@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error_handler.dart';
+import '../../../../core/negative_stock_override.dart';
 import '../../../dashboard/data/payment_methods_repository.dart';
 import '../../controllers/pos_notifier.dart';
 import '../../data/pos_repository.dart';
@@ -494,10 +495,32 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                       final result = await ref
                           .read(posNotifierProvider.notifier)
                           .processCheckout(
-                              paymentMethodId: primaryMethod,
-                              paidAmount: paid,
-                              payments: payments,
-                              redeemPoints: redeemPoints);
+                            paymentMethodId: primaryMethod,
+                            paidAmount: paid,
+                            payments: payments,
+                            redeemPoints: redeemPoints,
+                          );
+                      if (!context.mounted) return;
+                      Navigator.of(context).pop(result);
+                    } on NegativeStockApprovalRequiredException catch (e) {
+                      if (!context.mounted) return;
+                      final password = await showNegativeStockApprovalDialog(
+                        context,
+                        message: e.message,
+                      );
+                      if (password == null || password.isEmpty) {
+                        setState(() => _submitting = false);
+                        return;
+                      }
+                      final result = await ref
+                          .read(posNotifierProvider.notifier)
+                          .processCheckout(
+                            paymentMethodId: primaryMethod,
+                            paidAmount: paid,
+                            payments: payments,
+                            redeemPoints: redeemPoints,
+                            overridePassword: password,
+                          );
                       if (!context.mounted) return;
                       Navigator.of(context).pop(result);
                     } on OutboxQueuedException catch (e) {

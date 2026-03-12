@@ -24,6 +24,7 @@ type Product struct {
 	Weight            *float64                `json:"weight,omitempty" db:"weight"`
 	Dimensions        *string                 `json:"dimensions,omitempty" db:"dimensions"`
 	IsSerialized      bool                    `json:"is_serialized" db:"is_serialized"`
+	TrackingType      string                  `json:"tracking_type" db:"tracking_type"`
 	IsActive          bool                    `json:"is_active" db:"is_active"`
 	CreatedBy         int                     `json:"created_by" db:"created_by"`
 	UpdatedBy         *int                    `json:"updated_by,omitempty" db:"updated_by"`
@@ -54,6 +55,7 @@ type CreateProductRequest struct {
 	Weight            *float64         `json:"weight,omitempty"`
 	Dimensions        *string          `json:"dimensions,omitempty"`
 	IsSerialized      bool             `json:"is_serialized"`
+	TrackingType      string           `json:"tracking_type"`
 	Attributes        map[int]string   `json:"attributes,omitempty"`
 	DefaultSupplierID *int             `json:"default_supplier_id,omitempty"`
 }
@@ -80,6 +82,7 @@ type UpdateProductRequest struct {
 	Weight            *float64         `json:"weight,omitempty"`
 	Dimensions        *string          `json:"dimensions,omitempty"`
 	IsSerialized      *bool            `json:"is_serialized,omitempty"`
+	TrackingType      *string          `json:"tracking_type,omitempty"`
 	IsActive          *bool            `json:"is_active,omitempty"`
 	Attributes        map[int]string   `json:"attributes,omitempty"`
 	DefaultSupplierID *int             `json:"default_supplier_id,omitempty"`

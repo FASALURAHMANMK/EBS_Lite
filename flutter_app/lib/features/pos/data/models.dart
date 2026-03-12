@@ -1,11 +1,14 @@
 class PosProductDto {
   final int productId;
+  final int barcodeId;
   final String name;
   final double price;
   final double stock;
   final String? barcode;
+  final String? variantName;
   final String? categoryName;
   final bool isWeighable;
+  final String trackingType;
   final String sellingUomMode;
   final int? sellingUnitId;
   final String? sellingUnitName;
@@ -13,12 +16,15 @@ class PosProductDto {
 
   PosProductDto({
     required this.productId,
+    this.barcodeId = 0,
     required this.name,
     required this.price,
     required this.stock,
     this.barcode,
+    this.variantName,
     this.categoryName,
     this.isWeighable = false,
+    this.trackingType = 'VARIANT',
     this.sellingUomMode = 'LOOSE',
     this.sellingUnitId,
     this.sellingUnitName,
@@ -27,17 +33,31 @@ class PosProductDto {
 
   factory PosProductDto.fromJson(Map<String, dynamic> json) => PosProductDto(
         productId: json['product_id'] as int,
+        barcodeId: json['barcode_id'] as int? ?? 0,
         name: json['name'] as String? ?? '',
         price: (json['price'] as num?)?.toDouble() ?? 0.0,
         stock: (json['stock'] as num?)?.toDouble() ?? 0.0,
         barcode: json['barcode'] as String?,
+        variantName: json['variant_name'] as String?,
         categoryName: json['category_name'] as String?,
         isWeighable: json['is_weighable'] as bool? ?? false,
+        trackingType: json['tracking_type'] as String? ?? 'VARIANT',
         sellingUomMode: json['selling_uom_mode'] as String? ?? 'LOOSE',
         sellingUnitId: json['selling_unit_id'] as int?,
         sellingUnitName: json['selling_unit_name'] as String?,
         sellingUnitSymbol: json['selling_unit_symbol'] as String?,
       );
+
+  String get identityKey =>
+      barcodeId > 0 ? 'barcode:$barcodeId' : 'product:$productId';
+
+  String get displayLabel {
+    final variant = (variantName ?? '').trim();
+    if (variant.isNotEmpty) return '$name • $variant';
+    final code = (barcode ?? '').trim();
+    if (code.isNotEmpty) return '$name • $code';
+    return name;
+  }
 }
 
 class PosCustomerDto {
@@ -82,6 +102,8 @@ class PosCartItem {
         unitPrice: unitPrice ?? this.unitPrice,
         discountPercent: discountPercent ?? this.discountPercent,
       );
+
+  String get identityKey => product.identityKey;
 
   double get lineTotal {
     final gross = quantity * unitPrice;
@@ -158,21 +180,33 @@ class CurrencyDto {
 
 class SaleItemDto {
   final int? productId;
+  final int? barcodeId;
   final String? productName;
+  final String? barcode;
+  final String? variantName;
+  final String trackingType;
   final double quantity;
   final double unitPrice;
   final double discountPercent;
 
   SaleItemDto(
       {this.productId,
+      this.barcodeId,
       this.productName,
+      this.barcode,
+      this.variantName,
+      this.trackingType = 'VARIANT',
       required this.quantity,
       required this.unitPrice,
       this.discountPercent = 0.0});
 
   factory SaleItemDto.fromJson(Map<String, dynamic> json) => SaleItemDto(
         productId: json['product_id'] as int?,
+        barcodeId: json['barcode_id'] as int?,
         productName: json['product_name'] as String?,
+        barcode: json['barcode'] as String?,
+        variantName: json['variant_name'] as String?,
+        trackingType: json['tracking_type'] as String? ?? 'VARIANT',
         quantity: (json['quantity'] as num?)?.toDouble() ?? 0.0,
         unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0.0,
         discountPercent:

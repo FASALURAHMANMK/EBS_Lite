@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/negative_stock_override.dart';
 import '../../../core/offline_cache/offline_cache_providers.dart';
 import '../../../core/offline_cache/offline_exception.dart';
 import '../../../core/offline_cache/offline_numbering.dart';
@@ -238,6 +239,7 @@ class PosRepository {
     String? idempotencyKey,
     String? managerOverrideToken,
     String? overrideReason,
+    String? overridePassword,
   }) async {
     final loc = _ref.read(locationNotifierProvider).selected;
     if (loc == null) {
@@ -267,6 +269,7 @@ class PosRepository {
       'items': items
           .map((i) => {
                 'product_id': i.product.productId,
+                if (i.product.barcodeId > 0) 'barcode_id': i.product.barcodeId,
                 'quantity': i.quantity,
                 'unit_price': i.unitPrice,
                 'discount_percentage': i.discountPercent,
@@ -284,6 +287,8 @@ class PosRepository {
         'manager_override_token': managerOverrideToken.trim(),
       if (overrideReason != null && overrideReason.trim().isNotEmpty)
         'override_reason': overrideReason.trim(),
+      if (overridePassword != null && overridePassword.trim().isNotEmpty)
+        'override_password': overridePassword.trim(),
     };
     final headers = <String, dynamic>{
       'Idempotency-Key': idem,
@@ -319,6 +324,10 @@ class PosRepository {
         options: headers.isEmpty ? null : Options(headers: headers),
       );
     } on DioException catch (e) {
+      final approval = parseNegativeStockApprovalRequired(e);
+      if (approval != null) {
+        throw approval;
+      }
       if (outbox.isNetworkError(e)) {
         if (trainingEnabled) rethrow;
         await outbox.enqueue(
@@ -352,6 +361,7 @@ class PosRepository {
       'items': items
           .map((i) => {
                 'product_id': i.product.productId,
+                if (i.product.barcodeId > 0) 'barcode_id': i.product.barcodeId,
                 'quantity': i.quantity,
                 'unit_price': i.unitPrice,
                 'discount_percentage': i.discountPercent,
@@ -384,6 +394,7 @@ class PosRepository {
       'items': items
           .map((i) => {
                 'product_id': i.product.productId,
+                if (i.product.barcodeId > 0) 'barcode_id': i.product.barcodeId,
                 'quantity': i.quantity,
                 'unit_price': i.unitPrice,
                 'discount_percentage': i.discountPercent,

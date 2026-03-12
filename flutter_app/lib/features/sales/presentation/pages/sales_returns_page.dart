@@ -6,6 +6,7 @@ import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 import '../../../../core/error_handler.dart';
 import '../../../inventory/data/inventory_repository.dart';
 import '../../../inventory/data/models.dart';
+import '../../../inventory/presentation/widgets/inventory_tracking_selector.dart';
 import '../../../pos/data/models.dart';
 import '../../../pos/data/pos_repository.dart';
 import '../../../pos/presentation/widgets/customer_selector_dialog.dart';
@@ -70,39 +71,46 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
   }
 
   Future<void> _save() async {
-    // Build lines
-    final items = <Map<String, dynamic>>[];
-    for (final l in _lines) {
-      if (l.product == null) continue;
-      final qty = double.tryParse(l.qty.text.trim()) ?? 0;
-      if (qty <= 0) continue;
-      final price = double.tryParse(l.price.text.trim()) ?? 0;
-      if (price <= 0) continue;
-      items.add({
-        'product_id': l.product!.productId,
-        'quantity': qty,
-        'unit_price': price,
-      });
-    }
-    if (items.isEmpty) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Enter items to return')));
-      return;
-    }
-
-    final reason = _reasonCtrl.text.trim();
-    if (reason.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Reason is required')));
-      return;
-    }
-
-    final customer = _customer;
-    final sale = _linkedSale;
     try {
+      final items = <Map<String, dynamic>>[];
+      for (final l in _lines) {
+        if (l.product == null) continue;
+        final qty = double.tryParse(l.qty.text.trim()) ?? 0;
+        if (qty <= 0) continue;
+        final price = double.tryParse(l.price.text.trim()) ?? 0;
+        if (price <= 0) continue;
+        final tracking = l.tracking;
+        if (tracking == null) {
+          throw StateError(
+            'Configure variation / tracking for ${l.product!.name}',
+          );
+        }
+        items.add({
+          'product_id': l.product!.productId,
+          'quantity': qty,
+          'unit_price': price,
+          ...tracking.toReceiveJson(),
+        });
+      }
+      if (items.isEmpty) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+              const SnackBar(content: Text('Enter items to return')));
+        return;
+      }
+
+      final reason = _reasonCtrl.text.trim();
+      if (reason.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(content: Text('Reason is required')));
+        return;
+      }
+
+      final customer = _customer;
+      final sale = _linkedSale;
       int returnId;
       if (customer == null) {
         // Walk-in: invoice mandatory
@@ -281,16 +289,65 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _configureTracking(_lines[i]),
+                    icon: const Icon(Icons.qr_code_2_rounded),
+                    label: Text(
+                      _lines[i].tracking == null
+                          ? 'Configure Variation / Tracking'
+                          : _lines[i].tracking!.summary(
+                                double.tryParse(_lines[i].qty.text.trim()) ?? 0,
+                              ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         ),
     ];
   }
+
+  Future<void> _configureTracking(_RetLine line) async {
+    final product = line.product;
+    if (product == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Select a product first')),
+        );
+      return;
+    }
+    final qty = double.tryParse(line.qty.text.trim()) ?? 0;
+    if (qty <= 0) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Enter quantity first')),
+        );
+      return;
+    }
+    final selection = await showInventoryTrackingSelector(
+      context: context,
+      ref: ref,
+      productId: product.productId,
+      productName: product.name,
+      quantity: qty,
+      mode: InventoryTrackingMode.receive,
+      initialSelection: line.tracking,
+    );
+    if (selection != null && mounted) {
+      setState(() => line.tracking = selection);
+    }
+  }
 }
 
 class _RetLine {
   InventoryListItem? product;
+  InventoryTrackingSelection? tracking;
   final qty = TextEditingController();
   final price = TextEditingController();
   void dispose() {
@@ -368,11 +425,16 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
                         dense: true,
                         leading: const Icon(Icons.inventory_2_outlined),
                         title: Text(p.name),
-                        subtitle: Text(
-                            'Stock: ${p.stock.toStringAsFixed(2)}  ·  Price: ${(p.price ?? 0).toStringAsFixed(2)}'),
+                        subtitle: Text([
+                          if ((p.variantName ?? '').isNotEmpty)
+                            'Var: ${p.variantName}',
+                          'Stock: ${p.stock.toStringAsFixed(2)}',
+                          'Price: ${(p.price ?? 0).toStringAsFixed(2)}'
+                        ].join('  ·  ')),
                         onTap: () {
                           setState(() {
                             widget.line.product = p;
+                            widget.line.tracking = null;
                             _controller.text = p.name;
                             final defaultPrice =
                                 widget.defaultPrices[p.productId] ??

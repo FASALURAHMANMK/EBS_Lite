@@ -124,9 +124,16 @@ class AuthRepository {
     });
   }
 
-  Future<Company> createCompany({required String name, String? email}) async {
-    final response = await _dio.post('/companies',
-        data: {'name': name, if (email != null) 'email': email});
+  Future<Company> createCompany({
+    required String name,
+    String? email,
+    String inventoryCostingMethod = 'FIFO',
+  }) async {
+    final response = await _dio.post('/companies', data: {
+      'name': name,
+      if (email != null) 'email': email,
+      'inventory_costing_method': inventoryCostingMethod,
+    });
     final company =
         Company.fromJson(response.data['data'] as Map<String, dynamic>);
     await _prefs.setString(

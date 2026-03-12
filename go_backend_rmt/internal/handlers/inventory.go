@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -61,6 +62,108 @@ func (h *InventoryHandler) GetStock(c *gin.Context) {
 	utils.SuccessResponse(c, "Stock retrieved successfully", stock)
 }
 
+// GET /inventory/variants
+func (h *InventoryHandler) GetStockVariants(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	if locationParam := c.Query("location_id"); locationParam != "" {
+		if id, err := strconv.Atoi(locationParam); err == nil {
+			locationID = id
+		}
+	}
+	if locationID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+		return
+	}
+	productID, err := strconv.Atoi(c.Query("product_id"))
+	if err != nil || productID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Valid product_id is required", err)
+		return
+	}
+	items, err := h.inventoryService.GetStockVariants(companyID, locationID, productID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get stock variants", err)
+		return
+	}
+	utils.SuccessResponse(c, "Stock variants retrieved successfully", items)
+}
+
+// GET /inventory/batches
+func (h *InventoryHandler) GetStockBatches(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	if locationParam := c.Query("location_id"); locationParam != "" {
+		if id, err := strconv.Atoi(locationParam); err == nil {
+			locationID = id
+		}
+	}
+	if locationID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+		return
+	}
+	productID, err := strconv.Atoi(c.Query("product_id"))
+	if err != nil || productID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Valid product_id is required", err)
+		return
+	}
+	var barcodeID *int
+	if raw := c.Query("barcode_id"); raw != "" {
+		if id, err := strconv.Atoi(raw); err == nil && id > 0 {
+			barcodeID = &id
+		}
+	}
+	items, err := h.inventoryService.GetStockBatches(companyID, locationID, productID, barcodeID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get stock batches", err)
+		return
+	}
+	utils.SuccessResponse(c, "Stock batches retrieved successfully", items)
+}
+
+// GET /inventory/serials
+func (h *InventoryHandler) GetAvailableSerials(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	if locationParam := c.Query("location_id"); locationParam != "" {
+		if id, err := strconv.Atoi(locationParam); err == nil {
+			locationID = id
+		}
+	}
+	if locationID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+		return
+	}
+	productID, err := strconv.Atoi(c.Query("product_id"))
+	if err != nil || productID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Valid product_id is required", err)
+		return
+	}
+	var barcodeID *int
+	if raw := c.Query("barcode_id"); raw != "" {
+		if id, err := strconv.Atoi(raw); err == nil && id > 0 {
+			barcodeID = &id
+		}
+	}
+	items, err := h.inventoryService.GetAvailableSerials(companyID, locationID, productID, barcodeID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get serials", err)
+		return
+	}
+	utils.SuccessResponse(c, "Serials retrieved successfully", items)
+}
+
 // POST /inventory/stock-adjustment
 func (h *InventoryHandler) AdjustStock(c *gin.Context) {
 	companyID := c.GetInt("company_id")
@@ -99,6 +202,13 @@ func (h *InventoryHandler) AdjustStock(c *gin.Context) {
 
 	err := h.inventoryService.AdjustStock(companyID, locationID, userID, &req)
 	if err != nil {
+		var approvalErr *services.NegativeStockApprovalRequiredError
+		if errors.As(err, &approvalErr) {
+			utils.JSONResponse(c, http.StatusForbidden, false, approvalErr.Error(), gin.H{
+				"code": "NEGATIVE_STOCK_APPROVAL_REQUIRED",
+			}, nil)
+			return
+		}
 		if err.Error() == "product not found" {
 			utils.NotFoundResponse(c, "Product not found")
 			return
@@ -174,6 +284,13 @@ func (h *InventoryHandler) CreateStockAdjustmentDocument(c *gin.Context) {
 
 	doc, err := h.inventoryService.CreateStockAdjustmentDocument(companyID, locationID, userID, &req)
 	if err != nil {
+		var approvalErr *services.NegativeStockApprovalRequiredError
+		if errors.As(err, &approvalErr) {
+			utils.JSONResponse(c, http.StatusForbidden, false, approvalErr.Error(), gin.H{
+				"code": "NEGATIVE_STOCK_APPROVAL_REQUIRED",
+			}, nil)
+			return
+		}
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create adjustment document", err)
 		return
 	}
@@ -599,8 +716,23 @@ func (h *InventoryHandler) ApproveStockTransfer(c *gin.Context) {
 		return
 	}
 
-	err = h.inventoryService.ApproveStockTransfer(transferID, companyID, actingLocationID, userID)
+	var req models.ApproveStockTransferRequest
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+			return
+		}
+	}
+
+	err = h.inventoryService.ApproveStockTransfer(transferID, companyID, actingLocationID, userID, req.OverridePassword)
 	if err != nil {
+		var approvalErr *services.NegativeStockApprovalRequiredError
+		if errors.As(err, &approvalErr) {
+			utils.JSONResponse(c, http.StatusForbidden, false, approvalErr.Error(), gin.H{
+				"code": "NEGATIVE_STOCK_APPROVAL_REQUIRED",
+			}, nil)
+			return
+		}
 		if err.Error() == "transfer not found" {
 			utils.NotFoundResponse(c, "Transfer not found")
 			return

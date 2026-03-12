@@ -66,8 +66,15 @@ class GrnRepository {
       for (final it in items)
         {
           'product_id': it.productId,
+          if (it.barcodeId != null && it.barcodeId! > 0)
+            'barcode_id': it.barcodeId,
           'quantity': it.quantity,
           'unit_price': it.unitPrice,
+          if (it.serialNumbers.isNotEmpty) 'serial_numbers': it.serialNumbers,
+          if ((it.batchNumber ?? '').trim().isNotEmpty)
+            'batch_number': it.batchNumber,
+          if (it.expiryDate != null)
+            'expiry_date': it.expiryDate!.toIso8601String(),
           if (it.taxId != null) 'tax_id': it.taxId,
           if (it.discountPercent != null)
             'discount_percentage': it.discountPercent,
@@ -148,18 +155,25 @@ class GrnRepository {
         ((purRes.data['data'] as Map<String, dynamic>)['items'] as List)
             .cast<Map<String, dynamic>>();
 
-    // Build receive items by matching product_id
+    // Build receive items in the same order as the create request. This purchase
+    // was just created, so detail order is the only reliable mapping when the
+    // same product can appear on multiple barcode-based lines.
     final receiveItems = <Map<String, dynamic>>[];
-    for (final it in items) {
-      final match = details.firstWhere(
-        (d) => (d['product_id'] as int) == it.productId,
-        orElse: () => const {},
-      );
-      final pdid = match['purchase_detail_id'] as int?;
+    final limit = items.length < details.length ? items.length : details.length;
+    for (var index = 0; index < limit; index++) {
+      final it = items[index];
+      final pdid = details[index]['purchase_detail_id'] as int?;
       if (pdid == null) continue;
       receiveItems.add({
         'purchase_detail_id': pdid,
+        if (it.barcodeId != null && it.barcodeId! > 0)
+          'barcode_id': it.barcodeId,
         'received_quantity': it.quantity,
+        if (it.serialNumbers.isNotEmpty) 'serial_numbers': it.serialNumbers,
+        if ((it.batchNumber ?? '').trim().isNotEmpty)
+          'batch_number': it.batchNumber,
+        if (it.expiryDate != null)
+          'expiry_date': it.expiryDate!.toIso8601String(),
       });
     }
 

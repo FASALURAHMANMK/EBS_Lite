@@ -6,6 +6,7 @@ import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 import 'package:ebs_lite/shared/widgets/app_selection_dialog.dart';
 
 import '../../../../core/error_handler.dart';
+import '../../../../core/negative_stock_override.dart';
 import '../../data/purchase_returns_repository.dart';
 import '../../data/purchases_repository.dart';
 import 'purchase_return_detail_page.dart';
@@ -13,6 +14,7 @@ import 'purchase_return_detail_page.dart';
 // Product picking (inventory)
 import '../../../inventory/data/inventory_repository.dart';
 import '../../../inventory/data/models.dart';
+import '../../../inventory/presentation/widgets/inventory_tracking_selector.dart';
 
 // Supplier picking
 import '../../../suppliers/data/supplier_repository.dart';
@@ -252,27 +254,34 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
         ..showSnackBar(const SnackBar(content: Text('Select supplier')));
       return;
     }
-    // Build lines payload
-    final payload = <Map<String, dynamic>>[];
-    for (final l in _lines) {
-      if (l.product == null) continue;
-      final qty = double.tryParse(l.qty.text.trim()) ?? 0;
-      if (qty <= 0) continue;
-      final price = double.tryParse(l.price.text.trim()) ?? 0;
-      payload.add({
-        'product_id': l.product!.productId,
-        'quantity': qty,
-        'unit_price': price,
-      });
-    }
-    if (payload.isEmpty) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-            const SnackBar(content: Text('Enter quantities to return')));
-      return;
-    }
     try {
+      final payload = <Map<String, dynamic>>[];
+      for (final l in _lines) {
+        if (l.product == null) continue;
+        final qty = double.tryParse(l.qty.text.trim()) ?? 0;
+        if (qty <= 0) continue;
+        final price = double.tryParse(l.price.text.trim()) ?? 0;
+        final tracking = l.tracking;
+        if (tracking == null) {
+          throw StateError(
+            'Configure variation / tracking for ${l.product!.name}',
+          );
+        }
+        payload.add({
+          'product_id': l.product!.productId,
+          'quantity': qty,
+          'unit_price': price,
+          ...tracking.toIssueJson(),
+        });
+      }
+      if (payload.isEmpty) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+              const SnackBar(content: Text('Enter quantities to return')));
+        return;
+      }
+
       // Ensure purchase link
       if (_linkedPurchaseId == null) {
         await _linkPurchaseForSupplier();
@@ -291,21 +300,41 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
       // map purchase_detail_id if available
       final details =
           (purchase['items'] as List? ?? const []).cast<Map<String, dynamic>>();
+      final usedDetailIds = <int>{};
       for (final p in payload) {
-        final pid = p['product_id'] as int;
-        final match = details.firstWhere(
-          (d) => (d['product_id'] as int) == pid,
-          orElse: () => const {},
+        final match = _matchPurchaseDetail(
+          details: details,
+          payload: p,
+          usedDetailIds: usedDetailIds,
         );
         final pdid = match['purchase_detail_id'] as int?;
-        if (pdid != null) p['purchase_detail_id'] = pdid;
+        if (pdid != null) {
+          p['purchase_detail_id'] = pdid;
+          usedDetailIds.add(pdid);
+        }
       }
 
-      final id = await ref.read(purchaseReturnsRepositoryProvider).createReturn(
-            purchaseId: purchaseId,
-            items: payload,
-            reason: _reason.text.trim().isEmpty ? null : _reason.text.trim(),
-          );
+      int id;
+      try {
+        id = await ref.read(purchaseReturnsRepositoryProvider).createReturn(
+              purchaseId: purchaseId,
+              items: payload,
+              reason: _reason.text.trim().isEmpty ? null : _reason.text.trim(),
+            );
+      } on NegativeStockApprovalRequiredException catch (e) {
+        if (!mounted) return;
+        final password = await showNegativeStockApprovalDialog(
+          context,
+          message: e.message,
+        );
+        if (password == null || password.isEmpty) return;
+        id = await ref.read(purchaseReturnsRepositoryProvider).createReturn(
+              purchaseId: purchaseId,
+              items: payload,
+              reason: _reason.text.trim().isEmpty ? null : _reason.text.trim(),
+              overridePassword: password,
+            );
+      }
       final file = (_receiptFilePath ?? '').trim();
       final number = _receiptNumber.text.trim();
       if (file.isNotEmpty) {
@@ -457,15 +486,89 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
                         : () => setState(() => _lines.removeAt(i)),
                     icon: const Icon(Icons.delete_outline_rounded))
               ]),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () => _configureTracking(_lines[i]),
+                  icon: const Icon(Icons.qr_code_2_rounded),
+                  label: Text(
+                    _lines[i].tracking == null
+                        ? 'Configure Variation / Tracking'
+                        : _lines[i].tracking!.summary(
+                              double.tryParse(_lines[i].qty.text.trim()) ?? 0,
+                            ),
+                  ),
+                ),
+              ),
             ]),
           ),
         ),
     ];
   }
+
+  Future<void> _configureTracking(_RetLine line) async {
+    final product = line.product;
+    if (product == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Select a product first')),
+        );
+      return;
+    }
+    final qty = double.tryParse(line.qty.text.trim()) ?? 0;
+    if (qty <= 0) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Enter quantity first')),
+        );
+      return;
+    }
+    final selection = await showInventoryTrackingSelector(
+      context: context,
+      ref: ref,
+      productId: product.productId,
+      productName: product.name,
+      quantity: qty,
+      mode: InventoryTrackingMode.issue,
+      initialSelection: line.tracking,
+    );
+    if (selection != null && mounted) {
+      setState(() => line.tracking = selection);
+    }
+  }
+
+  Map<String, dynamic> _matchPurchaseDetail({
+    required List<Map<String, dynamic>> details,
+    required Map<String, dynamic> payload,
+    required Set<int> usedDetailIds,
+  }) {
+    final productId = payload['product_id'] as int?;
+    final barcodeId = payload['barcode_id'] as int?;
+    for (final detail in details) {
+      final detailId = detail['purchase_detail_id'] as int?;
+      if (detailId == null || usedDetailIds.contains(detailId)) continue;
+      if (detail['product_id'] != productId) continue;
+      if (barcodeId != null && detail['barcode_id'] == barcodeId) {
+        return detail;
+      }
+    }
+    for (final detail in details) {
+      final detailId = detail['purchase_detail_id'] as int?;
+      if (detailId == null || usedDetailIds.contains(detailId)) continue;
+      if (detail['product_id'] == productId) {
+        return detail;
+      }
+    }
+    return const {};
+  }
 }
 
 class _RetLine {
   InventoryListItem? product;
+  InventoryTrackingSelection? tracking;
   final qty = TextEditingController();
   final price = TextEditingController();
   void dispose() {
@@ -490,7 +593,10 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
       onTap: () async {
         final picked = await _openProductPicker(context);
         if (picked != null) {
-          setState(() => widget.line.product = picked);
+          setState(() {
+            widget.line.product = picked;
+            widget.line.tracking = null;
+          });
           // Auto-fill unit price from latest purchase for this supplier if available
           final current = widget.line.price.text.trim();
           if (current.isEmpty) {
@@ -565,6 +671,8 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
                         value: it.productId,
                         title: Text(it.name),
                         subtitle: Text([
+                          if ((it.variantName ?? '').isNotEmpty)
+                            'Var: ${it.variantName}',
                           (it.sku ?? '').isNotEmpty ? 'SKU: ${it.sku}' : null,
                           'Stock: ${it.stock.toStringAsFixed(2)}'
                         ].whereType<String>().join(' · ')),

@@ -6,6 +6,7 @@ import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/negative_stock_override.dart';
 
 class StockTransferViewPage extends ConsumerStatefulWidget {
   const StockTransferViewPage({super.key, required this.transferId});
@@ -148,6 +149,7 @@ class _Actions extends ConsumerWidget {
             ..showSnackBar(SnackBar(content: Text(ok)));
         }
       } catch (e) {
+        if (e is _ActionAborted) return;
         if (context.mounted) {
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
@@ -162,8 +164,26 @@ class _Actions extends ConsumerWidget {
       children: [
         if (canApprove)
           FilledButton.icon(
-              onPressed: () => runAction(
-                  () => repo.approveStockTransfer(t.transferId), 'Approved'),
+              onPressed: () => runAction(() async {
+                    try {
+                      await repo.approveStockTransfer(t.transferId);
+                    } on NegativeStockApprovalRequiredException catch (e) {
+                      if (!context.mounted) {
+                        throw const _ActionAborted();
+                      }
+                      final password = await showNegativeStockApprovalDialog(
+                        context,
+                        message: e.message,
+                      );
+                      if (password == null || password.isEmpty) {
+                        throw const _ActionAborted();
+                      }
+                      await repo.approveStockTransfer(
+                        t.transferId,
+                        overridePassword: password,
+                      );
+                    }
+                  }, 'Approved'),
               icon: const Icon(Icons.check_circle_outline_rounded),
               label: const Text('Approve (Dispatch)')),
         if (canComplete)
@@ -181,4 +201,8 @@ class _Actions extends ConsumerWidget {
       ],
     );
   }
+}
+
+class _ActionAborted implements Exception {
+  const _ActionAborted();
 }

@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -25,6 +26,101 @@ func NewInventoryService() *InventoryService {
 	}
 }
 
+type transferLotSnapshot struct {
+	LotID             int
+	BatchNumber       *string
+	ExpiryDate        *time.Time
+	RemainingQuantity float64
+	CostPrice         float64
+}
+
+type transferIssueSnapshot struct {
+	Variant          *resolvedVariant
+	BatchAllocations []models.InventoryBatchSelectionInput
+}
+
+func encodeBatchAllocations(inputs []models.InventoryBatchSelectionInput) []byte {
+	if len(inputs) == 0 {
+		return []byte("[]")
+	}
+	raw, err := json.Marshal(inputs)
+	if err != nil {
+		return []byte("[]")
+	}
+	return raw
+}
+
+func decodeBatchAllocations(raw []byte) []models.InventoryBatchSelectionInput {
+	if len(raw) == 0 {
+		return nil
+	}
+	var items []models.InventoryBatchSelectionInput
+	if err := json.Unmarshal(raw, &items); err != nil {
+		return nil
+	}
+	return items
+}
+
+func (s *InventoryService) validateProductInCompanyTx(tx *sql.Tx, companyID, productID int) error {
+	var productCompanyID int
+	err := tx.QueryRow("SELECT company_id FROM products WHERE product_id = $1 AND is_deleted = FALSE", productID).Scan(&productCompanyID)
+	if err == sql.ErrNoRows || productCompanyID != companyID {
+		return fmt.Errorf("product not found")
+	}
+	if err != nil {
+		return fmt.Errorf("failed to verify product: %w", err)
+	}
+	return nil
+}
+
+func (s *InventoryService) loadTransferLotSnapshotTx(tx *sql.Tx, companyID, fromLocationID int, lotID int) (*transferLotSnapshot, error) {
+	var snap transferLotSnapshot
+	err := tx.QueryRow(`
+		SELECT lot_id, batch_number, expiry_date, remaining_quantity::float8, cost_price::float8
+		FROM stock_lots
+		WHERE company_id = $1 AND location_id = $2 AND lot_id = $3
+		FOR UPDATE
+	`, companyID, fromLocationID, lotID).Scan(
+		&snap.LotID, &snap.BatchNumber, &snap.ExpiryDate, &snap.RemainingQuantity, &snap.CostPrice,
+	)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("selected batch not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to load stock lot: %w", err)
+	}
+	return &snap, nil
+}
+
+func (s *InventoryService) loadTransferIssueUnitCostTx(tx *sql.Tx, companyID, fromLocationID, transferDetailID, lotID int) (float64, error) {
+	var unitCost float64
+	query := `
+		SELECT ABS(unit_cost)::float8
+		FROM inventory_movements
+		WHERE company_id = $1
+		  AND location_id = $2
+		  AND movement_type = 'TRANSFER_OUT'
+		  AND source_type = 'stock_transfer_detail'
+		  AND source_line_id = $3
+	`
+	args := []interface{}{companyID, fromLocationID, transferDetailID}
+	if lotID > 0 {
+		query += ` AND stock_lot_id = $4`
+		args = append(args, lotID)
+	} else {
+		query += ` AND stock_lot_id IS NULL`
+	}
+	query += ` LIMIT 1`
+	err := tx.QueryRow(query, args...).Scan(&unitCost)
+	if err == sql.ErrNoRows {
+		return 0, fmt.Errorf("transfer issue cost not found")
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to load transfer issue cost: %w", err)
+	}
+	return unitCost, nil
+}
+
 func (s *InventoryService) GetStock(companyID, locationID int, productID *int) ([]models.StockWithProduct, error) {
 	// Select products in the company and left-join stock for the requested location.
 	// COALESCE stock fields to avoid NULL scans and to return zero-quantity rows.
@@ -38,6 +134,8 @@ func (s *InventoryService) GetStock(companyID, locationID int, productID *int) (
             COALESCE(s.last_updated, CURRENT_TIMESTAMP) AS last_updated,
             p.name AS product_name,
             p.sku,
+            pb.barcode_id,
+            COALESCE(p.tracking_type, CASE WHEN COALESCE(p.is_serialized, FALSE) THEN 'SERIAL' ELSE 'VARIANT' END) AS tracking_type,
             p.reorder_level,
             p.category_id,
             c.name AS category_name,
@@ -50,6 +148,14 @@ func (s *InventoryService) GetStock(companyID, locationID int, productID *int) (
         LEFT JOIN categories c ON p.category_id = c.category_id
         LEFT JOIN brands b ON p.brand_id = b.brand_id
         LEFT JOIN units u ON p.unit_id = u.unit_id
+        LEFT JOIN LATERAL (
+            SELECT barcode_id
+            FROM product_barcodes
+            WHERE product_id = p.product_id
+              AND COALESCE(is_active, TRUE) = TRUE
+            ORDER BY is_primary DESC, barcode_id
+            LIMIT 1
+        ) pb ON TRUE
         WHERE p.company_id = $1 AND p.is_deleted = FALSE
     `
 
@@ -77,7 +183,8 @@ func (s *InventoryService) GetStock(companyID, locationID int, productID *int) (
 		err := rows.Scan(
 			&item.StockID, &item.LocationID, &item.ProductID, &item.Quantity,
 			&item.ReservedQuantity, &item.LastUpdated, &item.ProductName, &item.ProductSKU,
-			&item.ReorderLevel, &item.CategoryID, &item.CategoryName, &item.BrandName, &item.UnitSymbol,
+			&item.BarcodeID, &item.TrackingType, &item.ReorderLevel, &item.CategoryID,
+			&item.CategoryName, &item.BrandName, &item.UnitSymbol,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan stock: %w", err)
@@ -92,49 +199,186 @@ func (s *InventoryService) GetStock(companyID, locationID int, productID *int) (
 	return stockItems, nil
 }
 
-func (s *InventoryService) AdjustStock(companyID, locationID, userID int, req *models.CreateStockAdjustmentRequest) error {
-	// Verify product belongs to company
-	var productCompanyID int
-	err := s.db.QueryRow("SELECT company_id FROM products WHERE product_id = $1 AND is_deleted = FALSE",
-		req.ProductID).Scan(&productCompanyID)
-	if err == sql.ErrNoRows {
-		return fmt.Errorf("product not found")
-	}
+func (s *InventoryService) GetStockVariants(companyID, locationID, productID int) ([]models.StockVariant, error) {
+	rows, err := s.db.Query(`
+		SELECT
+			COALESCE(sv.stock_variant_id, 0) AS stock_variant_id,
+			$2 AS location_id,
+			p.product_id,
+			pb.barcode_id,
+			pb.barcode,
+			pb.variant_name,
+			COALESCE(pb.variant_attributes, '{}'::jsonb),
+			COALESCE(sv.quantity, 0)::float8 AS quantity,
+			COALESCE(sv.reserved_quantity, 0)::float8 AS reserved_quantity,
+			COALESCE(sv.average_cost, COALESCE(pb.cost_price, p.cost_price, 0))::float8 AS average_cost,
+			COALESCE(pb.selling_price, p.selling_price, 0)::float8 AS selling_price,
+			COALESCE(p.tracking_type, CASE WHEN COALESCE(p.is_serialized, FALSE) THEN 'SERIAL' ELSE 'VARIANT' END) AS tracking_type,
+			COALESCE(sv.last_updated, CURRENT_TIMESTAMP)
+		FROM products p
+		JOIN product_barcodes pb ON pb.product_id = p.product_id
+		LEFT JOIN stock_variants sv ON sv.location_id = $2 AND sv.barcode_id = pb.barcode_id
+		WHERE p.company_id = $1
+		  AND p.product_id = $3
+		  AND p.is_deleted = FALSE
+		  AND COALESCE(pb.is_active, TRUE) = TRUE
+		ORDER BY pb.is_primary DESC, pb.barcode_id
+	`, companyID, locationID, productID)
 	if err != nil {
-		return fmt.Errorf("failed to verify product: %w", err)
+		return nil, fmt.Errorf("failed to get stock variants: %w", err)
 	}
-	if productCompanyID != companyID {
-		return fmt.Errorf("product not found")
+	defer rows.Close()
+
+	items := make([]models.StockVariant, 0)
+	for rows.Next() {
+		var item models.StockVariant
+		if err := rows.Scan(
+			&item.StockVariantID, &item.LocationID, &item.ProductID, &item.BarcodeID,
+			&item.Barcode, &item.VariantName, &item.VariantAttributes, &item.Quantity,
+			&item.ReservedQuantity, &item.AverageCost, &item.SellingPrice, &item.TrackingType,
+			&item.LastUpdated,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan stock variant: %w", err)
+		}
+		item.TrackingType = normalizeTrackingType(item.TrackingType)
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (s *InventoryService) GetStockBatches(companyID, locationID, productID int, barcodeID *int) ([]models.StockLot, error) {
+	args := []interface{}{companyID, locationID, productID}
+	query := `
+		SELECT
+			sl.lot_id, sl.company_id, sl.product_id, sl.barcode_id, sl.location_id,
+			sl.batch_number, sl.expiry_date, sl.received_date, sl.quantity::float8,
+			sl.remaining_quantity::float8, sl.cost_price::float8, pb.barcode, pb.variant_name,
+			COALESCE(pb.variant_attributes, '{}'::jsonb)
+		FROM stock_lots sl
+		JOIN locations l ON l.location_id = sl.location_id
+		LEFT JOIN product_barcodes pb ON pb.barcode_id = sl.barcode_id
+		WHERE sl.company_id = $1
+		  AND l.company_id = $1
+		  AND sl.location_id = $2
+		  AND sl.product_id = $3
+		  AND sl.remaining_quantity > 0
+	`
+	if barcodeID != nil && *barcodeID > 0 {
+		query += " AND sl.barcode_id = $4"
+		args = append(args, *barcodeID)
+	}
+	query += " ORDER BY sl.expiry_date NULLS LAST, sl.received_date, sl.lot_id"
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get stock batches: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]models.StockLot, 0)
+	for rows.Next() {
+		var item models.StockLot
+		if err := rows.Scan(
+			&item.LotID, &item.CompanyID, &item.ProductID, &item.BarcodeID, &item.LocationID,
+			&item.BatchNumber, &item.ExpiryDate, &item.ReceivedDate, &item.Quantity,
+			&item.RemainingQuantity, &item.CostPrice, &item.Barcode, &item.VariantName,
+			&item.VariantAttributes,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan stock batch: %w", err)
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (s *InventoryService) GetAvailableSerials(companyID, locationID, productID int, barcodeID *int) ([]models.ProductSerial, error) {
+	args := []interface{}{companyID, locationID, productID}
+	query := `
+		SELECT
+			ps.product_serial_id, ps.company_id, ps.product_id, ps.barcode_id, ps.stock_lot_id,
+			ps.serial_number, ps.location_id, ps.status, ps.cost_price::float8,
+			ps.received_at, ps.sold_at, ps.last_movement_at, pb.barcode, pb.variant_name,
+			COALESCE(p.tracking_type, CASE WHEN COALESCE(p.is_serialized, FALSE) THEN 'SERIAL' ELSE 'VARIANT' END) AS tracking_type
+		FROM product_serials ps
+		JOIN products p ON p.product_id = ps.product_id
+		LEFT JOIN product_barcodes pb ON pb.barcode_id = ps.barcode_id
+		WHERE ps.company_id = $1
+		  AND ps.location_id = $2
+		  AND ps.product_id = $3
+		  AND ps.status = 'IN_STOCK'
+	`
+	if barcodeID != nil && *barcodeID > 0 {
+		query += " AND ps.barcode_id = $4"
+		args = append(args, *barcodeID)
+	}
+	query += " ORDER BY ps.serial_number"
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get serials: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]models.ProductSerial, 0)
+	for rows.Next() {
+		var item models.ProductSerial
+		if err := rows.Scan(
+			&item.ProductSerialID, &item.CompanyID, &item.ProductID, &item.BarcodeID, &item.StockLotID,
+			&item.SerialNumber, &item.LocationID, &item.Status, &item.CostPrice,
+			&item.ReceivedAt, &item.SoldAt, &item.LastMovementAt, &item.Barcode, &item.VariantName,
+			&item.TrackingType,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan serial: %w", err)
+		}
+		item.TrackingType = normalizeTrackingType(item.TrackingType)
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (s *InventoryService) AdjustStock(companyID, locationID, userID int, req *models.CreateStockAdjustmentRequest) error {
+	if req.Adjustment == 0 {
+		return fmt.Errorf("adjustment must be non-zero")
 	}
 
-	// Start transaction
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback()
-
-	// Update or insert stock
-	_, err = tx.Exec(`
-		INSERT INTO stock (location_id, product_id, quantity, last_updated)
-		VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-		ON CONFLICT (location_id, product_id)
-		DO UPDATE SET 
-			quantity = stock.quantity + $3,
-			last_updated = CURRENT_TIMESTAMP
-	`, locationID, req.ProductID, req.Adjustment)
-
-	if err != nil {
-		return fmt.Errorf("failed to adjust stock: %w", err)
+	if err := s.validateProductInCompanyTx(tx, companyID, req.ProductID); err != nil {
+		return err
 	}
 
-	// Record adjustment history
-	_, err = tx.Exec(`
+	trackingSvc := newInventoryTrackingService(s.db)
+	movementReason := req.Reason
+	selection := inventorySelection{
+		ProductID:        req.ProductID,
+		BarcodeID:        req.BarcodeID,
+		Quantity:         req.Adjustment,
+		BatchAllocations: req.BatchAllocations,
+		SerialNumbers:    req.SerialNumbers,
+		BatchNumber:      req.BatchNumber,
+		ExpiryDate:       req.ExpiryDate,
+		Notes:            &movementReason,
+		OverridePassword: req.OverridePassword,
+	}
+	if req.Adjustment > 0 {
+		selection.UnitCost = 0
+		if _, err := trackingSvc.ReceiveStockTx(tx, companyID, locationID, userID, "ADJUSTMENT_IN", "stock_adjustment", nil, nil, selection); err != nil {
+			return err
+		}
+	} else {
+		selection.Quantity = -req.Adjustment
+		if _, err := trackingSvc.IssueStockTx(tx, companyID, locationID, userID, "ADJUSTMENT_OUT", "stock_adjustment", nil, nil, selection); err != nil {
+			return err
+		}
+	}
+
+	if _, err := tx.Exec(`
 		INSERT INTO stock_adjustments (location_id, product_id, adjustment, reason, created_by)
 		VALUES ($1, $2, $3, $4, $5)
-	`, locationID, req.ProductID, req.Adjustment, req.Reason, userID)
-
-	if err != nil {
+	`, locationID, req.ProductID, req.Adjustment, req.Reason, userID); err != nil {
 		return fmt.Errorf("failed to record adjustment: %w", err)
 	}
 
@@ -184,6 +428,7 @@ func (s *InventoryService) CreateStockAdjustmentDocument(companyID, locationID, 
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback()
+	trackingSvc := newInventoryTrackingService(s.db)
 
 	// Generate document number using numbering sequence, fallback to timestamp if not configured
 	ns := NewNumberingSequenceService()
@@ -205,41 +450,52 @@ func (s *InventoryService) CreateStockAdjustmentDocument(companyID, locationID, 
 	}
 
 	for _, it := range req.Items {
-		// Verify product belongs to company
-		var productCompanyID int
-		err := tx.QueryRow("SELECT company_id FROM products WHERE product_id = $1 AND is_deleted = FALSE", it.ProductID).Scan(&productCompanyID)
-		if err == sql.ErrNoRows || productCompanyID != companyID {
-			return nil, fmt.Errorf("product not found")
+		if err := s.validateProductInCompanyTx(tx, companyID, it.ProductID); err != nil {
+			return nil, err
 		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to verify product: %w", err)
+		if it.Adjustment == 0 {
+			return nil, fmt.Errorf("adjustment must be non-zero")
 		}
 
-		// Insert item
-		if _, err := tx.Exec(`
-            INSERT INTO stock_adjustment_document_items (document_id, product_id, adjustment)
-            VALUES ($1,$2,$3)
-        `, docID, it.ProductID, it.Adjustment); err != nil {
+		var itemID int
+		if err := tx.QueryRow(`
+            INSERT INTO stock_adjustment_document_items (
+                document_id, product_id, barcode_id, adjustment, serial_numbers, batch_allocations
+            )
+            VALUES ($1,$2,$3,$4,$5,$6)
+            RETURNING item_id
+        `, docID, it.ProductID, it.BarcodeID, it.Adjustment, pq.Array(it.SerialNumbers), encodeBatchAllocations(it.BatchAllocations)).Scan(&itemID); err != nil {
 			return nil, fmt.Errorf("failed to add document item: %w", err)
 		}
 
-		// Apply stock change (upsert)
-		if _, err := tx.Exec(`
-            INSERT INTO stock (location_id, product_id, quantity, last_updated)
-            VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-            ON CONFLICT (location_id, product_id)
-            DO UPDATE SET 
-                quantity = stock.quantity + $3,
-                last_updated = CURRENT_TIMESTAMP
-        `, locationID, it.ProductID, it.Adjustment); err != nil {
-			return nil, fmt.Errorf("failed to adjust stock: %w", err)
+		movementReason := fmt.Sprintf("%s | %s", docNumber, req.Reason)
+		selection := inventorySelection{
+			ProductID:        it.ProductID,
+			BarcodeID:        it.BarcodeID,
+			Quantity:         it.Adjustment,
+			BatchAllocations: it.BatchAllocations,
+			SerialNumbers:    it.SerialNumbers,
+			BatchNumber:      it.BatchNumber,
+			ExpiryDate:       it.ExpiryDate,
+			Notes:            &movementReason,
+			OverridePassword: req.OverridePassword,
+		}
+		if it.Adjustment > 0 {
+			selection.UnitCost = 0
+			if _, err := trackingSvc.ReceiveStockTx(tx, companyID, locationID, userID, "ADJUSTMENT_IN", "stock_adjustment_document_item", &itemID, nil, selection); err != nil {
+				return nil, fmt.Errorf("failed to adjust stock: %w", err)
+			}
+		} else {
+			selection.Quantity = -it.Adjustment
+			if _, err := trackingSvc.IssueStockTx(tx, companyID, locationID, userID, "ADJUSTMENT_OUT", "stock_adjustment_document_item", &itemID, nil, selection); err != nil {
+				return nil, fmt.Errorf("failed to adjust stock: %w", err)
+			}
 		}
 
-		// Record adjustment history (keeps legacy listing working)
 		if _, err := tx.Exec(`
             INSERT INTO stock_adjustments (location_id, product_id, adjustment, reason, created_by)
             VALUES ($1,$2,$3,$4,$5)
-        `, locationID, it.ProductID, it.Adjustment, fmt.Sprintf("%s | %s", docNumber, req.Reason), userID); err != nil {
+        `, locationID, it.ProductID, it.Adjustment, movementReason, userID); err != nil {
 			return nil, fmt.Errorf("failed to record adjustment: %w", err)
 		}
 	}
@@ -279,7 +535,7 @@ func (s *InventoryService) GetStockAdjustmentDocuments(companyID, locationID int
 		}
 		// include items for each document for list summaries
 		itsRows, err := s.db.Query(`
-            SELECT item_id, document_id, product_id, adjustment
+            SELECT item_id, document_id, product_id, barcode_id, adjustment, serial_numbers, COALESCE(batch_allocations, '[]'::jsonb)
             FROM stock_adjustment_document_items
             WHERE document_id = $1
             ORDER BY item_id
@@ -288,7 +544,11 @@ func (s *InventoryService) GetStockAdjustmentDocuments(companyID, locationID int
 			var items []models.StockAdjustmentDocumentItem
 			for itsRows.Next() {
 				var it models.StockAdjustmentDocumentItem
-				if err := itsRows.Scan(&it.ItemID, &it.DocumentID, &it.ProductID, &it.Adjustment); err == nil {
+				var serials pq.StringArray
+				var batchAllocRaw []byte
+				if err := itsRows.Scan(&it.ItemID, &it.DocumentID, &it.ProductID, &it.BarcodeID, &it.Adjustment, &serials, &batchAllocRaw); err == nil {
+					it.SerialNumbers = []string(serials)
+					it.BatchAllocations = decodeBatchAllocations(batchAllocRaw)
 					items = append(items, it)
 				}
 			}
@@ -317,7 +577,7 @@ func (s *InventoryService) GetStockAdjustmentDocument(documentID, companyID, loc
 	}
 
 	rows, err := s.db.Query(`
-        SELECT item_id, document_id, product_id, adjustment
+        SELECT item_id, document_id, product_id, barcode_id, adjustment, serial_numbers, COALESCE(batch_allocations, '[]'::jsonb)
         FROM stock_adjustment_document_items
         WHERE document_id = $1
         ORDER BY item_id
@@ -329,17 +589,295 @@ func (s *InventoryService) GetStockAdjustmentDocument(documentID, companyID, loc
 	var items []models.StockAdjustmentDocumentItem
 	for rows.Next() {
 		var it models.StockAdjustmentDocumentItem
-		if err := rows.Scan(&it.ItemID, &it.DocumentID, &it.ProductID, &it.Adjustment); err != nil {
+		var serials pq.StringArray
+		var batchAllocRaw []byte
+		if err := rows.Scan(&it.ItemID, &it.DocumentID, &it.ProductID, &it.BarcodeID, &it.Adjustment, &serials, &batchAllocRaw); err != nil {
 			return nil, fmt.Errorf("failed to scan item: %w", err)
 		}
+		it.SerialNumbers = []string(serials)
+		it.BatchAllocations = decodeBatchAllocations(batchAllocRaw)
 		items = append(items, it)
 	}
 	d.Items = items
 	return &d, nil
 }
 
+func (s *InventoryService) transferTrackedStockTx(tx *sql.Tx, companyID, fromLocationID, toLocationID, userID int, sourceLineID *int, sourceRef *string, selection inventorySelection) error {
+	issue, err := s.issueTransferTrackedStockTx(tx, companyID, fromLocationID, userID, sourceLineID, sourceRef, selection)
+	if err != nil {
+		return err
+	}
+	selection.BarcodeID = &issue.Variant.BarcodeID
+	if len(issue.BatchAllocations) > 0 {
+		selection.BatchAllocations = issue.BatchAllocations
+	}
+	return s.receiveTransferTrackedStockTx(tx, companyID, fromLocationID, toLocationID, userID, sourceLineID, sourceRef, selection)
+}
+
+func (s *InventoryService) issueTransferTrackedStockTx(tx *sql.Tx, companyID, fromLocationID, userID int, sourceLineID *int, sourceRef *string, selection inventorySelection) (*transferIssueSnapshot, error) {
+	trackingSvc := newInventoryTrackingService(s.db)
+	variant, err := trackingSvc.resolveVariantTx(tx, companyID, selection.ProductID, selection.BarcodeID)
+	if err != nil {
+		return nil, err
+	}
+	if selection.Quantity <= 0 {
+		return nil, fmt.Errorf("quantity must be greater than zero")
+	}
+
+	snapshot := &transferIssueSnapshot{Variant: variant}
+	if variant.TrackingType == trackingTypeSerial {
+		if selection.Quantity != float64(int(selection.Quantity)) {
+			return nil, fmt.Errorf("serialized quantities must be whole numbers")
+		}
+		if len(selection.SerialNumbers) != int(selection.Quantity) {
+			return nil, fmt.Errorf("serial numbers count must equal quantity")
+		}
+		records, err := trackingSvc.loadSerialsForIssueTx(tx, companyID, fromLocationID, variant, selection.SerialNumbers)
+		if err != nil {
+			return nil, err
+		}
+		for _, rec := range records {
+			if rec.StockLotID != nil {
+				if err := trackingSvc.consumeLotTx(tx, *rec.StockLotID, 1); err != nil {
+					return nil, err
+				}
+			}
+			if err := trackingSvc.markSerialStatusTx(tx, rec.ProductSerialID, "TRANSFER_IN_TRANSIT", nil); err != nil {
+				return nil, fmt.Errorf("failed to update serial status: %w", err)
+			}
+			if err := trackingSvc.createMovementTx(tx, companyID, fromLocationID, variant, "TRANSFER_OUT", "stock_transfer_detail", sourceLineID, sourceRef, rec.StockLotID, &rec.ProductSerialID, -1, rec.CostPrice, userID, selection.Notes); err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		lots, err := trackingSvc.loadAvailableLotsTx(tx, companyID, fromLocationID, variant)
+		if err != nil {
+			return nil, err
+		}
+		method, err := trackingSvc.getCompanyCostingMethodTx(tx, companyID)
+		if err != nil {
+			return nil, err
+		}
+		avgCost := variant.DefaultCostPrice
+		if err := tx.QueryRow(`
+			SELECT COALESCE(average_cost, 0)::float8
+			FROM stock_variants
+			WHERE location_id = $1 AND barcode_id = $2
+		`, fromLocationID, variant.BarcodeID).Scan(&avgCost); err != nil && err != sql.ErrNoRows {
+			return nil, fmt.Errorf("failed to get source average cost: %w", err)
+		}
+
+		allocations := make([]models.InventoryBatchSelectionInput, 0)
+		if len(selection.BatchAllocations) > 0 {
+			allocations = append(allocations, selection.BatchAllocations...)
+		} else {
+			if variant.TrackingType == trackingTypeBatch {
+				return nil, fmt.Errorf("batch selection is required")
+			}
+			remaining := selection.Quantity
+			for _, lot := range lots {
+				if remaining <= 1e-9 {
+					break
+				}
+				consumeQty := lot.RemainingQuantity
+				if consumeQty > remaining {
+					consumeQty = remaining
+				}
+				if consumeQty <= 0 {
+					continue
+				}
+				allocations = append(allocations, models.InventoryBatchSelectionInput{
+					LotID:    lot.LotID,
+					Quantity: consumeQty,
+				})
+				remaining -= consumeQty
+			}
+			if remaining > 1e-9 {
+				if err := trackingSvc.validateNegativeStockPolicyTx(tx, companyID, selection.OverridePassword); err != nil {
+					if _, ok := err.(*NegativeStockApprovalRequiredError); ok {
+						return nil, err
+					}
+					if err.Error() == "insufficient stock" || variant.TrackingType != trackingTypeVariant {
+						return nil, fmt.Errorf("insufficient stock")
+					}
+					return nil, err
+				}
+				if variant.TrackingType != trackingTypeVariant {
+					return nil, fmt.Errorf("insufficient stock")
+				}
+				allocations = append(allocations, models.InventoryBatchSelectionInput{
+					LotID:    0,
+					Quantity: remaining,
+				})
+			}
+		}
+
+		coveredQty := 0.0
+		for _, alloc := range allocations {
+			coveredQty += alloc.Quantity
+			var lotID *int
+			unitCost := avgCost
+			if alloc.LotID > 0 {
+				snap, err := s.loadTransferLotSnapshotTx(tx, companyID, fromLocationID, alloc.LotID)
+				if err != nil {
+					return nil, err
+				}
+				if alloc.Quantity > snap.RemainingQuantity+1e-9 {
+					return nil, fmt.Errorf("insufficient quantity in selected batch")
+				}
+				if err := trackingSvc.consumeLotTx(tx, alloc.LotID, alloc.Quantity); err != nil {
+					return nil, err
+				}
+				unitCost = snap.CostPrice
+				lotID = &alloc.LotID
+			} else if unitCost <= 0 {
+				unitCost = variant.DefaultCostPrice
+			}
+			if method == costingMethodWAC && avgCost > 0 {
+				unitCost = avgCost
+			}
+			if err := trackingSvc.createMovementTx(tx, companyID, fromLocationID, variant, "TRANSFER_OUT", "stock_transfer_detail", sourceLineID, sourceRef, lotID, nil, -alloc.Quantity, unitCost, userID, selection.Notes); err != nil {
+				return nil, err
+			}
+		}
+		if coveredQty+1e-9 < selection.Quantity {
+			return nil, fmt.Errorf("batch allocations do not cover requested quantity")
+		}
+		snapshot.BatchAllocations = allocations
+	}
+
+	if _, _, err := trackingSvc.adjustVariantBalanceTx(tx, companyID, fromLocationID, variant, -selection.Quantity, 0, selection.OverridePassword); err != nil {
+		return nil, err
+	}
+	if err := trackingSvc.updateProductCostSnapshotTx(tx, companyID, variant.ProductID); err != nil {
+		return nil, fmt.Errorf("failed to update product cost snapshot: %w", err)
+	}
+	return snapshot, nil
+}
+
+func (s *InventoryService) receiveTransferTrackedStockTx(tx *sql.Tx, companyID, fromLocationID, toLocationID, userID int, sourceLineID *int, sourceRef *string, selection inventorySelection) error {
+	trackingSvc := newInventoryTrackingService(s.db)
+	variant, err := trackingSvc.resolveVariantTx(tx, companyID, selection.ProductID, selection.BarcodeID)
+	if err != nil {
+		return err
+	}
+	if selection.Quantity <= 0 {
+		return fmt.Errorf("quantity must be greater than zero")
+	}
+
+	totalCost := 0.0
+	if variant.TrackingType == trackingTypeSerial {
+		if selection.Quantity != float64(int(selection.Quantity)) {
+			return fmt.Errorf("serialized quantities must be whole numbers")
+		}
+		if len(selection.SerialNumbers) != int(selection.Quantity) {
+			return fmt.Errorf("serial numbers count must equal quantity")
+		}
+		records, err := trackingSvc.loadSerialsForTransferReceiveTx(tx, companyID, variant, selection.SerialNumbers)
+		if err != nil {
+			return err
+		}
+		for _, rec := range records {
+			var batchNumber *string
+			var expiryDate *time.Time
+			if rec.StockLotID != nil {
+				snap, err := s.loadTransferLotSnapshotTx(tx, companyID, fromLocationID, *rec.StockLotID)
+				if err != nil {
+					return err
+				}
+				batchNumber = snap.BatchNumber
+				expiryDate = snap.ExpiryDate
+			}
+			destLotID, err := trackingSvc.createLotTx(tx, companyID, toLocationID, variant, inventorySelection{
+				ProductID:     variant.ProductID,
+				BarcodeID:     &variant.BarcodeID,
+				Quantity:      1,
+				BatchNumber:   batchNumber,
+				ExpiryDate:    expiryDate,
+				UnitCost:      rec.CostPrice,
+				SerialNumbers: []string{rec.SerialNumber},
+				Notes:         selection.Notes,
+			})
+			if err != nil {
+				return err
+			}
+			if _, err := tx.Exec(`
+				UPDATE product_serials
+				SET stock_lot_id = $1,
+				    location_id = $2,
+				    status = 'IN_STOCK',
+				    cost_price = $3,
+				    last_movement_at = CURRENT_TIMESTAMP
+				WHERE product_serial_id = $4
+			`, destLotID, toLocationID, rec.CostPrice, rec.ProductSerialID); err != nil {
+				return fmt.Errorf("failed to relocate serial: %w", err)
+			}
+			if err := trackingSvc.createMovementTx(tx, companyID, toLocationID, variant, "TRANSFER_IN", "stock_transfer_detail", sourceLineID, sourceRef, &destLotID, &rec.ProductSerialID, 1, rec.CostPrice, userID, selection.Notes); err != nil {
+				return err
+			}
+			totalCost += rec.CostPrice
+		}
+	} else {
+		if len(selection.BatchAllocations) == 0 {
+			return fmt.Errorf("approved transfer is missing issued batch allocations")
+		}
+		coveredQty := 0.0
+		for _, alloc := range selection.BatchAllocations {
+			coveredQty += alloc.Quantity
+			var batchNumber *string
+			var expiryDate *time.Time
+			unitCost := variant.DefaultCostPrice
+			if alloc.LotID > 0 {
+				snap, err := s.loadTransferLotSnapshotTx(tx, companyID, fromLocationID, alloc.LotID)
+				if err != nil {
+					return err
+				}
+				batchNumber = snap.BatchNumber
+				expiryDate = snap.ExpiryDate
+				unitCost = snap.CostPrice
+			}
+			if sourceLineID != nil {
+				unitCost, err = s.loadTransferIssueUnitCostTx(tx, companyID, fromLocationID, *sourceLineID, alloc.LotID)
+				if err != nil {
+					return err
+				}
+			}
+			destLotID, err := trackingSvc.createLotTx(tx, companyID, toLocationID, variant, inventorySelection{
+				ProductID:   variant.ProductID,
+				BarcodeID:   &variant.BarcodeID,
+				Quantity:    alloc.Quantity,
+				BatchNumber: batchNumber,
+				ExpiryDate:  expiryDate,
+				UnitCost:    unitCost,
+				Notes:       selection.Notes,
+			})
+			if err != nil {
+				return err
+			}
+			if err := trackingSvc.createMovementTx(tx, companyID, toLocationID, variant, "TRANSFER_IN", "stock_transfer_detail", sourceLineID, sourceRef, &destLotID, nil, alloc.Quantity, unitCost, userID, selection.Notes); err != nil {
+				return err
+			}
+			totalCost += alloc.Quantity * unitCost
+		}
+		if coveredQty+1e-9 < selection.Quantity {
+			return fmt.Errorf("batch allocations do not cover requested quantity")
+		}
+	}
+
+	inboundUnitCost := 0.0
+	if selection.Quantity > 0 {
+		inboundUnitCost = totalCost / selection.Quantity
+	}
+	if _, _, err := trackingSvc.adjustVariantBalanceTx(tx, companyID, toLocationID, variant, selection.Quantity, inboundUnitCost, nil); err != nil {
+		return err
+	}
+	if err := trackingSvc.updateProductCostSnapshotTx(tx, companyID, variant.ProductID); err != nil {
+		return fmt.Errorf("failed to update product cost snapshot: %w", err)
+	}
+	return nil
+}
+
 func (s *InventoryService) CreateStockTransfer(companyID, fromLocationID, userID int, req *models.CreateStockTransferRequest) (*models.StockTransfer, error) {
-	// Verify locations belong to company
 	err := s.verifyLocationsInCompany(companyID, fromLocationID, req.ToLocationID)
 	if err != nil {
 		return nil, err
@@ -371,30 +909,32 @@ func (s *InventoryService) CreateStockTransfer(companyID, fromLocationID, userID
 		return nil, fmt.Errorf("failed to create transfer: %w", err)
 	}
 
-	// Add transfer items
+	trackingSvc := newInventoryTrackingService(s.db)
 	for _, item := range req.Items {
-		// Verify product exists and has sufficient stock
-		var currentStock float64
-		err = tx.QueryRow(`
-			SELECT COALESCE(quantity, 0) FROM stock 
-			WHERE location_id = $1 AND product_id = $2
-		`, fromLocationID, item.ProductID).Scan(&currentStock)
-
-		if err != nil && err != sql.ErrNoRows {
-			return nil, fmt.Errorf("failed to check stock: %w", err)
+		if err := s.validateProductInCompanyTx(tx, companyID, item.ProductID); err != nil {
+			return nil, err
 		}
-
-		if currentStock < item.Quantity {
-			return nil, fmt.Errorf("insufficient stock for product ID %d", item.ProductID)
-		}
-
-		// Insert transfer detail
-		_, err = tx.Exec(`
-			INSERT INTO stock_transfer_details (transfer_id, product_id, quantity)
-			VALUES ($1, $2, $3)
-		`, transferID, item.ProductID, item.Quantity)
-
+		variant, err := trackingSvc.resolveVariantTx(tx, companyID, item.ProductID, item.BarcodeID)
 		if err != nil {
+			return nil, err
+		}
+		if variant.TrackingType == trackingTypeBatch && len(item.BatchAllocations) == 0 {
+			return nil, fmt.Errorf("batch selection is required")
+		}
+		if variant.TrackingType == trackingTypeSerial {
+			if item.Quantity != float64(int(item.Quantity)) {
+				return nil, fmt.Errorf("serialized quantities must be whole numbers")
+			}
+			if len(item.SerialNumbers) != int(item.Quantity) {
+				return nil, fmt.Errorf("serial numbers count must equal quantity")
+			}
+		}
+		if _, err := tx.Exec(`
+			INSERT INTO stock_transfer_details (
+				transfer_id, product_id, barcode_id, quantity, serial_numbers, batch_allocations
+			)
+			VALUES ($1, $2, $3, $4, $5, $6)
+		`, transferID, item.ProductID, item.BarcodeID, item.Quantity, pq.Array(item.SerialNumbers), encodeBatchAllocations(item.BatchAllocations)); err != nil {
 			return nil, fmt.Errorf("failed to add transfer item: %w", err)
 		}
 	}
@@ -454,7 +994,7 @@ func (s *InventoryService) GetStockTransfers(companyID, locationID int) ([]model
 }
 
 // ApproveStockTransfer marks a pending transfer as in transit
-func (s *InventoryService) ApproveStockTransfer(transferID, companyID, actingLocationID, userID int) error {
+func (s *InventoryService) ApproveStockTransfer(transferID, companyID, actingLocationID, userID int, overridePassword *string) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
@@ -463,13 +1003,14 @@ func (s *InventoryService) ApproveStockTransfer(transferID, companyID, actingLoc
 
 	var status string
 	var fromLocationID int
+	var transferNumber string
 	err = tx.QueryRow(`
-                SELECT st.status, st.from_location_id
+                SELECT st.status, st.from_location_id, st.transfer_number
                 FROM stock_transfers st
                 JOIN locations fl ON st.from_location_id = fl.location_id
                 JOIN locations tl ON st.to_location_id = tl.location_id
                 WHERE st.transfer_id = $1 AND (fl.company_id = $2 OR tl.company_id = $2)
-        `, transferID, companyID).Scan(&status, &fromLocationID)
+        `, transferID, companyID).Scan(&status, &fromLocationID, &transferNumber)
 
 	if err == sql.ErrNoRows {
 		return fmt.Errorf("transfer not found")
@@ -487,6 +1028,70 @@ func (s *InventoryService) ApproveStockTransfer(transferID, companyID, actingLoc
 		return fmt.Errorf("approval must be done from source location")
 	}
 
+	rows, err := tx.Query(`
+        SELECT transfer_detail_id, product_id, barcode_id, quantity, serial_numbers, COALESCE(batch_allocations, '[]'::jsonb)
+        FROM stock_transfer_details
+        WHERE transfer_id = $1
+        ORDER BY transfer_detail_id
+    `, transferID)
+	if err != nil {
+		return fmt.Errorf("failed to get transfer items: %w", err)
+	}
+	var items []struct {
+		transferDetailID int
+		productID        int
+		barcodeID        *int
+		quantity         float64
+		serials          []string
+		batches          []models.InventoryBatchSelectionInput
+	}
+	for rows.Next() {
+		var item struct {
+			transferDetailID int
+			productID        int
+			barcodeID        *int
+			quantity         float64
+			serials          []string
+			batches          []models.InventoryBatchSelectionInput
+		}
+		var serials pq.StringArray
+		var batchAllocRaw []byte
+		if err := rows.Scan(&item.transferDetailID, &item.productID, &item.barcodeID, &item.quantity, &serials, &batchAllocRaw); err != nil {
+			rows.Close()
+			return fmt.Errorf("failed to scan transfer item: %w", err)
+		}
+		item.serials = []string(serials)
+		item.batches = decodeBatchAllocations(batchAllocRaw)
+		items = append(items, item)
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("failed to close items cursor: %w", err)
+	}
+
+	for _, it := range items {
+		sourceRef := transferNumber
+		issue, err := s.issueTransferTrackedStockTx(tx, companyID, fromLocationID, userID, &it.transferDetailID, &sourceRef, inventorySelection{
+			ProductID:        it.productID,
+			BarcodeID:        it.barcodeID,
+			Quantity:         it.quantity,
+			SerialNumbers:    it.serials,
+			BatchAllocations: it.batches,
+			Notes:            nil,
+			OverridePassword: overridePassword,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to move transfer stock into transit: %w", err)
+		}
+		if _, err := tx.Exec(`
+			UPDATE stock_transfer_details
+			SET barcode_id = $2,
+			    batch_allocations = $3
+			WHERE transfer_detail_id = $1
+		`, it.transferDetailID, issue.Variant.BarcodeID, encodeBatchAllocations(issue.BatchAllocations)); err != nil {
+			return fmt.Errorf("failed to persist transfer issue details: %w", err)
+		}
+	}
+
 	_, err = tx.Exec(`
                 UPDATE stock_transfers
                 SET status = 'IN_TRANSIT', approved_by = $2, approved_at = CURRENT_TIMESTAMP, updated_by = $2, updated_at = CURRENT_TIMESTAMP
@@ -500,21 +1105,22 @@ func (s *InventoryService) ApproveStockTransfer(transferID, companyID, actingLoc
 }
 
 func (s *InventoryService) CompleteStockTransfer(transferID, companyID, actingLocationID, userID int) error {
-	// Start transaction
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	// Get transfer details
 	var fromLocationID, toLocationID int
-	var status string
+	var status, transferNumber string
 	err = tx.QueryRow(`
-		SELECT from_location_id, to_location_id, status 
-		FROM stock_transfers 
-		WHERE transfer_id = $1
-	`, transferID).Scan(&fromLocationID, &toLocationID, &status)
+		SELECT st.from_location_id, st.to_location_id, st.status, st.transfer_number
+		FROM stock_transfers st
+		JOIN locations fl ON fl.location_id = st.from_location_id
+		JOIN locations tl ON tl.location_id = st.to_location_id
+		WHERE st.transfer_id = $1
+		  AND (fl.company_id = $2 OR tl.company_id = $2)
+	`, transferID, companyID).Scan(&fromLocationID, &toLocationID, &status, &transferNumber)
 
 	if err == sql.ErrNoRows {
 		return fmt.Errorf("transfer not found")
@@ -532,54 +1138,64 @@ func (s *InventoryService) CompleteStockTransfer(transferID, companyID, actingLo
 		return fmt.Errorf("completion must be done at destination location")
 	}
 
-	// Get transfer items first (drain rows), then process updates to avoid
-	// issuing new queries while the result set is still open (lib/pq quirk).
 	rows, err := tx.Query(`
-        SELECT product_id, quantity FROM stock_transfer_details 
+        SELECT transfer_detail_id, product_id, barcode_id, quantity, serial_numbers, COALESCE(batch_allocations, '[]'::jsonb)
+        FROM stock_transfer_details
         WHERE transfer_id = $1
+        ORDER BY transfer_detail_id
     `, transferID)
 	if err != nil {
 		return fmt.Errorf("failed to get transfer items: %w", err)
 	}
 	var items []struct {
-		productID int
-		quantity  float64
+		transferDetailID int
+		productID        int
+		barcodeID        *int
+		quantity         float64
+		serials          []string
+		batches          []models.InventoryBatchSelectionInput
 	}
 	for rows.Next() {
-		var productID int
-		var quantity float64
-		if err := rows.Scan(&productID, &quantity); err != nil {
+		var item struct {
+			transferDetailID int
+			productID        int
+			barcodeID        *int
+			quantity         float64
+			serials          []string
+			batches          []models.InventoryBatchSelectionInput
+		}
+		var serials pq.StringArray
+		var batchAllocRaw []byte
+		if err := rows.Scan(&item.transferDetailID, &item.productID, &item.barcodeID, &item.quantity, &serials, &batchAllocRaw); err != nil {
 			rows.Close()
 			return fmt.Errorf("failed to scan transfer item: %w", err)
 		}
-		items = append(items, struct {
-			productID int
-			quantity  float64
-		}{productID: productID, quantity: quantity})
+		item.serials = []string(serials)
+		item.batches = decodeBatchAllocations(batchAllocRaw)
+		items = append(items, item)
 	}
 	if err := rows.Close(); err != nil {
 		return fmt.Errorf("failed to close items cursor: %w", err)
 	}
 
 	for _, it := range items {
-		// Reduce stock from source location
-		if _, err := tx.Exec(`
-            UPDATE stock SET quantity = quantity - $1, last_updated = CURRENT_TIMESTAMP
-            WHERE location_id = $2 AND product_id = $3
-        `, it.quantity, fromLocationID, it.productID); err != nil {
-			return fmt.Errorf("failed to reduce source stock: %w", err)
+		sourceRef := transferNumber
+		if err := s.receiveTransferTrackedStockTx(tx, companyID, fromLocationID, toLocationID, userID, &it.transferDetailID, &sourceRef, inventorySelection{
+			ProductID:        it.productID,
+			BarcodeID:        it.barcodeID,
+			Quantity:         it.quantity,
+			SerialNumbers:    it.serials,
+			BatchAllocations: it.batches,
+			Notes:            nil,
+		}); err != nil {
+			return fmt.Errorf("failed to transfer stock: %w", err)
 		}
-
-		// Add stock to destination location
 		if _, err := tx.Exec(`
-            INSERT INTO stock (location_id, product_id, quantity, last_updated)
-            VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-            ON CONFLICT (location_id, product_id)
-            DO UPDATE SET 
-                quantity = stock.quantity + $3,
-                last_updated = CURRENT_TIMESTAMP
-        `, toLocationID, it.productID, it.quantity); err != nil {
-			return fmt.Errorf("failed to add destination stock: %w", err)
+			UPDATE stock_transfer_details
+			SET received_quantity = quantity
+			WHERE transfer_detail_id = $1
+		`, it.transferDetailID); err != nil {
+			return fmt.Errorf("failed to update received quantity: %w", err)
 		}
 	}
 
@@ -635,10 +1251,15 @@ func (s *InventoryService) GetStockTransfer(transferID, companyID int) (*models.
 
 	// Get transfer items with product details
 	itemsQuery := `
-		SELECT std.transfer_detail_id, std.product_id, std.quantity, std.received_quantity,
-			   p.name as product_name, p.sku as product_sku, u.symbol as unit_symbol
+		SELECT
+			std.transfer_detail_id, std.product_id, std.barcode_id, std.quantity, std.received_quantity,
+			p.name as product_name, p.sku as product_sku, u.symbol as unit_symbol,
+			pb.barcode, pb.variant_name,
+			COALESCE(p.tracking_type, CASE WHEN COALESCE(p.is_serialized, FALSE) THEN 'SERIAL' ELSE 'VARIANT' END) AS tracking_type,
+			std.serial_numbers, COALESCE(std.batch_allocations, '[]'::jsonb)
 		FROM stock_transfer_details std
 		JOIN products p ON std.product_id = p.product_id
+		LEFT JOIN product_barcodes pb ON pb.barcode_id = std.barcode_id
 		LEFT JOIN units u ON p.unit_id = u.unit_id
 		WHERE std.transfer_id = $1
 		ORDER BY std.transfer_detail_id
@@ -653,13 +1274,18 @@ func (s *InventoryService) GetStockTransfer(transferID, companyID int) (*models.
 	var items []models.StockTransferDetailWithProduct
 	for rows.Next() {
 		var item models.StockTransferDetailWithProduct
+		var serials pq.StringArray
+		var batchAllocRaw []byte
 		err := rows.Scan(
-			&item.TransferDetailID, &item.ProductID, &item.Quantity, &item.ReceivedQuantity,
-			&item.ProductName, &item.ProductSKU, &item.UnitSymbol,
+			&item.TransferDetailID, &item.ProductID, &item.BarcodeID, &item.Quantity, &item.ReceivedQuantity,
+			&item.ProductName, &item.ProductSKU, &item.UnitSymbol, &item.Barcode, &item.VariantName,
+			&item.TrackingType, &serials, &batchAllocRaw,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan transfer item: %w", err)
 		}
+		item.SerialNumbers = []string(serials)
+		item.BatchAllocations = decodeBatchAllocations(batchAllocRaw)
 		items = append(items, item)
 	}
 

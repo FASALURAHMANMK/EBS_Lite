@@ -29,7 +29,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   final _reorder = TextEditingController();
   final _purchaseFactor = TextEditingController(text: '1');
   final _sellingFactor = TextEditingController(text: '1');
-  bool _serialized = false;
+  String _trackingType = 'VARIANT';
   bool _active = true;
   bool _weighable = false;
   final _itemCode = TextEditingController();
@@ -105,7 +105,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       _price.text = p.sellingPrice?.toString() ?? '';
       _cost.text = p.costPrice?.toString() ?? '';
       _reorder.text = p.reorderLevel.toString();
-      _serialized = p.isSerialized;
+      _trackingType = p.trackingType;
       _active = p.isActive;
       _barcodes = List.of(p.barcodes);
       final pri = _barcodes.firstWhere(
@@ -221,26 +221,24 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       if (_itemCode.text.trim().isNotEmpty) {
         final idx = _barcodes.indexWhere((b) => b.isPrimary);
         if (idx >= 0) {
-          _barcodes[idx] = ProductBarcodeDto(
-            barcodeId: _barcodes[idx].barcodeId,
+          _barcodes[idx] = _copyBarcode(
+            _barcodes[idx],
             barcode: _itemCode.text.trim(),
-            packSize: _barcodes[idx].packSize ?? 1,
-            costPrice: _barcodes[idx].costPrice,
-            sellingPrice: _barcodes[idx].sellingPrice,
             isPrimary: true,
           );
         } else if (_barcodes.isNotEmpty) {
-          _barcodes[0] = ProductBarcodeDto(
-            barcodeId: _barcodes[0].barcodeId,
+          _barcodes[0] = _copyBarcode(
+            _barcodes[0],
             barcode: _itemCode.text.trim(),
-            packSize: _barcodes[0].packSize ?? 1,
-            costPrice: _barcodes[0].costPrice,
-            sellingPrice: _barcodes[0].sellingPrice,
             isPrimary: true,
           );
         } else {
           _barcodes.add(ProductBarcodeDto(
-              barcode: _itemCode.text.trim(), packSize: 1, isPrimary: true));
+            barcode: _itemCode.text.trim(),
+            packSize: 1,
+            isPrimary: true,
+            isActive: true,
+          ));
         }
       }
 
@@ -274,7 +272,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         reorderLevel: int.tryParse(_reorder.text.trim()) ?? 0,
         weight: null,
         dimensions: null,
-        isSerialized: _serialized,
+        isSerialized: _trackingType == 'SERIAL',
+        trackingType: _trackingType,
         isActive: _active,
         barcodes: _barcodes,
         attributes: attrs,
@@ -295,6 +294,30 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
 
   String _formatPercent(double p) =>
       (p % 1 == 0) ? p.toStringAsFixed(0) : p.toStringAsFixed(2);
+
+  ProductBarcodeDto _copyBarcode(
+    ProductBarcodeDto source, {
+    String? barcode,
+    int? packSize,
+    double? costPrice,
+    double? sellingPrice,
+    bool? isPrimary,
+    String? variantName,
+    Map<String, dynamic>? variantAttributes,
+    bool? isActive,
+  }) {
+    return ProductBarcodeDto(
+      barcodeId: source.barcodeId,
+      barcode: barcode ?? source.barcode,
+      packSize: packSize ?? source.packSize,
+      costPrice: costPrice ?? source.costPrice,
+      sellingPrice: sellingPrice ?? source.sellingPrice,
+      isPrimary: isPrimary ?? source.isPrimary,
+      variantName: variantName ?? source.variantName,
+      variantAttributes: variantAttributes ?? source.variantAttributes,
+      isActive: isActive ?? source.isActive,
+    );
+  }
 
   Future<void> _delete() async {
     final ok = await showDialog<bool>(
@@ -497,12 +520,43 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
           textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: 12),
-        SwitchListTile.adaptive(
-          value: _serialized,
-          onChanged: (v) => setState(() => _serialized = v),
-          title: const Text('Serialized'),
-          contentPadding: EdgeInsets.zero,
+        DropdownButtonFormField<String>(
+          initialValue: _trackingType,
+          decoration: const InputDecoration(
+            labelText: 'Inventory Tracking',
+            border: OutlineInputBorder(),
+          ),
+          items: const [
+            DropdownMenuItem(
+              value: 'VARIANT',
+              child: Text('Variation / Barcode'),
+            ),
+            DropdownMenuItem(
+              value: 'SERIAL',
+              child: Text('Serial Number'),
+            ),
+            DropdownMenuItem(
+              value: 'BATCH',
+              child: Text('Batch / Expiry'),
+            ),
+          ],
+          onChanged: (value) {
+            if (value == null) return;
+            setState(() {
+              _trackingType = value;
+            });
+          },
         ),
+        const SizedBox(height: 8),
+        Text(
+          _trackingType == 'SERIAL'
+              ? 'Every stock unit requires a unique serial number.'
+              : _trackingType == 'BATCH'
+                  ? 'Stock-out operations consume selected batches.'
+                  : 'Stock is tracked by barcode variation.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 8),
         SwitchListTile.adaptive(
           value: _weighable,
           onChanged: (v) => setState(() => _weighable = v),
@@ -711,8 +765,11 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
               elevation: 0,
               child: ListTile(
                 title: Text(b.barcode),
-                subtitle: Text(
-                    'Conversion: ${b.packSize ?? 1} • Selling: ${b.sellingPrice?.toStringAsFixed(2) ?? '-'}'),
+                subtitle: Text([
+                  if ((b.variantName ?? '').trim().isNotEmpty) b.variantName!,
+                  'Conversion: ${b.packSize ?? 1}',
+                  'Selling: ${b.sellingPrice?.toStringAsFixed(2) ?? '-'}',
+                ].join(' • ')),
                 trailing: Wrap(
                   spacing: 8,
                   children: [
@@ -1324,6 +1381,7 @@ class _SelectField extends StatelessWidget {
 Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context,
     {ProductBarcodeDto? initial}) async {
   final code = TextEditingController(text: initial?.barcode ?? '');
+  final variant = TextEditingController(text: initial?.variantName ?? '');
   final pack = TextEditingController(text: (initial?.packSize ?? 1).toString());
   final sell =
       TextEditingController(text: initial?.sellingPrice?.toString() ?? '');
@@ -1340,6 +1398,11 @@ Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context,
               controller: code,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(labelText: 'Barcode'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: variant,
+              decoration: const InputDecoration(labelText: 'Variation Name'),
             ),
             const SizedBox(height: 8),
             Row(
@@ -1394,7 +1457,12 @@ Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context,
               barcodeId: initial?.barcodeId,
               barcode: s,
               packSize: p,
+              costPrice: initial?.costPrice,
               sellingPrice: sp,
+              variantName:
+                  variant.text.trim().isEmpty ? null : variant.text.trim(),
+              variantAttributes: initial?.variantAttributes,
+              isActive: initial?.isActive ?? true,
               isPrimary: false,
             ));
           },

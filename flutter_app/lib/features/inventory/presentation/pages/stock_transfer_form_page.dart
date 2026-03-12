@@ -7,6 +7,7 @@ import '../../../../shared/widgets/app_selection_dialog.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
 import '../../../../core/error_handler.dart';
+import '../widgets/inventory_tracking_selector.dart';
 
 enum TransferMode { transfer, request }
 
@@ -23,6 +24,7 @@ class _LineItem {
   int? productId;
   String? name;
   double qty = 0;
+  InventoryTrackingSelection? tracking;
 }
 
 class _StockTransferFormPageState extends ConsumerState<StockTransferFormPage> {
@@ -57,13 +59,18 @@ class _StockTransferFormPageState extends ConsumerState<StockTransferFormPage> {
     setState(() => _saving = true);
     try {
       // Build items payload
-      final payload = _items
-          .where((e) => (e.productId ?? 0) > 0 && e.qty > 0)
-          .map((e) => {
-                'product_id': e.productId,
-                'quantity': e.qty,
-              })
-          .toList();
+      final payload =
+          _items.where((e) => (e.productId ?? 0) > 0 && e.qty > 0).map((e) {
+        if (e.tracking == null) {
+          throw Exception(
+              'Configure variation / tracking for ${e.name ?? 'selected item'}');
+        }
+        return {
+          'product_id': e.productId,
+          'quantity': e.qty,
+          ...e.tracking!.toIssueJson(),
+        };
+      }).toList();
       if (payload.isEmpty) throw Exception('At least one line item required');
 
       final selectedLoc = ref.read(locationNotifierProvider).selected;
@@ -304,6 +311,47 @@ class _LineEditorState extends ConsumerState<_LineEditor> {
     }
   }
 
+  Future<void> _configureTracking() async {
+    final productId = widget.line.productId;
+    if (productId == null || productId <= 0) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Select a product first')),
+        );
+      return;
+    }
+    final src = widget.sourceLocationId;
+    if (src == null || src <= 0) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Select a source location first')),
+        );
+      return;
+    }
+    if (widget.line.qty <= 0) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Enter quantity first')),
+        );
+      return;
+    }
+    final selection = await showInventoryTrackingSelector(
+      context: context,
+      ref: ref,
+      productId: productId,
+      productName: widget.line.name,
+      quantity: widget.line.qty,
+      mode: InventoryTrackingMode.issue,
+      initialSelection: widget.line.tracking,
+    );
+    if (selection != null && mounted) {
+      setState(() => widget.line.tracking = selection);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -362,6 +410,19 @@ class _LineEditorState extends ConsumerState<_LineEditor> {
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
             ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: _configureTracking,
+                icon: const Icon(Icons.qr_code_2_rounded),
+                label: Text(
+                  widget.line.tracking == null
+                      ? 'Configure Variation / Tracking'
+                      : widget.line.tracking!.summary(widget.line.qty),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -383,6 +444,7 @@ class _ProductPicker extends ConsumerWidget {
         if (product != null) {
           line.productId = product.productId;
           line.name = product.name;
+          line.tracking = null;
           (context as Element).markNeedsBuild();
           if (onPicked != null) await onPicked!();
         }
@@ -438,6 +500,8 @@ class _ProductPicker extends ConsumerWidget {
                     return ListTile(
                       title: Text(p.name),
                       subtitle: Text([
+                        if ((p.variantName ?? '').isNotEmpty)
+                          'Var: ${p.variantName}',
                         (p.sku ?? ''),
                         if ((p.categoryName ?? '').isNotEmpty) p.categoryName!
                       ].where((e) => e.toString().isNotEmpty).join(' · ')),

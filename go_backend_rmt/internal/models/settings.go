@@ -25,10 +25,22 @@ type UpdateSettingsRequest struct {
 
 // CompanySettings holds company-related configuration
 type CompanySettings struct {
-	Name    string  `json:"name,omitempty"`
-	Address *string `json:"address,omitempty"`
-	Phone   *string `json:"phone,omitempty"`
-	Email   *string `json:"email,omitempty"`
+	Name                   string  `json:"name,omitempty"`
+	Address                *string `json:"address,omitempty"`
+	Phone                  *string `json:"phone,omitempty"`
+	Email                  *string `json:"email,omitempty"`
+	InventoryCostingMethod string  `json:"inventory_costing_method,omitempty"`
+}
+
+type InventorySettings struct {
+	InventoryCostingMethod           string `json:"inventory_costing_method,omitempty"`
+	NegativeStockPolicy              string `json:"negative_stock_policy,omitempty"`
+	HasNegativeStockApprovalPassword bool   `json:"has_negative_stock_approval_password"`
+}
+
+type UpdateInventorySettingsRequest struct {
+	NegativeStockPolicy           string  `json:"negative_stock_policy"`
+	NegativeStockApprovalPassword *string `json:"negative_stock_approval_password,omitempty"`
 }
 
 // InvoiceSettings holds invoice-related configuration

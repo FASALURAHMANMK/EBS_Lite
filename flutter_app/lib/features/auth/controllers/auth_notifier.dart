@@ -109,10 +109,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<Company?> createCompany({required String name, String? email}) async {
+  Future<Company?> createCompany({
+    required String name,
+    String? email,
+    String inventoryCostingMethod = 'FIFO',
+  }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final company = await _repository.createCompany(name: name, email: email);
+      final company = await _repository.createCompany(
+        name: name,
+        email: email,
+        inventoryCostingMethod: inventoryCostingMethod,
+      );
       // Refresh /me to pick up updated company context and permissions
       try {
         final me = await _repository.me();
