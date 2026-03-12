@@ -6,8 +6,10 @@ import '../../../../shared/widgets/app_selection_dialog.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
 import '../widgets/inventory_tracking_selector.dart';
+import '../widgets/product_storage_editor.dart';
 import '../../../suppliers/data/supplier_repository.dart';
 import '../../../dashboard/data/taxes_repository.dart';
+import '../../../dashboard/controllers/location_notifier.dart';
 
 class ProductFormPage extends ConsumerStatefulWidget {
   const ProductFormPage({super.key, this.initialName});
@@ -61,6 +63,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   final _supplierController = TextEditingController();
   // Barcodes handled via dialog
   final List<ProductBarcodeDto> _barcodes = [];
+  List<ProductStorageAssignmentPayload> _storageAssignments = const [];
 
   @override
   void dispose() {
@@ -215,6 +218,18 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         taxId: _taxId!,
       );
       final created = await repo.createProduct(payload);
+      final selectedLocation = ref.read(locationNotifierProvider).selected;
+      if (selectedLocation != null && _storageAssignments.isNotEmpty) {
+        await repo.replaceProductStorageAssignments(
+          created.productId,
+          locationId: selectedLocation.locationId,
+          assignments: _storageAssignments
+              .where((e) =>
+                  (e.barcode ?? '').trim().isNotEmpty &&
+                  e.storageLabel.trim().isNotEmpty)
+              .toList(),
+        );
+      }
       if (!mounted) return;
       final initQty = double.tryParse(_initialStock.text.trim()) ?? 0;
       if (initQty != 0) {
@@ -301,7 +316,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('New Product'),
@@ -312,6 +327,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               Tab(text: 'UOM'),
               Tab(text: 'Barcodes'),
               Tab(text: 'Attributes'),
+              Tab(text: 'Storage'),
             ],
           ),
         ),
@@ -326,6 +342,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       _buildUomTab(),
                       _buildBarcodeTab(),
                       _buildAttributesTab(),
+                      _buildStorageTab(),
                     ],
                   ),
                 ),
@@ -350,6 +367,27 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildStorageTab() {
+    final selectedLocation = ref.watch(locationNotifierProvider).selected;
+    if (selectedLocation == null) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'Select a location first to assign storage details.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+    return ProductStorageEditor(
+      entries: _storageAssignments,
+      barcodes: _barcodes,
+      locationLabel: selectedLocation.name,
+      onChanged: (entries) => setState(() => _storageAssignments = entries),
     );
   }
 

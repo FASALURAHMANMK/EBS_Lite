@@ -2,6 +2,7 @@ import '../../inventory/data/models.dart';
 
 class PosProductDto {
   final int productId;
+  final int? comboProductId;
   final int barcodeId;
   final String name;
   final double price;
@@ -9,6 +10,8 @@ class PosProductDto {
   final String? barcode;
   final String? variantName;
   final String? categoryName;
+  final String? primaryStorage;
+  final bool isVirtualCombo;
   final bool isWeighable;
   final String trackingType;
   final bool isSerialized;
@@ -19,6 +22,7 @@ class PosProductDto {
 
   PosProductDto({
     required this.productId,
+    this.comboProductId,
     this.barcodeId = 0,
     required this.name,
     required this.price,
@@ -26,6 +30,8 @@ class PosProductDto {
     this.barcode,
     this.variantName,
     this.categoryName,
+    this.primaryStorage,
+    this.isVirtualCombo = false,
     this.isWeighable = false,
     this.trackingType = 'VARIANT',
     this.isSerialized = false,
@@ -37,6 +43,7 @@ class PosProductDto {
 
   factory PosProductDto.fromJson(Map<String, dynamic> json) => PosProductDto(
         productId: json['product_id'] as int,
+        comboProductId: json['combo_product_id'] as int?,
         barcodeId: json['barcode_id'] as int? ?? 0,
         name: json['name'] as String? ?? '',
         price: (json['price'] as num?)?.toDouble() ?? 0.0,
@@ -44,6 +51,8 @@ class PosProductDto {
         barcode: json['barcode'] as String?,
         variantName: json['variant_name'] as String?,
         categoryName: json['category_name'] as String?,
+        primaryStorage: json['primary_storage'] as String?,
+        isVirtualCombo: json['is_virtual_combo'] as bool? ?? false,
         isWeighable: json['is_weighable'] as bool? ?? false,
         trackingType: json['tracking_type'] as String? ?? 'VARIANT',
         isSerialized: json['is_serialized'] as bool? ?? false,
@@ -53,16 +62,20 @@ class PosProductDto {
         sellingUnitSymbol: json['selling_unit_symbol'] as String?,
       );
 
-  String get identityKey =>
-      barcodeId > 0 ? 'barcode:$barcodeId' : 'product:$productId';
+  String get identityKey => comboProductId != null && comboProductId! > 0
+      ? 'combo:$comboProductId'
+      : (barcodeId > 0 ? 'barcode:$barcodeId' : 'product:$productId');
 
-  bool get requiresTracking => isSerialized || trackingType == 'BATCH';
+  bool get requiresTracking =>
+      !isVirtualCombo && (isSerialized || trackingType == 'BATCH');
 
   String get displayLabel {
     final variant = (variantName ?? '').trim();
     if (variant.isNotEmpty) return '$name • $variant';
     final code = (barcode ?? '').trim();
     if (code.isNotEmpty) return '$name • $code';
+    final storage = (primaryStorage ?? '').trim();
+    if (storage.isNotEmpty) return '$name • $storage';
     return name;
   }
 }
@@ -88,12 +101,150 @@ class PosCustomerDto {
       );
 }
 
+class PosComboComponentTracking {
+  final int productId;
+  final int barcodeId;
+  final String productName;
+  final String? variantName;
+  final double quantityPerCombo;
+  final String trackingType;
+  final bool isSerialized;
+  final InventoryTrackingSelection? tracking;
+
+  const PosComboComponentTracking({
+    required this.productId,
+    required this.barcodeId,
+    required this.productName,
+    this.variantName,
+    required this.quantityPerCombo,
+    this.trackingType = 'VARIANT',
+    this.isSerialized = false,
+    this.tracking,
+  });
+
+  bool get requiresTracking => isSerialized || trackingType == 'BATCH';
+
+  String get displayLabel {
+    final variant = (variantName ?? '').trim();
+    return variant.isEmpty ? productName : '$productName • $variant';
+  }
+
+  PosComboComponentTracking copyWith({
+    InventoryTrackingSelection? tracking,
+    bool clearTracking = false,
+  }) {
+    return PosComboComponentTracking(
+      productId: productId,
+      barcodeId: barcodeId,
+      productName: productName,
+      variantName: variantName,
+      quantityPerCombo: quantityPerCombo,
+      trackingType: trackingType,
+      isSerialized: isSerialized,
+      tracking: clearTracking ? null : (tracking ?? this.tracking),
+    );
+  }
+
+  bool hasTrackingConfigured(double comboQuantity) {
+    if (!requiresTracking) return true;
+    final selection = tracking;
+    if (selection == null) return false;
+    final requiredQuantity = comboQuantity * quantityPerCombo;
+    if (isSerialized) {
+      return selection.serialNumbers.length == requiredQuantity.round();
+    }
+    if (trackingType == 'BATCH') {
+      final allocated = selection.batchAllocations.fold<double>(
+        0,
+        (sum, item) => sum + item.quantity,
+      );
+      return (allocated - requiredQuantity).abs() <= 0.0001;
+    }
+    return true;
+  }
+
+  String summary(double comboQuantity) {
+    final requiredQuantity = comboQuantity * quantityPerCombo;
+    final selection = tracking;
+    final title = [
+      productName,
+      if ((variantName ?? '').trim().isNotEmpty) variantName!.trim(),
+    ].join(' • ');
+    if (!requiresTracking) {
+      return '$title • ${requiredQuantity.toStringAsFixed(3)}';
+    }
+    if (selection == null) {
+      return '$title • Tracking required';
+    }
+    return '$title • ${selection.summary(requiredQuantity)}';
+  }
+
+  String identityKey(double comboQuantity) {
+    if (!requiresTracking) return 'component:$barcodeId';
+    final selection = tracking;
+    final trackingKey = selection == null
+        ? 'unconfigured:${comboQuantity.toStringAsFixed(3)}'
+        : [
+            if ((selection.barcodeId ?? 0) > 0) 'b:${selection.barcodeId}',
+            if (selection.serialNumbers.isNotEmpty)
+              's:${selection.serialNumbers.join(",")}',
+            if (selection.batchAllocations.isNotEmpty)
+              'ba:${selection.batchAllocations.map((e) => '${e.lotId}:${e.quantity}').join(",")}',
+          ].join('|');
+    return 'component:$barcodeId|$trackingKey';
+  }
+
+  Map<String, dynamic> toJson() => {
+        'product_id': productId,
+        'barcode_id': barcodeId,
+        'product_name': productName,
+        if ((variantName ?? '').trim().isNotEmpty) 'variant_name': variantName,
+        'quantity_per_combo': quantityPerCombo,
+        'tracking_type': trackingType,
+        'is_serialized': isSerialized,
+        if (tracking != null) ...tracking!.toIssueJson(),
+      };
+
+  factory PosComboComponentTracking.fromJson(Map<String, dynamic> json) => (() {
+        final serialNumbers =
+            (json['serial_numbers'] as List<dynamic>? ?? const [])
+                .map((e) => e.toString())
+                .toList();
+        final batchAllocations = (json['batch_allocations'] as List<dynamic>? ??
+                const [])
+            .map((e) =>
+                InventoryBatchAllocationDto.fromJson(e as Map<String, dynamic>))
+            .toList();
+        return PosComboComponentTracking(
+          productId: json['product_id'] as int? ?? 0,
+          barcodeId: json['barcode_id'] as int? ?? 0,
+          productName: json['product_name'] as String? ?? '',
+          variantName: json['variant_name'] as String?,
+          quantityPerCombo:
+              (json['quantity_per_combo'] as num?)?.toDouble() ?? 0.0,
+          trackingType: json['tracking_type'] as String? ?? 'VARIANT',
+          isSerialized: json['is_serialized'] as bool? ?? false,
+          tracking: serialNumbers.isNotEmpty || batchAllocations.isNotEmpty
+              ? InventoryTrackingSelection(
+                  barcodeId: json['barcode_id'] as int?,
+                  trackingType: json['tracking_type'] as String? ?? 'VARIANT',
+                  isSerialized: json['is_serialized'] as bool? ?? false,
+                  variantName: json['variant_name'] as String?,
+                  serialNumbers: serialNumbers,
+                  batchAllocations: batchAllocations,
+                )
+              : null,
+        );
+      })();
+}
+
 class PosCartItem {
   final PosProductDto product;
   final double quantity;
   final double unitPrice;
   final double discountPercent; // 0-100, per-line
   final InventoryTrackingSelection? tracking;
+  final List<PosComboComponentTracking> comboTracking;
 
   PosCartItem({
     required this.product,
@@ -101,6 +252,7 @@ class PosCartItem {
     required this.unitPrice,
     this.discountPercent = 0.0,
     this.tracking,
+    this.comboTracking = const [],
   });
 
   PosCartItem copyWith(
@@ -108,6 +260,7 @@ class PosCartItem {
           double? unitPrice,
           double? discountPercent,
           InventoryTrackingSelection? tracking,
+          List<PosComboComponentTracking>? comboTracking,
           bool clearTracking = false}) =>
       PosCartItem(
         product: product,
@@ -115,10 +268,14 @@ class PosCartItem {
         unitPrice: unitPrice ?? this.unitPrice,
         discountPercent: discountPercent ?? this.discountPercent,
         tracking: clearTracking ? null : (tracking ?? this.tracking),
+        comboTracking: comboTracking ?? this.comboTracking,
       );
 
   String get identityKey {
-    if (!product.requiresTracking) return product.identityKey;
+    final requiresComboTracking = comboTracking.any((c) => c.requiresTracking);
+    if (!product.requiresTracking && !requiresComboTracking) {
+      return product.identityKey;
+    }
     final trackingKey = tracking == null
         ? 'unconfigured'
         : [
@@ -130,24 +287,41 @@ class PosCartItem {
             if ((tracking!.batchNumber ?? '').trim().isNotEmpty)
               'bn:${tracking!.batchNumber!.trim()}',
           ].join('|');
-    return '${product.identityKey}|$trackingKey';
+    final comboKey = comboTracking
+        .where((c) => c.requiresTracking)
+        .map((c) => c.identityKey(quantity))
+        .join('|');
+    return '${product.identityKey}|$trackingKey|$comboKey';
   }
 
-  bool get requiresTracking => product.requiresTracking;
+  bool get requiresTracking =>
+      product.requiresTracking || comboTracking.any((c) => c.requiresTracking);
+
+  bool get requiresDirectTracking => product.requiresTracking;
+
+  bool get requiresComboTracking =>
+      comboTracking.any((c) => c.requiresTracking);
 
   bool get hasTrackingConfigured {
-    if (!requiresTracking) return true;
-    final sel = tracking;
-    if (sel == null) return false;
-    if (sel.isSerialized) {
-      return sel.serialNumbers.length == quantity.round();
+    final directTrackingRequired = product.requiresTracking;
+    if (directTrackingRequired) {
+      final sel = tracking;
+      if (sel == null) return false;
+      if (sel.isSerialized) {
+        return sel.serialNumbers.length == quantity.round();
+      }
+      if (sel.trackingType == 'BATCH') {
+        final allocated = sel.batchAllocations.fold<double>(
+          0,
+          (sum, item) => sum + item.quantity,
+        );
+        if ((allocated - quantity).abs() > 0.0001) return false;
+      }
     }
-    if (sel.trackingType == 'BATCH') {
-      final allocated = sel.batchAllocations.fold<double>(
-        0,
-        (sum, item) => sum + item.quantity,
-      );
-      return (allocated - quantity).abs() <= 0.0001;
+    for (final component in comboTracking) {
+      if (!component.hasTrackingConfigured(quantity)) {
+        return false;
+      }
     }
     return true;
   }
@@ -227,36 +401,44 @@ class CurrencyDto {
 
 class SaleItemDto {
   final int? productId;
+  final int? comboProductId;
   final int? barcodeId;
   final String? productName;
   final String? barcode;
   final String? variantName;
+  final bool isVirtualCombo;
   final String trackingType;
   final bool isSerialized;
   final double quantity;
   final double unitPrice;
   final double discountPercent;
   final List<String> serialNumbers;
+  final List<PosComboComponentTracking> comboComponentTracking;
 
   SaleItemDto(
       {this.productId,
+      this.comboProductId,
       this.barcodeId,
       this.productName,
       this.barcode,
       this.variantName,
+      this.isVirtualCombo = false,
       this.trackingType = 'VARIANT',
       this.isSerialized = false,
       required this.quantity,
       required this.unitPrice,
       this.discountPercent = 0.0,
-      this.serialNumbers = const []});
+      this.serialNumbers = const [],
+      this.comboComponentTracking = const []});
 
   factory SaleItemDto.fromJson(Map<String, dynamic> json) => SaleItemDto(
         productId: json['product_id'] as int?,
+        comboProductId: json['combo_product_id'] as int?,
         barcodeId: json['barcode_id'] as int?,
         productName: json['product_name'] as String?,
         barcode: json['barcode'] as String?,
         variantName: json['variant_name'] as String?,
+        isVirtualCombo: json['is_virtual_combo'] as bool? ?? false,
         trackingType: json['tracking_type'] as String? ?? 'VARIANT',
         isSerialized: json['is_serialized'] as bool? ?? false,
         quantity: (json['quantity'] as num?)?.toDouble() ?? 0.0,
@@ -265,6 +447,12 @@ class SaleItemDto {
             (json['discount_percentage'] as num?)?.toDouble() ?? 0.0,
         serialNumbers: (json['serial_numbers'] as List<dynamic>? ?? const [])
             .map((e) => e.toString())
+            .toList(),
+        comboComponentTracking: (json['combo_component_tracking']
+                    as List<dynamic>? ??
+                const [])
+            .map((e) =>
+                PosComboComponentTracking.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
 }

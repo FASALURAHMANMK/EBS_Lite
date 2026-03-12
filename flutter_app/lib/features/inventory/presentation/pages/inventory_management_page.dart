@@ -682,6 +682,17 @@ class _InventoryCard extends ConsumerWidget {
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
+              if ((item.primaryStorage ?? '').trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Storage: ${item.primaryStorage}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
               const Spacer(),
               Row(
                 children: [
@@ -739,7 +750,8 @@ class _InventoryTile extends ConsumerWidget {
       subtitle: Text(
         [
           (item.sku ?? '').isNotEmpty ? 'SKU: ${item.sku}' : null,
-          item.categoryName
+          item.categoryName,
+          item.primaryStorage,
         ].whereType<String>().join(' • '),
       ),
       trailing: Column(

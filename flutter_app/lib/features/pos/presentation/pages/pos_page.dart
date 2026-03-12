@@ -19,7 +19,9 @@ import '../../../../shared/widgets/manager_override_dialog.dart';
 import '../../../../core/error_handler.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import '../../../inventory/data/models.dart';
+import '../../../inventory/data/inventory_repository.dart';
 import '../../../inventory/presentation/widgets/inventory_tracking_selector.dart';
+import '../widgets/combo_tracking_dialog.dart';
 
 class PosPage extends ConsumerWidget {
   const PosPage({super.key});
@@ -209,25 +211,20 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
       if (picked == null || picked <= 0) return;
       qty = picked;
     }
-    InventoryTrackingSelection? tracking;
-    if (product.requiresTracking) {
-      tracking = await _configurePosTracking(
-        context: context,
-        ref: ref,
-        product: product,
-        quantity: qty,
-        initialSelection: InventoryTrackingSelection(
-          barcodeId: product.barcodeId > 0 ? product.barcodeId : null,
-          trackingType: product.trackingType,
-          isSerialized: product.isSerialized,
-          barcode: product.barcode,
-          variantName: product.variantName,
-        ),
-      );
-      if (!mounted) return;
-      if (tracking == null) return;
-    }
-    notifier.addProduct(product, qty: qty, tracking: tracking);
+    final config = await _configureCartTracking(
+      context: context,
+      ref: ref,
+      product: product,
+      quantity: qty,
+    );
+    if (!mounted) return;
+    if (config == null) return;
+    notifier.addProduct(
+      product,
+      qty: qty,
+      tracking: config.tracking,
+      comboTracking: config.comboTracking ?? const [],
+    );
   }
 
   Widget _buildTextField(
@@ -394,7 +391,14 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
                           dense: true,
                           title: Text(p.name),
                           subtitle: Text(
-                              'Price: ${p.price.toStringAsFixed(2)}  •  Stock: ${p.stock.toStringAsFixed(2)}${_posUnitSuffix(p)}'),
+                            [
+                              'Price: ${p.price.toStringAsFixed(2)}',
+                              'Stock: ${p.stock.toStringAsFixed(2)}${_posUnitSuffix(p)}',
+                              if ((p.primaryStorage ?? '').trim().isNotEmpty)
+                                p.primaryStorage!,
+                              if (p.isVirtualCombo) 'Combo',
+                            ].join('  •  '),
+                          ),
                           trailing: IconButton(
                             icon: const Icon(Icons.add_circle_rounded),
                             onPressed: () async =>
@@ -430,6 +434,7 @@ class _CartList extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       itemBuilder: (context, index) {
         final item = state.cart[index];
+        final trackingLines = _trackingSummaryLines(item);
         return Card(
           child: ListTile(
             title: Row(
@@ -443,13 +448,12 @@ class _CartList extends ConsumerWidget {
                   ]),
               ],
             ),
-            subtitle: Text([
-              'Unit: ${item.unitPrice.toStringAsFixed(2)}${_posUnitSuffix(item.product)}',
-              if (item.requiresTracking)
-                item.tracking == null
-                    ? 'Tracking required'
-                    : item.tracking!.summary(item.quantity),
-            ].join('\n')),
+            subtitle: Text(
+              [
+                'Unit: ${item.unitPrice.toStringAsFixed(2)}${_posUnitSuffix(item.product)}',
+                ...trackingLines,
+              ].join('\n'),
+            ),
             leading: IconButton(
               icon: const Icon(Icons.remove_circle_outline_rounded),
               onPressed: () async {
@@ -458,19 +462,21 @@ class _CartList extends ConsumerWidget {
                   notifier.removeItem(item);
                 } else {
                   if (item.requiresTracking) {
-                    final tracking = await _configurePosTracking(
+                    final config = await _configureCartTracking(
                       context: context,
                       ref: ref,
                       product: item.product,
                       quantity: newQty,
-                      initialSelection: item.tracking,
+                      initialTracking: item.tracking,
+                      initialComboTracking: item.comboTracking,
                     );
                     if (!context.mounted) return;
-                    if (tracking == null) return;
+                    if (config == null) return;
                     notifier.updateTrackedItem(
                       item,
                       quantity: newQty,
-                      tracking: tracking,
+                      tracking: config.tracking,
+                      comboTracking: config.comboTracking,
                     );
                   } else {
                     notifier.updateQty(item, newQty);
@@ -490,16 +496,24 @@ class _CartList extends ConsumerWidget {
                           : Icons.qr_code_2_rounded,
                     ),
                     onPressed: () async {
-                      final tracking = await _configurePosTracking(
+                      final config = await _configureCartTracking(
                         context: context,
                         ref: ref,
                         product: item.product,
                         quantity: item.quantity,
-                        initialSelection: item.tracking,
+                        initialTracking: item.tracking,
+                        initialComboTracking: item.comboTracking,
                       );
                       if (!context.mounted) return;
-                      if (tracking != null) {
-                        notifier.setItemTracking(item, tracking);
+                      if (config != null) {
+                        if (config.comboTracking != null) {
+                          notifier.setItemComboTracking(
+                            item,
+                            config.comboTracking!,
+                          );
+                        } else if (config.tracking != null) {
+                          notifier.setItemTracking(item, config.tracking);
+                        }
                       }
                     },
                   ),
@@ -515,19 +529,21 @@ class _CartList extends ConsumerWidget {
                       if (extra == null || extra <= 0) return;
                       final newQty = item.quantity + extra;
                       if (item.requiresTracking) {
-                        final tracking = await _configurePosTracking(
+                        final config = await _configureCartTracking(
                           context: context,
                           ref: ref,
                           product: item.product,
                           quantity: newQty,
-                          initialSelection: item.tracking,
+                          initialTracking: item.tracking,
+                          initialComboTracking: item.comboTracking,
                         );
                         if (!context.mounted) return;
-                        if (tracking == null) return;
+                        if (config == null) return;
                         notifier.updateTrackedItem(
                           item,
                           quantity: newQty,
-                          tracking: tracking,
+                          tracking: config.tracking,
+                          comboTracking: config.comboTracking,
                         );
                       } else {
                         notifier.updateQty(item, newQty);
@@ -536,19 +552,21 @@ class _CartList extends ConsumerWidget {
                     }
                     final newQty = item.quantity + 1;
                     if (item.requiresTracking) {
-                      final tracking = await _configurePosTracking(
+                      final config = await _configureCartTracking(
                         context: context,
                         ref: ref,
                         product: item.product,
                         quantity: newQty,
-                        initialSelection: item.tracking,
+                        initialTracking: item.tracking,
+                        initialComboTracking: item.comboTracking,
                       );
                       if (!context.mounted) return;
-                      if (tracking == null) return;
+                      if (config == null) return;
                       notifier.updateTrackedItem(
                         item,
                         quantity: newQty,
-                        tracking: tracking,
+                        tracking: config.tracking,
+                        comboTracking: config.comboTracking,
                       );
                     } else {
                       notifier.updateQty(item, item.quantity + 1);
@@ -771,7 +789,7 @@ class _BottomBar extends ConsumerWidget {
                               ..showSnackBar(
                                 const SnackBar(
                                   content: Text(
-                                    'Configure batch / serial details for all tracked items before payment.',
+                                    'Configure batch / serial details for all tracked items and combo components before payment.',
                                   ),
                                 ),
                               );
@@ -812,6 +830,93 @@ Future<InventoryTrackingSelection?> _configurePosTracking({
     productName: product.name,
     initialSelection: initialSelection,
   );
+}
+
+Future<_TrackedCartConfig?> _configureCartTracking({
+  required BuildContext context,
+  required WidgetRef ref,
+  required PosProductDto product,
+  required double quantity,
+  InventoryTrackingSelection? initialTracking,
+  List<PosComboComponentTracking> initialComboTracking = const [],
+}) async {
+  if (product.requiresTracking) {
+    final tracking = await _configurePosTracking(
+      context: context,
+      ref: ref,
+      product: product,
+      quantity: quantity,
+      initialSelection: initialTracking ??
+          InventoryTrackingSelection(
+            barcodeId: product.barcodeId > 0 ? product.barcodeId : null,
+            trackingType: product.trackingType,
+            isSerialized: product.isSerialized,
+            barcode: product.barcode,
+            variantName: product.variantName,
+          ),
+    );
+    if (!context.mounted || tracking == null) return null;
+    return _TrackedCartConfig(tracking: tracking);
+  }
+
+  final comboProductId = product.comboProductId;
+  if ((comboProductId ?? 0) <= 0) {
+    return const _TrackedCartConfig();
+  }
+
+  final combo = await ref
+      .read(inventoryRepositoryProvider)
+      .getComboProduct(comboProductId!);
+  if (!context.mounted) return null;
+  final hasTrackedComponents =
+      combo.components.any(_comboComponentRequiresTracking);
+  if (!hasTrackedComponents) {
+    return const _TrackedCartConfig(
+        comboTracking: <PosComboComponentTracking>[]);
+  }
+
+  final comboTracking = await showComboTrackingDialog(
+    context: context,
+    ref: ref,
+    combo: combo,
+    quantity: quantity,
+    initialTracking: initialComboTracking,
+  );
+  if (!context.mounted || comboTracking == null) return null;
+  return _TrackedCartConfig(comboTracking: comboTracking);
+}
+
+List<String> _trackingSummaryLines(PosCartItem item) {
+  final lines = <String>[];
+  if (item.requiresDirectTracking) {
+    lines.add(
+      item.tracking == null
+          ? 'Tracking required'
+          : item.tracking!.summary(item.quantity),
+    );
+  }
+  if (item.requiresComboTracking) {
+    lines.addAll(
+      item.comboTracking
+          .where((component) => component.requiresTracking)
+          .map((component) => component.summary(item.quantity)),
+    );
+  }
+  return lines;
+}
+
+class _TrackedCartConfig {
+  const _TrackedCartConfig({
+    this.tracking,
+    this.comboTracking,
+  });
+
+  final InventoryTrackingSelection? tracking;
+  final List<PosComboComponentTracking>? comboTracking;
+}
+
+bool _comboComponentRequiresTracking(ComboProductComponentDto component) {
+  return component.isSerialized || component.trackingType == 'BATCH';
 }
 
 class _DiscountDialog extends StatefulWidget {

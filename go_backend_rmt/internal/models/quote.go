@@ -42,6 +42,7 @@ type QuoteItem struct {
 	QuoteItemID     int      `json:"quote_item_id" db:"quote_item_id"`
 	QuoteID         int      `json:"quote_id" db:"quote_id"`
 	ProductID       *int     `json:"product_id,omitempty" db:"product_id"`
+	ComboProductID  *int     `json:"combo_product_id,omitempty" db:"combo_product_id"`
 	ProductName     *string  `json:"product_name,omitempty" db:"product_name"`
 	Quantity        float64  `json:"quantity" db:"quantity"`
 	UnitPrice       float64  `json:"unit_price" db:"unit_price"`
@@ -65,6 +66,7 @@ type CreateQuoteRequest struct {
 
 type CreateQuoteItemRequest struct {
 	ProductID       *int     `json:"product_id,omitempty"`
+	ComboProductID  *int     `json:"combo_product_id,omitempty"`
 	ProductName     *string  `json:"product_name,omitempty"`
 	Quantity        float64  `json:"quantity" validate:"required,gt=0"`
 	UnitPrice       float64  `json:"unit_price" validate:"required,gt=0"`

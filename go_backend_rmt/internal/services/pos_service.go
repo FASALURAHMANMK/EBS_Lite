@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -19,6 +20,13 @@ type POSService struct {
 	printService *PrintService
 }
 
+func nullIfEmptyBytes(value []byte) interface{} {
+	if len(value) == 0 {
+		return nil
+	}
+	return value
+}
+
 func NewPOSService() *POSService {
 	return &POSService{
 		db:           database.GetDB(),
@@ -27,14 +35,19 @@ func NewPOSService() *POSService {
 	}
 }
 
-func (s *POSService) GetPOSProducts(companyID, locationID int) ([]models.POSProductResponse, error) {
+func (s *POSService) GetPOSProducts(companyID, locationID int, includeCombos bool) ([]models.POSProductResponse, error) {
 	query := `
-                SELECT p.product_id, p.name,
+                SELECT p.product_id, NULL::int AS combo_product_id, COALESCE(pb.barcode_id, 0) AS barcode_id, p.name,
                            COALESCE(pb.selling_price, p.selling_price, 0) as price,
                            COALESCE(st.quantity, 0) as stock,
                            pb.barcode,
+                           NULL::varchar as variant_name,
                            c.name as category_name,
+                           psa.storage_label as primary_storage,
+                           FALSE as is_virtual_combo,
                            COALESCE(p.is_weighable, FALSE) as is_weighable,
+                           CASE WHEN COALESCE(p.tracking_type, 'VARIANT') = 'BATCH' THEN 'BATCH' ELSE 'VARIANT' END as tracking_type,
+                           CASE WHEN COALESCE(p.is_serialized, FALSE) OR COALESCE(p.tracking_type, '') = 'SERIAL' THEN TRUE ELSE FALSE END as is_serialized,
                            COALESCE(p.selling_uom_mode, 'LOOSE') as selling_uom_mode,
                            p.selling_unit_id,
                            su.name as selling_unit_name,
@@ -44,9 +57,50 @@ func (s *POSService) GetPOSProducts(companyID, locationID int) ([]models.POSProd
                 LEFT JOIN stock st ON p.product_id = st.product_id AND st.location_id = $2
                 LEFT JOIN categories c ON p.category_id = c.category_id
                 LEFT JOIN units su ON COALESCE(p.selling_unit_id, p.unit_id) = su.unit_id
+                LEFT JOIN LATERAL (
+                  SELECT storage_label
+                  FROM product_storage_assignments
+                  WHERE location_id = $2
+                    AND barcode_id = pb.barcode_id
+                  ORDER BY is_primary DESC, sort_order, storage_assignment_id
+                  LIMIT 1
+                ) psa ON TRUE
                 WHERE p.company_id = $1 AND p.is_active = TRUE AND p.is_deleted = FALSE
-                ORDER BY p.name
         `
+	if includeCombos {
+		query += `
+                UNION ALL
+                SELECT 0 AS product_id, cp.combo_product_id, 0 AS barcode_id, cp.name,
+                           cp.selling_price::float8 AS price,
+                           COALESCE(availability.available_stock, 0)::float8 AS stock,
+                           cp.barcode,
+                           NULL::varchar as variant_name,
+                           NULL::varchar as category_name,
+                           NULL::varchar as primary_storage,
+                           TRUE as is_virtual_combo,
+                           FALSE as is_weighable,
+                           'VARIANT' as tracking_type,
+                           FALSE as is_serialized,
+                           'LOOSE' as selling_uom_mode,
+                           NULL::int as selling_unit_id,
+                           NULL::varchar as selling_unit_name,
+                           NULL::varchar as selling_unit_symbol
+                FROM combo_products cp
+                LEFT JOIN LATERAL (
+                  SELECT CASE
+                           WHEN COUNT(*) = 0 THEN 0::float8
+                           ELSE MIN(COALESCE(sv.quantity, 0)::float8 / NULLIF(cpi.quantity::float8, 0))
+                         END AS available_stock
+                  FROM combo_product_items cpi
+                  LEFT JOIN stock_variants sv
+                    ON sv.location_id = $2
+                   AND sv.barcode_id = cpi.barcode_id
+                  WHERE cpi.combo_product_id = cp.combo_product_id
+                ) availability ON TRUE
+                WHERE cp.company_id = $1 AND cp.is_active = TRUE AND cp.is_deleted = FALSE
+                `
+	}
+	query += " ORDER BY name"
 
 	rows, err := s.db.Query(query, companyID, locationID)
 	if err != nil {
@@ -58,8 +112,9 @@ func (s *POSService) GetPOSProducts(companyID, locationID int) ([]models.POSProd
 	for rows.Next() {
 		var product models.POSProductResponse
 		err := rows.Scan(
-			&product.ProductID, &product.Name, &product.Price, &product.Stock,
-			&product.Barcode, &product.CategoryName, &product.IsWeighable, &product.SellingUOMMode,
+			&product.ProductID, &product.ComboProductID, &product.BarcodeID, &product.Name, &product.Price, &product.Stock,
+			&product.Barcode, &product.VariantName, &product.CategoryName, &product.PrimaryStorage, &product.IsVirtualCombo,
+			&product.IsWeighable, &product.TrackingType, &product.IsSerialized, &product.SellingUOMMode,
 			&product.SellingUnitID, &product.SellingUnitName, &product.SellingUnitSymbol,
 		)
 		if err != nil {
@@ -429,7 +484,7 @@ func (s *POSService) GetHeldSales(companyID, locationID int) ([]models.Sale, err
 	return s.salesService.GetSales(companyID, locationID, filters)
 }
 
-func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string) ([]models.POSProductResponse, error) {
+func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string, includeCombos bool) ([]models.POSProductResponse, error) {
 	// Enrich POS search to match:
 	// - name (ILIKE)
 	// - sku (ILIKE)
@@ -437,12 +492,14 @@ func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string
 	// - category name (ILIKE)
 	// - attribute values (ILIKE)
 	query := `
-                SELECT p.product_id, pb.barcode_id, p.name,
+                SELECT p.product_id, NULL::int AS combo_product_id, pb.barcode_id, p.name,
                            COALESCE(pb.selling_price, p.selling_price, 0) as price,
                            COALESCE(sv.quantity, 0) as stock,
                            pb.barcode,
                            pb.variant_name,
                            c.name as category_name,
+                           psa.storage_label as primary_storage,
+                           FALSE as is_virtual_combo,
                            COALESCE(p.is_weighable, FALSE) as is_weighable,
                            CASE WHEN COALESCE(p.tracking_type, 'VARIANT') = 'BATCH' THEN 'BATCH' ELSE 'VARIANT' END as tracking_type,
                            CASE WHEN COALESCE(p.is_serialized, FALSE) OR COALESCE(p.tracking_type, '') = 'SERIAL' THEN TRUE ELSE FALSE END as is_serialized,
@@ -455,6 +512,14 @@ func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string
                 LEFT JOIN stock_variants sv ON pb.barcode_id = sv.barcode_id AND sv.location_id = $2
                 LEFT JOIN categories c ON p.category_id = c.category_id
                 LEFT JOIN units su ON COALESCE(p.selling_unit_id, p.unit_id) = su.unit_id
+                LEFT JOIN LATERAL (
+                    SELECT storage_label
+                    FROM product_storage_assignments
+                    WHERE location_id = $2
+                      AND barcode_id = pb.barcode_id
+                    ORDER BY is_primary DESC, sort_order, storage_assignment_id
+                    LIMIT 1
+                ) psa ON TRUE
                 WHERE p.company_id = $1 AND p.is_active = TRUE AND p.is_deleted = FALSE
                 AND (
                         LOWER(p.name) LIKE LOWER($3) OR
@@ -469,9 +534,47 @@ func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string
                               AND LOWER(pav.value) LIKE LOWER($3)
                         )
                 )
-                ORDER BY p.name, pb.is_primary DESC, pb.barcode_id
-                LIMIT 50
         `
+	if includeCombos {
+		query += `
+                UNION ALL
+                SELECT 0 AS product_id, cp.combo_product_id, 0 AS barcode_id, cp.name,
+                           cp.selling_price::float8 AS price,
+                           COALESCE(availability.available_stock, 0)::float8 AS stock,
+                           cp.barcode,
+                           NULL::varchar as variant_name,
+                           NULL::varchar as category_name,
+                           NULL::varchar as primary_storage,
+                           TRUE as is_virtual_combo,
+                           FALSE as is_weighable,
+                           'VARIANT' as tracking_type,
+                           FALSE as is_serialized,
+                           'LOOSE' as selling_uom_mode,
+                           NULL::int as selling_unit_id,
+                           NULL::varchar as selling_unit_name,
+                           NULL::varchar as selling_unit_symbol
+                FROM combo_products cp
+                LEFT JOIN LATERAL (
+                    SELECT CASE
+                             WHEN COUNT(*) = 0 THEN 0::float8
+                             ELSE MIN(COALESCE(sv.quantity, 0)::float8 / NULLIF(cpi.quantity::float8, 0))
+                           END AS available_stock
+                    FROM combo_product_items cpi
+                    LEFT JOIN stock_variants sv
+                      ON sv.location_id = $2
+                     AND sv.barcode_id = cpi.barcode_id
+                    WHERE cpi.combo_product_id = cp.combo_product_id
+                ) availability ON TRUE
+                WHERE cp.company_id = $1 AND cp.is_active = TRUE AND cp.is_deleted = FALSE
+                  AND (
+                        LOWER(cp.name) LIKE LOWER($3) OR
+                        LOWER(COALESCE(cp.sku, '')) LIKE LOWER($3) OR
+                        cp.barcode = $4 OR
+                        cp.barcode ILIKE $3
+                  )
+                `
+	}
+	query += " ORDER BY name, barcode_id DESC LIMIT 50"
 
 	searchPattern := "%" + searchTerm + "%"
 
@@ -485,8 +588,8 @@ func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string
 	for rows.Next() {
 		var product models.POSProductResponse
 		err := rows.Scan(
-			&product.ProductID, &product.BarcodeID, &product.Name, &product.Price, &product.Stock,
-			&product.Barcode, &product.VariantName, &product.CategoryName, &product.IsWeighable, &product.TrackingType, &product.IsSerialized, &product.SellingUOMMode,
+			&product.ProductID, &product.ComboProductID, &product.BarcodeID, &product.Name, &product.Price, &product.Stock,
+			&product.Barcode, &product.VariantName, &product.CategoryName, &product.PrimaryStorage, &product.IsVirtualCombo, &product.IsWeighable, &product.TrackingType, &product.IsSerialized, &product.SellingUOMMode,
 			&product.SellingUnitID, &product.SellingUnitName, &product.SellingUnitSymbol,
 		)
 		if err != nil {
@@ -767,104 +870,52 @@ func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int,
 		return nil, fmt.Errorf("failed to clear sale details: %w", err)
 	}
 
-	productIDs := make([]int, 0, len(req.Items))
-	for _, item := range req.Items {
-		if item.ProductID != nil {
-			productIDs = append(productIDs, *item.ProductID)
-		}
-	}
-	metaByID, err := fetchProductMeta(tx, companyID, productIDs)
+	preparedLines, err := prepareSaleDetailsTx(tx, companyID, locationID, req.Items)
 	if err != nil {
 		return nil, err
 	}
-	taxIDs := make([]int, 0, len(req.Items))
-	for _, item := range req.Items {
-		var tid *int
-		if item.TaxID != nil {
-			tid = item.TaxID
-		} else if item.ProductID != nil {
-			meta, ok := metaByID[*item.ProductID]
-			if !ok {
-				return nil, fmt.Errorf("product not found")
-			}
-			tid = meta.TaxID
-		}
-		if tid != nil {
-			taxIDs = append(taxIDs, *tid)
-		}
-	}
-	taxPctByID, err := fetchTaxPercentages(tx, companyID, taxIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to calculate tax: %w", err)
-	}
 
 	// Insert details and update stock
-	for _, item := range req.Items {
-		// Compute line
-		lineTotal := item.Quantity * item.UnitPrice
-		discountAmount := lineTotal * (item.DiscountPercent / 100)
-		lineTotal -= discountAmount
-		var taxAmount float64
-		var effectiveTaxID *int
-		if item.TaxID != nil {
-			effectiveTaxID = item.TaxID
-		} else if item.ProductID != nil {
-			meta, ok := metaByID[*item.ProductID]
-			if !ok {
-				return nil, fmt.Errorf("product not found")
-			}
-			effectiveTaxID = meta.TaxID
-		}
-		if effectiveTaxID != nil {
-			pct, ok := taxPctByID[*effectiveTaxID]
-			if !ok {
-				return nil, fmt.Errorf("failed to calculate tax: %w", fmt.Errorf("failed to get tax percentage: %w", sql.ErrNoRows))
-			}
-			taxAmount = lineTotal * (pct / 100)
-		}
-
-		lineSnapshot := saleLineSnapshot{}
-		if item.ProductID != nil {
-			meta, ok := metaByID[*item.ProductID]
-			if !ok {
-				return nil, fmt.Errorf("product not found")
-			}
-			lineSnapshot = newSaleLineSnapshot(meta, item.Quantity)
-		}
-
+	for _, line := range preparedLines {
 		var saleDetailID int
 		if err := tx.QueryRow(`
-            INSERT INTO sale_details (sale_id, product_id, barcode_id, product_name, quantity, unit_price,
+            INSERT INTO sale_details (sale_id, product_id, combo_product_id, barcode_id, product_name, quantity, unit_price,
                                       discount_percentage, discount_amount, tax_id, tax_amount,
                                       line_total, serial_numbers, notes, cost_price,
                                       stock_unit_id, selling_unit_id, selling_uom_mode, selling_to_stock_factor, stock_quantity)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
             RETURNING sale_detail_id
-        `, saleID, item.ProductID, item.BarcodeID, item.ProductName, item.Quantity, item.UnitPrice, item.DiscountPercent, discountAmount, effectiveTaxID, taxAmount, lineTotal, pq.Array(item.SerialNumbers), item.Notes, lineSnapshot.CostPricePerUnit, lineSnapshot.StockUnitID, lineSnapshot.SellingUnitID, lineSnapshot.SellingUOMMode, lineSnapshot.SellingToStock, lineSnapshot.StockQuantity).Scan(&saleDetailID); err != nil {
+        `, saleID, line.ProductID, line.ComboProductID, line.BarcodeID, line.ProductName, line.Quantity, line.UnitPrice, line.DiscountPercent, line.DiscountAmount, line.TaxID, line.TaxAmount, line.LineTotal, pq.Array(line.SerialNumbers), line.Notes, line.Snapshot.CostPricePerUnit, line.Snapshot.StockUnitID, line.Snapshot.SellingUnitID, line.Snapshot.SellingUOMMode, line.Snapshot.SellingToStock, line.Snapshot.StockQuantity).Scan(&saleDetailID); err != nil {
 			return nil, fmt.Errorf("failed to insert sale detail: %w", err)
 		}
 
-		if item.ProductID != nil && !isTraining {
-			issue, err := trackingSvc.IssueStockTx(tx, companyID, locationID, userID, "SALE", "sale_detail", &saleDetailID, nil, inventorySelection{
-				ProductID:        *item.ProductID,
-				BarcodeID:        item.BarcodeID,
-				Quantity:         lineSnapshot.StockQuantity,
-				SerialNumbers:    item.SerialNumbers,
-				BatchAllocations: item.BatchAllocations,
-				Notes:            item.Notes,
-				OverridePassword: req.OverridePassword,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("failed to update stock: %w", err)
-			}
-			if _, err := tx.Exec(`
-				UPDATE sale_details
-				SET barcode_id = COALESCE($1, barcode_id),
-				    cost_price = $2
-				WHERE sale_detail_id = $3
-			`, issue.BarcodeID, issue.UnitCost, saleDetailID); err != nil {
-				return nil, fmt.Errorf("failed to update sale detail cost snapshot: %w", err)
-			}
+		if isTraining || line.ProductID == nil {
+			continue
+		}
+
+		selection := inventorySelection{
+			ProductID:        *line.ProductID,
+			BarcodeID:        line.BarcodeID,
+			ComboProductID:   line.ComboProductID,
+			Quantity:         line.Snapshot.StockQuantity,
+			SerialNumbers:    line.SerialNumbers,
+			BatchAllocations: line.BatchAllocations,
+			Notes:            line.Notes,
+			OverridePassword: req.OverridePassword,
+		}
+
+		issue, err := trackingSvc.IssueStockTx(tx, companyID, locationID, userID, "SALE", "sale_detail", &saleDetailID, nil, selection)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update stock: %w", err)
+		}
+		if _, err := tx.Exec(`
+			UPDATE sale_details
+			SET barcode_id = COALESCE($1, barcode_id),
+			    cost_price = $2,
+			    serial_numbers = $3
+			WHERE sale_detail_id = $4
+		`, issue.BarcodeID, issue.UnitCost, pq.Array(selection.SerialNumbers), saleDetailID); err != nil {
+			return nil, fmt.Errorf("failed to update sale detail cost snapshot: %w", err)
 		}
 	}
 
@@ -1170,12 +1221,20 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 	totalTax := float64(0)
 
 	productIDs := make([]int, 0, len(req.Items))
+	comboProductIDs := make([]int, 0, len(req.Items))
 	for _, item := range req.Items {
 		if item.ProductID != nil {
 			productIDs = append(productIDs, *item.ProductID)
 		}
+		if item.ComboProductID != nil {
+			comboProductIDs = append(comboProductIDs, *item.ComboProductID)
+		}
 	}
 	metaByID, err := fetchProductMeta(tx, companyID, productIDs)
+	if err != nil {
+		return nil, err
+	}
+	comboMetaByID, err := fetchComboProductMeta(tx, companyID, comboProductIDs, &locationID)
 	if err != nil {
 		return nil, err
 	}
@@ -1184,6 +1243,12 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 		var tid *int
 		if item.TaxID != nil {
 			tid = item.TaxID
+		} else if item.ComboProductID != nil {
+			meta, ok := comboMetaByID[*item.ComboProductID]
+			if !ok {
+				return nil, fmt.Errorf("combo product not found")
+			}
+			tid = meta.TaxID
 		} else if item.ProductID != nil {
 			meta, ok := metaByID[*item.ProductID]
 			if !ok {
@@ -1202,19 +1267,21 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 
 	// We'll also compute discount per line for persistence
 	type lineComputed struct {
-		qty       float64
-		unit      float64
-		discPct   float64
-		discAmt   float64
-		taxID     *int
-		taxAmt    float64
-		total     float64
-		pid       *int
-		barcodeID *int
-		pname     *string
-		serials   []string
-		notes     *string
-		snapshot  saleLineSnapshot
+		qty           float64
+		unit          float64
+		discPct       float64
+		discAmt       float64
+		taxID         *int
+		taxAmt        float64
+		total         float64
+		pid           *int
+		comboPID      *int
+		barcodeID     *int
+		pname         *string
+		serials       []string
+		comboTracking []models.ComboComponentTrackingInput
+		notes         *string
+		snapshot      saleLineSnapshot
 	}
 	lines := make([]lineComputed, 0, len(req.Items))
 
@@ -1226,6 +1293,12 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 		var effectiveTaxID *int
 		if item.TaxID != nil {
 			effectiveTaxID = item.TaxID
+		} else if item.ComboProductID != nil {
+			meta, ok := comboMetaByID[*item.ComboProductID]
+			if !ok {
+				return nil, fmt.Errorf("combo product not found")
+			}
+			effectiveTaxID = meta.TaxID
 		} else if item.ProductID != nil {
 			meta, ok := metaByID[*item.ProductID]
 			if !ok {
@@ -1250,20 +1323,27 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 			}
 			lineSnapshot = newSaleLineSnapshot(meta, item.Quantity)
 		}
+		lineName := item.ProductName
+		if item.ComboProductID != nil {
+			meta := comboMetaByID[*item.ComboProductID]
+			lineName = &meta.Name
+		}
 		lines = append(lines, lineComputed{
-			qty:       item.Quantity,
-			unit:      item.UnitPrice,
-			discPct:   item.DiscountPercent,
-			discAmt:   discountAmount,
-			taxID:     effectiveTaxID,
-			taxAmt:    taxAmount,
-			total:     lineTotal,
-			pid:       item.ProductID,
-			barcodeID: item.BarcodeID,
-			pname:     item.ProductName,
-			serials:   item.SerialNumbers,
-			notes:     item.Notes,
-			snapshot:  lineSnapshot,
+			qty:           item.Quantity,
+			unit:          item.UnitPrice,
+			discPct:       item.DiscountPercent,
+			discAmt:       discountAmount,
+			taxID:         effectiveTaxID,
+			taxAmt:        taxAmount,
+			total:         lineTotal,
+			pid:           item.ProductID,
+			comboPID:      item.ComboProductID,
+			barcodeID:     item.BarcodeID,
+			pname:         lineName,
+			serials:       item.SerialNumbers,
+			comboTracking: item.ComboComponentTracking,
+			notes:         item.Notes,
+			snapshot:      lineSnapshot,
 		})
 	}
 
@@ -1287,13 +1367,20 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 
 	// Insert sale details (no stock updates)
 	for _, lc := range lines {
+		var comboTrackingPayload []byte
+		if len(lc.comboTracking) > 0 {
+			comboTrackingPayload, err = json.Marshal(lc.comboTracking)
+			if err != nil {
+				return nil, fmt.Errorf("failed to encode combo tracking: %w", err)
+			}
+		}
 		if _, err := tx.Exec(`
-            INSERT INTO sale_details (sale_id, product_id, barcode_id, product_name, quantity, unit_price,
+            INSERT INTO sale_details (sale_id, product_id, combo_product_id, barcode_id, product_name, quantity, unit_price,
                                       discount_percentage, discount_amount, tax_id, tax_amount,
-                                      line_total, serial_numbers, notes, cost_price,
+                                      line_total, serial_numbers, combo_component_tracking, notes, cost_price,
                                       stock_unit_id, selling_unit_id, selling_uom_mode, selling_to_stock_factor, stock_quantity)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
-        `, saleID, lc.pid, lc.barcodeID, lc.pname, lc.qty, lc.unit, lc.discPct, lc.discAmt, lc.taxID, lc.taxAmt, lc.total, pq.Array(lc.serials), lc.notes, lc.snapshot.CostPricePerUnit, lc.snapshot.StockUnitID, lc.snapshot.SellingUnitID, lc.snapshot.SellingUOMMode, lc.snapshot.SellingToStock, lc.snapshot.StockQuantity); err != nil {
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+        `, saleID, lc.pid, lc.comboPID, lc.barcodeID, lc.pname, lc.qty, lc.unit, lc.discPct, lc.discAmt, lc.taxID, lc.taxAmt, lc.total, pq.Array(lc.serials), nullIfEmptyBytes(comboTrackingPayload), lc.notes, lc.snapshot.CostPricePerUnit, lc.snapshot.StockUnitID, lc.snapshot.SellingUnitID, lc.snapshot.SellingUOMMode, lc.snapshot.SellingToStock, lc.snapshot.StockQuantity); err != nil {
 			return nil, fmt.Errorf("failed to create held sale item: %w", err)
 		}
 	}

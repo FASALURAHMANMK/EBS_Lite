@@ -154,6 +154,7 @@ class PosNotifier extends StateNotifier<PosState> {
     PosProductDto p, {
     double qty = 1,
     InventoryTrackingSelection? tracking,
+    List<PosComboComponentTracking> comboTracking = const [],
   }) {
     final items = [...state.cart];
     final incoming = PosCartItem(
@@ -161,8 +162,9 @@ class PosNotifier extends StateNotifier<PosState> {
       quantity: qty,
       unitPrice: p.price,
       tracking: tracking,
+      comboTracking: comboTracking,
     );
-    final shouldMerge = !p.requiresTracking;
+    final shouldMerge = !incoming.requiresTracking;
     final idx = shouldMerge
         ? items.indexWhere((i) => i.identityKey == incoming.identityKey)
         : -1;
@@ -199,14 +201,32 @@ class PosNotifier extends StateNotifier<PosState> {
     _recalculateTotals();
   }
 
+  void setItemComboTracking(
+    PosCartItem item,
+    List<PosComboComponentTracking> comboTracking,
+  ) {
+    final items = state.cart
+        .map((i) => i == item ? i.copyWith(comboTracking: comboTracking) : i)
+        .toList();
+    state = state.copyWith(cart: items);
+    // ignore: unawaited_futures
+    _recalculateTotals();
+  }
+
   void updateTrackedItem(
     PosCartItem item, {
     required double quantity,
-    required InventoryTrackingSelection tracking,
+    InventoryTrackingSelection? tracking,
+    List<PosComboComponentTracking>? comboTracking,
   }) {
     final items = state.cart
-        .map((i) =>
-            i == item ? i.copyWith(quantity: quantity, tracking: tracking) : i)
+        .map((i) => i == item
+            ? i.copyWith(
+                quantity: quantity,
+                tracking: tracking,
+                comboTracking: comboTracking,
+              )
+            : i)
         .toList();
     state = state.copyWith(cart: items);
     // ignore: unawaited_futures
@@ -334,26 +354,33 @@ class PosNotifier extends StateNotifier<PosState> {
         .map((si) => PosCartItem(
               product: PosProductDto(
                 productId: si.productId ?? 0,
+                comboProductId: si.comboProductId,
                 barcodeId: si.barcodeId ?? 0,
                 name: si.productName ?? 'Item',
                 price: si.unitPrice,
                 stock: 0,
                 barcode: si.barcode,
                 variantName: si.variantName,
+                isVirtualCombo: si.isVirtualCombo,
                 trackingType: si.trackingType,
                 isSerialized: si.isSerialized,
               ),
               quantity: si.quantity,
               unitPrice: si.unitPrice,
               discountPercent: si.discountPercent,
-              tracking: InventoryTrackingSelection(
-                barcodeId: si.barcodeId,
-                trackingType: si.trackingType,
-                isSerialized: si.isSerialized,
-                barcode: si.barcode,
-                variantName: si.variantName,
-                serialNumbers: si.serialNumbers,
-              ),
+              tracking: si.isSerialized ||
+                      si.trackingType == 'BATCH' ||
+                      si.serialNumbers.isNotEmpty
+                  ? InventoryTrackingSelection(
+                      barcodeId: si.barcodeId,
+                      trackingType: si.trackingType,
+                      isSerialized: si.isSerialized,
+                      barcode: si.barcode,
+                      variantName: si.variantName,
+                      serialNumbers: si.serialNumbers,
+                    )
+                  : null,
+              comboTracking: si.comboComponentTracking,
             ))
         .toList();
     state = state.copyWith(

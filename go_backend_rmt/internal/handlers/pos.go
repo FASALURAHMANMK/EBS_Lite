@@ -48,9 +48,14 @@ func (h *POSHandler) GetPOSProducts(c *gin.Context) {
 		return
 	}
 
+	includeCombos := true
+	if raw := c.Query("include_combo_products"); raw != "" {
+		includeCombos = raw != "false" && raw != "0"
+	}
+
 	// Check if it's a search request
 	if searchTerm := c.Query("search"); searchTerm != "" {
-		products, err := h.posService.SearchProducts(companyID, locationID, searchTerm)
+		products, err := h.posService.SearchProducts(companyID, locationID, searchTerm, includeCombos)
 		if err != nil {
 			utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to search products", err)
 			return
@@ -59,7 +64,7 @@ func (h *POSHandler) GetPOSProducts(c *gin.Context) {
 		return
 	}
 
-	products, err := h.posService.GetPOSProducts(companyID, locationID)
+	products, err := h.posService.GetPOSProducts(companyID, locationID, includeCombos)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get POS products", err)
 		return

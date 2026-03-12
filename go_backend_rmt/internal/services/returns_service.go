@@ -7,6 +7,7 @@ import (
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
+	"github.com/lib/pq"
 )
 
 type ReturnsService struct {
@@ -15,6 +16,7 @@ type ReturnsService struct {
 
 type saleReturnAllocation struct {
 	SaleDetailID   int
+	ComboProductID *int
 	BarcodeID      *int
 	Quantity       float64
 	UnitPrice      float64
@@ -25,6 +27,7 @@ type saleReturnAllocation struct {
 	SellingUnitID  *int
 	SellingUOMMode string
 	SellingToStock float64
+	SerialNumbers  []string
 }
 
 func NewReturnsService() *ReturnsService {
@@ -293,25 +296,30 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 			var returnDetailID int
 			err = tx.QueryRow(`
 				INSERT INTO sale_return_details (
-					return_id, sale_detail_id, product_id, barcode_id, quantity, unit_price, line_total, tax_amount, cost_price,
+					return_id, sale_detail_id, product_id, combo_product_id, barcode_id, quantity, unit_price, line_total, tax_amount, cost_price,
 					stock_unit_id, selling_unit_id, selling_uom_mode, selling_to_stock_factor, stock_quantity
 				)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 				RETURNING return_detail_id
-			`, returnID, allocation.SaleDetailID, item.ProductID, firstNonNilInt(item.BarcodeID, allocation.BarcodeID), allocation.Quantity, item.UnitPrice, lineTotal, allocation.TaxAmount, allocation.CostPrice, allocation.StockUnitID, allocation.SellingUnitID, allocation.SellingUOMMode, allocation.SellingToStock, allocation.StockQuantity).Scan(&returnDetailID)
+			`, returnID, allocation.SaleDetailID, item.ProductID, allocation.ComboProductID, firstNonNilInt(item.BarcodeID, allocation.BarcodeID), allocation.Quantity, item.UnitPrice, lineTotal, allocation.TaxAmount, allocation.CostPrice, allocation.StockUnitID, allocation.SellingUnitID, allocation.SellingUOMMode, allocation.SellingToStock, allocation.StockQuantity).Scan(&returnDetailID)
 
 			if err != nil {
 				return nil, fmt.Errorf("failed to create return item: %w", err)
 			}
 			if !isTraining {
+				serialNumbers := item.SerialNumbers
+				if len(serialNumbers) == 0 {
+					serialNumbers = allocation.SerialNumbers
+				}
 				if _, err := trackingSvc.ReceiveStockTx(tx, companyID, locationID, userID, "SALE_RETURN", "sale_return_detail", &returnDetailID, nil, inventorySelection{
-					ProductID:     item.ProductID,
-					BarcodeID:     firstNonNilInt(item.BarcodeID, allocation.BarcodeID),
-					Quantity:      allocation.StockQuantity,
-					SerialNumbers: item.SerialNumbers,
-					BatchNumber:   item.BatchNumber,
-					ExpiryDate:    item.ExpiryDate,
-					UnitCost:      allocation.CostPrice,
+					ProductID:      item.ProductID,
+					BarcodeID:      firstNonNilInt(item.BarcodeID, allocation.BarcodeID),
+					ComboProductID: allocation.ComboProductID,
+					Quantity:       allocation.StockQuantity,
+					SerialNumbers:  serialNumbers,
+					BatchNumber:    item.BatchNumber,
+					ExpiryDate:     item.ExpiryDate,
+					UnitCost:       allocation.CostPrice,
 				}); err != nil {
 					return nil, fmt.Errorf("failed to update stock: %w", err)
 				}
@@ -583,7 +591,7 @@ func (s *ReturnsService) GetReturnsSummary(companyID int, dateFrom, dateTo strin
 // Helper methods
 func (s *ReturnsService) getSaleReturnItems(returnID, companyID int) ([]models.SaleReturnDetail, error) {
 	query := `
-		SELECT srd.return_detail_id, srd.return_id, srd.sale_detail_id, srd.product_id,
+		SELECT srd.return_detail_id, srd.return_id, srd.sale_detail_id, srd.product_id, srd.combo_product_id,
 			   srd.quantity, srd.unit_price, srd.line_total,
 			   p.name as product_name
 		FROM sale_return_details srd
@@ -606,7 +614,7 @@ func (s *ReturnsService) getSaleReturnItems(returnID, companyID int) ([]models.S
 		var productName sql.NullString
 
 		err := rows.Scan(
-			&item.ReturnDetailID, &item.ReturnID, &item.SaleDetailID, &item.ProductID,
+			&item.ReturnDetailID, &item.ReturnID, &item.SaleDetailID, &item.ProductID, &item.ComboProductID,
 			&item.Quantity, &item.UnitPrice, &item.LineTotal, &productName,
 		)
 		if err != nil {
@@ -778,6 +786,7 @@ func (s *ReturnsService) allocateSaleReturnLines(tx *sql.Tx, companyID, saleID, 
 	query := `
 		SELECT
 			sd.sale_detail_id,
+			sd.combo_product_id,
 			sd.barcode_id,
 			sd.quantity,
 			sd.unit_price,
@@ -788,6 +797,7 @@ func (s *ReturnsService) allocateSaleReturnLines(tx *sql.Tx, companyID, saleID, 
 			COALESCE(sd.selling_uom_mode, 'LOOSE') AS selling_uom_mode,
 			sd.stock_unit_id,
 			sd.selling_unit_id,
+			sd.serial_numbers,
 			COALESCE(ret.returned_qty, 0)::float8 AS returned_qty
 		FROM sale_details sd
 		JOIN sales s ON s.sale_id = sd.sale_id
@@ -824,6 +834,7 @@ func (s *ReturnsService) allocateSaleReturnLines(tx *sql.Tx, companyID, saleID, 
 	for rows.Next() {
 		found = true
 		var saleDetailID int
+		var comboProductID sql.NullInt64
 		var barcodeID sql.NullInt64
 		var quantity float64
 		var unitPrice float64
@@ -834,8 +845,9 @@ func (s *ReturnsService) allocateSaleReturnLines(tx *sql.Tx, companyID, saleID, 
 		var sellingUOMMode string
 		var stockUnitID *int
 		var sellingUnitID *int
+		var serialNumbers pq.StringArray
 		var returnedQty float64
-		if err := rows.Scan(&saleDetailID, &barcodeID, &quantity, &unitPrice, &taxAmount, &costPrice, &sellingToStock, &stockQuantity, &sellingUOMMode, &stockUnitID, &sellingUnitID, &returnedQty); err != nil {
+		if err := rows.Scan(&saleDetailID, &comboProductID, &barcodeID, &quantity, &unitPrice, &taxAmount, &costPrice, &sellingToStock, &stockQuantity, &sellingUOMMode, &stockUnitID, &sellingUnitID, &serialNumbers, &returnedQty); err != nil {
 			return nil, err
 		}
 		available := quantity - returnedQty
@@ -860,6 +872,7 @@ func (s *ReturnsService) allocateSaleReturnLines(tx *sql.Tx, companyID, saleID, 
 		}
 		allocations = append(allocations, saleReturnAllocation{
 			SaleDetailID:   saleDetailID,
+			ComboProductID: intPtrFromNullInt64(comboProductID),
 			BarcodeID:      intPtrFromNullInt64(barcodeID),
 			Quantity:       allocatedQty,
 			UnitPrice:      unitPrice,
@@ -870,6 +883,7 @@ func (s *ReturnsService) allocateSaleReturnLines(tx *sql.Tx, companyID, saleID, 
 			SellingUnitID:  sellingUnitID,
 			SellingUOMMode: sellingUOMMode,
 			SellingToStock: sellingToStock,
+			SerialNumbers:  []string(serialNumbers),
 		})
 		remaining -= allocatedQty
 		if remaining <= 0.000001 {

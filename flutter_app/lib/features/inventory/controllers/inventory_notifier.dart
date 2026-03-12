@@ -133,7 +133,7 @@ class InventoryNotifier extends StateNotifier<InventoryState> {
     if (loc == null) return;
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final items = await _repo.searchProducts(q);
+      final items = await _repo.searchProducts(q, includeComboProducts: false);
       state = state.copyWith(isLoading: false, items: items);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: ErrorHandler.message(e));

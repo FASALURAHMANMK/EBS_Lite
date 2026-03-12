@@ -131,7 +131,10 @@ class InventoryRepository {
         .toList();
   }
 
-  Future<List<InventoryListItem>> searchProducts(String term) async {
+  Future<List<InventoryListItem>> searchProducts(
+    String term, {
+    bool includeComboProducts = false,
+  }) async {
     final loc = _requireLocation();
     final outbox = _ref.read(outboxNotifierProvider.notifier);
     final store = _ref.read(cacheStoreProvider);
@@ -142,7 +145,10 @@ class InventoryRepository {
         query: term,
         limit: 120,
       );
-      return cached.map(InventoryListItem.fromPOSJson).toList();
+      final items = cached.map(InventoryListItem.fromPOSJson).toList();
+      return includeComboProducts
+          ? items
+          : items.where((e) => !e.isVirtualCombo).toList();
     }
 
     final res = await _dio.get(
@@ -150,12 +156,100 @@ class InventoryRepository {
       queryParameters: {
         'search': term,
         'location_id': loc,
+        'include_combo_products': includeComboProducts,
       },
     );
     final data = _extractList(res).cast<Map<String, dynamic>>();
     // ignore: unawaited_futures
     store.upsertProducts(locationId: loc, items: data);
-    return data.map((e) => InventoryListItem.fromPOSJson(e)).toList();
+    final items = data.map((e) => InventoryListItem.fromPOSJson(e)).toList();
+    return includeComboProducts
+        ? items
+        : items.where((e) => !e.isVirtualCombo).toList();
+  }
+
+  Future<List<ProductStorageAssignmentDto>> getProductStorageAssignments(
+    int productId, {
+    int? locationId,
+  }) async {
+    final qp = <String, dynamic>{};
+    if (locationId != null) qp['location_id'] = locationId;
+    final res = await _dio.get(
+      '/products/$productId/storage-assignments',
+      queryParameters: qp.isEmpty ? null : qp,
+    );
+    final data = _extractList(res);
+    return data
+        .map((e) =>
+            ProductStorageAssignmentDto.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<ProductStorageAssignmentDto>> replaceProductStorageAssignments(
+    int productId, {
+    required int locationId,
+    required List<ProductStorageAssignmentPayload> assignments,
+  }) async {
+    final res = await _dio.put(
+      '/products/$productId/storage-assignments',
+      queryParameters: {'location_id': locationId},
+      data: {
+        'assignments': assignments.map((e) => e.toJson()).toList(),
+      },
+    );
+    final data = _extractList(res);
+    return data
+        .map((e) =>
+            ProductStorageAssignmentDto.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<ComboProductDto>> getComboProducts({String? search}) async {
+    final qp = <String, dynamic>{};
+    final loc = _locationId;
+    if (loc != null) qp['location_id'] = loc;
+    if (search != null && search.trim().isNotEmpty) {
+      qp['search'] = search.trim();
+    }
+    final res = await _dio.get(
+      '/inventory/combo-products',
+      queryParameters: qp.isEmpty ? null : qp,
+    );
+    final data = _extractList(res);
+    return data
+        .map((e) => ComboProductDto.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<ComboProductDto> getComboProduct(int id) async {
+    final qp = <String, dynamic>{};
+    final loc = _locationId;
+    if (loc != null) qp['location_id'] = loc;
+    final res = await _dio.get(
+      '/inventory/combo-products/$id',
+      queryParameters: qp.isEmpty ? null : qp,
+    );
+    return ComboProductDto.fromJson(res.data['data'] as Map<String, dynamic>);
+  }
+
+  Future<ComboProductDto> createComboProduct(
+      ComboProductPayload payload) async {
+    final res =
+        await _dio.post('/inventory/combo-products', data: payload.toJson());
+    return ComboProductDto.fromJson(res.data['data'] as Map<String, dynamic>);
+  }
+
+  Future<ComboProductDto> updateComboProduct(
+    int id,
+    ComboProductPayload payload,
+  ) async {
+    final res =
+        await _dio.put('/inventory/combo-products/$id', data: payload.toJson());
+    return ComboProductDto.fromJson(res.data['data'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteComboProduct(int id) async {
+    await _dio.delete('/inventory/combo-products/$id');
   }
 
   Future<List<CategoryDto>> getCategories() async {

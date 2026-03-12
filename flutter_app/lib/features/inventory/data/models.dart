@@ -2,6 +2,7 @@ import 'dart:convert';
 
 class InventoryListItem {
   final int productId;
+  final int? comboProductId;
   final int? barcodeId;
   final String name;
   final String? sku;
@@ -15,9 +16,12 @@ class InventoryListItem {
   final bool isLowStock;
   final String trackingType;
   final double? price; // may be null when sourced from stock API
+  final String? primaryStorage;
+  final bool isVirtualCombo;
 
   const InventoryListItem({
     required this.productId,
+    this.comboProductId,
     this.barcodeId,
     required this.name,
     this.sku,
@@ -31,6 +35,8 @@ class InventoryListItem {
     required this.isLowStock,
     this.trackingType = 'VARIANT',
     this.price,
+    this.primaryStorage,
+    this.isVirtualCombo = false,
   });
 
   factory InventoryListItem.fromStockJson(Map<String, dynamic> json) =>
@@ -49,11 +55,14 @@ class InventoryListItem {
         isLowStock: json['is_low_stock'] as bool? ?? false,
         trackingType: json['tracking_type'] as String? ?? 'VARIANT',
         price: null,
+        primaryStorage: json['primary_storage'] as String?,
+        isVirtualCombo: json['is_virtual_combo'] as bool? ?? false,
       );
 
   factory InventoryListItem.fromPOSJson(Map<String, dynamic> json) =>
       InventoryListItem(
         productId: json['product_id'] as int,
+        comboProductId: json['combo_product_id'] as int?,
         barcodeId: json['barcode_id'] as int?,
         name: json['name'] as String? ?? '',
         sku: json['sku']
@@ -68,7 +77,241 @@ class InventoryListItem {
         isLowStock: false,
         trackingType: json['tracking_type'] as String? ?? 'VARIANT',
         price: (json['price'] as num?)?.toDouble(),
+        primaryStorage: json['primary_storage'] as String?,
+        isVirtualCombo: json['is_virtual_combo'] as bool? ?? false,
       );
+}
+
+class ProductStorageAssignmentDto {
+  final int storageAssignmentId;
+  final int productId;
+  final int locationId;
+  final int barcodeId;
+  final String storageType;
+  final String storageLabel;
+  final String? notes;
+  final bool isPrimary;
+  final int sortOrder;
+  final String? locationName;
+  final String? barcode;
+  final String? variantName;
+
+  const ProductStorageAssignmentDto({
+    required this.storageAssignmentId,
+    required this.productId,
+    required this.locationId,
+    required this.barcodeId,
+    required this.storageType,
+    required this.storageLabel,
+    this.notes,
+    required this.isPrimary,
+    required this.sortOrder,
+    this.locationName,
+    this.barcode,
+    this.variantName,
+  });
+
+  factory ProductStorageAssignmentDto.fromJson(Map<String, dynamic> json) =>
+      ProductStorageAssignmentDto(
+        storageAssignmentId: json['storage_assignment_id'] as int? ?? 0,
+        productId: json['product_id'] as int? ?? 0,
+        locationId: json['location_id'] as int? ?? 0,
+        barcodeId: json['barcode_id'] as int? ?? 0,
+        storageType: json['storage_type'] as String? ?? '',
+        storageLabel: json['storage_label'] as String? ?? '',
+        notes: json['notes'] as String?,
+        isPrimary: json['is_primary'] as bool? ?? false,
+        sortOrder: json['sort_order'] as int? ?? 0,
+        locationName: json['location_name'] as String?,
+        barcode: json['barcode'] as String?,
+        variantName: json['variant_name'] as String?,
+      );
+}
+
+class ProductStorageAssignmentPayload {
+  final int? storageAssignmentId;
+  final int? barcodeId;
+  final String? barcode;
+  final String storageType;
+  final String storageLabel;
+  final String? notes;
+  final bool isPrimary;
+  final int sortOrder;
+
+  const ProductStorageAssignmentPayload({
+    this.storageAssignmentId,
+    this.barcodeId,
+    this.barcode,
+    required this.storageType,
+    required this.storageLabel,
+    this.notes,
+    required this.isPrimary,
+    required this.sortOrder,
+  });
+
+  Map<String, dynamic> toJson() => {
+        if (storageAssignmentId != null)
+          'storage_assignment_id': storageAssignmentId,
+        if (barcodeId != null) 'barcode_id': barcodeId,
+        if (barcode != null && barcode!.trim().isNotEmpty) 'barcode': barcode,
+        'storage_type': storageType,
+        'storage_label': storageLabel,
+        if (notes != null && notes!.trim().isNotEmpty) 'notes': notes,
+        'is_primary': isPrimary,
+        'sort_order': sortOrder,
+      };
+}
+
+class ComboProductComponentDto {
+  final int comboProductItemId;
+  final int comboProductId;
+  final int productId;
+  final int barcodeId;
+  final double quantity;
+  final int sortOrder;
+  final String productName;
+  final String? productSku;
+  final String? barcode;
+  final String? variantName;
+  final String trackingType;
+  final bool isSerialized;
+  final String? unitSymbol;
+  final double? availableStock;
+
+  const ComboProductComponentDto({
+    required this.comboProductItemId,
+    required this.comboProductId,
+    required this.productId,
+    required this.barcodeId,
+    required this.quantity,
+    required this.sortOrder,
+    required this.productName,
+    this.productSku,
+    this.barcode,
+    this.variantName,
+    this.trackingType = 'VARIANT',
+    this.isSerialized = false,
+    this.unitSymbol,
+    this.availableStock,
+  });
+
+  factory ComboProductComponentDto.fromJson(Map<String, dynamic> json) =>
+      ComboProductComponentDto(
+        comboProductItemId: json['combo_product_item_id'] as int? ?? 0,
+        comboProductId: json['combo_product_id'] as int? ?? 0,
+        productId: json['product_id'] as int? ?? 0,
+        barcodeId: json['barcode_id'] as int? ?? 0,
+        quantity: (json['quantity'] as num?)?.toDouble() ?? 0,
+        sortOrder: json['sort_order'] as int? ?? 0,
+        productName: json['product_name'] as String? ?? '',
+        productSku: json['product_sku'] as String?,
+        barcode: json['barcode'] as String?,
+        variantName: json['variant_name'] as String?,
+        trackingType: json['tracking_type'] as String? ?? 'VARIANT',
+        isSerialized: json['is_serialized'] as bool? ?? false,
+        unitSymbol: json['unit_symbol'] as String?,
+        availableStock: (json['available_stock'] as num?)?.toDouble(),
+      );
+}
+
+class ComboProductDto {
+  final int comboProductId;
+  final int companyId;
+  final String name;
+  final String? sku;
+  final String barcode;
+  final double sellingPrice;
+  final int taxId;
+  final String? notes;
+  final bool isActive;
+  final double? availableStock;
+  final List<ComboProductComponentDto> components;
+
+  const ComboProductDto({
+    required this.comboProductId,
+    required this.companyId,
+    required this.name,
+    this.sku,
+    required this.barcode,
+    required this.sellingPrice,
+    required this.taxId,
+    this.notes,
+    required this.isActive,
+    this.availableStock,
+    this.components = const [],
+  });
+
+  factory ComboProductDto.fromJson(Map<String, dynamic> json) =>
+      ComboProductDto(
+        comboProductId: json['combo_product_id'] as int? ?? 0,
+        companyId: json['company_id'] as int? ?? 0,
+        name: json['name'] as String? ?? '',
+        sku: json['sku'] as String?,
+        barcode: json['barcode'] as String? ?? '',
+        sellingPrice: (json['selling_price'] as num?)?.toDouble() ?? 0,
+        taxId: json['tax_id'] as int? ?? 0,
+        notes: json['notes'] as String?,
+        isActive: json['is_active'] as bool? ?? true,
+        availableStock: (json['available_stock'] as num?)?.toDouble(),
+        components: (json['components'] as List? ?? const [])
+            .map((e) =>
+                ComboProductComponentDto.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+class ComboProductComponentPayload {
+  final int productId;
+  final int barcodeId;
+  final double quantity;
+  final int sortOrder;
+
+  const ComboProductComponentPayload({
+    required this.productId,
+    required this.barcodeId,
+    required this.quantity,
+    required this.sortOrder,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'product_id': productId,
+        'barcode_id': barcodeId,
+        'quantity': quantity,
+        'sort_order': sortOrder,
+      };
+}
+
+class ComboProductPayload {
+  final String name;
+  final String? sku;
+  final String barcode;
+  final double sellingPrice;
+  final int taxId;
+  final String? notes;
+  final bool isActive;
+  final List<ComboProductComponentPayload> components;
+
+  const ComboProductPayload({
+    required this.name,
+    this.sku,
+    required this.barcode,
+    required this.sellingPrice,
+    required this.taxId,
+    this.notes,
+    required this.isActive,
+    required this.components,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        if (sku != null && sku!.trim().isNotEmpty) 'sku': sku,
+        'barcode': barcode,
+        'selling_price': sellingPrice,
+        'tax_id': taxId,
+        if (notes != null && notes!.trim().isNotEmpty) 'notes': notes,
+        'is_active': isActive,
+        'components': components.map((e) => e.toJson()).toList(),
+      };
 }
 
 class CategoryDto {

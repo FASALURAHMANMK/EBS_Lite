@@ -5,8 +5,10 @@ import '../../../../core/error_handler.dart';
 import '../../../../shared/widgets/app_selection_dialog.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
+import '../widgets/product_storage_editor.dart';
 import '../../../suppliers/data/supplier_repository.dart';
 import '../../../dashboard/data/taxes_repository.dart';
+import '../../../dashboard/controllers/location_notifier.dart';
 
 class ProductEditPage extends ConsumerStatefulWidget {
   const ProductEditPage({super.key, required this.productId});
@@ -59,6 +61,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   final _brandController = TextEditingController();
   final _supplierController = TextEditingController();
   // description/weight/dimensions removed; use attributes
+  List<ProductStorageAssignmentPayload> _storageAssignments = const [];
 
   @override
   void initState() {
@@ -200,6 +203,27 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
           _taxName = 'ID: $id';
         }
       }
+      final selectedLocation = ref.read(locationNotifierProvider).selected;
+      if (selectedLocation != null) {
+        final assignments = await repo.getProductStorageAssignments(
+          widget.productId,
+          locationId: selectedLocation.locationId,
+        );
+        _storageAssignments = assignments
+            .map(
+              (e) => ProductStorageAssignmentPayload(
+                storageAssignmentId: e.storageAssignmentId,
+                barcodeId: e.barcodeId,
+                barcode: e.barcode,
+                storageType: e.storageType,
+                storageLabel: e.storageLabel,
+                notes: e.notes,
+                isPrimary: e.isPrimary,
+                sortOrder: e.sortOrder,
+              ),
+            )
+            .toList();
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -282,6 +306,18 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         taxId: _taxId!,
       );
       await repo.updateProduct(updated);
+      final selectedLocation = ref.read(locationNotifierProvider).selected;
+      if (selectedLocation != null) {
+        await repo.replaceProductStorageAssignments(
+          widget.productId,
+          locationId: selectedLocation.locationId,
+          assignments: _storageAssignments
+              .where((e) =>
+                  (e.barcode != null && e.barcode!.trim().isNotEmpty) &&
+                  e.storageLabel.trim().isNotEmpty)
+              .toList(),
+        );
+      }
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
@@ -355,7 +391,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Edit Product'),
@@ -374,6 +410,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
               Tab(text: 'UOM'),
               Tab(text: 'Barcodes'),
               Tab(text: 'Attributes'),
+              Tab(text: 'Storage'),
             ],
           ),
         ),
@@ -388,6 +425,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                       _buildUomTab(),
                       _buildBarcodeTab(),
                       _buildAttributesTab(),
+                      _buildStorageTab(),
                     ],
                   ),
                 ),
@@ -438,6 +476,28 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       }
     }
     return map;
+  }
+
+  Widget _buildStorageTab() {
+    final selectedLocation = ref.watch(locationNotifierProvider).selected;
+    if (selectedLocation == null) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'Select a location first to manage storage details.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+    return ProductStorageEditor(
+      entries: _storageAssignments,
+      barcodes: _barcodes,
+      locationLabel: selectedLocation.name,
+      enabled: !_saving,
+      onChanged: (entries) => setState(() => _storageAssignments = entries),
+    );
   }
 
   String _unitLabel(int? unitId) {

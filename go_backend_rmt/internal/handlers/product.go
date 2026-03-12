@@ -14,12 +14,14 @@ import (
 type ProductHandler struct {
 	productService   *services.ProductService
 	inventoryService *services.InventoryService
+	storageService   *services.ProductStorageService
 }
 
 func NewProductHandler() *ProductHandler {
 	return &ProductHandler{
 		productService:   services.NewProductService(),
 		inventoryService: services.NewInventoryService(),
+		storageService:   services.NewProductStorageService(),
 	}
 }
 
@@ -205,6 +207,70 @@ func (h *ProductHandler) GetProductSummary(c *gin.Context) {
 		return
 	}
 	utils.SuccessResponse(c, "Product summary retrieved successfully", summary)
+}
+
+// GET /products/:id/storage-assignments
+func (h *ProductHandler) GetStorageAssignments(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	productID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid product ID", err)
+		return
+	}
+	var locationID *int
+	if raw := c.Query("location_id"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			locationID = &parsed
+		}
+	}
+	items, err := h.storageService.GetAssignments(productID, companyID, locationID)
+	if err != nil {
+		if err.Error() == "product not found" {
+			utils.NotFoundResponse(c, "Product not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to get storage assignments", err)
+		return
+	}
+	utils.SuccessResponse(c, "Storage assignments retrieved successfully", items)
+}
+
+// PUT /products/:id/storage-assignments
+func (h *ProductHandler) ReplaceStorageAssignments(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	productID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid product ID", err)
+		return
+	}
+	locationID, err := strconv.Atoi(c.Query("location_id"))
+	if err != nil || locationID <= 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Valid location_id is required", err)
+		return
+	}
+	var req models.ReplaceProductStorageAssignmentsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	items, err := h.storageService.ReplaceAssignments(productID, companyID, locationID, &req)
+	if err != nil {
+		if err.Error() == "product not found" {
+			utils.NotFoundResponse(c, "Product not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update storage assignments", err)
+		return
+	}
+	utils.SuccessResponse(c, "Storage assignments updated successfully", items)
 }
 
 // GET /categories

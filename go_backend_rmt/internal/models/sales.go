@@ -32,25 +32,28 @@ type Sale struct {
 }
 
 type SaleDetail struct {
-	SaleDetailID    int      `json:"sale_detail_id" db:"sale_detail_id"`
-	SaleID          int      `json:"sale_id" db:"sale_id"`
-	ProductID       *int     `json:"product_id,omitempty" db:"product_id"`
-	BarcodeID       *int     `json:"barcode_id,omitempty" db:"barcode_id"`
-	ProductName     *string  `json:"product_name,omitempty" db:"product_name"`
-	Barcode         *string  `json:"barcode,omitempty" db:"barcode"`
-	VariantName     *string  `json:"variant_name,omitempty" db:"variant_name"`
-	TrackingType    string   `json:"tracking_type,omitempty" db:"tracking_type"`
-	IsSerialized    bool     `json:"is_serialized" db:"is_serialized"`
-	Quantity        float64  `json:"quantity" db:"quantity"`
-	UnitPrice       float64  `json:"unit_price" db:"unit_price"`
-	DiscountPercent float64  `json:"discount_percentage" db:"discount_percentage"`
-	DiscountAmount  float64  `json:"discount_amount" db:"discount_amount"`
-	TaxID           *int     `json:"tax_id,omitempty" db:"tax_id"`
-	TaxAmount       float64  `json:"tax_amount" db:"tax_amount"`
-	LineTotal       float64  `json:"line_total" db:"line_total"`
-	SerialNumbers   []string `json:"serial_numbers,omitempty" db:"serial_numbers"`
-	Notes           *string  `json:"notes,omitempty" db:"notes"`
-	Product         *Product `json:"product,omitempty"`
+	SaleDetailID           int                           `json:"sale_detail_id" db:"sale_detail_id"`
+	SaleID                 int                           `json:"sale_id" db:"sale_id"`
+	ProductID              *int                          `json:"product_id,omitempty" db:"product_id"`
+	ComboProductID         *int                          `json:"combo_product_id,omitempty" db:"combo_product_id"`
+	BarcodeID              *int                          `json:"barcode_id,omitempty" db:"barcode_id"`
+	ProductName            *string                       `json:"product_name,omitempty" db:"product_name"`
+	Barcode                *string                       `json:"barcode,omitempty" db:"barcode"`
+	VariantName            *string                       `json:"variant_name,omitempty" db:"variant_name"`
+	IsVirtualCombo         bool                          `json:"is_virtual_combo" db:"-"`
+	TrackingType           string                        `json:"tracking_type,omitempty" db:"tracking_type"`
+	IsSerialized           bool                          `json:"is_serialized" db:"is_serialized"`
+	Quantity               float64                       `json:"quantity" db:"quantity"`
+	UnitPrice              float64                       `json:"unit_price" db:"unit_price"`
+	DiscountPercent        float64                       `json:"discount_percentage" db:"discount_percentage"`
+	DiscountAmount         float64                       `json:"discount_amount" db:"discount_amount"`
+	TaxID                  *int                          `json:"tax_id,omitempty" db:"tax_id"`
+	TaxAmount              float64                       `json:"tax_amount" db:"tax_amount"`
+	LineTotal              float64                       `json:"line_total" db:"line_total"`
+	SerialNumbers          []string                      `json:"serial_numbers,omitempty" db:"serial_numbers"`
+	ComboComponentTracking []ComboComponentTrackingInput `json:"combo_component_tracking,omitempty" db:"-"`
+	Notes                  *string                       `json:"notes,omitempty" db:"notes"`
+	Product                *Product                      `json:"product,omitempty"`
 }
 
 type SaleReturn struct {
@@ -73,6 +76,7 @@ type SaleReturnDetail struct {
 	ReturnID       int     `json:"return_id" db:"return_id"`
 	SaleDetailID   *int    `json:"sale_detail_id,omitempty" db:"sale_detail_id"`
 	ProductID      *int    `json:"product_id,omitempty" db:"product_id"`
+	ComboProductID *int    `json:"combo_product_id,omitempty" db:"combo_product_id"`
 	BarcodeID      *int    `json:"barcode_id,omitempty" db:"barcode_id"`
 	Quantity       float64 `json:"quantity" db:"quantity"`
 	UnitPrice      float64 `json:"unit_price" db:"unit_price"`
@@ -103,16 +107,30 @@ type CreateSaleRequest struct {
 }
 
 type CreateSaleDetailRequest struct {
-	ProductID        *int                           `json:"product_id,omitempty"`
-	BarcodeID        *int                           `json:"barcode_id,omitempty"`
-	ProductName      *string                        `json:"product_name,omitempty"` // For quick sales
-	Quantity         float64                        `json:"quantity" validate:"required,gt=0"`
-	UnitPrice        float64                        `json:"unit_price" validate:"required,gt=0"`
-	DiscountPercent  float64                        `json:"discount_percentage"`
-	TaxID            *int                           `json:"tax_id,omitempty"`
+	ProductID              *int                           `json:"product_id,omitempty"`
+	ComboProductID         *int                           `json:"combo_product_id,omitempty"`
+	BarcodeID              *int                           `json:"barcode_id,omitempty"`
+	ProductName            *string                        `json:"product_name,omitempty"` // For quick sales
+	Quantity               float64                        `json:"quantity" validate:"required,gt=0"`
+	UnitPrice              float64                        `json:"unit_price" validate:"required,gt=0"`
+	DiscountPercent        float64                        `json:"discount_percentage"`
+	TaxID                  *int                           `json:"tax_id,omitempty"`
+	SerialNumbers          []string                       `json:"serial_numbers,omitempty"`
+	BatchAllocations       []InventoryBatchSelectionInput `json:"batch_allocations,omitempty"`
+	ComboComponentTracking []ComboComponentTrackingInput  `json:"combo_component_tracking,omitempty"`
+	Notes                  *string                        `json:"notes,omitempty"`
+}
+
+type ComboComponentTrackingInput struct {
+	ProductID        int                            `json:"product_id" validate:"required"`
+	BarcodeID        int                            `json:"barcode_id" validate:"required"`
+	ProductName      *string                        `json:"product_name,omitempty"`
+	VariantName      *string                        `json:"variant_name,omitempty"`
+	QuantityPerCombo *float64                       `json:"quantity_per_combo,omitempty"`
+	TrackingType     *string                        `json:"tracking_type,omitempty"`
+	IsSerialized     *bool                          `json:"is_serialized,omitempty"`
 	SerialNumbers    []string                       `json:"serial_numbers,omitempty"`
 	BatchAllocations []InventoryBatchSelectionInput `json:"batch_allocations,omitempty"`
-	Notes            *string                        `json:"notes,omitempty"`
 }
 
 type UpdateSaleRequest struct {
@@ -179,6 +197,7 @@ type POSPrintDataResponse struct {
 
 type POSProductResponse struct {
 	ProductID         int     `json:"product_id"`
+	ComboProductID    *int    `json:"combo_product_id,omitempty"`
 	BarcodeID         int     `json:"barcode_id"`
 	Name              string  `json:"name"`
 	Price             float64 `json:"price"`
@@ -186,6 +205,8 @@ type POSProductResponse struct {
 	Barcode           *string `json:"barcode,omitempty"`
 	VariantName       *string `json:"variant_name,omitempty"`
 	CategoryName      *string `json:"category_name,omitempty"`
+	PrimaryStorage    *string `json:"primary_storage,omitempty"`
+	IsVirtualCombo    bool    `json:"is_virtual_combo"`
 	IsWeighable       bool    `json:"is_weighable"`
 	TrackingType      string  `json:"tracking_type"`
 	IsSerialized      bool    `json:"is_serialized"`

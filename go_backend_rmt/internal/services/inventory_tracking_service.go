@@ -29,6 +29,7 @@ const (
 type inventorySelection struct {
 	ProductID        int
 	BarcodeID        *int
+	ComboProductID   *int
 	Quantity         float64
 	SerialNumbers    []string
 	BatchAllocations []models.InventoryBatchSelectionInput
@@ -389,15 +390,15 @@ func (s *inventoryTrackingService) createSerialsTx(tx *sql.Tx, companyID, locati
 	return result, nil
 }
 
-func (s *inventoryTrackingService) createMovementTx(tx *sql.Tx, companyID, locationID int, variant *resolvedVariant, movementType, sourceType string, sourceLineID *int, sourceRef *string, lotID, serialID *int, quantity, unitCost float64, userID int, notes *string) error {
+func (s *inventoryTrackingService) createMovementTx(tx *sql.Tx, companyID, locationID int, variant *resolvedVariant, movementType, sourceType string, sourceLineID *int, sourceRef *string, comboProductID *int, lotID, serialID *int, quantity, unitCost float64, userID int, notes *string) error {
 	totalCost := quantity * unitCost
 	_, err := tx.Exec(`
 		INSERT INTO inventory_movements (
 			company_id, location_id, product_id, barcode_id, stock_lot_id, product_serial_id,
-			movement_type, source_type, source_line_id, source_ref, quantity, unit_cost, total_cost, notes, created_by, occurred_at
+			movement_type, source_type, source_line_id, source_ref, combo_product_id, quantity, unit_cost, total_cost, notes, created_by, occurred_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP)
-	`, companyID, locationID, variant.ProductID, variant.BarcodeID, lotID, serialID, movementType, sourceType, sourceLineID, sourceRef, quantity, unitCost, totalCost, notes, userID)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, CURRENT_TIMESTAMP)
+	`, companyID, locationID, variant.ProductID, variant.BarcodeID, lotID, serialID, movementType, sourceType, sourceLineID, sourceRef, comboProductID, quantity, unitCost, totalCost, notes, userID)
 	if err != nil {
 		return fmt.Errorf("failed to create inventory movement: %w", err)
 	}
@@ -448,12 +449,12 @@ func (s *inventoryTrackingService) ReceiveStockTx(tx *sql.Tx, companyID, locatio
 	if len(selection.SerialNumbers) > 0 {
 		for _, serial := range selection.SerialNumbers {
 			serialID := serialIDs[serial]
-			if err := s.createMovementTx(tx, companyID, locationID, variant, movementType, sourceType, sourceLineID, sourceRef, &lotID, &serialID, 1, selection.UnitCost, userID, selection.Notes); err != nil {
+			if err := s.createMovementTx(tx, companyID, locationID, variant, movementType, sourceType, sourceLineID, sourceRef, selection.ComboProductID, &lotID, &serialID, 1, selection.UnitCost, userID, selection.Notes); err != nil {
 				return nil, err
 			}
 		}
 	} else {
-		if err := s.createMovementTx(tx, companyID, locationID, variant, movementType, sourceType, sourceLineID, sourceRef, &lotID, nil, selection.Quantity, selection.UnitCost, userID, selection.Notes); err != nil {
+		if err := s.createMovementTx(tx, companyID, locationID, variant, movementType, sourceType, sourceLineID, sourceRef, selection.ComboProductID, &lotID, nil, selection.Quantity, selection.UnitCost, userID, selection.Notes); err != nil {
 			return nil, err
 		}
 	}
@@ -481,6 +482,7 @@ func (s *inventoryTrackingService) loadAvailableLotsTx(tx *sql.Tx, companyID, lo
 		  AND barcode_id = $4
 		  AND remaining_quantity > 0
 		ORDER BY received_date, expiry_date NULLS LAST, lot_id
+		FOR UPDATE
 	`, companyID, locationID, variant.ProductID, variant.BarcodeID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load stock lots: %w", err)
@@ -638,7 +640,7 @@ func (s *inventoryTrackingService) IssueStockTx(tx *sql.Tx, companyID, locationI
 			if err := s.markSerialStatusTx(tx, rec.ProductSerialID, serialStatusForMovement(movementType), nil); err != nil {
 				return nil, fmt.Errorf("failed to update serial status: %w", err)
 			}
-			if err := s.createMovementTx(tx, companyID, locationID, variant, movementType, sourceType, sourceLineID, sourceRef, rec.StockLotID, &rec.ProductSerialID, -1, rec.CostPrice, userID, selection.Notes); err != nil {
+			if err := s.createMovementTx(tx, companyID, locationID, variant, movementType, sourceType, sourceLineID, sourceRef, selection.ComboProductID, rec.StockLotID, &rec.ProductSerialID, -1, rec.CostPrice, userID, selection.Notes); err != nil {
 				return nil, err
 			}
 			totalCost += rec.CostPrice
@@ -683,7 +685,7 @@ func (s *inventoryTrackingService) IssueStockTx(tx *sql.Tx, companyID, locationI
 				if method == costingMethodWAC {
 					unitCost = avgCost
 				}
-				if err := s.createMovementTx(tx, companyID, locationID, variant, movementType, sourceType, sourceLineID, sourceRef, &alloc.LotID, nil, -alloc.Quantity, unitCost, userID, selection.Notes); err != nil {
+				if err := s.createMovementTx(tx, companyID, locationID, variant, movementType, sourceType, sourceLineID, sourceRef, selection.ComboProductID, &alloc.LotID, nil, -alloc.Quantity, unitCost, userID, selection.Notes); err != nil {
 					return nil, err
 				}
 				totalCost += alloc.Quantity * unitCost
@@ -714,7 +716,7 @@ func (s *inventoryTrackingService) IssueStockTx(tx *sql.Tx, companyID, locationI
 				if method == costingMethodWAC {
 					unitCost = avgCost
 				}
-				if err := s.createMovementTx(tx, companyID, locationID, variant, movementType, sourceType, sourceLineID, sourceRef, &lot.LotID, nil, -consumeQty, unitCost, userID, selection.Notes); err != nil {
+				if err := s.createMovementTx(tx, companyID, locationID, variant, movementType, sourceType, sourceLineID, sourceRef, selection.ComboProductID, &lot.LotID, nil, -consumeQty, unitCost, userID, selection.Notes); err != nil {
 					return nil, err
 				}
 				totalCost += consumeQty * unitCost
@@ -737,7 +739,7 @@ func (s *inventoryTrackingService) IssueStockTx(tx *sql.Tx, companyID, locationI
 				if unitCost <= 0 {
 					unitCost = variant.DefaultCostPrice
 				}
-				if err := s.createMovementTx(tx, companyID, locationID, variant, movementType, sourceType, sourceLineID, sourceRef, nil, nil, -remaining, unitCost, userID, selection.Notes); err != nil {
+				if err := s.createMovementTx(tx, companyID, locationID, variant, movementType, sourceType, sourceLineID, sourceRef, selection.ComboProductID, nil, nil, -remaining, unitCost, userID, selection.Notes); err != nil {
 					return nil, err
 				}
 				totalCost += remaining * unitCost

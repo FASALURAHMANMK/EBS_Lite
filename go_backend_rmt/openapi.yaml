@@ -720,6 +720,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Product'
+  /products/{id}/storage-assignments:
+    get:
+      summary: GET /api/v1/products/{id}/storage-assignments
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      - name: location_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ProductStorageAssignment'
+    put:
+      summary: PUT /api/v1/products/{id}/storage-assignments
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      - name: location_id
+        in: query
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceProductStorageAssignmentsRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ProductStorageAssignment'
   /categories:
     get:
       summary: GET /api/v1/categories
@@ -1220,6 +1281,121 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
+  /inventory/combo-products:
+    get:
+      summary: GET /api/v1/inventory/combo-products
+      parameters:
+      - name: location_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ComboProduct'
+    post:
+      summary: POST /api/v1/inventory/combo-products
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateComboProductRequest'
+      responses:
+        '201':
+          description: Combo product created
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/ComboProduct'
+  /inventory/combo-products/{id}:
+    get:
+      summary: GET /api/v1/inventory/combo-products/{id}
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      - name: location_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/ComboProduct'
+    put:
+      summary: PUT /api/v1/inventory/combo-products/{id}
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateComboProductRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/ComboProduct'
+    delete:
+      summary: DELETE /api/v1/inventory/combo-products/{id}
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
   /inventory/transfers:
     get:
       summary: GET /api/v1/inventory/transfers
@@ -1495,21 +1671,33 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Quote'
     post:
       summary: POST /api/v1/sales/quotes
       responses:
-        '200':
-          description: Successful response
+        '201':
+          description: Quote created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/Quote'
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreateQuoteRequest'
   /sales/quotes/export:
     get:
       summary: GET /api/v1/sales/quotes/export
@@ -1529,7 +1717,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/Quote'
       parameters:
       - name: id
         in: path
@@ -1658,13 +1851,36 @@ paths:
   /pos/products:
     get:
       summary: GET /api/v1/pos/products
+      parameters:
+      - name: location_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: include_combo_products
+        in: query
+        required: false
+        schema:
+          type: boolean
       responses:
         '200':
           description: Successful response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/POSProductResponse'
   /pos/customers:
     get:
       summary: GET /api/v1/pos/customers
@@ -3040,7 +3256,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/UpdateQuoteRequest'
   /designations/{id}:
     put:
       summary: PUT /api/v1/designations/{id}
@@ -3061,7 +3277,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/POSCheckoutRequest'
     delete:
       summary: DELETE /api/v1/designations/{id}
       responses:
@@ -5405,7 +5621,7 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/GenericObject'
+            $ref: '#/components/schemas/CreateSaleDetailRequest'
         payment_method_id:
           type: integer
           nullable: true
@@ -5427,6 +5643,55 @@ components:
           type: string
           nullable: true
         override_password:
+          type: string
+          nullable: true
+    POSProductResponse:
+      type: object
+      properties:
+        product_id:
+          type: integer
+        combo_product_id:
+          type: integer
+          nullable: true
+        barcode_id:
+          type: integer
+        name:
+          type: string
+        price:
+          type: number
+          format: float
+        stock:
+          type: number
+          format: float
+        barcode:
+          type: string
+          nullable: true
+        variant_name:
+          type: string
+          nullable: true
+        category_name:
+          type: string
+          nullable: true
+        primary_storage:
+          type: string
+          nullable: true
+        is_virtual_combo:
+          type: boolean
+        is_weighable:
+          type: boolean
+        tracking_type:
+          type: string
+        is_serialized:
+          type: boolean
+        selling_uom_mode:
+          type: string
+        selling_unit_id:
+          type: integer
+          nullable: true
+        selling_unit_name:
+          type: string
+          nullable: true
+        selling_unit_symbol:
           type: string
           nullable: true
     CreateSaleRequest:
@@ -5466,6 +5731,9 @@ components:
         product_id:
           type: integer
           nullable: true
+        combo_product_id:
+          type: integer
+          nullable: true
         barcode_id:
           type: integer
           nullable: true
@@ -5492,9 +5760,211 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/InventoryBatchSelectionInput'
+        combo_component_tracking:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComboComponentTrackingInput'
         notes:
           type: string
           nullable: true
+    ComboComponentTrackingInput:
+      type: object
+      required:
+        - product_id
+        - barcode_id
+      properties:
+        product_id:
+          type: integer
+        barcode_id:
+          type: integer
+        product_name:
+          type: string
+          nullable: true
+        variant_name:
+          type: string
+          nullable: true
+        quantity_per_combo:
+          type: number
+          format: float
+          nullable: true
+        tracking_type:
+          type: string
+          nullable: true
+        is_serialized:
+          type: boolean
+          nullable: true
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        batch_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryBatchSelectionInput'
+    CreateQuoteItemRequest:
+      type: object
+      required:
+        - quantity
+        - unit_price
+      properties:
+        product_id:
+          type: integer
+          nullable: true
+        combo_product_id:
+          type: integer
+          nullable: true
+        product_name:
+          type: string
+          nullable: true
+        quantity:
+          type: number
+          format: float
+        unit_price:
+          type: number
+          format: float
+        discount_percentage:
+          type: number
+          format: float
+        tax_id:
+          type: integer
+          nullable: true
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        notes:
+          type: string
+          nullable: true
+    CreateQuoteRequest:
+      type: object
+      required:
+        - items
+      properties:
+        customer_id:
+          type: integer
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateQuoteItemRequest'
+        discount_amount:
+          type: number
+          format: float
+        valid_until:
+          type: string
+          format: date-time
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+    UpdateQuoteRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        valid_until:
+          type: string
+          format: date-time
+          nullable: true
+        discount_amount:
+          type: number
+          format: float
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateQuoteItemRequest'
+    QuoteItem:
+      type: object
+      properties:
+        quote_item_id:
+          type: integer
+        quote_id:
+          type: integer
+        product_id:
+          type: integer
+          nullable: true
+        combo_product_id:
+          type: integer
+          nullable: true
+        product_name:
+          type: string
+          nullable: true
+        quantity:
+          type: number
+          format: float
+        unit_price:
+          type: number
+          format: float
+        discount_percentage:
+          type: number
+          format: float
+        discount_amount:
+          type: number
+          format: float
+        tax_id:
+          type: integer
+          nullable: true
+        tax_amount:
+          type: number
+          format: float
+        line_total:
+          type: number
+          format: float
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        notes:
+          type: string
+          nullable: true
+    Quote:
+      type: object
+      properties:
+        quote_id:
+          type: integer
+        quote_number:
+          type: string
+        location_id:
+          type: integer
+        customer_id:
+          type: integer
+          nullable: true
+        quote_date:
+          type: string
+          format: date-time
+        valid_until:
+          type: string
+          format: date-time
+          nullable: true
+        subtotal:
+          type: number
+          format: float
+        tax_amount:
+          type: number
+          format: float
+        discount_amount:
+          type: number
+          format: float
+        total_amount:
+          type: number
+          format: float
+        status:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        converted_sale_id:
+          type: integer
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteItem'
     ReserveNumberBlockRequest:
       type: object
       properties:
@@ -5893,6 +6363,226 @@ components:
         is_active:
           type: boolean
           nullable: true
+    ProductStorageAssignment:
+      type: object
+      properties:
+        storage_assignment_id:
+          type: integer
+        product_id:
+          type: integer
+        location_id:
+          type: integer
+        barcode_id:
+          type: integer
+        storage_type:
+          type: string
+        storage_label:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        is_primary:
+          type: boolean
+        sort_order:
+          type: integer
+        location_name:
+          type: string
+          nullable: true
+        barcode:
+          type: string
+          nullable: true
+        variant_name:
+          type: string
+          nullable: true
+    ProductStorageAssignmentInput:
+      type: object
+      properties:
+        storage_assignment_id:
+          type: integer
+          nullable: true
+        barcode_id:
+          type: integer
+          nullable: true
+        barcode:
+          type: string
+          nullable: true
+        storage_type:
+          type: string
+        storage_label:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        is_primary:
+          type: boolean
+        sort_order:
+          type: integer
+    ReplaceProductStorageAssignmentsRequest:
+      type: object
+      required:
+        - assignments
+      properties:
+        assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductStorageAssignmentInput'
+    ComboProductComponent:
+      type: object
+      properties:
+        combo_product_item_id:
+          type: integer
+        combo_product_id:
+          type: integer
+        product_id:
+          type: integer
+        barcode_id:
+          type: integer
+        quantity:
+          type: number
+          format: float
+        sort_order:
+          type: integer
+        product_name:
+          type: string
+          nullable: true
+        product_sku:
+          type: string
+          nullable: true
+        barcode:
+          type: string
+          nullable: true
+        variant_name:
+          type: string
+          nullable: true
+        tracking_type:
+          type: string
+          nullable: true
+        is_serialized:
+          type: boolean
+        unit_symbol:
+          type: string
+          nullable: true
+        selling_price:
+          type: number
+          format: float
+          nullable: true
+        available_stock:
+          type: number
+          format: float
+          nullable: true
+    ComboProduct:
+      type: object
+      properties:
+        combo_product_id:
+          type: integer
+        company_id:
+          type: integer
+        name:
+          type: string
+        sku:
+          type: string
+          nullable: true
+        barcode:
+          type: string
+        selling_price:
+          type: number
+          format: float
+        tax_id:
+          type: integer
+        notes:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+        created_by:
+          type: integer
+        updated_by:
+          type: integer
+          nullable: true
+        available_stock:
+          type: number
+          format: float
+          nullable: true
+        components:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComboProductComponent'
+    CreateComboComponentInput:
+      type: object
+      required:
+        - product_id
+        - barcode_id
+        - quantity
+      properties:
+        product_id:
+          type: integer
+        barcode_id:
+          type: integer
+        quantity:
+          type: number
+          format: float
+        sort_order:
+          type: integer
+    CreateComboProductRequest:
+      type: object
+      required:
+        - name
+        - barcode
+        - selling_price
+        - tax_id
+        - components
+      properties:
+        name:
+          type: string
+        sku:
+          type: string
+          nullable: true
+        barcode:
+          type: string
+        selling_price:
+          type: number
+          format: float
+        tax_id:
+          type: integer
+        notes:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
+        components:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateComboComponentInput'
+    UpdateComboProductRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        sku:
+          type: string
+          nullable: true
+        barcode:
+          type: string
+          nullable: true
+        selling_price:
+          type: number
+          format: float
+          nullable: true
+        tax_id:
+          type: integer
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
+        components:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateComboComponentInput'
     Stock:
       type: object
       properties:

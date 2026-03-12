@@ -5,6 +5,7 @@ import 'package:ebs_lite/features/customers/presentation/pages/loyalty_managemen
 import 'package:ebs_lite/features/inventory/presentation/pages/attribute_management_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/brand_management_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/category_management_page.dart';
+import 'package:ebs_lite/features/inventory/presentation/pages/combo_definitions_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/inventory_management_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/inventory_view_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/stock_adjustments_page.dart';
@@ -249,6 +250,12 @@ class DashboardDesktopSidebar extends ConsumerWidget {
                   icon: Icons.build_rounded,
                   label: 'Attributes',
                   onTap: () => onOpen(const AttributeManagementPage()),
+                ),
+                _child(
+                  context,
+                  icon: Icons.widgets_rounded,
+                  label: 'Combo Definitions',
+                  onTap: () => onOpen(const ComboDefinitionsPage()),
                 ),
               ],
             ),

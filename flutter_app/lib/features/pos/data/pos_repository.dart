@@ -20,6 +20,24 @@ class PosRepository {
   final Dio _dio;
   final Ref _ref;
 
+  Map<String, dynamic> _saleItemPayload(PosCartItem item) {
+    final comboTracking = item.comboTracking
+        .where((component) => component.requiresTracking)
+        .map((component) => component.toJson())
+        .toList();
+    return {
+      if (item.product.productId > 0) 'product_id': item.product.productId,
+      if ((item.product.comboProductId ?? 0) > 0)
+        'combo_product_id': item.product.comboProductId,
+      if (item.product.barcodeId > 0) 'barcode_id': item.product.barcodeId,
+      'quantity': item.quantity,
+      'unit_price': item.unitPrice,
+      'discount_percentage': item.discountPercent,
+      if (item.tracking != null) ...item.tracking!.toIssueJson(),
+      if (comboTracking.isNotEmpty) 'combo_component_tracking': comboTracking,
+    };
+  }
+
   // Small helper to unwrap list payloads that may be wrapped in {data: []}
   List<dynamic> _asList(Response res) {
     final body = res.data;
@@ -105,6 +123,7 @@ class PosRepository {
     final res = await _dio.get('/pos/products', queryParameters: {
       'search': query,
       'location_id': loc.locationId,
+      'include_combo_products': true,
     });
     final list = _asList(res).cast<Map<String, dynamic>>();
     // ignore: unawaited_futures
@@ -266,16 +285,7 @@ class PosRepository {
       if (saleNumber != null && saleNumber.isNotEmpty)
         'sale_number': saleNumber,
       if (customerId != null) 'customer_id': customerId,
-      'items': items
-          .map((i) => {
-                'product_id': i.product.productId,
-                if (i.product.barcodeId > 0) 'barcode_id': i.product.barcodeId,
-                'quantity': i.quantity,
-                'unit_price': i.unitPrice,
-                'discount_percentage': i.discountPercent,
-                if (i.tracking != null) ...i.tracking!.toIssueJson(),
-              })
-          .toList(),
+      'items': items.map(_saleItemPayload).toList(),
       if (paymentMethodId != null) 'payment_method_id': paymentMethodId,
       'paid_amount': paidAmount,
       'discount_amount': discountAmount,
@@ -359,16 +369,7 @@ class PosRepository {
     required double discountAmount,
   }) async {
     final res = await _dio.post('/pos/calculate', data: {
-      'items': items
-          .map((i) => {
-                'product_id': i.product.productId,
-                if (i.product.barcodeId > 0) 'barcode_id': i.product.barcodeId,
-                'quantity': i.quantity,
-                'unit_price': i.unitPrice,
-                'discount_percentage': i.discountPercent,
-                if (i.tracking != null) ...i.tracking!.toIssueJson(),
-              })
-          .toList(),
+      'items': items.map(_saleItemPayload).toList(),
       'discount_amount': discountAmount,
     });
     final map = (res.data is Map<String, dynamic>)
@@ -393,16 +394,7 @@ class PosRepository {
     }
     final payload = {
       if (customerId != null) 'customer_id': customerId,
-      'items': items
-          .map((i) => {
-                'product_id': i.product.productId,
-                if (i.product.barcodeId > 0) 'barcode_id': i.product.barcodeId,
-                'quantity': i.quantity,
-                'unit_price': i.unitPrice,
-                'discount_percentage': i.discountPercent,
-                if (i.tracking != null) ...i.tracking!.toIssueJson(),
-              })
-          .toList(),
+      'items': items.map(_saleItemPayload).toList(),
       'paid_amount': 0,
       'discount_amount': discountAmount,
     };

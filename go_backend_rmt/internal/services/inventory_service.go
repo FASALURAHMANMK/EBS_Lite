@@ -649,7 +649,7 @@ func (s *InventoryService) issueTransferTrackedStockTx(tx *sql.Tx, companyID, fr
 			if err := trackingSvc.markSerialStatusTx(tx, rec.ProductSerialID, "TRANSFER_IN_TRANSIT", nil); err != nil {
 				return nil, fmt.Errorf("failed to update serial status: %w", err)
 			}
-			if err := trackingSvc.createMovementTx(tx, companyID, fromLocationID, variant, "TRANSFER_OUT", "stock_transfer_detail", sourceLineID, sourceRef, rec.StockLotID, &rec.ProductSerialID, -1, rec.CostPrice, userID, selection.Notes); err != nil {
+			if err := trackingSvc.createMovementTx(tx, companyID, fromLocationID, variant, "TRANSFER_OUT", "stock_transfer_detail", sourceLineID, sourceRef, nil, rec.StockLotID, &rec.ProductSerialID, -1, rec.CostPrice, userID, selection.Notes); err != nil {
 				return nil, err
 			}
 		}
@@ -740,7 +740,7 @@ func (s *InventoryService) issueTransferTrackedStockTx(tx *sql.Tx, companyID, fr
 			if method == costingMethodWAC && avgCost > 0 {
 				unitCost = avgCost
 			}
-			if err := trackingSvc.createMovementTx(tx, companyID, fromLocationID, variant, "TRANSFER_OUT", "stock_transfer_detail", sourceLineID, sourceRef, lotID, nil, -alloc.Quantity, unitCost, userID, selection.Notes); err != nil {
+			if err := trackingSvc.createMovementTx(tx, companyID, fromLocationID, variant, "TRANSFER_OUT", "stock_transfer_detail", sourceLineID, sourceRef, nil, lotID, nil, -alloc.Quantity, unitCost, userID, selection.Notes); err != nil {
 				return nil, err
 			}
 		}
@@ -816,7 +816,7 @@ func (s *InventoryService) receiveTransferTrackedStockTx(tx *sql.Tx, companyID, 
 			`, destLotID, toLocationID, rec.CostPrice, rec.ProductSerialID); err != nil {
 				return fmt.Errorf("failed to relocate serial: %w", err)
 			}
-			if err := trackingSvc.createMovementTx(tx, companyID, toLocationID, variant, "TRANSFER_IN", "stock_transfer_detail", sourceLineID, sourceRef, &destLotID, &rec.ProductSerialID, 1, rec.CostPrice, userID, selection.Notes); err != nil {
+			if err := trackingSvc.createMovementTx(tx, companyID, toLocationID, variant, "TRANSFER_IN", "stock_transfer_detail", sourceLineID, sourceRef, nil, &destLotID, &rec.ProductSerialID, 1, rec.CostPrice, userID, selection.Notes); err != nil {
 				return err
 			}
 			totalCost += rec.CostPrice
@@ -858,7 +858,7 @@ func (s *InventoryService) receiveTransferTrackedStockTx(tx *sql.Tx, companyID, 
 			if err != nil {
 				return err
 			}
-			if err := trackingSvc.createMovementTx(tx, companyID, toLocationID, variant, "TRANSFER_IN", "stock_transfer_detail", sourceLineID, sourceRef, &destLotID, nil, alloc.Quantity, unitCost, userID, selection.Notes); err != nil {
+			if err := trackingSvc.createMovementTx(tx, companyID, toLocationID, variant, "TRANSFER_IN", "stock_transfer_detail", sourceLineID, sourceRef, nil, &destLotID, nil, alloc.Quantity, unitCost, userID, selection.Notes); err != nil {
 				return err
 			}
 			totalCost += alloc.Quantity * unitCost

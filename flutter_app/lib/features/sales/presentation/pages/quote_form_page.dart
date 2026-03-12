@@ -88,9 +88,12 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
         return PosCartItem(
           product: PosProductDto(
             productId: productId,
+            comboProductId: i['combo_product_id'] as int?,
             name: name,
             price: (i['unit_price'] as num?)?.toDouble() ?? 0.0,
             stock: 0,
+            barcode: i['barcode'] as String?,
+            isVirtualCombo: (i['combo_product_id'] as int?) != null,
           ),
           quantity: (i['quantity'] as num?)?.toDouble() ?? 0.0,
           unitPrice: (i['unit_price'] as num?)?.toDouble() ?? 0.0,
@@ -256,8 +259,16 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                         final p = results[i];
                         return ListTile(
                           title: Text(p.name),
-                          subtitle:
-                              Text('Price: ${p.price.toStringAsFixed(2)}'),
+                          subtitle: Text(
+                            [
+                              'Price ${p.price.toStringAsFixed(2)}',
+                              if ((p.barcode ?? '').trim().isNotEmpty)
+                                p.barcode!,
+                              if ((p.primaryStorage ?? '').trim().isNotEmpty)
+                                p.primaryStorage!,
+                              if (p.isVirtualCombo) 'Combo',
+                            ].join(' • '),
+                          ),
                           onTap: () => Navigator.of(context).pop(p),
                         );
                       },
@@ -277,7 +288,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
     if (picked != null) {
       final items = [..._items];
       final idx =
-          items.indexWhere((i) => i.product.productId == picked.productId);
+          items.indexWhere((i) => i.product.identityKey == picked.identityKey);
       if (idx >= 0) {
         items[idx] = items[idx].copyWith(quantity: items[idx].quantity + 1);
       } else {
@@ -370,7 +381,9 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       final repo = ref.read(salesRepositoryProvider);
       final payloadItems = _items
           .map((i) => {
-                'product_id': i.product.productId,
+                if (i.product.productId > 0) 'product_id': i.product.productId,
+                if ((i.product.comboProductId ?? 0) > 0)
+                  'combo_product_id': i.product.comboProductId,
                 'quantity': i.quantity,
                 'unit_price': i.unitPrice,
                 'discount_percentage': i.discountPercent,

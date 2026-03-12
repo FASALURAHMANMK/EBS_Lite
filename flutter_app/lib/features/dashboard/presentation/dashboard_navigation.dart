@@ -13,6 +13,7 @@ import '../../hr/presentation/pages/departments_designations_page.dart';
 import '../../hr/presentation/pages/employees_page.dart';
 import '../../hr/presentation/pages/hr_page.dart';
 import '../../hr/presentation/pages/payroll_page.dart';
+import '../../inventory/presentation/pages/combo_definitions_page.dart';
 import '../../reports/presentation/pages/report_category_page.dart';
 import '../../reports/presentation/pages/reports_page.dart';
 import '../../reports/presentation/report_categories.dart';
@@ -120,6 +121,8 @@ class DashboardNavigation {
         );
       case 'Settings':
         return SettingsPage(fromMenu: fromMenu, onMenuSelect: onMenuSelect);
+      case 'Combo Definitions':
+        return const ComboDefinitionsPage();
       default:
         return Scaffold(
           appBar: AppBar(title: Text(label)),

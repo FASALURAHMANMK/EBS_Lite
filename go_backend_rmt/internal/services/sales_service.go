@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"sort"
@@ -166,12 +167,20 @@ func (s *SalesService) CalculateTotals(companyID int, req *models.CreateSaleRequ
 	totalTax := float64(0)
 
 	productIDs := make([]int, 0, len(req.Items))
+	comboProductIDs := make([]int, 0, len(req.Items))
 	for _, item := range req.Items {
 		if item.ProductID != nil {
 			productIDs = append(productIDs, *item.ProductID)
 		}
+		if item.ComboProductID != nil {
+			comboProductIDs = append(comboProductIDs, *item.ComboProductID)
+		}
 	}
 	products, err := fetchProductMeta(s.db, companyID, productIDs)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	comboProducts, err := fetchComboProductMeta(s.db, companyID, comboProductIDs, nil)
 	if err != nil {
 		return 0, 0, 0, err
 	}
@@ -180,6 +189,16 @@ func (s *SalesService) CalculateTotals(companyID int, req *models.CreateSaleRequ
 	for _, item := range req.Items {
 		if item.TaxID != nil {
 			taxIDs = append(taxIDs, *item.TaxID)
+			continue
+		}
+		if item.ComboProductID != nil {
+			meta, ok := comboProducts[*item.ComboProductID]
+			if !ok {
+				return 0, 0, 0, fmt.Errorf("combo product not found")
+			}
+			if meta.TaxID != nil {
+				taxIDs = append(taxIDs, *meta.TaxID)
+			}
 			continue
 		}
 		if item.ProductID == nil {
@@ -207,6 +226,12 @@ func (s *SalesService) CalculateTotals(companyID int, req *models.CreateSaleRequ
 		var effectiveTaxID *int
 		if item.TaxID != nil {
 			effectiveTaxID = item.TaxID
+		} else if item.ComboProductID != nil {
+			meta, ok := comboProducts[*item.ComboProductID]
+			if !ok {
+				return 0, 0, 0, fmt.Errorf("combo product not found")
+			}
+			effectiveTaxID = meta.TaxID
 		} else if item.ProductID != nil {
 			meta, ok := products[*item.ProductID]
 			if !ok {
@@ -858,143 +883,55 @@ func (s *SalesService) CreateSaleWithOptions(
 	}
 
 	// Create sale items and update stock
-	productIDs := make([]int, 0, len(req.Items))
-	for _, item := range req.Items {
-		if item.ProductID != nil {
-			productIDs = append(productIDs, *item.ProductID)
-		}
-	}
-	productMetaByID, err := fetchProductMeta(tx, companyID, productIDs)
+	preparedLines, err := prepareSaleDetailsTx(tx, companyID, locationID, req.Items)
 	if err != nil {
 		return nil, err
 	}
 
-	taxIDs := make([]int, 0, len(req.Items))
-	for _, item := range req.Items {
-		var effectiveTaxID *int
-		if item.TaxID != nil {
-			effectiveTaxID = item.TaxID
-		} else if item.ProductID != nil {
-			meta, ok := productMetaByID[*item.ProductID]
-			if !ok {
-				return nil, fmt.Errorf("product not found")
-			}
-			effectiveTaxID = meta.TaxID
-		}
-		if effectiveTaxID != nil {
-			taxIDs = append(taxIDs, *effectiveTaxID)
-		}
-	}
-	taxPctByID, err := fetchTaxPercentages(tx, companyID, taxIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to calculate tax: %w", err)
-	}
-
-	for _, item := range req.Items {
-		// Calculate line total and tax
-		lineTotal := item.Quantity * item.UnitPrice
-		discountAmount := lineTotal * (item.DiscountPercent / 100)
-		lineTotal -= discountAmount
-
-		var taxAmount float64
-		var effectiveTaxID *int
-		if item.TaxID != nil {
-			effectiveTaxID = item.TaxID
-		} else if item.ProductID != nil {
-			meta, ok := productMetaByID[*item.ProductID]
-			if !ok {
-				return nil, fmt.Errorf("product not found")
-			}
-			effectiveTaxID = meta.TaxID
-		}
-		if effectiveTaxID != nil {
-			pct, ok := taxPctByID[*effectiveTaxID]
-			if !ok {
-				return nil, fmt.Errorf("failed to calculate tax: %w", fmt.Errorf("failed to get tax percentage: %w", sql.ErrNoRows))
-			}
-			taxAmount = lineTotal * (pct / 100)
-		}
-
-		// Validate serial numbers for serialized products
-		if item.ProductID != nil {
-			meta, ok := productMetaByID[*item.ProductID]
-			if !ok {
-				return nil, fmt.Errorf("product not found")
-			}
-			stockQuantity := saleQuantityToStock(meta, item.Quantity)
-			if meta.IsSerialized {
-				if stockQuantity != float64(int(stockQuantity)) {
-					return nil, fmt.Errorf("quantity must be a whole number for serialized products")
-				}
-				if len(item.SerialNumbers) != int(stockQuantity) {
-					return nil, fmt.Errorf("serial numbers count must equal quantity for serialized products")
-				}
-				seen := make(map[string]struct{}, len(item.SerialNumbers))
-				for _, srl := range item.SerialNumbers {
-					if srl == "" {
-						return nil, fmt.Errorf("serial numbers cannot be empty for serialized products")
-					}
-					if _, ok := seen[srl]; ok {
-						return nil, fmt.Errorf("duplicate serial number '%s' in sale item", srl)
-					}
-					seen[srl] = struct{}{}
-				}
-			} else {
-				if len(item.SerialNumbers) > 0 {
-					return nil, fmt.Errorf("serial numbers provided for a non-serialized product")
-				}
-			}
-		}
-
-		// Insert sale detail
-		lineSnapshot := saleLineSnapshot{}
-		if item.ProductID != nil {
-			meta, ok := productMetaByID[*item.ProductID]
-			if !ok {
-				return nil, fmt.Errorf("product not found")
-			}
-			lineSnapshot = newSaleLineSnapshot(meta, item.Quantity)
-		}
-
+	for _, line := range preparedLines {
 		var saleDetailID int
 		err = tx.QueryRow(`
-			INSERT INTO sale_details (sale_id, product_id, barcode_id, product_name, quantity, unit_price,
+			INSERT INTO sale_details (sale_id, product_id, combo_product_id, barcode_id, product_name, quantity, unit_price,
 									 discount_percentage, discount_amount, tax_id, tax_amount,
 									 line_total, serial_numbers, notes, cost_price,
 									 stock_unit_id, selling_unit_id, selling_uom_mode, selling_to_stock_factor, stock_quantity)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 			RETURNING sale_detail_id
-		`, saleID, item.ProductID, item.BarcodeID, item.ProductName, item.Quantity, item.UnitPrice,
-			item.DiscountPercent, discountAmount, effectiveTaxID, taxAmount, lineTotal,
-			pq.Array(item.SerialNumbers), item.Notes, lineSnapshot.CostPricePerUnit,
-			lineSnapshot.StockUnitID, lineSnapshot.SellingUnitID, lineSnapshot.SellingUOMMode, lineSnapshot.SellingToStock, lineSnapshot.StockQuantity).Scan(&saleDetailID)
-
+		`, saleID, line.ProductID, line.ComboProductID, line.BarcodeID, line.ProductName, line.Quantity, line.UnitPrice,
+			line.DiscountPercent, line.DiscountAmount, line.TaxID, line.TaxAmount, line.LineTotal,
+			pq.Array(line.SerialNumbers), line.Notes, line.Snapshot.CostPricePerUnit,
+			line.Snapshot.StockUnitID, line.Snapshot.SellingUnitID, line.Snapshot.SellingUOMMode, line.Snapshot.SellingToStock, line.Snapshot.StockQuantity).Scan(&saleDetailID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create sale item: %w", err)
 		}
 
-		// Update stock if product_id is provided (skip in training mode).
-		if !opts.IsTraining && item.ProductID != nil {
-			issue, err := trackingSvc.IssueStockTx(tx, companyID, locationID, userID, "SALE", "sale_detail", &saleDetailID, nil, inventorySelection{
-				ProductID:        *item.ProductID,
-				BarcodeID:        item.BarcodeID,
-				Quantity:         lineSnapshot.StockQuantity,
-				SerialNumbers:    item.SerialNumbers,
-				BatchAllocations: item.BatchAllocations,
-				Notes:            item.Notes,
-				OverridePassword: req.OverridePassword,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("failed to update stock: %w", err)
-			}
-			if _, err := tx.Exec(`
-				UPDATE sale_details
-				SET barcode_id = COALESCE($1, barcode_id),
-				    cost_price = $2
-				WHERE sale_detail_id = $3
-			`, issue.BarcodeID, issue.UnitCost, saleDetailID); err != nil {
-				return nil, fmt.Errorf("failed to update sale item cost snapshot: %w", err)
-			}
+		if opts.IsTraining || line.ProductID == nil {
+			continue
+		}
+
+		selection := inventorySelection{
+			ProductID:        *line.ProductID,
+			BarcodeID:        line.BarcodeID,
+			ComboProductID:   line.ComboProductID,
+			Quantity:         line.Snapshot.StockQuantity,
+			SerialNumbers:    line.SerialNumbers,
+			BatchAllocations: line.BatchAllocations,
+			Notes:            line.Notes,
+			OverridePassword: req.OverridePassword,
+		}
+
+		issue, err := trackingSvc.IssueStockTx(tx, companyID, locationID, userID, "SALE", "sale_detail", &saleDetailID, nil, selection)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update stock: %w", err)
+		}
+		if _, err := tx.Exec(`
+			UPDATE sale_details
+			SET barcode_id = COALESCE($1, barcode_id),
+			    cost_price = $2,
+			    serial_numbers = $3
+			WHERE sale_detail_id = $4
+		`, issue.BarcodeID, issue.UnitCost, pq.Array(selection.SerialNumbers), saleDetailID); err != nil {
+			return nil, fmt.Errorf("failed to update sale item cost snapshot: %w", err)
 		}
 	}
 
@@ -1302,18 +1239,28 @@ func (s *SalesService) CreateQuickSale(companyID, locationID, userID int, req *m
 // Helper methods
 func (s *SalesService) getSaleItems(saleID, companyID int) ([]models.SaleDetail, error) {
 	query := `
-		SELECT sd.sale_detail_id, sd.sale_id, sd.product_id, sd.barcode_id, sd.product_name,
-			   pb.barcode, pb.variant_name,
-			   CASE WHEN COALESCE(p.tracking_type, 'VARIANT') = 'BATCH' THEN 'BATCH' ELSE 'VARIANT' END AS tracking_type,
-			   CASE WHEN COALESCE(p.is_serialized, FALSE) OR COALESCE(p.tracking_type, '') = 'SERIAL' THEN TRUE ELSE FALSE END AS is_serialized,
+		SELECT sd.sale_detail_id, sd.sale_id, sd.product_id, sd.combo_product_id, sd.barcode_id, sd.product_name,
+			   COALESCE(pb.barcode, cp.barcode), pb.variant_name,
+			   CASE
+			     WHEN sd.product_id IS NULL AND sd.combo_product_id IS NOT NULL THEN 'VARIANT'
+			     WHEN COALESCE(p.tracking_type, 'VARIANT') = 'BATCH' THEN 'BATCH'
+			     ELSE 'VARIANT'
+			   END AS tracking_type,
+			   CASE
+			     WHEN sd.product_id IS NULL AND sd.combo_product_id IS NOT NULL THEN FALSE
+			     WHEN COALESCE(p.is_serialized, FALSE) OR COALESCE(p.tracking_type, '') = 'SERIAL' THEN TRUE
+			     ELSE FALSE
+			   END AS is_serialized,
+			   CASE WHEN sd.product_id IS NULL AND sd.combo_product_id IS NOT NULL THEN TRUE ELSE FALSE END AS is_virtual_combo,
 			   sd.quantity,
 			   sd.unit_price, sd.discount_percentage, sd.discount_amount, sd.tax_id,
-			   sd.tax_amount, sd.line_total, sd.serial_numbers, sd.notes,
-			   p.name as product_name_from_table
+			   sd.tax_amount, sd.line_total, sd.serial_numbers, sd.combo_component_tracking, sd.notes,
+			   COALESCE(p.name, cp.name) as product_name_from_table
 		FROM sale_details sd
 		JOIN sales s ON sd.sale_id = s.sale_id
 		JOIN locations l ON s.location_id = l.location_id
 		LEFT JOIN products p ON sd.product_id = p.product_id
+		LEFT JOIN combo_products cp ON sd.combo_product_id = cp.combo_product_id
 		LEFT JOIN product_barcodes pb ON pb.barcode_id = sd.barcode_id
 		WHERE sd.sale_id = $1 AND l.company_id = $2 AND s.is_deleted = FALSE
 		ORDER BY sd.sale_detail_id
@@ -1329,13 +1276,14 @@ func (s *SalesService) getSaleItems(saleID, companyID int) ([]models.SaleDetail,
 	for rows.Next() {
 		var item models.SaleDetail
 		var serialNumbers pq.StringArray
+		var comboTrackingRaw []byte
 		var productNameFromTable sql.NullString
 
 		err := rows.Scan(
-			&item.SaleDetailID, &item.SaleID, &item.ProductID, &item.BarcodeID, &item.ProductName,
-			&item.Barcode, &item.VariantName, &item.TrackingType, &item.IsSerialized,
+			&item.SaleDetailID, &item.SaleID, &item.ProductID, &item.ComboProductID, &item.BarcodeID, &item.ProductName,
+			&item.Barcode, &item.VariantName, &item.TrackingType, &item.IsSerialized, &item.IsVirtualCombo,
 			&item.Quantity, &item.UnitPrice, &item.DiscountPercent, &item.DiscountAmount,
-			&item.TaxID, &item.TaxAmount, &item.LineTotal, &serialNumbers, &item.Notes,
+			&item.TaxID, &item.TaxAmount, &item.LineTotal, &serialNumbers, &comboTrackingRaw, &item.Notes,
 			&productNameFromTable,
 		)
 		if err != nil {
@@ -1345,6 +1293,11 @@ func (s *SalesService) getSaleItems(saleID, companyID int) ([]models.SaleDetail,
 		// Handle serial numbers (TEXT[])
 		if len(serialNumbers) > 0 {
 			item.SerialNumbers = []string(serialNumbers)
+		}
+		if len(comboTrackingRaw) > 0 {
+			if err := json.Unmarshal(comboTrackingRaw, &item.ComboComponentTracking); err != nil {
+				return nil, fmt.Errorf("failed to decode combo tracking: %w", err)
+			}
 		}
 
 		// Set product name from products table if available
@@ -1651,12 +1604,20 @@ func (s *SalesService) CreateQuote(companyID, locationID, userID int, req *model
 	calcs := make([]itemCalc, 0, len(req.Items))
 
 	productIDs := make([]int, 0, len(req.Items))
+	comboProductIDs := make([]int, 0, len(req.Items))
 	for _, item := range req.Items {
 		if item.ProductID != nil {
 			productIDs = append(productIDs, *item.ProductID)
 		}
+		if item.ComboProductID != nil {
+			comboProductIDs = append(comboProductIDs, *item.ComboProductID)
+		}
 	}
 	metaByID, err := fetchProductMeta(tx, companyID, productIDs)
+	if err != nil {
+		return nil, err
+	}
+	comboMetaByID, err := fetchComboProductMeta(tx, companyID, comboProductIDs, &locationID)
 	if err != nil {
 		return nil, err
 	}
@@ -1665,6 +1626,12 @@ func (s *SalesService) CreateQuote(companyID, locationID, userID int, req *model
 		var tid *int
 		if item.TaxID != nil {
 			tid = item.TaxID
+		} else if item.ComboProductID != nil {
+			meta, ok := comboMetaByID[*item.ComboProductID]
+			if !ok {
+				return nil, fmt.Errorf("combo product not found")
+			}
+			tid = meta.TaxID
 		} else if item.ProductID != nil {
 			meta, ok := metaByID[*item.ProductID]
 			if !ok {
@@ -1689,6 +1656,12 @@ func (s *SalesService) CreateQuote(companyID, locationID, userID int, req *model
 		var effectiveTaxID *int
 		if item.TaxID != nil {
 			effectiveTaxID = item.TaxID
+		} else if item.ComboProductID != nil {
+			meta, ok := comboMetaByID[*item.ComboProductID]
+			if !ok {
+				return nil, fmt.Errorf("combo product not found")
+			}
+			effectiveTaxID = meta.TaxID
 		} else if item.ProductID != nil {
 			meta, ok := metaByID[*item.ProductID]
 			if !ok {
@@ -1739,12 +1712,17 @@ func (s *SalesService) CreateQuote(companyID, locationID, userID int, req *model
 	}
 
 	for _, calc := range calcs {
+		lineProductName := calc.item.ProductName
+		if calc.item.ComboProductID != nil {
+			meta := comboMetaByID[*calc.item.ComboProductID]
+			lineProductName = &meta.Name
+		}
 		_, err = tx.Exec(`
-			INSERT INTO quote_items (quote_id, product_id, product_name, quantity, unit_price,
+			INSERT INTO quote_items (quote_id, product_id, combo_product_id, product_name, quantity, unit_price,
 									discount_percentage, discount_amount, tax_id, tax_amount,
 									line_total, serial_numbers, notes)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-		`, quoteID, calc.item.ProductID, calc.item.ProductName, calc.item.Quantity, calc.item.UnitPrice,
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+		`, quoteID, calc.item.ProductID, calc.item.ComboProductID, lineProductName, calc.item.Quantity, calc.item.UnitPrice,
 			calc.item.DiscountPercent, calc.discountAmt, calc.effectiveTax, calc.taxAmt,
 			calc.lineTotal, pq.Array(calc.item.SerialNumbers), calc.item.Notes)
 		if err != nil {
@@ -1824,12 +1802,20 @@ func (s *SalesService) UpdateQuote(quoteID, companyID, userID int, req *models.U
 		}
 
 		productIDs := make([]int, 0, len(req.Items))
+		comboProductIDs := make([]int, 0, len(req.Items))
 		for _, item := range req.Items {
 			if item.ProductID != nil {
 				productIDs = append(productIDs, *item.ProductID)
 			}
+			if item.ComboProductID != nil {
+				comboProductIDs = append(comboProductIDs, *item.ComboProductID)
+			}
 		}
 		metaByID, err := fetchProductMeta(tx, companyID, productIDs)
+		if err != nil {
+			return err
+		}
+		comboMetaByID, err := fetchComboProductMeta(tx, companyID, comboProductIDs, nil)
 		if err != nil {
 			return err
 		}
@@ -1838,6 +1824,12 @@ func (s *SalesService) UpdateQuote(quoteID, companyID, userID int, req *models.U
 			var tid *int
 			if item.TaxID != nil {
 				tid = item.TaxID
+			} else if item.ComboProductID != nil {
+				meta, ok := comboMetaByID[*item.ComboProductID]
+				if !ok {
+					return fmt.Errorf("combo product not found")
+				}
+				tid = meta.TaxID
 			} else if item.ProductID != nil {
 				meta, ok := metaByID[*item.ProductID]
 				if !ok {
@@ -1862,6 +1854,12 @@ func (s *SalesService) UpdateQuote(quoteID, companyID, userID int, req *models.U
 			var effectiveTaxID *int
 			if item.TaxID != nil {
 				effectiveTaxID = item.TaxID
+			} else if item.ComboProductID != nil {
+				meta, ok := comboMetaByID[*item.ComboProductID]
+				if !ok {
+					return fmt.Errorf("combo product not found")
+				}
+				effectiveTaxID = meta.TaxID
 			} else if item.ProductID != nil {
 				meta, ok := metaByID[*item.ProductID]
 				if !ok {
@@ -1882,12 +1880,17 @@ func (s *SalesService) UpdateQuote(quoteID, companyID, userID int, req *models.U
 			subtotal += lineTotal
 			totalTax += taxAmount
 
+			lineProductName := item.ProductName
+			if item.ComboProductID != nil {
+				meta := comboMetaByID[*item.ComboProductID]
+				lineProductName = &meta.Name
+			}
 			_, err = tx.Exec(`
-				INSERT INTO quote_items (quote_id, product_id, product_name, quantity, unit_price,
+				INSERT INTO quote_items (quote_id, product_id, combo_product_id, product_name, quantity, unit_price,
 										discount_percentage, discount_amount, tax_id, tax_amount,
 										line_total, serial_numbers, notes)
-				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-			`, quoteID, item.ProductID, item.ProductName, item.Quantity, item.UnitPrice,
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+			`, quoteID, item.ProductID, item.ComboProductID, lineProductName, item.Quantity, item.UnitPrice,
 				item.DiscountPercent, discountAmt, effectiveTaxID, taxAmount,
 				lineTotal, pq.Array(item.SerialNumbers), item.Notes)
 			if err != nil {
@@ -2094,6 +2097,7 @@ func (s *SalesService) ConvertQuoteToSale(quoteID, companyID, userID int) (*mode
 	for _, it := range items {
 		saleItems = append(saleItems, models.CreateSaleDetailRequest{
 			ProductID:       it.ProductID,
+			ComboProductID:  it.ComboProductID,
 			ProductName:     it.ProductName,
 			Quantity:        it.Quantity,
 			UnitPrice:       it.UnitPrice,
@@ -2148,13 +2152,14 @@ func (s *SalesService) ConvertQuoteToSale(quoteID, companyID, userID int) (*mode
 
 func (s *SalesService) getQuoteItems(quoteID, companyID int) ([]models.QuoteItem, error) {
 	query := `
-		SELECT qi.quote_item_id, qi.quote_id, qi.product_id, qi.product_name, qi.quantity,
+		SELECT qi.quote_item_id, qi.quote_id, qi.product_id, qi.combo_product_id, qi.product_name, qi.quantity,
 			   qi.unit_price, qi.discount_percentage, qi.discount_amount, qi.tax_id, qi.tax_amount,
-			   qi.line_total, qi.serial_numbers, qi.notes, p.name as product_name_from_table
+			   qi.line_total, qi.serial_numbers, qi.notes, COALESCE(cp.name, p.name) as product_name_from_table
 		FROM quote_items qi
 		JOIN quotes q ON qi.quote_id = q.quote_id
 		JOIN locations l ON q.location_id = l.location_id
 		LEFT JOIN products p ON qi.product_id = p.product_id
+		LEFT JOIN combo_products cp ON qi.combo_product_id = cp.combo_product_id
 		WHERE qi.quote_id = $1 AND l.company_id = $2 AND q.is_deleted = FALSE
 		ORDER BY qi.quote_item_id
 	`
@@ -2171,7 +2176,7 @@ func (s *SalesService) getQuoteItems(quoteID, companyID int) ([]models.QuoteItem
 		var serialNumbers pq.StringArray
 		var productName sql.NullString
 		if err := rows.Scan(
-			&item.QuoteItemID, &item.QuoteID, &item.ProductID, &item.ProductName, &item.Quantity,
+			&item.QuoteItemID, &item.QuoteID, &item.ProductID, &item.ComboProductID, &item.ProductName, &item.Quantity,
 			&item.UnitPrice, &item.DiscountPercent, &item.DiscountAmount, &item.TaxID, &item.TaxAmount,
 			&item.LineTotal, &serialNumbers, &item.Notes, &productName,
 		); err != nil {
