@@ -209,7 +209,8 @@ class SettingsPage extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.inventory_2_rounded),
             title: const Text('Inventory Configuration'),
-            subtitle: const Text('Costing policy and negative stock control'),
+            subtitle: const Text(
+                'View costing method and manage negative stock rules'),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: theme.colorScheme.surface,

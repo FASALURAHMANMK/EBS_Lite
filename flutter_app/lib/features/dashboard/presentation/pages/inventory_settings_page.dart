@@ -65,7 +65,7 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(const SnackBar(
-            content: Text('Set an approval password to enable this policy'),
+            content: Text('Set an approval password before enabling this rule'),
           ));
         return;
       }
@@ -74,7 +74,8 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
             ..showSnackBar(const SnackBar(
-              content: Text('Approval password must be at least 4 characters'),
+              content:
+                  Text('Use at least 4 characters for the approval password'),
             ));
           return;
         }
@@ -82,7 +83,10 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
             ..showSnackBar(
-              const SnackBar(content: Text('Passwords do not match')),
+              const SnackBar(
+                content:
+                    Text('Approval password and confirmation do not match'),
+              ),
             );
           return;
         }
@@ -105,7 +109,7 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Inventory settings updated')),
+          const SnackBar(content: Text('Inventory configuration saved')),
         );
     } catch (e) {
       if (!mounted) return;
@@ -120,6 +124,17 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final costingLabel = _costingMethod == 'WAC'
+        ? 'Weighted Average Cost (WAC)'
+        : 'First In, First Out (FIFO)';
+    final policyHelpText = switch (_negativeStockPolicy) {
+      'ALLOW' =>
+        'Stock-out actions can continue even if the selected variation goes below zero.',
+      'ALLOW_WITH_APPROVAL' =>
+        'A password is required whenever a stock-out action would make the selected variation go below zero.',
+      _ =>
+        'Stock-out actions stop when the selected variation would go below zero.',
+    };
     return Scaffold(
       appBar: AppBar(title: const Text('Inventory Configuration')),
       body: SafeArea(
@@ -130,24 +145,50 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
                 children: [
                   Card(
                     elevation: 0,
-                    child: ListTile(
-                      leading: const Icon(Icons.inventory_2_rounded),
-                      title: const Text('Inventory costing method'),
-                      subtitle: Text(
-                        _costingMethod == 'WAC'
-                            ? 'Weighted Average Cost'
-                            : 'FIFO',
-                      ),
-                      trailing: Text(
-                        'Set during company creation',
-                        style: theme.textTheme.bodySmall,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.inventory_2_rounded),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Inventory costing method',
+                                  style: theme.textTheme.titleMedium,
+                                ),
+                              ),
+                              Text(
+                                'Locked',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            costingLabel,
+                            style: theme.textTheme.bodyLarge,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'This is chosen when the company is created and cannot be changed later.',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
+                  Text(
+                    'Negative stock control',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
                   InputDecorator(
                     decoration: const InputDecoration(
-                      labelText: 'Negative stock policy',
+                      labelText: 'When stock would go below zero',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.warning_amber_rounded),
                     ),
@@ -158,15 +199,15 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
                         items: const [
                           DropdownMenuItem(
                             value: 'DONT_ALLOW',
-                            child: Text('Do not allow'),
+                            child: Text('Block negative stock'),
                           ),
                           DropdownMenuItem(
                             value: 'ALLOW',
-                            child: Text('Allow'),
+                            child: Text('Allow negative stock'),
                           ),
                           DropdownMenuItem(
                             value: 'ALLOW_WITH_APPROVAL',
-                            child: Text('Allow with approval password'),
+                            child: Text('Allow with password approval'),
                           ),
                         ],
                         onChanged: _saving
@@ -180,7 +221,12 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'This rule is enforced on variation-level stock reductions across POS, stock adjustments, transfer dispatch, and purchase returns.',
+                    policyHelpText,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Applied to variation-level stock reductions in POS, stock adjustments, transfer dispatch, sales, and purchase returns.',
                     style: theme.textTheme.bodySmall,
                   ),
                   if (_negativeStockPolicy == 'ALLOW_WITH_APPROVAL') ...[
@@ -189,7 +235,7 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Text(
-                          'An approval password is already configured. Leave the fields below empty to keep it unchanged.',
+                          'An approval password is already set. Leave these fields blank to keep it unchanged.',
                           style: theme.textTheme.bodySmall,
                         ),
                       ),
@@ -198,6 +244,7 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
                       obscureText: true,
                       decoration: const InputDecoration(
                         labelText: 'Approval password',
+                        hintText: 'Enter a new password',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.lock_rounded),
                       ),
@@ -207,7 +254,7 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
                       controller: _confirmPassword,
                       obscureText: true,
                       decoration: const InputDecoration(
-                        labelText: 'Confirm password',
+                        labelText: 'Confirm approval password',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.lock_outline_rounded),
                       ),
@@ -225,7 +272,7 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
                               child:
                                   CircularProgressIndicator(strokeWidth: 2.4),
                             )
-                          : const Text('Save'),
+                          : const Text('Save Inventory Configuration'),
                     ),
                   ),
                 ],
