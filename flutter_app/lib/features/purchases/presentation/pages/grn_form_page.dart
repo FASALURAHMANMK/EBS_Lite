@@ -394,7 +394,7 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
             'Configure variation / tracking for ${line.product!.name}',
           );
         }
-        if (tracking.trackingType == 'SERIAL') {
+        if (tracking.isSerialized) {
           if (qty != qty.roundToDouble() ||
               tracking.serialNumbers.length != qty.round()) {
             throw StateError(
@@ -662,6 +662,7 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
               tracking = InventoryTrackingSelection(
                 barcodeId: v.barcodeId,
                 trackingType: v.trackingType,
+                isSerialized: v.isSerialized,
                 barcode: v.barcode,
                 variantName: v.variantName,
               );

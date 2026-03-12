@@ -37,6 +37,10 @@ type SaleDetail struct {
 	ProductID       *int     `json:"product_id,omitempty" db:"product_id"`
 	BarcodeID       *int     `json:"barcode_id,omitempty" db:"barcode_id"`
 	ProductName     *string  `json:"product_name,omitempty" db:"product_name"`
+	Barcode         *string  `json:"barcode,omitempty" db:"barcode"`
+	VariantName     *string  `json:"variant_name,omitempty" db:"variant_name"`
+	TrackingType    string   `json:"tracking_type,omitempty" db:"tracking_type"`
+	IsSerialized    bool     `json:"is_serialized" db:"is_serialized"`
 	Quantity        float64  `json:"quantity" db:"quantity"`
 	UnitPrice       float64  `json:"unit_price" db:"unit_price"`
 	DiscountPercent float64  `json:"discount_percentage" db:"discount_percentage"`
@@ -184,6 +188,7 @@ type POSProductResponse struct {
 	CategoryName      *string `json:"category_name,omitempty"`
 	IsWeighable       bool    `json:"is_weighable"`
 	TrackingType      string  `json:"tracking_type"`
+	IsSerialized      bool    `json:"is_serialized"`
 	SellingUOMMode    string  `json:"selling_uom_mode"`
 	SellingUnitID     *int    `json:"selling_unit_id,omitempty"`
 	SellingUnitName   *string `json:"selling_unit_name,omitempty"`

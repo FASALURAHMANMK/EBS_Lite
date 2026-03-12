@@ -18,7 +18,7 @@ func TestSalesService_CalculateTotals_BatchedQueries(t *testing.T) {
 
 	svc := &SalesService{db: db}
 
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT product_id, unit_id, purchase_unit_id, selling_unit_id, tax_id, is_serialized, COALESCE(cost_price, 0)::float8,")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT product_id, unit_id, purchase_unit_id, selling_unit_id, tax_id, CASE WHEN COALESCE(is_serialized, FALSE) OR COALESCE(tracking_type, '') = 'SERIAL' THEN TRUE ELSE FALSE END AS is_serialized, COALESCE(cost_price, 0)::float8,")).
 		WithArgs(1, sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"product_id", "unit_id", "purchase_unit_id", "selling_unit_id", "tax_id", "is_serialized", "cost_price", "purchase_to_stock_factor", "selling_to_stock_factor", "is_weighable", "purchase_uom_mode", "selling_uom_mode"}).
 			AddRow(1, 1, 1, 1, 10, false, 25.0, 1.0, 1.0, false, "LOOSE", "LOOSE").
@@ -66,7 +66,7 @@ func TestSalesService_CalculateTotals_MissingTaxUsesStableError(t *testing.T) {
 
 	svc := &SalesService{db: db}
 
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT product_id, unit_id, purchase_unit_id, selling_unit_id, tax_id, is_serialized, COALESCE(cost_price, 0)::float8,")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT product_id, unit_id, purchase_unit_id, selling_unit_id, tax_id, CASE WHEN COALESCE(is_serialized, FALSE) OR COALESCE(tracking_type, '') = 'SERIAL' THEN TRUE ELSE FALSE END AS is_serialized, COALESCE(cost_price, 0)::float8,")).
 		WithArgs(1, sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"product_id", "unit_id", "purchase_unit_id", "selling_unit_id", "tax_id", "is_serialized", "cost_price", "purchase_to_stock_factor", "selling_to_stock_factor", "is_weighable", "purchase_uom_mode", "selling_uom_mode"}).
 			AddRow(1, 1, 1, 1, 10, false, 25.0, 1.0, 1.0, false, "LOOSE", "LOOSE"))

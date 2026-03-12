@@ -270,6 +270,7 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
               variation = InventoryTrackingSelection(
                 barcodeId: v.barcodeId,
                 trackingType: v.trackingType,
+                isSerialized: v.isSerialized,
                 barcode: v.barcode,
                 variantName: v.variantName,
               );

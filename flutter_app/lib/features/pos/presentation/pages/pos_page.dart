@@ -18,6 +18,8 @@ import 'payment_page.dart';
 import '../../../../shared/widgets/manager_override_dialog.dart';
 import '../../../../core/error_handler.dart';
 import '../../../../shared/widgets/app_error_view.dart';
+import '../../../inventory/data/models.dart';
+import '../../../inventory/presentation/widgets/inventory_tracking_selector.dart';
 
 class PosPage extends ConsumerWidget {
   const PosPage({super.key});
@@ -203,10 +205,29 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
     double qty = 1;
     if (product.isWeighable) {
       final picked = await _promptWeighableQuantity(context, product);
+      if (!mounted) return;
       if (picked == null || picked <= 0) return;
       qty = picked;
     }
-    notifier.addProduct(product, qty: qty);
+    InventoryTrackingSelection? tracking;
+    if (product.requiresTracking) {
+      tracking = await _configurePosTracking(
+        context: context,
+        ref: ref,
+        product: product,
+        quantity: qty,
+        initialSelection: InventoryTrackingSelection(
+          barcodeId: product.barcodeId > 0 ? product.barcodeId : null,
+          trackingType: product.trackingType,
+          isSerialized: product.isSerialized,
+          barcode: product.barcode,
+          variantName: product.variantName,
+        ),
+      );
+      if (!mounted) return;
+      if (tracking == null) return;
+    }
+    notifier.addProduct(product, qty: qty, tracking: tracking);
   }
 
   Widget _buildTextField(
@@ -422,22 +443,66 @@ class _CartList extends ConsumerWidget {
                   ]),
               ],
             ),
-            subtitle: Text(
-                'Unit: ${item.unitPrice.toStringAsFixed(2)}${_posUnitSuffix(item.product)}'),
+            subtitle: Text([
+              'Unit: ${item.unitPrice.toStringAsFixed(2)}${_posUnitSuffix(item.product)}',
+              if (item.requiresTracking)
+                item.tracking == null
+                    ? 'Tracking required'
+                    : item.tracking!.summary(item.quantity),
+            ].join('\n')),
             leading: IconButton(
               icon: const Icon(Icons.remove_circle_outline_rounded),
-              onPressed: () {
+              onPressed: () async {
                 final newQty = (item.quantity - 1).clamp(0.0, 1e9);
                 if (newQty == 0) {
                   notifier.removeItem(item);
                 } else {
-                  notifier.updateQty(item, newQty);
+                  if (item.requiresTracking) {
+                    final tracking = await _configurePosTracking(
+                      context: context,
+                      ref: ref,
+                      product: item.product,
+                      quantity: newQty,
+                      initialSelection: item.tracking,
+                    );
+                    if (!context.mounted) return;
+                    if (tracking == null) return;
+                    notifier.updateTrackedItem(
+                      item,
+                      quantity: newQty,
+                      tracking: tracking,
+                    );
+                  } else {
+                    notifier.updateQty(item, newQty);
+                  }
                 }
               },
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (item.requiresTracking)
+                  IconButton(
+                    tooltip: 'Configure tracking',
+                    icon: Icon(
+                      item.hasTrackingConfigured
+                          ? Icons.task_alt_rounded
+                          : Icons.qr_code_2_rounded,
+                    ),
+                    onPressed: () async {
+                      final tracking = await _configurePosTracking(
+                        context: context,
+                        ref: ref,
+                        product: item.product,
+                        quantity: item.quantity,
+                        initialSelection: item.tracking,
+                      );
+                      if (!context.mounted) return;
+                      if (tracking != null) {
+                        notifier.setItemTracking(item, tracking);
+                      }
+                    },
+                  ),
                 Text(
                     'x ${item.quantity.toStringAsFixed(item.product.isWeighable ? 3 : 0)}  '),
                 IconButton(
@@ -446,11 +511,48 @@ class _CartList extends ConsumerWidget {
                     if (item.product.isWeighable) {
                       final extra =
                           await _promptWeighableQuantity(context, item.product);
+                      if (!context.mounted) return;
                       if (extra == null || extra <= 0) return;
-                      notifier.updateQty(item, item.quantity + extra);
+                      final newQty = item.quantity + extra;
+                      if (item.requiresTracking) {
+                        final tracking = await _configurePosTracking(
+                          context: context,
+                          ref: ref,
+                          product: item.product,
+                          quantity: newQty,
+                          initialSelection: item.tracking,
+                        );
+                        if (!context.mounted) return;
+                        if (tracking == null) return;
+                        notifier.updateTrackedItem(
+                          item,
+                          quantity: newQty,
+                          tracking: tracking,
+                        );
+                      } else {
+                        notifier.updateQty(item, newQty);
+                      }
                       return;
                     }
-                    notifier.updateQty(item, item.quantity + 1);
+                    final newQty = item.quantity + 1;
+                    if (item.requiresTracking) {
+                      final tracking = await _configurePosTracking(
+                        context: context,
+                        ref: ref,
+                        product: item.product,
+                        quantity: newQty,
+                        initialSelection: item.tracking,
+                      );
+                      if (!context.mounted) return;
+                      if (tracking == null) return;
+                      notifier.updateTrackedItem(
+                        item,
+                        quantity: newQty,
+                        tracking: tracking,
+                      );
+                    } else {
+                      notifier.updateQty(item, item.quantity + 1);
+                    }
                   },
                 ),
                 const SizedBox(width: 8),
@@ -663,6 +765,18 @@ class _BottomBar extends ConsumerWidget {
                   onPressed: state.cart.isEmpty
                       ? null
                       : () async {
+                          if (state.cart.any((e) => !e.hasTrackingConfigured)) {
+                            ScaffoldMessenger.of(context)
+                              ..hideCurrentSnackBar()
+                              ..showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Configure batch / serial details for all tracked items before payment.',
+                                  ),
+                                ),
+                              );
+                            return;
+                          }
                           await Navigator.of(context).push(
                             MaterialPageRoute(
                                 builder: (_) => const PaymentPage()),
@@ -680,6 +794,24 @@ class _BottomBar extends ConsumerWidget {
       ),
     );
   }
+}
+
+Future<InventoryTrackingSelection?> _configurePosTracking({
+  required BuildContext context,
+  required WidgetRef ref,
+  required PosProductDto product,
+  required double quantity,
+  InventoryTrackingSelection? initialSelection,
+}) {
+  return showInventoryTrackingSelector(
+    context: context,
+    ref: ref,
+    productId: product.productId,
+    quantity: quantity,
+    mode: InventoryTrackingMode.issue,
+    productName: product.name,
+    initialSelection: initialSelection,
+  );
 }
 
 class _DiscountDialog extends StatefulWidget {

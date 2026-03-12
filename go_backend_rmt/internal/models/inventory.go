@@ -19,6 +19,7 @@ type StockWithProduct struct {
 	ProductSKU   *string `json:"product_sku,omitempty"`
 	BarcodeID    *int    `json:"barcode_id,omitempty"`
 	TrackingType string  `json:"tracking_type,omitempty"`
+	IsSerialized bool    `json:"is_serialized"`
 	CategoryID   *int    `json:"category_id,omitempty"`
 	CategoryName *string `json:"category_name,omitempty"`
 	BrandName    *string `json:"brand_name,omitempty"`
@@ -40,6 +41,7 @@ type StockVariant struct {
 	AverageCost       float64   `json:"average_cost" db:"average_cost"`
 	SellingPrice      *float64  `json:"selling_price,omitempty"`
 	TrackingType      string    `json:"tracking_type,omitempty"`
+	IsSerialized      bool      `json:"is_serialized"`
 	LastUpdated       time.Time `json:"last_updated" db:"last_updated"`
 }
 
@@ -76,6 +78,8 @@ type ProductSerial struct {
 	Barcode         *string    `json:"barcode,omitempty"`
 	VariantName     *string    `json:"variant_name,omitempty"`
 	TrackingType    string     `json:"tracking_type,omitempty"`
+	BatchNumber     *string    `json:"batch_number,omitempty"`
+	ExpiryDate      *time.Time `json:"expiry_date,omitempty"`
 }
 
 type InventoryMovement struct {

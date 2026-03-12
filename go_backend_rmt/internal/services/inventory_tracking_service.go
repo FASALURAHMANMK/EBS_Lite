@@ -63,6 +63,7 @@ type resolvedVariant struct {
 	VariantName       *string
 	VariantAttributes models.JSONB
 	TrackingType      string
+	IsSerialized      bool
 	DefaultCostPrice  float64
 	DefaultSellPrice  float64
 }
@@ -83,13 +84,15 @@ func newInventoryTrackingService(db *sql.DB) *inventoryTrackingService {
 
 func normalizeTrackingType(value string) string {
 	switch strings.ToUpper(strings.TrimSpace(value)) {
-	case trackingTypeSerial:
-		return trackingTypeSerial
 	case trackingTypeBatch:
 		return trackingTypeBatch
 	default:
 		return trackingTypeVariant
 	}
+}
+
+func normalizeSerializedFlag(isSerialized bool, trackingType string) bool {
+	return isSerialized || strings.EqualFold(strings.TrimSpace(trackingType), trackingTypeSerial)
 }
 
 func normalizeCostingMethod(value string) string {
@@ -199,7 +202,8 @@ func (s *inventoryTrackingService) resolveVariantTx(tx *sql.Tx, companyID, produ
 			pb.barcode,
 			pb.variant_name,
 			COALESCE(pb.variant_attributes, '{}'::jsonb),
-			COALESCE(p.tracking_type, CASE WHEN COALESCE(p.is_serialized, FALSE) THEN 'SERIAL' ELSE 'VARIANT' END),
+			COALESCE(p.tracking_type, 'VARIANT'),
+			COALESCE(p.is_serialized, FALSE),
 			COALESCE(pb.cost_price, p.cost_price, 0)::float8,
 			COALESCE(pb.selling_price, p.selling_price, 0)::float8
 		FROM products p
@@ -217,13 +221,15 @@ func (s *inventoryTrackingService) resolveVariantTx(tx *sql.Tx, companyID, produ
 	}
 
 	var result resolvedVariant
+	var rawTrackingType string
 	if err := tx.QueryRow(query, args...).Scan(
 		&result.ProductID,
 		&result.BarcodeID,
 		&result.Barcode,
 		&result.VariantName,
 		&result.VariantAttributes,
-		&result.TrackingType,
+		&rawTrackingType,
+		&result.IsSerialized,
 		&result.DefaultCostPrice,
 		&result.DefaultSellPrice,
 	); err != nil {
@@ -232,7 +238,8 @@ func (s *inventoryTrackingService) resolveVariantTx(tx *sql.Tx, companyID, produ
 		}
 		return nil, fmt.Errorf("failed to resolve product variation: %w", err)
 	}
-	result.TrackingType = normalizeTrackingType(result.TrackingType)
+	result.TrackingType = normalizeTrackingType(rawTrackingType)
+	result.IsSerialized = normalizeSerializedFlag(result.IsSerialized, rawTrackingType)
 	return &result, nil
 }
 
@@ -407,7 +414,7 @@ func (s *inventoryTrackingService) ReceiveStockTx(tx *sql.Tx, companyID, locatio
 		return nil, fmt.Errorf("quantity must be greater than zero")
 	}
 
-	if variant.TrackingType == trackingTypeSerial {
+	if variant.IsSerialized {
 		if selection.Quantity != float64(int(selection.Quantity)) {
 			return nil, fmt.Errorf("serialized quantities must be whole numbers")
 		}
@@ -611,7 +618,7 @@ func (s *inventoryTrackingService) IssueStockTx(tx *sql.Tx, companyID, locationI
 	totalCost := 0.0
 	totalQty := selection.Quantity
 
-	if variant.TrackingType == trackingTypeSerial {
+	if variant.IsSerialized {
 		if selection.Quantity != float64(int(selection.Quantity)) {
 			return nil, fmt.Errorf("serialized quantities must be whole numbers")
 		}
@@ -718,12 +725,12 @@ func (s *inventoryTrackingService) IssueStockTx(tx *sql.Tx, companyID, locationI
 					if _, ok := err.(*NegativeStockApprovalRequiredError); ok {
 						return nil, err
 					}
-					if err.Error() == "insufficient stock" || variant.TrackingType != trackingTypeVariant {
+					if err.Error() == "insufficient stock" || variant.TrackingType != trackingTypeVariant || variant.IsSerialized {
 						return nil, fmt.Errorf("insufficient stock")
 					}
 					return nil, err
 				}
-				if variant.TrackingType != trackingTypeVariant {
+				if variant.TrackingType != trackingTypeVariant || variant.IsSerialized {
 					return nil, fmt.Errorf("insufficient stock")
 				}
 				unitCost := avgCost

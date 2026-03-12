@@ -135,7 +135,8 @@ func (s *InventoryService) GetStock(companyID, locationID int, productID *int) (
             p.name AS product_name,
             p.sku,
             pb.barcode_id,
-            COALESCE(p.tracking_type, CASE WHEN COALESCE(p.is_serialized, FALSE) THEN 'SERIAL' ELSE 'VARIANT' END) AS tracking_type,
+            CASE WHEN COALESCE(p.tracking_type, 'VARIANT') = 'BATCH' THEN 'BATCH' ELSE 'VARIANT' END AS tracking_type,
+            CASE WHEN COALESCE(p.is_serialized, FALSE) OR COALESCE(p.tracking_type, '') = 'SERIAL' THEN TRUE ELSE FALSE END AS is_serialized,
             p.reorder_level,
             p.category_id,
             c.name AS category_name,
@@ -183,7 +184,7 @@ func (s *InventoryService) GetStock(companyID, locationID int, productID *int) (
 		err := rows.Scan(
 			&item.StockID, &item.LocationID, &item.ProductID, &item.Quantity,
 			&item.ReservedQuantity, &item.LastUpdated, &item.ProductName, &item.ProductSKU,
-			&item.BarcodeID, &item.TrackingType, &item.ReorderLevel, &item.CategoryID,
+			&item.BarcodeID, &item.TrackingType, &item.IsSerialized, &item.ReorderLevel, &item.CategoryID,
 			&item.CategoryName, &item.BrandName, &item.UnitSymbol,
 		)
 		if err != nil {
@@ -213,7 +214,8 @@ func (s *InventoryService) GetStockVariants(companyID, locationID, productID int
 			COALESCE(sv.reserved_quantity, 0)::float8 AS reserved_quantity,
 			COALESCE(sv.average_cost, COALESCE(pb.cost_price, p.cost_price, 0))::float8 AS average_cost,
 			COALESCE(pb.selling_price, p.selling_price, 0)::float8 AS selling_price,
-			COALESCE(p.tracking_type, CASE WHEN COALESCE(p.is_serialized, FALSE) THEN 'SERIAL' ELSE 'VARIANT' END) AS tracking_type,
+			CASE WHEN COALESCE(p.tracking_type, 'VARIANT') = 'BATCH' THEN 'BATCH' ELSE 'VARIANT' END AS tracking_type,
+			CASE WHEN COALESCE(p.is_serialized, FALSE) OR COALESCE(p.tracking_type, '') = 'SERIAL' THEN TRUE ELSE FALSE END AS is_serialized,
 			COALESCE(sv.last_updated, CURRENT_TIMESTAMP)
 		FROM products p
 		JOIN product_barcodes pb ON pb.product_id = p.product_id
@@ -235,7 +237,7 @@ func (s *InventoryService) GetStockVariants(companyID, locationID, productID int
 		if err := rows.Scan(
 			&item.StockVariantID, &item.LocationID, &item.ProductID, &item.BarcodeID,
 			&item.Barcode, &item.VariantName, &item.VariantAttributes, &item.Quantity,
-			&item.ReservedQuantity, &item.AverageCost, &item.SellingPrice, &item.TrackingType,
+			&item.ReservedQuantity, &item.AverageCost, &item.SellingPrice, &item.TrackingType, &item.IsSerialized,
 			&item.LastUpdated,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan stock variant: %w", err)
@@ -298,10 +300,12 @@ func (s *InventoryService) GetAvailableSerials(companyID, locationID, productID 
 			ps.product_serial_id, ps.company_id, ps.product_id, ps.barcode_id, ps.stock_lot_id,
 			ps.serial_number, ps.location_id, ps.status, ps.cost_price::float8,
 			ps.received_at, ps.sold_at, ps.last_movement_at, pb.barcode, pb.variant_name,
-			COALESCE(p.tracking_type, CASE WHEN COALESCE(p.is_serialized, FALSE) THEN 'SERIAL' ELSE 'VARIANT' END) AS tracking_type
+			CASE WHEN COALESCE(p.tracking_type, 'VARIANT') = 'BATCH' THEN 'BATCH' ELSE 'VARIANT' END AS tracking_type,
+			sl.batch_number, sl.expiry_date
 		FROM product_serials ps
 		JOIN products p ON p.product_id = ps.product_id
 		LEFT JOIN product_barcodes pb ON pb.barcode_id = ps.barcode_id
+		LEFT JOIN stock_lots sl ON sl.lot_id = ps.stock_lot_id
 		WHERE ps.company_id = $1
 		  AND ps.location_id = $2
 		  AND ps.product_id = $3
@@ -326,7 +330,7 @@ func (s *InventoryService) GetAvailableSerials(companyID, locationID, productID 
 			&item.ProductSerialID, &item.CompanyID, &item.ProductID, &item.BarcodeID, &item.StockLotID,
 			&item.SerialNumber, &item.LocationID, &item.Status, &item.CostPrice,
 			&item.ReceivedAt, &item.SoldAt, &item.LastMovementAt, &item.Barcode, &item.VariantName,
-			&item.TrackingType,
+			&item.TrackingType, &item.BatchNumber, &item.ExpiryDate,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan serial: %w", err)
 		}
@@ -625,7 +629,7 @@ func (s *InventoryService) issueTransferTrackedStockTx(tx *sql.Tx, companyID, fr
 	}
 
 	snapshot := &transferIssueSnapshot{Variant: variant}
-	if variant.TrackingType == trackingTypeSerial {
+	if variant.IsSerialized {
 		if selection.Quantity != float64(int(selection.Quantity)) {
 			return nil, fmt.Errorf("serialized quantities must be whole numbers")
 		}
@@ -697,12 +701,12 @@ func (s *InventoryService) issueTransferTrackedStockTx(tx *sql.Tx, companyID, fr
 					if _, ok := err.(*NegativeStockApprovalRequiredError); ok {
 						return nil, err
 					}
-					if err.Error() == "insufficient stock" || variant.TrackingType != trackingTypeVariant {
+					if err.Error() == "insufficient stock" || variant.TrackingType != trackingTypeVariant || variant.IsSerialized {
 						return nil, fmt.Errorf("insufficient stock")
 					}
 					return nil, err
 				}
-				if variant.TrackingType != trackingTypeVariant {
+				if variant.TrackingType != trackingTypeVariant || variant.IsSerialized {
 					return nil, fmt.Errorf("insufficient stock")
 				}
 				allocations = append(allocations, models.InventoryBatchSelectionInput{
@@ -766,7 +770,7 @@ func (s *InventoryService) receiveTransferTrackedStockTx(tx *sql.Tx, companyID, 
 	}
 
 	totalCost := 0.0
-	if variant.TrackingType == trackingTypeSerial {
+	if variant.IsSerialized {
 		if selection.Quantity != float64(int(selection.Quantity)) {
 			return fmt.Errorf("serialized quantities must be whole numbers")
 		}
@@ -918,10 +922,10 @@ func (s *InventoryService) CreateStockTransfer(companyID, fromLocationID, userID
 		if err != nil {
 			return nil, err
 		}
-		if variant.TrackingType == trackingTypeBatch && len(item.BatchAllocations) == 0 {
+		if variant.TrackingType == trackingTypeBatch && !variant.IsSerialized && len(item.BatchAllocations) == 0 {
 			return nil, fmt.Errorf("batch selection is required")
 		}
-		if variant.TrackingType == trackingTypeSerial {
+		if variant.IsSerialized {
 			if item.Quantity != float64(int(item.Quantity)) {
 				return nil, fmt.Errorf("serialized quantities must be whole numbers")
 			}

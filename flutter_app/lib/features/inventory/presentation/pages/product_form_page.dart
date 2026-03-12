@@ -31,8 +31,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   final _sellingFactor = TextEditingController(text: '1');
 
   bool _saving = false;
-  bool _serialized = false;
-  String _trackingType = 'VARIANT';
+  bool _serialTracked = false;
+  bool _batchTracked = false;
   bool _loading = true;
   bool _autoItemCode = false;
 
@@ -192,8 +192,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         sellingPrice: double.tryParse(_price.text.trim()),
         costPrice: double.tryParse(_cost.text.trim()),
         reorderLevel: int.tryParse(_reorder.text.trim()) ?? 0,
-        isSerialized: _serialized,
-        trackingType: _trackingType,
+        isSerialized: _serialTracked,
+        trackingType: _batchTracked ? 'BATCH' : 'VARIANT',
         barcodes: barcodes,
         attributes: attrs,
         categoryId: _categoryId,
@@ -219,8 +219,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       final initQty = double.tryParse(_initialStock.text.trim()) ?? 0;
       if (initQty != 0) {
         InventoryTrackingSelection? trackingSelection;
-        if (initQty > 0 &&
-            (_trackingType == 'SERIAL' || _trackingType == 'BATCH')) {
+        if (initQty > 0 && (_serialTracked || _batchTracked)) {
           trackingSelection = await showInventoryTrackingSelector(
             context: context,
             ref: ref,
@@ -826,41 +825,37 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          initialValue: _trackingType,
-          decoration: const InputDecoration(
-            labelText: 'Inventory Tracking',
-            border: OutlineInputBorder(),
-          ),
-          items: const [
-            DropdownMenuItem(
-              value: 'VARIANT',
-              child: Text('Variation / Barcode'),
-            ),
-            DropdownMenuItem(
-              value: 'SERIAL',
-              child: Text('Serial Number'),
-            ),
-            DropdownMenuItem(
-              value: 'BATCH',
-              child: Text('Batch / Expiry'),
-            ),
-          ],
-          onChanged: (value) {
-            if (value == null) return;
-            setState(() {
-              _trackingType = value;
-              _serialized = value == 'SERIAL';
-            });
-          },
+        Text(
+          'Variation / barcode tracking is always enabled.',
+          style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 8),
+        SwitchListTile.adaptive(
+          value: _batchTracked,
+          onChanged: (v) => setState(() => _batchTracked = v),
+          title: const Text('Batch / expiry tracking'),
+          subtitle: const Text(
+            'Receive stock into batches and choose the batch during stock-out.',
+          ),
+          contentPadding: EdgeInsets.zero,
+        ),
+        SwitchListTile.adaptive(
+          value: _serialTracked,
+          onChanged: (v) => setState(() => _serialTracked = v),
+          title: const Text('Serial number tracking'),
+          subtitle: const Text(
+            'Every stock unit requires a unique serial number.',
+          ),
+          contentPadding: EdgeInsets.zero,
+        ),
         Text(
-          _trackingType == 'SERIAL'
-              ? 'Every stock unit requires a unique serial number.'
-              : _trackingType == 'BATCH'
-                  ? 'Stock-out operations will consume selected batches.'
-                  : 'Stock is tracked by barcode variation.',
+          _batchTracked && _serialTracked
+              ? 'This product will track variation, batch, and serial together.'
+              : _batchTracked
+                  ? 'This product will track variation and batch.'
+                  : _serialTracked
+                      ? 'This product will track variation and serial.'
+                      : 'This product will track stock by variation only.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 8),

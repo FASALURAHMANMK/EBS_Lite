@@ -793,6 +793,7 @@ class InventoryVariantStockDto {
   final double averageCost;
   final double? sellingPrice;
   final String trackingType;
+  final bool isSerialized;
 
   const InventoryVariantStockDto({
     required this.barcodeId,
@@ -803,6 +804,7 @@ class InventoryVariantStockDto {
     required this.averageCost,
     this.sellingPrice,
     this.trackingType = 'VARIANT',
+    this.isSerialized = false,
   });
 
   String get displayName {
@@ -824,6 +826,7 @@ class InventoryVariantStockDto {
         averageCost: (json['average_cost'] as num?)?.toDouble() ?? 0,
         sellingPrice: (json['selling_price'] as num?)?.toDouble(),
         trackingType: json['tracking_type'] as String? ?? 'VARIANT',
+        isSerialized: json['is_serialized'] as bool? ?? false,
       );
 }
 
@@ -898,6 +901,8 @@ class InventorySerialStockDto {
   final String? barcode;
   final String? variantName;
   final String trackingType;
+  final String? batchNumber;
+  final DateTime? expiryDate;
 
   const InventorySerialStockDto({
     required this.productSerialId,
@@ -907,6 +912,8 @@ class InventorySerialStockDto {
     this.barcode,
     this.variantName,
     this.trackingType = 'SERIAL',
+    this.batchNumber,
+    this.expiryDate,
   });
 
   factory InventorySerialStockDto.fromJson(Map<String, dynamic> json) =>
@@ -918,28 +925,36 @@ class InventorySerialStockDto {
         barcode: json['barcode'] as String?,
         variantName: json['variant_name'] as String?,
         trackingType: json['tracking_type'] as String? ?? 'SERIAL',
+        batchNumber: json['batch_number'] as String?,
+        expiryDate: json['expiry_date'] != null
+            ? DateTime.tryParse(json['expiry_date'] as String)
+            : null,
       );
 }
 
 class InventoryTrackingSelection {
   final int? barcodeId;
   final String trackingType;
+  final bool isSerialized;
   final String? barcode;
   final String? variantName;
   final List<String> serialNumbers;
   final List<InventoryBatchAllocationDto> batchAllocations;
   final String? batchNumber;
   final DateTime? expiryDate;
+  final List<String> serialBatchLabels;
 
   const InventoryTrackingSelection({
     this.barcodeId,
     this.trackingType = 'VARIANT',
+    this.isSerialized = false,
     this.barcode,
     this.variantName,
     this.serialNumbers = const [],
     this.batchAllocations = const [],
     this.batchNumber,
     this.expiryDate,
+    this.serialBatchLabels = const [],
   });
 
   String summary(double quantity) {
@@ -949,10 +964,14 @@ class InventoryTrackingSelection {
     } else if ((barcode ?? '').trim().isNotEmpty) {
       parts.add(barcode!.trim());
     }
-    if (trackingType == 'SERIAL') {
+    if (isSerialized) {
       parts.add(
           '${serialNumbers.length}/${quantity.toStringAsFixed(0)} serials');
-    } else if (trackingType == 'BATCH') {
+      if (serialBatchLabels.isNotEmpty) {
+        parts.add(serialBatchLabels.join(', '));
+      }
+    }
+    if (trackingType == 'BATCH') {
       if ((batchNumber ?? '').trim().isNotEmpty) {
         parts.add('Batch ${batchNumber!.trim()}');
       } else if (batchAllocations.isNotEmpty) {

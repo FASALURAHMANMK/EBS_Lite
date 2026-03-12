@@ -75,6 +75,8 @@ class _InventoryTrackingDialogState extends State<_InventoryTrackingDialog> {
   }
 
   String get _trackingType => _selectedVariant?.trackingType ?? 'VARIANT';
+  bool get _serialTracked => _selectedVariant?.isSerialized ?? false;
+  bool get _batchTracked => _trackingType == 'BATCH';
 
   @override
   void initState() {
@@ -124,7 +126,8 @@ class _InventoryTrackingDialogState extends State<_InventoryTrackingDialog> {
     final variant = _selectedVariant;
     if (variant == null) return;
     if (widget.mode == InventoryTrackingMode.issue &&
-        variant.trackingType == 'BATCH') {
+        variant.trackingType == 'BATCH' &&
+        !variant.isSerialized) {
       _batches = await widget.repo.getStockBatches(
         productId: widget.productId,
         barcodeId: variant.barcodeId,
@@ -146,8 +149,7 @@ class _InventoryTrackingDialogState extends State<_InventoryTrackingDialog> {
     } else {
       _batches = const [];
     }
-    if (widget.mode == InventoryTrackingMode.issue &&
-        variant.trackingType == 'SERIAL') {
+    if (widget.mode == InventoryTrackingMode.issue && variant.isSerialized) {
       _serials = await widget.repo.getAvailableSerials(
         productId: widget.productId,
         barcodeId: variant.barcodeId,
@@ -211,8 +213,9 @@ class _InventoryTrackingDialogState extends State<_InventoryTrackingDialog> {
     var serialNumbers = const <String>[];
     var batchAllocations = const <InventoryBatchAllocationDto>[];
     String? batchNumber;
+    var serialBatchLabels = const <String>[];
 
-    if (variant.trackingType == 'SERIAL') {
+    if (variant.isSerialized) {
       final serials = widget.mode == InventoryTrackingMode.issue
           ? (() {
               final values = _selectedSerials.toList();
@@ -233,35 +236,53 @@ class _InventoryTrackingDialogState extends State<_InventoryTrackingDialog> {
         return;
       }
       serialNumbers = serials;
+      if (widget.mode == InventoryTrackingMode.issue) {
+        final labels = _serials
+            .where((item) => serials.contains(item.serialNumber))
+            .map((item) {
+              final batch = (item.batchNumber ?? '').trim();
+              if (batch.isNotEmpty) return 'Batch $batch';
+              if (item.expiryDate != null) {
+                return 'Lot exp ${_fmtDate(item.expiryDate!)}';
+              }
+              return 'Unbatched';
+            })
+            .toSet()
+            .toList()
+          ..sort();
+        serialBatchLabels = labels;
+      }
     }
 
     if (variant.trackingType == 'BATCH') {
       if (widget.mode == InventoryTrackingMode.issue) {
-        final allocations = _batches
-            .map((batch) => InventoryBatchAllocationDto(
-                  lotId: batch.lotId,
-                  quantity: double.tryParse(
-                        _batchQtyCtrls[batch.lotId]?.text.trim() ?? '',
-                      ) ??
-                      0,
-                ))
-            .where((e) => e.quantity > 0)
-            .toList();
-        final allocated =
-            allocations.fold<double>(0, (sum, item) => sum + item.quantity);
-        if ((allocated - widget.quantity).abs() > 0.0001) {
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Batch allocation must equal ${widget.quantity.toStringAsFixed(3)}',
+        if (!variant.isSerialized) {
+          final allocations = _batches
+              .map((batch) => InventoryBatchAllocationDto(
+                    lotId: batch.lotId,
+                    quantity: double.tryParse(
+                          _batchQtyCtrls[batch.lotId]?.text.trim() ?? '',
+                        ) ??
+                        0,
+                  ))
+              .where((e) => e.quantity > 0)
+              .toList();
+          final allocated =
+              allocations.fold<double>(0, (sum, item) => sum + item.quantity);
+          if ((allocated - widget.quantity).abs() > 0.0001) {
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Batch allocation must equal ${widget.quantity.toStringAsFixed(3)}',
+                  ),
                 ),
-              ),
-            );
-          return;
+              );
+            return;
+          }
+          batchAllocations = allocations;
         }
-        batchAllocations = allocations;
       } else {
         batchNumber = _batchNumberCtrl.text.trim().isEmpty
             ? null
@@ -273,12 +294,14 @@ class _InventoryTrackingDialogState extends State<_InventoryTrackingDialog> {
       InventoryTrackingSelection(
         barcodeId: variant.barcodeId,
         trackingType: variant.trackingType,
+        isSerialized: variant.isSerialized,
         barcode: variant.barcode,
         variantName: variant.variantName,
         serialNumbers: serialNumbers,
         batchAllocations: batchAllocations,
         batchNumber: batchNumber,
         expiryDate: _expiryDate,
+        serialBatchLabels: serialBatchLabels,
       ),
     );
   }
@@ -366,8 +389,13 @@ class _InventoryTrackingDialogState extends State<_InventoryTrackingDialog> {
                           runSpacing: 8,
                           children: [
                             Chip(
-                                label:
-                                    Text('Tracking: ${variant.trackingType}')),
+                                label: Text(
+                              'Tracking: ${[
+                                'Variation',
+                                if (variant.trackingType == 'BATCH') 'Batch',
+                                if (variant.isSerialized) 'Serial',
+                              ].join(' + ')}',
+                            )),
                             if ((variant.barcode ?? '').trim().isNotEmpty)
                               Chip(label: Text('Barcode: ${variant.barcode}')),
                             Chip(
@@ -378,7 +406,8 @@ class _InventoryTrackingDialogState extends State<_InventoryTrackingDialog> {
                           ],
                         ),
                       ],
-                      if (_trackingType == 'BATCH' &&
+                      if (_batchTracked &&
+                          !_serialTracked &&
                           widget.mode == InventoryTrackingMode.issue) ...[
                         const SizedBox(height: 16),
                         Row(
@@ -446,7 +475,7 @@ class _InventoryTrackingDialogState extends State<_InventoryTrackingDialog> {
                           ),
                         ),
                       ],
-                      if (_trackingType == 'SERIAL' &&
+                      if (_serialTracked &&
                           widget.mode == InventoryTrackingMode.issue) ...[
                         const SizedBox(height: 16),
                         Text('Serial Numbers',
@@ -476,6 +505,12 @@ class _InventoryTrackingDialogState extends State<_InventoryTrackingDialog> {
                                             .trim()
                                             .isNotEmpty)
                                           serial.barcode!,
+                                        if ((serial.batchNumber ?? '')
+                                            .trim()
+                                            .isNotEmpty)
+                                          'Batch ${serial.batchNumber!.trim()}',
+                                        if (serial.expiryDate != null)
+                                          'Exp ${_fmtDate(serial.expiryDate!)}',
                                       ].join(' • ')),
                                       onChanged: (value) {
                                         setState(() {
@@ -502,7 +537,7 @@ class _InventoryTrackingDialogState extends State<_InventoryTrackingDialog> {
                           ),
                         ),
                       ],
-                      if (_trackingType == 'BATCH' &&
+                      if (_batchTracked &&
                           widget.mode == InventoryTrackingMode.receive) ...[
                         const SizedBox(height: 16),
                         TextField(
@@ -535,7 +570,7 @@ class _InventoryTrackingDialogState extends State<_InventoryTrackingDialog> {
                           ),
                         ),
                       ],
-                      if (_trackingType == 'SERIAL' &&
+                      if (_serialTracked &&
                           widget.mode == InventoryTrackingMode.receive) ...[
                         const SizedBox(height: 16),
                         TextField(

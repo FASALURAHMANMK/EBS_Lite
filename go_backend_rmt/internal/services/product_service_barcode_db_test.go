@@ -22,11 +22,13 @@ func (m *barcodeMockAttrProvider) GetAttributeDefinitions(companyID int) ([]mode
 }
 
 type barcodeMockDB struct {
-	queryResults []int
-	queries      []string
-	txQueries    []string
-	inTx         bool
-	committed    bool
+	queryResults         []int
+	queries              []string
+	txQueries            []string
+	inTx                 bool
+	committed            bool
+	txBarcodeRows        [][]driver.Value
+	referencedBarcodeIDs map[int]bool
 }
 
 type barcodeMockDriver struct{ db *barcodeMockDB }
@@ -58,8 +60,33 @@ func (c *barcodeMockConn) ExecContext(ctx context.Context, query string, args []
 func (c *barcodeMockConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	if c.db.inTx {
 		c.db.txQueries = append(c.db.txQueries, query)
+		lower := strings.ToLower(query)
 		if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(query)), "INSERT INTO PRODUCTS") {
 			return &barcodeMockRows{cols: []string{"product_id", "created_at"}, vals: [][]driver.Value{{int64(1), time.Now()}}}, nil
+		}
+		if strings.Contains(lower, "from product_barcodes") {
+			rows := c.db.txBarcodeRows
+			if len(rows) == 0 {
+				rows = [][]driver.Value{
+					{int64(1), "111", int64(1), float64(0), float64(0), true, "Base", []byte(`{}`), true},
+				}
+			}
+			return &barcodeMockRows{
+				cols: []string{"barcode_id", "barcode", "pack_size", "cost_price", "selling_price", "is_primary", "variant_name", "variant_attributes", "is_active"},
+				vals: rows,
+			}, nil
+		}
+		if strings.Contains(lower, "select exists") {
+			referenced := false
+			if len(args) > 0 {
+				switch id := args[0].Value.(type) {
+				case int64:
+					referenced = c.db.referencedBarcodeIDs[int(id)]
+				case int:
+					referenced = c.db.referencedBarcodeIDs[id]
+				}
+			}
+			return &barcodeMockRows{cols: []string{"exists"}, vals: [][]driver.Value{{referenced}}}, nil
 		}
 		return &barcodeMockRows{cols: []string{"id"}, vals: [][]driver.Value{{int64(1)}}}, nil
 	}
@@ -140,7 +167,10 @@ func (r *barcodeMockRows) Next(dest []driver.Value) error {
 var drvCount int64
 
 func newBarcodeMockDB(results []int) (*sql.DB, *barcodeMockDB, error) {
-	m := &barcodeMockDB{queryResults: results}
+	m := &barcodeMockDB{
+		queryResults:         results,
+		referencedBarcodeIDs: map[int]bool{},
+	}
 	name := fmt.Sprintf("mockdrv_%d", atomic.AddInt64(&drvCount, 1))
 	sql.Register(name, &barcodeMockDriver{db: m})
 	db, err := sql.Open(name, "")
@@ -213,8 +243,8 @@ func TestUpdateProduct_UpdatesBarcodes(t *testing.T) {
 	req := &models.UpdateProductRequest{
 		Name: &name,
 		Barcodes: []models.ProductBarcode{
-			{Barcode: "111", IsPrimary: true},
-			{Barcode: "222", IsPrimary: false},
+			{BarcodeID: 1, Barcode: "111", IsPrimary: true, IsActive: true},
+			{Barcode: "222", IsPrimary: false, IsActive: true},
 		},
 	}
 	if _, err := svc.UpdateProduct(1, 1, 1, req); err != nil {
@@ -226,11 +256,48 @@ func TestUpdateProduct_UpdatesBarcodes(t *testing.T) {
 	if !contains(mock.txQueries, "update products set") {
 		t.Fatalf("missing product update: %v", mock.txQueries)
 	}
-	if !contains(mock.txQueries, "delete from product_barcodes") {
-		t.Fatalf("missing barcode delete: %v", mock.txQueries)
+	if countContains(mock.txQueries, "update product_barcodes") < 2 {
+		t.Fatalf("expected barcode updates, got %v", mock.txQueries)
 	}
-	if countContains(mock.txQueries, "insert into product_barcodes") != 2 {
-		t.Fatalf("expected 2 barcode inserts, got %v", mock.txQueries)
+	if contains(mock.txQueries, "delete from product_barcodes") {
+		t.Fatalf("unexpected barcode delete: %v", mock.txQueries)
+	}
+	if countContains(mock.txQueries, "insert into product_barcodes") != 1 {
+		t.Fatalf("expected 1 barcode insert, got %v", mock.txQueries)
+	}
+}
+
+func TestUpdateProduct_DeactivatesReferencedRemovedBarcode(t *testing.T) {
+	db, mock, err := newBarcodeMockDB([]int{0})
+	if err != nil {
+		t.Fatalf("mock db: %v", err)
+	}
+	mock.txBarcodeRows = [][]driver.Value{
+		{int64(1), "111", int64(1), float64(0), float64(0), true, "Base", []byte(`{}`), true},
+		{int64(2), "222", int64(1), float64(0), float64(0), false, "Promo", []byte(`{}`), true},
+	}
+	mock.referencedBarcodeIDs[1] = true
+
+	svc := &ProductService{db: db}
+	name := "Updated"
+	req := &models.UpdateProductRequest{
+		Name: &name,
+		Barcodes: []models.ProductBarcode{
+			{BarcodeID: 2, Barcode: "222", IsPrimary: true, IsActive: true},
+		},
+	}
+	if _, err := svc.UpdateProduct(1, 1, 1, req); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !contains(mock.txQueries, "select exists") {
+		t.Fatalf("missing barcode reference check: %v", mock.txQueries)
+	}
+	if contains(mock.txQueries, "delete from product_barcodes where barcode_id = $1 and product_id = $2") {
+		t.Fatalf("referenced barcode should not be deleted: %v", mock.txQueries)
+	}
+	if !contains(mock.txQueries, "is_active = false") {
+		t.Fatalf("missing referenced barcode deactivation: %v", mock.txQueries)
 	}
 }
 

@@ -5926,6 +5926,8 @@ components:
             nullable: true
           tracking_type:
             type: string
+          is_serialized:
+            type: boolean
           category_id:
             type: integer
             nullable: true
@@ -6349,6 +6351,8 @@ components:
           nullable: true
         tracking_type:
           type: string
+        is_serialized:
+          type: boolean
         last_updated:
           type: string
           format: date-time
@@ -6435,6 +6439,13 @@ components:
           nullable: true
         tracking_type:
           type: string
+        batch_number:
+          type: string
+          nullable: true
+        expiry_date:
+          type: string
+          format: date-time
+          nullable: true
     CreateStockTransferRequest:
       type: object
       properties:

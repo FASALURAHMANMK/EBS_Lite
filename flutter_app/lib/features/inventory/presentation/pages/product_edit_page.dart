@@ -29,7 +29,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   final _reorder = TextEditingController();
   final _purchaseFactor = TextEditingController(text: '1');
   final _sellingFactor = TextEditingController(text: '1');
-  String _trackingType = 'VARIANT';
+  bool _serialTracked = false;
+  bool _batchTracked = false;
   bool _active = true;
   bool _weighable = false;
   final _itemCode = TextEditingController();
@@ -105,7 +106,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       _price.text = p.sellingPrice?.toString() ?? '';
       _cost.text = p.costPrice?.toString() ?? '';
       _reorder.text = p.reorderLevel.toString();
-      _trackingType = p.trackingType;
+      _serialTracked = p.isSerialized;
+      _batchTracked = p.trackingType == 'BATCH';
       _active = p.isActive;
       _barcodes = List.of(p.barcodes);
       final pri = _barcodes.firstWhere(
@@ -272,8 +274,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         reorderLevel: int.tryParse(_reorder.text.trim()) ?? 0,
         weight: null,
         dimensions: null,
-        isSerialized: _trackingType == 'SERIAL',
-        trackingType: _trackingType,
+        isSerialized: _serialTracked,
+        trackingType: _batchTracked ? 'BATCH' : 'VARIANT',
         isActive: _active,
         barcodes: _barcodes,
         attributes: attrs,
@@ -520,40 +522,37 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
           textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          initialValue: _trackingType,
-          decoration: const InputDecoration(
-            labelText: 'Inventory Tracking',
-            border: OutlineInputBorder(),
-          ),
-          items: const [
-            DropdownMenuItem(
-              value: 'VARIANT',
-              child: Text('Variation / Barcode'),
-            ),
-            DropdownMenuItem(
-              value: 'SERIAL',
-              child: Text('Serial Number'),
-            ),
-            DropdownMenuItem(
-              value: 'BATCH',
-              child: Text('Batch / Expiry'),
-            ),
-          ],
-          onChanged: (value) {
-            if (value == null) return;
-            setState(() {
-              _trackingType = value;
-            });
-          },
+        Text(
+          'Variation / barcode tracking is always enabled.',
+          style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 8),
+        SwitchListTile.adaptive(
+          value: _batchTracked,
+          onChanged: (v) => setState(() => _batchTracked = v),
+          title: const Text('Batch / expiry tracking'),
+          subtitle: const Text(
+            'Receive stock into batches and choose the batch during stock-out.',
+          ),
+          contentPadding: EdgeInsets.zero,
+        ),
+        SwitchListTile.adaptive(
+          value: _serialTracked,
+          onChanged: (v) => setState(() => _serialTracked = v),
+          title: const Text('Serial number tracking'),
+          subtitle: const Text(
+            'Every stock unit requires a unique serial number.',
+          ),
+          contentPadding: EdgeInsets.zero,
+        ),
         Text(
-          _trackingType == 'SERIAL'
-              ? 'Every stock unit requires a unique serial number.'
-              : _trackingType == 'BATCH'
-                  ? 'Stock-out operations consume selected batches.'
-                  : 'Stock is tracked by barcode variation.',
+          _batchTracked && _serialTracked
+              ? 'This product tracks variation, batch, and serial together.'
+              : _batchTracked
+                  ? 'This product tracks variation and batch.'
+                  : _serialTracked
+                      ? 'This product tracks variation and serial.'
+                      : 'This product tracks stock by variation only.',
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 8),

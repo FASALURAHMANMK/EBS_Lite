@@ -492,6 +492,12 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                             ))
                         .toList();
                     try {
+                      final cart = ref.read(posNotifierProvider).cart;
+                      if (cart.any((item) => !item.hasTrackingConfigured)) {
+                        throw StateError(
+                          'Configure batch / serial details for all tracked items before checkout.',
+                        );
+                      }
                       final result = await ref
                           .read(posNotifierProvider.notifier)
                           .processCheckout(

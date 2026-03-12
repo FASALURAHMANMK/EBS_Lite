@@ -23,6 +23,18 @@ type ProductService struct {
 	attributeService AttributeDefinitionProvider
 }
 
+type barcodeSyncRow struct {
+	BarcodeID         int
+	Barcode           string
+	PackSize          int
+	CostPrice         *float64
+	SellingPrice      *float64
+	IsPrimary         bool
+	VariantName       *string
+	VariantAttributes models.JSONB
+	IsActive          bool
+}
+
 func NewProductService() *ProductService {
 	return &ProductService{
 		db:               database.GetDB(),
@@ -87,6 +99,10 @@ func validateSinglePrimaryBarcode(barcodes []models.ProductBarcode) error {
 	return nil
 }
 
+func barcodeLookupKey(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
 func (s *ProductService) GetProducts(companyID int, filters map[string]string) ([]models.Product, error) {
 	query := `
                 SELECT product_id, company_id, category_id, brand_id, unit_id, purchase_unit_id, selling_unit_id,
@@ -143,6 +159,9 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan product: %w", err)
 		}
+		rawTrackingType := product.TrackingType
+		product.TrackingType = normalizeTrackingType(rawTrackingType)
+		product.IsSerialized = normalizeSerializedFlag(product.IsSerialized, rawTrackingType)
 
 		products = append(products, product)
 		productIDs = append(productIDs, product.ProductID)
@@ -200,6 +219,9 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
 	if err != nil {
 		return nil, fmt.Errorf("failed to get product: %w", err)
 	}
+	rawTrackingType := product.TrackingType
+	product.TrackingType = normalizeTrackingType(rawTrackingType)
+	product.IsSerialized = normalizeSerializedFlag(product.IsSerialized, rawTrackingType)
 
 	product.Barcodes, err = s.getProductBarcodes(product.ProductID)
 	if err != nil {
@@ -229,7 +251,7 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 	purchaseFactor := normalizeProductUOMFactor(req.PurchaseToStock)
 	sellingFactor := normalizeProductUOMFactor(req.SellingToStock)
 	trackingType := normalizeTrackingType(req.TrackingType)
-	isSerialized := trackingType == trackingTypeSerial || req.IsSerialized
+	isSerialized := normalizeSerializedFlag(req.IsSerialized, req.TrackingType)
 	purchaseUnitID := req.PurchaseUnitID
 	if purchaseUnitID == nil {
 		purchaseUnitID = req.UnitID
@@ -493,24 +515,25 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 		args = append(args, *req.Dimensions)
 		changes["dimensions"] = *req.Dimensions
 	}
-	if req.IsSerialized != nil {
-		argCount++
-		setParts = append(setParts, fmt.Sprintf("is_serialized = $%d", argCount))
-		args = append(args, *req.IsSerialized)
-		changes["is_serialized"] = *req.IsSerialized
-	}
 	if req.TrackingType != nil {
 		trackingType := normalizeTrackingType(*req.TrackingType)
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("tracking_type = $%d", argCount))
 		args = append(args, trackingType)
 		changes["tracking_type"] = trackingType
-		if trackingType == trackingTypeSerial {
-			argCount++
-			setParts = append(setParts, fmt.Sprintf("is_serialized = $%d", argCount))
-			args = append(args, true)
-			changes["is_serialized"] = true
+	}
+	if req.IsSerialized != nil || req.TrackingType != nil {
+		isSerialized := false
+		if req.IsSerialized != nil {
+			isSerialized = *req.IsSerialized
 		}
+		if req.TrackingType != nil {
+			isSerialized = normalizeSerializedFlag(isSerialized, *req.TrackingType)
+		}
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("is_serialized = $%d", argCount))
+		args = append(args, isSerialized)
+		changes["is_serialized"] = isSerialized
 	}
 	if req.IsActive != nil {
 		argCount++
@@ -562,19 +585,8 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 	}
 
 	if req.Barcodes != nil {
-		if _, err := tx.Exec("DELETE FROM product_barcodes WHERE product_id = $1", productID); err != nil {
-			return nil, fmt.Errorf("failed to clear product barcodes: %w", err)
-		}
-		for _, bc := range req.Barcodes {
-			attrs := normalizeVariantAttributes(bc.VariantAttributes)
-			isActive := bc.IsActive
-			if !isActive {
-				isActive = true
-			}
-			if _, err := tx.Exec(`INSERT INTO product_barcodes (product_id, barcode, pack_size, cost_price, selling_price, is_primary, variant_name, variant_attributes, is_active) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-				productID, bc.Barcode, bc.PackSize, bc.CostPrice, bc.SellingPrice, bc.IsPrimary, bc.VariantName, attrs, isActive); err != nil {
-				return nil, fmt.Errorf("failed to insert product barcode: %w", err)
-			}
+		if err := s.syncProductBarcodesTx(tx, productID, req.Barcodes); err != nil {
+			return nil, err
 		}
 	}
 
@@ -1017,6 +1029,168 @@ func (s *ProductService) getProductBarcodes(productID int) ([]models.ProductBarc
 		barcodes = append(barcodes, bc)
 	}
 	return barcodes, nil
+}
+
+func (s *ProductService) loadProductBarcodesTx(tx *sql.Tx, productID int) ([]barcodeSyncRow, error) {
+	rows, err := tx.Query(`
+		SELECT barcode_id, barcode, pack_size, cost_price, selling_price, is_primary,
+		       variant_name, COALESCE(variant_attributes, '{}'::jsonb), COALESCE(is_active, TRUE)
+		FROM product_barcodes
+		WHERE product_id = $1
+		ORDER BY barcode_id
+	`, productID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load product barcodes: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]barcodeSyncRow, 0)
+	for rows.Next() {
+		var item barcodeSyncRow
+		if err := rows.Scan(
+			&item.BarcodeID,
+			&item.Barcode,
+			&item.PackSize,
+			&item.CostPrice,
+			&item.SellingPrice,
+			&item.IsPrimary,
+			&item.VariantName,
+			&item.VariantAttributes,
+			&item.IsActive,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan product barcode: %w", err)
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (s *ProductService) barcodeReferencedTx(tx *sql.Tx, barcodeID int) (bool, error) {
+	var referenced bool
+	err := tx.QueryRow(`
+		SELECT EXISTS (
+			SELECT 1 FROM purchase_details WHERE barcode_id = $1
+			UNION ALL
+			SELECT 1 FROM sale_details WHERE barcode_id = $1
+			UNION ALL
+			SELECT 1 FROM purchase_return_details WHERE barcode_id = $1
+			UNION ALL
+			SELECT 1 FROM sale_return_details WHERE barcode_id = $1
+			UNION ALL
+			SELECT 1 FROM stock_transfer_details WHERE barcode_id = $1
+			UNION ALL
+			SELECT 1 FROM stock_adjustment_document_items WHERE barcode_id = $1
+			UNION ALL
+			SELECT 1 FROM stock_lots WHERE barcode_id = $1
+			UNION ALL
+			SELECT 1 FROM stock_variants WHERE barcode_id = $1
+			UNION ALL
+			SELECT 1 FROM product_serials WHERE barcode_id = $1
+			UNION ALL
+			SELECT 1 FROM inventory_movements WHERE barcode_id = $1
+		)
+	`, barcodeID).Scan(&referenced)
+	if err != nil {
+		return false, fmt.Errorf("failed to verify barcode references: %w", err)
+	}
+	return referenced, nil
+}
+
+func (s *ProductService) syncProductBarcodesTx(tx *sql.Tx, productID int, requested []models.ProductBarcode) error {
+	existing, err := s.loadProductBarcodesTx(tx, productID)
+	if err != nil {
+		return err
+	}
+
+	byID := make(map[int]barcodeSyncRow, len(existing))
+	byCode := make(map[string]barcodeSyncRow, len(existing))
+	matched := make(map[int]struct{}, len(existing))
+	for _, item := range existing {
+		byID[item.BarcodeID] = item
+		byCode[barcodeLookupKey(item.Barcode)] = item
+	}
+
+	if _, err := tx.Exec(`UPDATE product_barcodes SET is_primary = FALSE WHERE product_id = $1 AND is_primary = TRUE`, productID); err != nil {
+		return fmt.Errorf("failed to reset primary barcode: %w", err)
+	}
+
+	for _, bc := range requested {
+		attrs := normalizeVariantAttributes(bc.VariantAttributes)
+		if bc.BarcodeID > 0 {
+			if _, ok := byID[bc.BarcodeID]; !ok {
+				return fmt.Errorf("barcode %d does not belong to product", bc.BarcodeID)
+			}
+			matched[bc.BarcodeID] = struct{}{}
+			if _, err := tx.Exec(`
+				UPDATE product_barcodes
+				SET barcode = $1,
+				    pack_size = $2,
+				    cost_price = $3,
+				    selling_price = $4,
+				    is_primary = $5,
+				    variant_name = $6,
+				    variant_attributes = $7,
+				    is_active = $8
+				WHERE barcode_id = $9 AND product_id = $10
+			`, bc.Barcode, bc.PackSize, bc.CostPrice, bc.SellingPrice, bc.IsPrimary, bc.VariantName, attrs, bc.IsActive, bc.BarcodeID, productID); err != nil {
+				return fmt.Errorf("failed to update product barcode: %w", err)
+			}
+			continue
+		}
+
+		if existingRow, ok := byCode[barcodeLookupKey(bc.Barcode)]; ok {
+			if _, alreadyMatched := matched[existingRow.BarcodeID]; !alreadyMatched {
+				matched[existingRow.BarcodeID] = struct{}{}
+				if _, err := tx.Exec(`
+					UPDATE product_barcodes
+					SET pack_size = $1,
+					    cost_price = $2,
+					    selling_price = $3,
+					    is_primary = $4,
+					    variant_name = $5,
+					    variant_attributes = $6,
+					    is_active = $7
+					WHERE barcode_id = $8 AND product_id = $9
+				`, bc.PackSize, bc.CostPrice, bc.SellingPrice, bc.IsPrimary, bc.VariantName, attrs, bc.IsActive, existingRow.BarcodeID, productID); err != nil {
+					return fmt.Errorf("failed to update product barcode: %w", err)
+				}
+				continue
+			}
+		}
+
+		if _, err := tx.Exec(`
+			INSERT INTO product_barcodes (product_id, barcode, pack_size, cost_price, selling_price, is_primary, variant_name, variant_attributes, is_active)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		`, productID, bc.Barcode, bc.PackSize, bc.CostPrice, bc.SellingPrice, bc.IsPrimary, bc.VariantName, attrs, bc.IsActive); err != nil {
+			return fmt.Errorf("failed to insert product barcode: %w", err)
+		}
+	}
+
+	for _, item := range existing {
+		if _, ok := matched[item.BarcodeID]; ok {
+			continue
+		}
+		referenced, err := s.barcodeReferencedTx(tx, item.BarcodeID)
+		if err != nil {
+			return err
+		}
+		if referenced {
+			if _, err := tx.Exec(`
+				UPDATE product_barcodes
+				SET is_primary = FALSE,
+				    is_active = FALSE
+				WHERE barcode_id = $1 AND product_id = $2
+			`, item.BarcodeID, productID); err != nil {
+				return fmt.Errorf("failed to deactivate referenced barcode: %w", err)
+			}
+			continue
+		}
+		if _, err := tx.Exec(`DELETE FROM product_barcodes WHERE barcode_id = $1 AND product_id = $2`, item.BarcodeID, productID); err != nil {
+			return fmt.Errorf("failed to delete unused barcode: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (s *ProductService) getProductAttributes(productID int) ([]models.ProductAttributeValue, error) {

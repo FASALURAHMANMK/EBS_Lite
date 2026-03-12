@@ -67,7 +67,9 @@ func fetchProductMeta(q sqlQueryer, companyID int, productIDs []int) (map[int]pr
 		return map[int]productMeta{}, nil
 	}
 	rows, err := q.Query(`
-		SELECT product_id, unit_id, purchase_unit_id, selling_unit_id, tax_id, is_serialized, COALESCE(cost_price, 0)::float8,
+		SELECT product_id, unit_id, purchase_unit_id, selling_unit_id, tax_id,
+		       CASE WHEN COALESCE(is_serialized, FALSE) OR COALESCE(tracking_type, '') = 'SERIAL' THEN TRUE ELSE FALSE END AS is_serialized,
+		       COALESCE(cost_price, 0)::float8,
 		       COALESCE(purchase_to_stock_factor, 1.0)::float8,
 		       COALESCE(selling_to_stock_factor, 1.0)::float8,
 		       COALESCE(is_weighable, FALSE),
@@ -1300,7 +1302,11 @@ func (s *SalesService) CreateQuickSale(companyID, locationID, userID int, req *m
 // Helper methods
 func (s *SalesService) getSaleItems(saleID, companyID int) ([]models.SaleDetail, error) {
 	query := `
-		SELECT sd.sale_detail_id, sd.sale_id, sd.product_id, sd.barcode_id, sd.product_name, sd.quantity,
+		SELECT sd.sale_detail_id, sd.sale_id, sd.product_id, sd.barcode_id, sd.product_name,
+			   pb.barcode, pb.variant_name,
+			   CASE WHEN COALESCE(p.tracking_type, 'VARIANT') = 'BATCH' THEN 'BATCH' ELSE 'VARIANT' END AS tracking_type,
+			   CASE WHEN COALESCE(p.is_serialized, FALSE) OR COALESCE(p.tracking_type, '') = 'SERIAL' THEN TRUE ELSE FALSE END AS is_serialized,
+			   sd.quantity,
 			   sd.unit_price, sd.discount_percentage, sd.discount_amount, sd.tax_id,
 			   sd.tax_amount, sd.line_total, sd.serial_numbers, sd.notes,
 			   p.name as product_name_from_table
@@ -1308,6 +1314,7 @@ func (s *SalesService) getSaleItems(saleID, companyID int) ([]models.SaleDetail,
 		JOIN sales s ON sd.sale_id = s.sale_id
 		JOIN locations l ON s.location_id = l.location_id
 		LEFT JOIN products p ON sd.product_id = p.product_id
+		LEFT JOIN product_barcodes pb ON pb.barcode_id = sd.barcode_id
 		WHERE sd.sale_id = $1 AND l.company_id = $2 AND s.is_deleted = FALSE
 		ORDER BY sd.sale_detail_id
 	`
@@ -1326,6 +1333,7 @@ func (s *SalesService) getSaleItems(saleID, companyID int) ([]models.SaleDetail,
 
 		err := rows.Scan(
 			&item.SaleDetailID, &item.SaleID, &item.ProductID, &item.BarcodeID, &item.ProductName,
+			&item.Barcode, &item.VariantName, &item.TrackingType, &item.IsSerialized,
 			&item.Quantity, &item.UnitPrice, &item.DiscountPercent, &item.DiscountAmount,
 			&item.TaxID, &item.TaxAmount, &item.LineTotal, &serialNumbers, &item.Notes,
 			&productNameFromTable,

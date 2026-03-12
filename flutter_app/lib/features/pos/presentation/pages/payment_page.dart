@@ -485,6 +485,15 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                           String? overrideReason,
                                           String? overridePassword,
                                         }) {
+                                          final cart = ref
+                                              .read(posNotifierProvider)
+                                              .cart;
+                                          if (cart.any((item) =>
+                                              !item.hasTrackingConfigured)) {
+                                            throw StateError(
+                                              'Configure batch / serial details for all tracked items before checkout.',
+                                            );
+                                          }
                                           return ref
                                               .read(
                                                   posNotifierProvider.notifier)

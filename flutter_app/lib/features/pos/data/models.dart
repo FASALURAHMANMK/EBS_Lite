@@ -1,3 +1,5 @@
+import '../../inventory/data/models.dart';
+
 class PosProductDto {
   final int productId;
   final int barcodeId;
@@ -9,6 +11,7 @@ class PosProductDto {
   final String? categoryName;
   final bool isWeighable;
   final String trackingType;
+  final bool isSerialized;
   final String sellingUomMode;
   final int? sellingUnitId;
   final String? sellingUnitName;
@@ -25,6 +28,7 @@ class PosProductDto {
     this.categoryName,
     this.isWeighable = false,
     this.trackingType = 'VARIANT',
+    this.isSerialized = false,
     this.sellingUomMode = 'LOOSE',
     this.sellingUnitId,
     this.sellingUnitName,
@@ -42,6 +46,7 @@ class PosProductDto {
         categoryName: json['category_name'] as String?,
         isWeighable: json['is_weighable'] as bool? ?? false,
         trackingType: json['tracking_type'] as String? ?? 'VARIANT',
+        isSerialized: json['is_serialized'] as bool? ?? false,
         sellingUomMode: json['selling_uom_mode'] as String? ?? 'LOOSE',
         sellingUnitId: json['selling_unit_id'] as int?,
         sellingUnitName: json['selling_unit_name'] as String?,
@@ -50,6 +55,8 @@ class PosProductDto {
 
   String get identityKey =>
       barcodeId > 0 ? 'barcode:$barcodeId' : 'product:$productId';
+
+  bool get requiresTracking => isSerialized || trackingType == 'BATCH';
 
   String get displayLabel {
     final variant = (variantName ?? '').trim();
@@ -86,24 +93,64 @@ class PosCartItem {
   final double quantity;
   final double unitPrice;
   final double discountPercent; // 0-100, per-line
+  final InventoryTrackingSelection? tracking;
 
   PosCartItem({
     required this.product,
     required this.quantity,
     required this.unitPrice,
     this.discountPercent = 0.0,
+    this.tracking,
   });
 
   PosCartItem copyWith(
-          {double? quantity, double? unitPrice, double? discountPercent}) =>
+          {double? quantity,
+          double? unitPrice,
+          double? discountPercent,
+          InventoryTrackingSelection? tracking,
+          bool clearTracking = false}) =>
       PosCartItem(
         product: product,
         quantity: quantity ?? this.quantity,
         unitPrice: unitPrice ?? this.unitPrice,
         discountPercent: discountPercent ?? this.discountPercent,
+        tracking: clearTracking ? null : (tracking ?? this.tracking),
       );
 
-  String get identityKey => product.identityKey;
+  String get identityKey {
+    if (!product.requiresTracking) return product.identityKey;
+    final trackingKey = tracking == null
+        ? 'unconfigured'
+        : [
+            if ((tracking!.barcodeId ?? 0) > 0) 'b:${tracking!.barcodeId}',
+            if (tracking!.serialNumbers.isNotEmpty)
+              's:${tracking!.serialNumbers.join(",")}',
+            if (tracking!.batchAllocations.isNotEmpty)
+              'ba:${tracking!.batchAllocations.map((e) => '${e.lotId}:${e.quantity}').join(",")}',
+            if ((tracking!.batchNumber ?? '').trim().isNotEmpty)
+              'bn:${tracking!.batchNumber!.trim()}',
+          ].join('|');
+    return '${product.identityKey}|$trackingKey';
+  }
+
+  bool get requiresTracking => product.requiresTracking;
+
+  bool get hasTrackingConfigured {
+    if (!requiresTracking) return true;
+    final sel = tracking;
+    if (sel == null) return false;
+    if (sel.isSerialized) {
+      return sel.serialNumbers.length == quantity.round();
+    }
+    if (sel.trackingType == 'BATCH') {
+      final allocated = sel.batchAllocations.fold<double>(
+        0,
+        (sum, item) => sum + item.quantity,
+      );
+      return (allocated - quantity).abs() <= 0.0001;
+    }
+    return true;
+  }
 
   double get lineTotal {
     final gross = quantity * unitPrice;
@@ -185,9 +232,11 @@ class SaleItemDto {
   final String? barcode;
   final String? variantName;
   final String trackingType;
+  final bool isSerialized;
   final double quantity;
   final double unitPrice;
   final double discountPercent;
+  final List<String> serialNumbers;
 
   SaleItemDto(
       {this.productId,
@@ -196,9 +245,11 @@ class SaleItemDto {
       this.barcode,
       this.variantName,
       this.trackingType = 'VARIANT',
+      this.isSerialized = false,
       required this.quantity,
       required this.unitPrice,
-      this.discountPercent = 0.0});
+      this.discountPercent = 0.0,
+      this.serialNumbers = const []});
 
   factory SaleItemDto.fromJson(Map<String, dynamic> json) => SaleItemDto(
         productId: json['product_id'] as int?,
@@ -207,10 +258,14 @@ class SaleItemDto {
         barcode: json['barcode'] as String?,
         variantName: json['variant_name'] as String?,
         trackingType: json['tracking_type'] as String? ?? 'VARIANT',
+        isSerialized: json['is_serialized'] as bool? ?? false,
         quantity: (json['quantity'] as num?)?.toDouble() ?? 0.0,
         unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0.0,
         discountPercent:
             (json['discount_percentage'] as num?)?.toDouble() ?? 0.0,
+        serialNumbers: (json['serial_numbers'] as List<dynamic>? ?? const [])
+            .map((e) => e.toString())
+            .toList(),
       );
 }
 

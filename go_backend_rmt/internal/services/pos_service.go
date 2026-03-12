@@ -444,7 +444,8 @@ func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string
                            pb.variant_name,
                            c.name as category_name,
                            COALESCE(p.is_weighable, FALSE) as is_weighable,
-                           COALESCE(p.tracking_type, CASE WHEN COALESCE(p.is_serialized, FALSE) THEN 'SERIAL' ELSE 'VARIANT' END) as tracking_type,
+                           CASE WHEN COALESCE(p.tracking_type, 'VARIANT') = 'BATCH' THEN 'BATCH' ELSE 'VARIANT' END as tracking_type,
+                           CASE WHEN COALESCE(p.is_serialized, FALSE) OR COALESCE(p.tracking_type, '') = 'SERIAL' THEN TRUE ELSE FALSE END as is_serialized,
                            COALESCE(p.selling_uom_mode, 'LOOSE') as selling_uom_mode,
                            p.selling_unit_id,
                            su.name as selling_unit_name,
@@ -485,7 +486,7 @@ func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string
 		var product models.POSProductResponse
 		err := rows.Scan(
 			&product.ProductID, &product.BarcodeID, &product.Name, &product.Price, &product.Stock,
-			&product.Barcode, &product.VariantName, &product.CategoryName, &product.IsWeighable, &product.TrackingType, &product.SellingUOMMode,
+			&product.Barcode, &product.VariantName, &product.CategoryName, &product.IsWeighable, &product.TrackingType, &product.IsSerialized, &product.SellingUOMMode,
 			&product.SellingUnitID, &product.SellingUnitName, &product.SellingUnitSymbol,
 		)
 		if err != nil {

@@ -704,7 +704,14 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 
 		// Validate serial numbers for serialized products
 		var isSerialized bool
-		if err = tx.QueryRow("SELECT is_serialized FROM products WHERE product_id = $1 AND company_id = $2 AND is_deleted = FALSE", productID, companyID).Scan(&isSerialized); err != nil {
+		if err = tx.QueryRow(`
+			SELECT CASE
+				WHEN COALESCE(is_serialized, FALSE) OR COALESCE(tracking_type, '') = 'SERIAL' THEN TRUE
+				ELSE FALSE
+			END
+			FROM products
+			WHERE product_id = $1 AND company_id = $2 AND is_deleted = FALSE
+		`, productID, companyID).Scan(&isSerialized); err != nil {
 			if err == sql.ErrNoRows {
 				return fmt.Errorf("product not found")
 			}

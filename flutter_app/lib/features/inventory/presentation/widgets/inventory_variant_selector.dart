@@ -115,7 +115,12 @@ class _InventoryVariantDialogState extends State<_InventoryVariantDialog> {
                                           .trim()
                                           .isNotEmpty)
                                         'Barcode: ${variant.barcode!}',
-                                      variant.trackingType,
+                                      [
+                                        'Variation',
+                                        if (variant.trackingType == 'BATCH')
+                                          'Batch',
+                                        if (variant.isSerialized) 'Serial',
+                                      ].join(' + '),
                                     ].join(' • ')),
                                   ),
                                 )
@@ -142,6 +147,7 @@ class _InventoryVariantDialogState extends State<_InventoryVariantDialog> {
                     InventoryTrackingSelection(
                       barcodeId: selected.barcodeId,
                       trackingType: selected.trackingType,
+                      isSerialized: selected.isSerialized,
                       barcode: selected.barcode,
                       variantName: selected.variantName,
                     ),

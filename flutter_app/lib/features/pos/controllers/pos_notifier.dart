@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/error_handler.dart';
 import '../../../core/outbox/outbox_notifier.dart';
+import '../../inventory/data/models.dart';
 import '../data/models.dart';
 import '../data/pos_repository.dart';
 import '../../dashboard/data/payment_methods_repository.dart';
@@ -149,13 +150,26 @@ class PosNotifier extends StateNotifier<PosState> {
     }
   }
 
-  void addProduct(PosProductDto p, {double qty = 1}) {
+  void addProduct(
+    PosProductDto p, {
+    double qty = 1,
+    InventoryTrackingSelection? tracking,
+  }) {
     final items = [...state.cart];
-    final idx = items.indexWhere((i) => i.identityKey == p.identityKey);
+    final incoming = PosCartItem(
+      product: p,
+      quantity: qty,
+      unitPrice: p.price,
+      tracking: tracking,
+    );
+    final shouldMerge = !p.requiresTracking;
+    final idx = shouldMerge
+        ? items.indexWhere((i) => i.identityKey == incoming.identityKey)
+        : -1;
     if (idx >= 0) {
       items[idx] = items[idx].copyWith(quantity: items[idx].quantity + qty);
     } else {
-      items.add(PosCartItem(product: p, quantity: qty, unitPrice: p.price));
+      items.add(incoming);
     }
     state = state.copyWith(cart: items, query: '', suggestions: const []);
     // ignore: unawaited_futures
@@ -164,7 +178,35 @@ class PosNotifier extends StateNotifier<PosState> {
 
   void updateQty(PosCartItem item, double qty) {
     final items = state.cart
-        .map((i) => i == item ? i.copyWith(quantity: qty) : i)
+        .map((i) => i == item
+            ? i.copyWith(quantity: qty, clearTracking: i.requiresTracking)
+            : i)
+        .toList();
+    state = state.copyWith(cart: items);
+    // ignore: unawaited_futures
+    _recalculateTotals();
+  }
+
+  void setItemTracking(
+    PosCartItem item,
+    InventoryTrackingSelection? tracking,
+  ) {
+    final items = state.cart
+        .map((i) => i == item ? i.copyWith(tracking: tracking) : i)
+        .toList();
+    state = state.copyWith(cart: items);
+    // ignore: unawaited_futures
+    _recalculateTotals();
+  }
+
+  void updateTrackedItem(
+    PosCartItem item, {
+    required double quantity,
+    required InventoryTrackingSelection tracking,
+  }) {
+    final items = state.cart
+        .map((i) =>
+            i == item ? i.copyWith(quantity: quantity, tracking: tracking) : i)
         .toList();
     state = state.copyWith(cart: items);
     // ignore: unawaited_futures
@@ -299,10 +341,19 @@ class PosNotifier extends StateNotifier<PosState> {
                 barcode: si.barcode,
                 variantName: si.variantName,
                 trackingType: si.trackingType,
+                isSerialized: si.isSerialized,
               ),
               quantity: si.quantity,
               unitPrice: si.unitPrice,
               discountPercent: si.discountPercent,
+              tracking: InventoryTrackingSelection(
+                barcodeId: si.barcodeId,
+                trackingType: si.trackingType,
+                isSerialized: si.isSerialized,
+                barcode: si.barcode,
+                variantName: si.variantName,
+                serialNumbers: si.serialNumbers,
+              ),
             ))
         .toList();
     state = state.copyWith(
