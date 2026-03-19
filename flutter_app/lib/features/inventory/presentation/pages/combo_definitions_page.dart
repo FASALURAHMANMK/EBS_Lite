@@ -179,10 +179,10 @@ class _ComboDefinitionsPageState extends ConsumerState<ComboDefinitionsPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         onPressed: () => _openForm(),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('New Combo'),
+        tooltip: 'New Combo',
+        child: const Icon(Icons.add_rounded),
       ),
     );
   }

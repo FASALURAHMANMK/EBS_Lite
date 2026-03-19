@@ -1505,6 +1505,308 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
+  /inventory/asset-categories:
+    get:
+      summary: GET /api/v1/inventory/asset-categories
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/AssetCategory'
+    post:
+      summary: POST /api/v1/inventory/asset-categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAssetCategoryRequest'
+      responses:
+        '201':
+          description: Asset category created
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/AssetCategory'
+  /inventory/asset-categories/{id}:
+    put:
+      summary: PUT /api/v1/inventory/asset-categories/{id}
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAssetCategoryRequest'
+      responses:
+        '200':
+          description: Asset category updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/AssetCategory'
+    delete:
+      summary: DELETE /api/v1/inventory/asset-categories/{id}
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Asset category deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /inventory/assets:
+    get:
+      summary: GET /api/v1/inventory/assets
+      parameters:
+      - name: location_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/AssetRegisterEntry'
+    post:
+      summary: POST /api/v1/inventory/assets
+      parameters:
+      - name: location_id
+        in: query
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAssetRegisterEntryRequest'
+      responses:
+        '201':
+          description: Asset register entry created
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/AssetRegisterEntry'
+  /inventory/assets/summary:
+    get:
+      summary: GET /api/v1/inventory/assets/summary
+      parameters:
+      - name: location_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/AssetRegisterSummary'
+  /inventory/consumable-categories:
+    get:
+      summary: GET /api/v1/inventory/consumable-categories
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ConsumableCategory'
+    post:
+      summary: POST /api/v1/inventory/consumable-categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConsumableCategoryRequest'
+      responses:
+        '201':
+          description: Consumable category created
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/ConsumableCategory'
+  /inventory/consumable-categories/{id}:
+    put:
+      summary: PUT /api/v1/inventory/consumable-categories/{id}
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateConsumableCategoryRequest'
+      responses:
+        '200':
+          description: Consumable category updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/ConsumableCategory'
+    delete:
+      summary: DELETE /api/v1/inventory/consumable-categories/{id}
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Consumable category deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /inventory/consumptions:
+    get:
+      summary: GET /api/v1/inventory/consumptions
+      parameters:
+      - name: location_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ConsumableEntry'
+    post:
+      summary: POST /api/v1/inventory/consumptions
+      parameters:
+      - name: location_id
+        in: query
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConsumableEntryRequest'
+      responses:
+        '201':
+          description: Consumable entry created
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/ConsumableEntry'
+  /inventory/consumptions/summary:
+    get:
+      summary: GET /api/v1/inventory/consumptions/summary
+      parameters:
+      - name: location_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/ConsumableSummary'
   /sales:
     get:
       summary: GET /api/v1/sales
@@ -4174,30 +4476,179 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-  /suppliers:
+  /reports/asset-register:
     get:
-      summary: GET /api/v1/suppliers
+      summary: GET /api/v1/reports/asset-register
+      parameters:
+      - name: location_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: from_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: to_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
       responses:
         '200':
           description: Successful response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
-    post:
-      summary: POST /api/v1/suppliers
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/AssetRegisterReportRow'
+  /reports/asset-value-summary:
+    get:
+      summary: GET /api/v1/reports/asset-value-summary
+      parameters:
+      - name: location_id
+        in: query
+        required: false
+        schema:
+          type: integer
       responses:
         '200':
           description: Successful response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenericObject'
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/AssetValueSummaryRow'
+  /reports/consumable-consumption:
+    get:
+      summary: GET /api/v1/reports/consumable-consumption
+      parameters:
+      - name: location_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: from_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: to_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ConsumableConsumptionReportRow'
+  /reports/consumable-balance:
+    get:
+      summary: GET /api/v1/reports/consumable-balance
+      parameters:
+      - name: location_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/ConsumableBalanceReportRow'
+  /suppliers:
+      get:
+        summary: GET /api/v1/suppliers
+        parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: is_active
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: is_mercantile
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: is_non_mercantile
+          in: query
+          required: false
+          schema:
+            type: boolean
+        responses:
+          '200':
+            description: Successful response
+            content:
+              application/json:
+                schema:
+                  allOf:
+                  - $ref: '#/components/schemas/APIResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SupplierWithStats'
+      post:
+        summary: POST /api/v1/suppliers
+        responses:
+          '200':
+            description: Successful response
+            content:
+              application/json:
+                schema:
+                  allOf:
+                  - $ref: '#/components/schemas/APIResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Supplier'
+        requestBody:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateSupplierRequest'
   /suppliers/import:
     post:
       summary: POST /api/v1/suppliers/import
@@ -4262,7 +4713,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/SupplierSummary'
       parameters:
       - name: id
         in: path
@@ -4278,7 +4734,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/SupplierWithStats'
       parameters:
       - name: id
         in: path
@@ -4293,7 +4754,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/SupplierWithStats'
       parameters:
       - name: id
         in: path
@@ -4304,7 +4770,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/UpdateSupplierRequest'
     delete:
       summary: DELETE /api/v1/suppliers/{id}
       responses:
@@ -4320,11 +4786,6 @@ paths:
         required: true
         schema:
           type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenericObject'
   /currencies:
     get:
       summary: GET /api/v1/currencies
@@ -5336,11 +5797,167 @@ components:
     GenericObject:
       type: object
       additionalProperties: true
+    Supplier:
+      type: object
+      properties:
+        supplier_id:
+          type: integer
+        company_id:
+          type: integer
+        name:
+          type: string
+        contact_person:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        tax_number:
+          type: string
+          nullable: true
+        payment_terms:
+          type: integer
+        credit_limit:
+          type: number
+          format: float
+        is_mercantile:
+          type: boolean
+        is_non_mercantile:
+          type: boolean
+        is_active:
+          type: boolean
+        created_by:
+          type: integer
+        updated_by:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+    SupplierWithStats:
+      allOf:
+      - $ref: '#/components/schemas/Supplier'
+      - type: object
+        properties:
+          total_purchases:
+            type: number
+            format: float
+          total_returns:
+            type: number
+            format: float
+          outstanding_amount:
+            type: number
+            format: float
+          last_purchase_date:
+            type: string
+            format: date-time
+            nullable: true
+    SupplierSummary:
+      type: object
+      properties:
+        supplier_id:
+          type: integer
+        company_id:
+          type: integer
+        total_purchases:
+          type: number
+          format: float
+        total_payments:
+          type: number
+          format: float
+        total_returns:
+          type: number
+          format: float
+        outstanding_balance:
+          type: number
+          format: float
+    CreateSupplierRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+        contact_person:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        tax_number:
+          type: string
+          nullable: true
+        payment_terms:
+          type: integer
+          nullable: true
+        credit_limit:
+          type: number
+          format: float
+          nullable: true
+        is_mercantile:
+          type: boolean
+          nullable: true
+        is_non_mercantile:
+          type: boolean
+          nullable: true
+    UpdateSupplierRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        contact_person:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        tax_number:
+          type: string
+          nullable: true
+        payment_terms:
+          type: integer
+          nullable: true
+        credit_limit:
+          type: number
+          format: float
+          nullable: true
+        is_mercantile:
+          type: boolean
+          nullable: true
+        is_non_mercantile:
+          type: boolean
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
     CreatePurchaseRequest:
       type: object
       required:
-        - supplier_id
-        - items
+      - supplier_id
+      - items
       properties:
         supplier_id:
           type: integer
@@ -6178,6 +6795,12 @@ components:
           type: integer
         company_id:
           type: integer
+        item_type:
+          type: string
+          enum:
+          - PRODUCT
+          - ASSET
+          - CONSUMABLE
         category_id:
           type: integer
           nullable: true
@@ -6237,6 +6860,13 @@ components:
     CreateProductRequest:
       type: object
       properties:
+        item_type:
+          type: string
+          nullable: true
+          enum:
+          - PRODUCT
+          - ASSET
+          - CONSUMABLE
         category_id:
           type: integer
           nullable: true
@@ -6298,6 +6928,13 @@ components:
     UpdateProductRequest:
       type: object
       properties:
+        item_type:
+          type: string
+          nullable: true
+          enum:
+          - PRODUCT
+          - ASSET
+          - CONSUMABLE
         category_id:
           type: integer
           nullable: true
@@ -6363,6 +7000,488 @@ components:
         is_active:
           type: boolean
           nullable: true
+    AssetCategory:
+      type: object
+      properties:
+        category_id:
+          type: integer
+        company_id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        ledger_account_id:
+          type: integer
+          nullable: true
+        ledger_code:
+          type: string
+          nullable: true
+        ledger_name:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+    CreateAssetCategoryRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        ledger_account_id:
+          type: integer
+          nullable: true
+    UpdateAssetCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        ledger_account_id:
+          type: integer
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
+    ConsumableCategory:
+      type: object
+      properties:
+        category_id:
+          type: integer
+        company_id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        ledger_account_id:
+          type: integer
+          nullable: true
+        ledger_code:
+          type: string
+          nullable: true
+        ledger_name:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+    CreateConsumableCategoryRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        ledger_account_id:
+          type: integer
+          nullable: true
+    UpdateConsumableCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        ledger_account_id:
+          type: integer
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
+    AssetRegisterEntry:
+      type: object
+      properties:
+        asset_entry_id:
+          type: integer
+        company_id:
+          type: integer
+        location_id:
+          type: integer
+        asset_tag:
+          type: string
+        product_id:
+          type: integer
+          nullable: true
+        barcode_id:
+          type: integer
+          nullable: true
+        category_id:
+          type: integer
+          nullable: true
+        supplier_id:
+          type: integer
+          nullable: true
+        item_name:
+          type: string
+        source_mode:
+          type: string
+          enum:
+          - STOCK
+          - DIRECT
+        quantity:
+          type: number
+          format: float
+        unit_cost:
+          type: number
+          format: float
+        total_value:
+          type: number
+          format: float
+        acquisition_date:
+          type: string
+          format: date-time
+        in_service_date:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+        offset_account_id:
+          type: integer
+          nullable: true
+        offset_account_code:
+          type: string
+          nullable: true
+        offset_account_name:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        batch_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryBatchSelectionInput'
+        category_name:
+          type: string
+          nullable: true
+        product_name:
+          type: string
+          nullable: true
+        supplier_name:
+          type: string
+          nullable: true
+        created_by:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+    AssetRegisterSummary:
+      type: object
+      properties:
+        total_items:
+          type: integer
+        active_items:
+          type: integer
+        total_value:
+          type: number
+          format: float
+        average_item_cost:
+          type: number
+          format: float
+    CreateAssetRegisterEntryRequest:
+      type: object
+      required:
+      - source_mode
+      - quantity
+      - acquisition_date
+      properties:
+        category_id:
+          type: integer
+          nullable: true
+        product_id:
+          type: integer
+          nullable: true
+        barcode_id:
+          type: integer
+          nullable: true
+        supplier_id:
+          type: integer
+          nullable: true
+        item_name:
+          type: string
+          nullable: true
+        asset_tag:
+          type: string
+          nullable: true
+        source_mode:
+          type: string
+          enum:
+          - STOCK
+          - DIRECT
+        quantity:
+          type: number
+          format: float
+        unit_cost:
+          type: number
+          format: float
+          nullable: true
+        acquisition_date:
+          type: string
+          format: date-time
+        in_service_date:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          nullable: true
+        offset_account_id:
+          type: integer
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        batch_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryBatchSelectionInput'
+    ConsumableEntry:
+      type: object
+      properties:
+        consumption_id:
+          type: integer
+        company_id:
+          type: integer
+        location_id:
+          type: integer
+        entry_number:
+          type: string
+        category_id:
+          type: integer
+          nullable: true
+        supplier_id:
+          type: integer
+          nullable: true
+        product_id:
+          type: integer
+          nullable: true
+        barcode_id:
+          type: integer
+          nullable: true
+        item_name:
+          type: string
+        source_mode:
+          type: string
+          enum:
+          - STOCK
+          - DIRECT
+        quantity:
+          type: number
+          format: float
+        unit_cost:
+          type: number
+          format: float
+        total_cost:
+          type: number
+          format: float
+        consumed_at:
+          type: string
+          format: date-time
+        offset_account_id:
+          type: integer
+          nullable: true
+        offset_account_code:
+          type: string
+          nullable: true
+        offset_account_name:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        batch_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryBatchSelectionInput'
+        category_name:
+          type: string
+          nullable: true
+        product_name:
+          type: string
+          nullable: true
+        supplier_name:
+          type: string
+          nullable: true
+        created_by:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+    ConsumableSummary:
+      type: object
+      properties:
+        total_entries:
+          type: integer
+        total_quantity:
+          type: number
+          format: float
+        total_cost:
+          type: number
+          format: float
+        average_unit_cost:
+          type: number
+          format: float
+    CreateConsumableEntryRequest:
+      type: object
+      required:
+      - source_mode
+      - quantity
+      - consumed_at
+      properties:
+        category_id:
+          type: integer
+          nullable: true
+        product_id:
+          type: integer
+          nullable: true
+        barcode_id:
+          type: integer
+          nullable: true
+        supplier_id:
+          type: integer
+          nullable: true
+        item_name:
+          type: string
+          nullable: true
+        source_mode:
+          type: string
+          enum:
+          - STOCK
+          - DIRECT
+        quantity:
+          type: number
+          format: float
+        unit_cost:
+          type: number
+          format: float
+          nullable: true
+        consumed_at:
+          type: string
+          format: date-time
+        offset_account_id:
+          type: integer
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        batch_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryBatchSelectionInput'
+    AssetRegisterReportRow:
+      type: object
+      properties:
+        asset_tag:
+          type: string
+        item_name:
+          type: string
+        category_name:
+          type: string
+        location_id:
+          type: integer
+        acquisition_date:
+          type: string
+          format: date-time
+        in_service_date:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+        source_mode:
+          type: string
+        quantity:
+          type: number
+          format: float
+        unit_cost:
+          type: number
+          format: float
+        total_value:
+          type: number
+          format: float
+    AssetValueSummaryRow:
+      type: object
+      properties:
+        category_name:
+          type: string
+        status:
+          type: string
+        item_count:
+          type: integer
+        total_value:
+          type: number
+          format: float
+    ConsumableConsumptionReportRow:
+      type: object
+      properties:
+        entry_number:
+          type: string
+        item_name:
+          type: string
+        category_name:
+          type: string
+        location_id:
+          type: integer
+        consumed_at:
+          type: string
+          format: date-time
+        source_mode:
+          type: string
+        quantity:
+          type: number
+          format: float
+        unit_cost:
+          type: number
+          format: float
+        total_cost:
+          type: number
+          format: float
+    ConsumableBalanceReportRow:
+      type: object
+      properties:
+        product_id:
+          type: integer
+        product_name:
+          type: string
+        location_id:
+          type: integer
+        quantity:
+          type: number
+          format: float
+        stock_value:
+          type: number
+          format: float
     ProductStorageAssignment:
       type: object
       properties:

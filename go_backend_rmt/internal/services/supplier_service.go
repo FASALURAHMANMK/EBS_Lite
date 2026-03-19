@@ -24,10 +24,47 @@ func NewSupplierService() *SupplierService {
 	}
 }
 
+func resolveSupplierTypesForCreate(req *models.CreateSupplierRequest) (bool, bool, error) {
+	isMercantile := true
+	if req.IsMercantile != nil {
+		isMercantile = *req.IsMercantile
+	}
+
+	isNonMercantile := false
+	if req.IsNonMercantile != nil {
+		isNonMercantile = *req.IsNonMercantile
+	}
+
+	if !isMercantile && !isNonMercantile {
+		return false, false, fmt.Errorf("at least one supplier type must be selected")
+	}
+
+	return isMercantile, isNonMercantile, nil
+}
+
+func resolveSupplierTypesForUpdate(currentMercantile, currentNonMercantile bool, req *models.UpdateSupplierRequest) (bool, bool, error) {
+	isMercantile := currentMercantile
+	if req.IsMercantile != nil {
+		isMercantile = *req.IsMercantile
+	}
+
+	isNonMercantile := currentNonMercantile
+	if req.IsNonMercantile != nil {
+		isNonMercantile = *req.IsNonMercantile
+	}
+
+	if !isMercantile && !isNonMercantile {
+		return false, false, fmt.Errorf("at least one supplier type must be selected")
+	}
+
+	return isMercantile, isNonMercantile, nil
+}
+
 func (s *SupplierService) GetSuppliers(companyID int, filters map[string]string) ([]models.SupplierWithStats, error) {
 	query := `
                 SELECT s.supplier_id, s.company_id, s.name, s.contact_person, s.phone, s.email,
-                          s.address, s.tax_number, s.payment_terms, s.credit_limit, s.is_active,
+                          s.address, s.tax_number, s.payment_terms, s.credit_limit, s.is_mercantile,
+                          s.is_non_mercantile, s.is_active,
                           s.created_by, s.updated_by, s.sync_status, s.created_at, s.updated_at,
                           COALESCE(stats.total_purchases, 0) as total_purchases,
                           COALESCE(stats.total_returns, 0) as total_returns,
@@ -58,6 +95,18 @@ func (s *SupplierService) GetSuppliers(companyID int, filters map[string]string)
 		args = append(args, isActive == "true")
 	}
 
+	if isMercantile, ok := filters["is_mercantile"]; ok && isMercantile != "" {
+		argCount++
+		query += fmt.Sprintf(" AND s.is_mercantile = $%d", argCount)
+		args = append(args, isMercantile == "true")
+	}
+
+	if isNonMercantile, ok := filters["is_non_mercantile"]; ok && isNonMercantile != "" {
+		argCount++
+		query += fmt.Sprintf(" AND s.is_non_mercantile = $%d", argCount)
+		args = append(args, isNonMercantile == "true")
+	}
+
 	if search, ok := filters["search"]; ok && search != "" {
 		argCount++
 		query += fmt.Sprintf(" AND (s.name ILIKE $%d OR s.contact_person ILIKE $%d OR s.phone ILIKE $%d OR s.email ILIKE $%d)",
@@ -81,7 +130,8 @@ func (s *SupplierService) GetSuppliers(companyID int, filters map[string]string)
 		err := rows.Scan(
 			&supplier.SupplierID, &supplier.CompanyID, &supplier.Name, &supplier.ContactPerson,
 			&supplier.Phone, &supplier.Email, &supplier.Address, &supplier.TaxNumber,
-			&supplier.PaymentTerms, &supplier.CreditLimit, &supplier.IsActive,
+			&supplier.PaymentTerms, &supplier.CreditLimit, &supplier.IsMercantile,
+			&supplier.IsNonMercantile, &supplier.IsActive,
 			&supplier.CreatedBy, &supplier.UpdatedBy, &supplier.SyncStatus, &supplier.CreatedAt, &supplier.UpdatedAt,
 			&supplier.TotalPurchases, &supplier.TotalReturns, &supplier.OutstandingAmount,
 			&supplier.LastPurchaseDate,
@@ -99,7 +149,8 @@ func (s *SupplierService) GetSuppliers(companyID int, filters map[string]string)
 func (s *SupplierService) GetSupplierByID(supplierID, companyID int) (*models.SupplierWithStats, error) {
 	query := `
                 SELECT s.supplier_id, s.company_id, s.name, s.contact_person, s.phone, s.email,
-                          s.address, s.tax_number, s.payment_terms, s.credit_limit, s.is_active,
+                          s.address, s.tax_number, s.payment_terms, s.credit_limit, s.is_mercantile,
+                          s.is_non_mercantile, s.is_active,
                           s.created_by, s.updated_by, s.sync_status, s.created_at, s.updated_at,
                           COALESCE(stats.total_purchases, 0) as total_purchases,
                           COALESCE(stats.total_returns, 0) as total_returns,
@@ -124,7 +175,8 @@ func (s *SupplierService) GetSupplierByID(supplierID, companyID int) (*models.Su
 	err := s.db.QueryRow(query, supplierID, companyID).Scan(
 		&supplier.SupplierID, &supplier.CompanyID, &supplier.Name, &supplier.ContactPerson,
 		&supplier.Phone, &supplier.Email, &supplier.Address, &supplier.TaxNumber,
-		&supplier.PaymentTerms, &supplier.CreditLimit, &supplier.IsActive,
+		&supplier.PaymentTerms, &supplier.CreditLimit, &supplier.IsMercantile,
+		&supplier.IsNonMercantile, &supplier.IsActive,
 		&supplier.CreatedBy, &supplier.UpdatedBy, &supplier.SyncStatus, &supplier.CreatedAt, &supplier.UpdatedAt,
 		&supplier.TotalPurchases, &supplier.TotalReturns, &supplier.OutstandingAmount,
 		&supplier.LastPurchaseDate,
@@ -163,18 +215,24 @@ func (s *SupplierService) CreateSupplier(companyID, userID int, req *models.Crea
 		creditLimit = *req.CreditLimit
 	}
 
+	isMercantile, isNonMercantile, err := resolveSupplierTypesForCreate(req)
+	if err != nil {
+		return nil, err
+	}
+
 	// Insert supplier
 	insertQuery := `
                 INSERT INTO suppliers (company_id, name, contact_person, phone, email, address,
-                                                          tax_number, payment_terms, credit_limit, is_active, created_by, updated_by)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
+                                                          tax_number, payment_terms, credit_limit, is_mercantile,
+                                                          is_non_mercantile, is_active, created_by, updated_by)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13)
                 RETURNING supplier_id, created_at
         `
 
 	var supplier models.Supplier
 	err = s.db.QueryRow(insertQuery,
 		companyID, req.Name, req.ContactPerson, req.Phone, req.Email, req.Address,
-		req.TaxNumber, paymentTerms, creditLimit, true, userID,
+		req.TaxNumber, paymentTerms, creditLimit, isMercantile, isNonMercantile, true, userID,
 	).Scan(&supplier.SupplierID, &supplier.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert supplier: %w", err)
@@ -190,6 +248,8 @@ func (s *SupplierService) CreateSupplier(companyID, userID int, req *models.Crea
 	supplier.TaxNumber = req.TaxNumber
 	supplier.PaymentTerms = paymentTerms
 	supplier.CreditLimit = creditLimit
+	supplier.IsMercantile = isMercantile
+	supplier.IsNonMercantile = isNonMercantile
 	supplier.IsActive = true
 	supplier.CreatedBy = userID
 	supplier.UpdatedBy = &userID
@@ -199,9 +259,10 @@ func (s *SupplierService) CreateSupplier(companyID, userID int, req *models.Crea
 
 func (s *SupplierService) UpdateSupplier(supplierID, companyID, userID int, req *models.UpdateSupplierRequest) (*models.SupplierWithStats, error) {
 	// Verify supplier exists and belongs to company
-	var exists bool
-	err := s.db.QueryRow("SELECT TRUE FROM suppliers WHERE supplier_id = $1 AND company_id = $2",
-		supplierID, companyID).Scan(&exists)
+	var currentMercantile bool
+	var currentNonMercantile bool
+	err := s.db.QueryRow("SELECT is_mercantile, is_non_mercantile FROM suppliers WHERE supplier_id = $1 AND company_id = $2",
+		supplierID, companyID).Scan(&currentMercantile, &currentNonMercantile)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("supplier not found")
@@ -221,6 +282,11 @@ func (s *SupplierService) UpdateSupplier(supplierID, companyID, userID int, req 
 		} else if err != sql.ErrNoRows {
 			return nil, fmt.Errorf("failed to check existing supplier: %w", err)
 		}
+	}
+
+	isMercantile, isNonMercantile, err := resolveSupplierTypesForUpdate(currentMercantile, currentNonMercantile, req)
+	if err != nil {
+		return nil, err
 	}
 
 	// Build update query
@@ -274,6 +340,18 @@ func (s *SupplierService) UpdateSupplier(supplierID, companyID, userID int, req 
 		argCount++
 		updates = append(updates, fmt.Sprintf("credit_limit = $%d", argCount))
 		args = append(args, *req.CreditLimit)
+	}
+
+	if req.IsMercantile != nil {
+		argCount++
+		updates = append(updates, fmt.Sprintf("is_mercantile = $%d", argCount))
+		args = append(args, isMercantile)
+	}
+
+	if req.IsNonMercantile != nil {
+		argCount++
+		updates = append(updates, fmt.Sprintf("is_non_mercantile = $%d", argCount))
+		args = append(args, isNonMercantile)
 	}
 
 	if req.IsActive != nil {
@@ -383,6 +461,8 @@ func (s *SupplierService) ImportSuppliersXLSX(companyID, userID int, data []byte
 	taxIdx, _ := firstHeaderMatch(hdr, "tax number", "tax_number", "tax")
 	termsIdx, _ := firstHeaderMatch(hdr, "payment terms", "payment_terms")
 	creditIdx, _ := firstHeaderMatch(hdr, "credit limit", "credit_limit")
+	mercIdx, hasMerc := firstHeaderMatch(hdr, "is mercantile", "is_mercantile", "mercantile")
+	nonMercIdx, hasNonMerc := firstHeaderMatch(hdr, "is non mercantile", "is_non_mercantile", "non_mercantile", "non mercantile")
 	activeIdx, hasActive := firstHeaderMatch(hdr, "is active", "is_active", "active")
 
 	res := &models.ImportResult{Errors: make([]models.ImportRowError, 0)}
@@ -406,6 +486,16 @@ func (s *SupplierService) ImportSuppliersXLSX(companyID, userID int, data []byte
 		}
 		if v, ok := parseFloatLoose(cell(row, creditIdx)); ok {
 			req.CreditLimit = &v
+		}
+		if hasMerc {
+			if v, ok := parseBoolLoose(cell(row, mercIdx)); ok {
+				req.IsMercantile = &v
+			}
+		}
+		if hasNonMerc {
+			if v, ok := parseBoolLoose(cell(row, nonMercIdx)); ok {
+				req.IsNonMercantile = &v
+			}
 		}
 
 		if err := utils.ValidateStruct(&req); err != nil {
@@ -444,13 +534,13 @@ func (s *SupplierService) ExportSuppliers(companyID int) ([]byte, error) {
 	sheet := "Suppliers"
 	f.SetSheetName("Sheet1", sheet)
 
-	headers := []string{"Name", "Contact Person", "Phone", "Email", "Address", "Tax Number", "Payment Terms", "Credit Limit", "Is Active"}
+	headers := []string{"Name", "Contact Person", "Phone", "Email", "Address", "Tax Number", "Payment Terms", "Credit Limit", "Is Mercantile", "Is Non-Mercantile", "Is Active"}
 	for i, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		f.SetCellValue(sheet, cell, h)
 	}
 	_ = f.SetPanes(sheet, &excelize.Panes{Freeze: true, Split: true, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"})
-	_ = f.AutoFilter(sheet, "A1:I1", nil)
+	_ = f.AutoFilter(sheet, "A1:K1", nil)
 
 	for idx, sup := range suppliers {
 		row := idx + 2
@@ -481,6 +571,10 @@ func (s *SupplierService) ExportSuppliers(companyID int) ([]byte, error) {
 		cell, _ = excelize.CoordinatesToCellName(8, row)
 		f.SetCellValue(sheet, cell, sup.CreditLimit)
 		cell, _ = excelize.CoordinatesToCellName(9, row)
+		f.SetCellValue(sheet, cell, sup.IsMercantile)
+		cell, _ = excelize.CoordinatesToCellName(10, row)
+		f.SetCellValue(sheet, cell, sup.IsNonMercantile)
+		cell, _ = excelize.CoordinatesToCellName(11, row)
 		f.SetCellValue(sheet, cell, sup.IsActive)
 	}
 
@@ -496,13 +590,13 @@ func (s *SupplierService) SuppliersImportTemplateXLSX() ([]byte, error) {
 	f := excelize.NewFile()
 	sheet := "Suppliers"
 	f.SetSheetName("Sheet1", sheet)
-	headers := []string{"Name", "Contact Person", "Phone", "Email", "Address", "Tax Number", "Payment Terms", "Credit Limit", "Is Active"}
+	headers := []string{"Name", "Contact Person", "Phone", "Email", "Address", "Tax Number", "Payment Terms", "Credit Limit", "Is Mercantile", "Is Non-Mercantile", "Is Active"}
 	for i, h := range headers {
 		cellName, _ := excelize.CoordinatesToCellName(i+1, 1)
 		f.SetCellValue(sheet, cellName, h)
 	}
 	_ = f.SetPanes(sheet, &excelize.Panes{Freeze: true, Split: true, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"})
-	_ = f.AutoFilter(sheet, "A1:I1", nil)
+	_ = f.AutoFilter(sheet, "A1:K1", nil)
 	buf, err := f.WriteToBuffer()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate file: %w", err)
@@ -529,6 +623,8 @@ func (s *SupplierService) SuppliersImportExampleXLSX() ([]byte, error) {
 	f.SetCellValue(sheet, "G2", 15)
 	f.SetCellValue(sheet, "H2", 0)
 	f.SetCellValue(sheet, "I2", true)
+	f.SetCellValue(sheet, "J2", false)
+	f.SetCellValue(sheet, "K2", true)
 	buf, err := f.WriteToBuffer()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate file: %w", err)

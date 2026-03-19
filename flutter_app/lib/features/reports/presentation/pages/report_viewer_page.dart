@@ -752,6 +752,45 @@ class _ReportDisplay {
       'quantity',
       'stock_value',
     ],
+    '/reports/asset-register': [
+      'asset_tag',
+      'item_name',
+      'category_name',
+      'supplier_name',
+      'location_id',
+      'acquisition_date',
+      'in_service_date',
+      'status',
+      'source_mode',
+      'quantity',
+      'unit_cost',
+      'total_value',
+    ],
+    '/reports/asset-value-summary': [
+      'category_name',
+      'status',
+      'item_count',
+      'total_value',
+    ],
+    '/reports/consumable-consumption': [
+      'entry_number',
+      'item_name',
+      'category_name',
+      'supplier_name',
+      'location_id',
+      'consumed_at',
+      'source_mode',
+      'quantity',
+      'unit_cost',
+      'total_cost',
+    ],
+    '/reports/consumable-balance': [
+      'product_id',
+      'product_name',
+      'location_id',
+      'quantity',
+      'stock_value',
+    ],
   };
 
   static const Map<String, String> _globalLabels = {
@@ -761,12 +800,14 @@ class _ReportDisplay {
     'account_name': 'Account Name',
     'account_type': 'Account Type',
     'amount': 'Amount',
+    'asset_tag': 'Asset Tag',
     'balance': 'Balance',
     'cash_in': 'Cash In',
     'cash_out': 'Cash Out',
     'closing_balance': 'Closing Balance',
     'closing_count': 'Closing Count',
     'credit': 'Credit',
+    'consumed_at': 'Consumed At',
     'customer_id': 'Customer ID',
     'date': 'Date',
     'day': 'Day',
@@ -775,6 +816,8 @@ class _ReportDisplay {
     'entry_id': 'Entry ID',
     'expected_balance': 'Expected Balance',
     'expenses_total': 'Expenses',
+    'item_count': 'Item Count',
+    'item_name': 'Item Name',
     'location_id': 'Location ID',
     'name': 'Name',
     'net_income': 'Net Income',
@@ -800,6 +843,7 @@ class _ReportDisplay {
     'section': 'Section',
     'status': 'Status',
     'stock_value': 'Stock Value',
+    'source_mode': 'Source Mode',
     'supplier_id': 'Supplier ID',
     'supplier_name': 'Supplier Name',
     'tax_amount': 'Tax Amount',
@@ -814,8 +858,14 @@ class _ReportDisplay {
     'transaction_id': 'Transaction ID',
     'transaction_type': 'Source Type',
     'type': 'Type',
+    'total_cost': 'Total Cost',
+    'total_value': 'Total Value',
+    'unit_cost': 'Unit Cost',
     'variance': 'Variance',
     'voucher_id': 'Voucher ID',
+    'entry_number': 'Entry Number',
+    'in_service_date': 'In Service Date',
+    'category_name': 'Category',
   };
 
   static const Map<String, String> _sectionValueLabels = {
@@ -901,7 +951,10 @@ class _ReportDisplay {
       key.contains('rate') || key.contains('percent');
 
   static bool _looksLikeQuantityKey(String key) =>
-      key == 'quantity' || key.endsWith('_qty') || key == 'transactions';
+      key == 'quantity' ||
+      key == 'transactions' ||
+      key == 'item_count' ||
+      key.endsWith('_qty');
 
   static String _humanizeKey(String raw) {
     if (raw.isEmpty) return raw;

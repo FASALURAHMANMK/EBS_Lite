@@ -19,6 +19,8 @@ class _SupplierCreatePageState extends ConsumerState<SupplierCreatePage> {
   final _address = TextEditingController();
   final _terms = TextEditingController();
   final _credit = TextEditingController();
+  bool _isMercantile = true;
+  bool _isNonMercantile = false;
   bool _saving = false;
 
   @override
@@ -36,8 +38,20 @@ class _SupplierCreatePageState extends ConsumerState<SupplierCreatePage> {
   String? _req(String? v) =>
       (v == null || v.trim().isEmpty) ? 'Required' : null;
 
+  bool get _hasSupplierUsage => _isMercantile || _isNonMercantile;
+
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!_hasSupplierUsage) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Select at least one supplier usage type.'),
+          ),
+        );
+      return;
+    }
     setState(() => _saving = true);
     try {
       final repo = ref.read(supplierRepositoryProvider);
@@ -49,6 +63,8 @@ class _SupplierCreatePageState extends ConsumerState<SupplierCreatePage> {
         address: _address.text.trim().isEmpty ? null : _address.text.trim(),
         paymentTerms: int.tryParse(_terms.text.trim()),
         creditLimit: double.tryParse(_credit.text.trim()),
+        isMercantile: _isMercantile,
+        isNonMercantile: _isNonMercantile,
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -109,6 +125,32 @@ class _SupplierCreatePageState extends ConsumerState<SupplierCreatePage> {
                             const InputDecoration(labelText: 'Credit Limit'),
                         keyboardType: TextInputType.number)),
               ]),
+              const SizedBox(height: 12),
+              Text(
+                'Supplier Usage',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              CheckboxListTile(
+                value: _isMercantile,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Mercantile'),
+                subtitle: const Text(
+                    'Buys products for resale and trading activity.'),
+                onChanged: _saving
+                    ? null
+                    : (value) => setState(() => _isMercantile = value ?? false),
+              ),
+              CheckboxListTile(
+                value: _isNonMercantile,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Non-Mercantile'),
+                subtitle: const Text(
+                    'Buys for internal use, assets, maintenance, or consumption.'),
+                onChanged: _saving
+                    ? null
+                    : (value) =>
+                        setState(() => _isNonMercantile = value ?? false),
+              ),
               const SizedBox(height: 12),
               FilledButton.icon(
                   onPressed: _saving ? null : _save,

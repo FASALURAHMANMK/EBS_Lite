@@ -3,9 +3,11 @@ import 'package:ebs_lite/features/auth/controllers/auth_permissions_provider.dar
 import 'package:ebs_lite/features/customers/presentation/pages/customer_management_page.dart';
 import 'package:ebs_lite/features/customers/presentation/pages/loyalty_management_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/attribute_management_page.dart';
+import 'package:ebs_lite/features/inventory/presentation/pages/asset_management_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/brand_management_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/category_management_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/combo_definitions_page.dart';
+import 'package:ebs_lite/features/inventory/presentation/pages/consumable_management_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/inventory_management_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/inventory_view_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/stock_adjustments_page.dart';
@@ -256,6 +258,18 @@ class DashboardDesktopSidebar extends ConsumerWidget {
                   icon: Icons.widgets_rounded,
                   label: 'Combo Definitions',
                   onTap: () => onOpen(const ComboDefinitionsPage()),
+                ),
+                _child(
+                  context,
+                  icon: Icons.apartment_rounded,
+                  label: 'Asset Register',
+                  onTap: () => onOpen(const AssetManagementPage()),
+                ),
+                _child(
+                  context,
+                  icon: Icons.science_rounded,
+                  label: 'Consumables',
+                  onTap: () => onOpen(const ConsumableManagementPage()),
                 ),
               ],
             ),

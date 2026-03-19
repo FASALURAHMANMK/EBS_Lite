@@ -22,12 +22,14 @@ const (
 	accountCodeBank          = "1010"
 	accountCodeAR            = "1100"
 	accountCodeInventory     = "1200"
+	accountCodeFixedAssets   = "1210"
 	accountCodeAP            = "2000"
 	accountCodeTaxPayable    = "2100"
 	accountCodeTaxReceivable = "2200"
 	accountCodeSalesRevenue  = "4000"
 	accountCodeCOGS          = "5000"
 	accountCodeExpenses      = "6000"
+	accountCodeConsumables   = "6010"
 )
 
 func (s *LedgerService) ensureDefaultAccountID(companyID int, code string) (int, error) {
@@ -827,6 +829,148 @@ func (s *LedgerService) RecordVoucher(companyID, voucherID, userID int) error {
 		}
 	default:
 		return nil
+	}
+	return nil
+}
+
+func (s *LedgerService) RecordAssetCapitalization(companyID, assetEntryID, userID int) error {
+	var amount float64
+	var acquisitionDate time.Time
+	var assetTag string
+	var itemName string
+	var sourceMode string
+	var categoryAccountID sql.NullInt64
+	var offsetAccountID sql.NullInt64
+
+	err := s.db.QueryRow(`
+		SELECT
+			ae.total_value,
+			ae.acquisition_date,
+			ae.asset_tag,
+			ae.item_name,
+			ae.source_mode,
+			ac.ledger_account_id,
+			ae.offset_account_id
+		FROM asset_register_entries ae
+		LEFT JOIN asset_categories ac ON ac.category_id = ae.category_id
+		WHERE ae.asset_entry_id = $1 AND ae.company_id = $2
+	`, assetEntryID, companyID).Scan(
+		&amount,
+		&acquisitionDate,
+		&assetTag,
+		&itemName,
+		&sourceMode,
+		&categoryAccountID,
+		&offsetAccountID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to load asset entry for ledger posting: %w", err)
+	}
+	if amount <= 0 {
+		return nil
+	}
+
+	debitAccountID := 0
+	if categoryAccountID.Valid && categoryAccountID.Int64 > 0 {
+		debitAccountID = int(categoryAccountID.Int64)
+	} else {
+		debitAccountID, err = s.ensureDefaultAccountID(companyID, accountCodeFixedAssets)
+		if err != nil {
+			return err
+		}
+	}
+
+	creditAccountID := 0
+	if sourceMode == "STOCK" {
+		creditAccountID, err = s.ensureDefaultAccountID(companyID, accountCodeInventory)
+		if err != nil {
+			return err
+		}
+	} else if offsetAccountID.Valid && offsetAccountID.Int64 > 0 {
+		creditAccountID = int(offsetAccountID.Int64)
+	} else {
+		return fmt.Errorf("offset account is required for direct asset entries")
+	}
+
+	desc := fmt.Sprintf("Asset capitalization %s - %s", assetTag, itemName)
+	ref1 := fmt.Sprintf("asset:%d:debit:%d", assetEntryID, debitAccountID)
+	if err := s.insertEntryIfMissing(companyID, ref1, debitAccountID, acquisitionDate, amount, 0, "asset", assetEntryID, &desc, nil, userID); err != nil {
+		return err
+	}
+	ref2 := fmt.Sprintf("asset:%d:credit:%d", assetEntryID, creditAccountID)
+	if err := s.insertEntryIfMissing(companyID, ref2, creditAccountID, acquisitionDate, 0, amount, "asset", assetEntryID, &desc, nil, userID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *LedgerService) RecordConsumableUsage(companyID, consumptionID, userID int) error {
+	var amount float64
+	var consumedAt time.Time
+	var itemName string
+	var entryNumber string
+	var sourceMode string
+	var categoryAccountID sql.NullInt64
+	var offsetAccountID sql.NullInt64
+
+	err := s.db.QueryRow(`
+		SELECT
+			ce.total_cost,
+			ce.consumed_at,
+			ce.item_name,
+			ce.entry_number,
+			ce.source_mode,
+			cc.ledger_account_id,
+			ce.offset_account_id
+		FROM consumable_entries ce
+		LEFT JOIN consumable_categories cc ON cc.category_id = ce.category_id
+		WHERE ce.consumption_id = $1 AND ce.company_id = $2
+	`, consumptionID, companyID).Scan(
+		&amount,
+		&consumedAt,
+		&itemName,
+		&entryNumber,
+		&sourceMode,
+		&categoryAccountID,
+		&offsetAccountID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to load consumable entry for ledger posting: %w", err)
+	}
+	if amount <= 0 {
+		return nil
+	}
+
+	debitAccountID := 0
+	if categoryAccountID.Valid && categoryAccountID.Int64 > 0 {
+		debitAccountID = int(categoryAccountID.Int64)
+	} else {
+		debitAccountID, err = s.ensureDefaultAccountID(companyID, accountCodeConsumables)
+		if err != nil {
+			return err
+		}
+	}
+
+	creditAccountID := 0
+	if sourceMode == "STOCK" {
+		creditAccountID, err = s.ensureDefaultAccountID(companyID, accountCodeInventory)
+		if err != nil {
+			return err
+		}
+	} else if offsetAccountID.Valid && offsetAccountID.Int64 > 0 {
+		creditAccountID = int(offsetAccountID.Int64)
+	} else {
+		return fmt.Errorf("offset account is required for direct consumable entries")
+	}
+
+	desc := fmt.Sprintf("Consumable usage %s - %s", entryNumber, itemName)
+	ref1 := fmt.Sprintf("consumable:%d:debit:%d", consumptionID, debitAccountID)
+	if err := s.insertEntryIfMissing(companyID, ref1, debitAccountID, consumedAt, amount, 0, "consumable", consumptionID, &desc, nil, userID); err != nil {
+		return err
+	}
+	ref2 := fmt.Sprintf("consumable:%d:credit:%d", consumptionID, creditAccountID)
+	if err := s.insertEntryIfMissing(companyID, ref2, creditAccountID, consumedAt, 0, amount, "consumable", consumptionID, &desc, nil, userID); err != nil {
+		return err
 	}
 	return nil
 }

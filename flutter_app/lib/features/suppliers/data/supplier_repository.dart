@@ -26,7 +26,11 @@ class SupplierRepository {
     return const [];
   }
 
-  Future<List<SupplierDto>> getSuppliers({String? search}) async {
+  Future<List<SupplierDto>> getSuppliers({
+    String? search,
+    bool? isMercantile,
+    bool? isNonMercantile,
+  }) async {
     final outbox = _ref.read(outboxNotifierProvider.notifier);
     final store = _ref.read(cacheStoreProvider);
     final q = (search ?? '').trim();
@@ -35,12 +39,25 @@ class SupplierRepository {
       final cached = q.isEmpty
           ? await store.listSuppliers(limit: 300)
           : await store.searchSuppliers(query: q, limit: 300);
-      return cached.map(SupplierDto.fromJson).toList();
+      return cached
+          .map(SupplierDto.fromJson)
+          .where((supplier) =>
+              isMercantile == null || supplier.isMercantile == isMercantile)
+          .where((supplier) =>
+              isNonMercantile == null ||
+              supplier.isNonMercantile == isNonMercantile)
+          .toList();
     }
 
     final qp = <String, dynamic>{};
     if (search != null && search.trim().isNotEmpty) {
       qp['search'] = search.trim();
+    }
+    if (isMercantile != null) {
+      qp['is_mercantile'] = isMercantile;
+    }
+    if (isNonMercantile != null) {
+      qp['is_non_mercantile'] = isNonMercantile;
     }
     final res = await _dio.get('/suppliers', queryParameters: qp);
     final data = _extractList(res);
@@ -168,7 +185,9 @@ class SupplierRepository {
       String? email,
       String? address,
       int? paymentTerms,
-      double? creditLimit}) async {
+      double? creditLimit,
+      required bool isMercantile,
+      required bool isNonMercantile}) async {
     final body = <String, dynamic>{'name': name};
     if (contact != null) body['contact_person'] = contact;
     if (phone != null) body['phone'] = phone;
@@ -176,6 +195,8 @@ class SupplierRepository {
     if (address != null) body['address'] = address;
     if (paymentTerms != null) body['payment_terms'] = paymentTerms;
     if (creditLimit != null) body['credit_limit'] = creditLimit;
+    body['is_mercantile'] = isMercantile;
+    body['is_non_mercantile'] = isNonMercantile;
     final res = await _dio.post('/suppliers', data: body);
     final bodyRes =
         res.data is Map<String, dynamic> ? res.data['data'] : res.data;
@@ -191,6 +212,8 @@ class SupplierRepository {
       String? address,
       int? paymentTerms,
       double? creditLimit,
+      bool? isMercantile,
+      bool? isNonMercantile,
       bool? isActive}) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
@@ -200,6 +223,10 @@ class SupplierRepository {
     if (address != null) body['address'] = address;
     if (paymentTerms != null) body['payment_terms'] = paymentTerms;
     if (creditLimit != null) body['credit_limit'] = creditLimit;
+    if (isMercantile != null) body['is_mercantile'] = isMercantile;
+    if (isNonMercantile != null) {
+      body['is_non_mercantile'] = isNonMercantile;
+    }
     if (isActive != null) body['is_active'] = isActive;
     final res = await _dio.put('/suppliers/$supplierId', data: body);
     final bodyRes =

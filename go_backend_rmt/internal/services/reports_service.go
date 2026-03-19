@@ -816,6 +816,127 @@ func (s *ReportsService) GetTopPerformers(companyID int, fromDate, toDate string
 	return queryToMaps(s.db, query, companyID, fromArg, toArg, limit)
 }
 
+func (s *ReportsService) GetAssetRegisterReport(companyID int, locationID *int, fromDate, toDate string) ([]map[string]interface{}, error) {
+	query := `
+		SELECT
+			ae.asset_tag,
+			ae.item_name,
+			COALESCE(ac.name, 'Uncategorized') AS category_name,
+			COALESCE(sup.name, '') AS supplier_name,
+			ae.location_id,
+			ae.acquisition_date,
+			ae.in_service_date,
+			ae.status,
+			ae.source_mode,
+			ae.quantity::float8 AS quantity,
+			ae.unit_cost::float8 AS unit_cost,
+			ae.total_value::float8 AS total_value
+		FROM asset_register_entries ae
+		LEFT JOIN asset_categories ac ON ac.category_id = ae.category_id
+		LEFT JOIN suppliers sup ON sup.supplier_id = ae.supplier_id
+		WHERE ae.company_id = $1
+		  AND ($2::int IS NULL OR ae.location_id = $2)
+		  AND ($3::timestamp IS NULL OR ae.acquisition_date >= $3)
+		  AND ($4::timestamp IS NULL OR ae.acquisition_date <= $4)
+		ORDER BY ae.acquisition_date DESC, ae.asset_entry_id DESC
+	`
+	var locArg interface{}
+	if locationID != nil {
+		locArg = *locationID
+	}
+	var fromArg interface{}
+	if fromDate != "" {
+		fromArg = fromDate
+	}
+	var toArg interface{}
+	if toDate != "" {
+		toArg = toDate
+	}
+	return queryToMaps(s.db, query, companyID, locArg, fromArg, toArg)
+}
+
+func (s *ReportsService) GetAssetValueSummary(companyID int, locationID *int) ([]map[string]interface{}, error) {
+	query := `
+		SELECT
+			COALESCE(ac.name, 'Uncategorized') AS category_name,
+			ae.status,
+			COUNT(*)::int AS item_count,
+			COALESCE(SUM(ae.total_value), 0)::float8 AS total_value
+		FROM asset_register_entries ae
+		LEFT JOIN asset_categories ac ON ac.category_id = ae.category_id
+		WHERE ae.company_id = $1
+		  AND ($2::int IS NULL OR ae.location_id = $2)
+		GROUP BY COALESCE(ac.name, 'Uncategorized'), ae.status
+		ORDER BY total_value DESC, category_name
+	`
+	var locArg interface{}
+	if locationID != nil {
+		locArg = *locationID
+	}
+	return queryToMaps(s.db, query, companyID, locArg)
+}
+
+func (s *ReportsService) GetConsumableConsumptionReport(companyID int, locationID *int, fromDate, toDate string) ([]map[string]interface{}, error) {
+	query := `
+		SELECT
+			ce.entry_number,
+			ce.item_name,
+			COALESCE(cc.name, 'Uncategorized') AS category_name,
+			COALESCE(sup.name, '') AS supplier_name,
+			ce.location_id,
+			ce.consumed_at,
+			ce.source_mode,
+			ce.quantity::float8 AS quantity,
+			ce.unit_cost::float8 AS unit_cost,
+			ce.total_cost::float8 AS total_cost
+		FROM consumable_entries ce
+		LEFT JOIN consumable_categories cc ON cc.category_id = ce.category_id
+		LEFT JOIN suppliers sup ON sup.supplier_id = ce.supplier_id
+		WHERE ce.company_id = $1
+		  AND ($2::int IS NULL OR ce.location_id = $2)
+		  AND ($3::timestamp IS NULL OR ce.consumed_at >= $3)
+		  AND ($4::timestamp IS NULL OR ce.consumed_at <= $4)
+		ORDER BY ce.consumed_at DESC, ce.consumption_id DESC
+	`
+	var locArg interface{}
+	if locationID != nil {
+		locArg = *locationID
+	}
+	var fromArg interface{}
+	if fromDate != "" {
+		fromArg = fromDate
+	}
+	var toArg interface{}
+	if toDate != "" {
+		toArg = toDate
+	}
+	return queryToMaps(s.db, query, companyID, locArg, fromArg, toArg)
+}
+
+func (s *ReportsService) GetConsumableBalanceReport(companyID int, locationID *int) ([]map[string]interface{}, error) {
+	query := `
+		SELECT
+			p.product_id,
+			p.name AS product_name,
+			COALESCE(st.location_id, $2::int) AS location_id,
+			COALESCE(SUM(st.quantity), 0)::float8 AS quantity,
+			COALESCE(SUM(st.quantity * COALESCE(p.cost_price, 0)), 0)::float8 AS stock_value
+		FROM products p
+		LEFT JOIN stock st ON st.product_id = p.product_id
+		WHERE p.company_id = $1
+		  AND p.is_deleted = FALSE
+		  AND COALESCE(p.item_type, 'PRODUCT') = 'CONSUMABLE'
+		  AND ($2::int IS NULL OR st.location_id = $2)
+		GROUP BY p.product_id, p.name, COALESCE(st.location_id, $2::int)
+		ORDER BY stock_value DESC, product_name
+	`
+	var locArg interface{}
+	if locationID != nil {
+		locArg = *locationID
+	}
+	return queryToMaps(s.db, query, companyID, locArg)
+}
+
 func queryToMaps(db *sql.DB, query string, args ...interface{}) ([]map[string]interface{}, error) {
 	rows, err := db.Query(query, args...)
 	if err != nil {

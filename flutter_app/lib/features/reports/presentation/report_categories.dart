@@ -126,4 +126,31 @@ const inventoryReports = <ReportConfig>[
     endpoint: '/reports/valuation',
     description: 'Inventory quantities and carrying values by product.',
   ),
+  ReportConfig(
+    title: 'Asset Register',
+    endpoint: '/reports/asset-register',
+    description:
+        'Capitalized asset entries with asset tags, classes, status, and values.',
+  ),
+  ReportConfig(
+    title: 'Asset Value Summary',
+    endpoint: '/reports/asset-value-summary',
+    description:
+        'Asset counts and capitalized values summarized by class and status.',
+    supportsDateRange: false,
+  ),
+  ReportConfig(
+    title: 'Consumable Consumption',
+    endpoint: '/reports/consumable-consumption',
+    description:
+        'Consumable usage entries by item, category, source, quantity, and cost.',
+  ),
+  ReportConfig(
+    title: 'Consumable Balance',
+    endpoint: '/reports/consumable-balance',
+    description:
+        'Remaining consumable stock quantities and carrying values by item.',
+    supportsDateRange: false,
+    supportsProductId: false,
+  ),
 ];

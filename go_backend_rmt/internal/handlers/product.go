@@ -44,6 +44,9 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 	if isActive := c.Query("is_active"); isActive != "" {
 		filters["is_active"] = isActive
 	}
+	if itemType := c.Query("item_type"); itemType != "" {
+		filters["item_type"] = itemType
+	}
 
 	products, err := h.productService.GetProducts(companyID, filters)
 	if err != nil {

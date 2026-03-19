@@ -457,3 +457,67 @@ func (h *ReportsHandler) GetTopPerformers(c *gin.Context) {
 	}
 	h.handleReportResponse(c, "Top performers report retrieved successfully", data)
 }
+
+func (h *ReportsHandler) GetAssetRegisterReport(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	var locationID *int
+	if val := c.Query("location_id"); val != "" {
+		if id, err := strconv.Atoi(val); err == nil {
+			locationID = &id
+		}
+	}
+	data, err := h.reportsService.GetAssetRegisterReport(companyID, locationID, c.Query("from_date"), c.Query("to_date"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get asset register report", err)
+		return
+	}
+	h.handleReportResponse(c, "Asset register report retrieved successfully", data)
+}
+
+func (h *ReportsHandler) GetAssetValueSummaryReport(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	var locationID *int
+	if val := c.Query("location_id"); val != "" {
+		if id, err := strconv.Atoi(val); err == nil {
+			locationID = &id
+		}
+	}
+	data, err := h.reportsService.GetAssetValueSummary(companyID, locationID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get asset value summary report", err)
+		return
+	}
+	h.handleReportResponse(c, "Asset value summary report retrieved successfully", data)
+}
+
+func (h *ReportsHandler) GetConsumableConsumptionReport(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	var locationID *int
+	if val := c.Query("location_id"); val != "" {
+		if id, err := strconv.Atoi(val); err == nil {
+			locationID = &id
+		}
+	}
+	data, err := h.reportsService.GetConsumableConsumptionReport(companyID, locationID, c.Query("from_date"), c.Query("to_date"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get consumable consumption report", err)
+		return
+	}
+	h.handleReportResponse(c, "Consumable consumption report retrieved successfully", data)
+}
+
+func (h *ReportsHandler) GetConsumableBalanceReport(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	var locationID *int
+	if val := c.Query("location_id"); val != "" {
+		if id, err := strconv.Atoi(val); err == nil {
+			locationID = &id
+		}
+	}
+	data, err := h.reportsService.GetConsumableBalanceReport(companyID, locationID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get consumable balance report", err)
+		return
+	}
+	h.handleReportResponse(c, "Consumable balance report retrieved successfully", data)
+}

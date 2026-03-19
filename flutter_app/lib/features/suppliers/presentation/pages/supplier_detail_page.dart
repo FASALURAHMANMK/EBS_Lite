@@ -87,6 +87,7 @@ class _SupplierDetailPageState extends ConsumerState<SupplierDetailPage> {
                       if ((sup.email ?? '').isNotEmpty) 'Email: ${sup.email}',
                       if ((sup.address ?? '').isNotEmpty)
                         'Address: ${sup.address}',
+                      'Usage: ${sup.usageLabel}',
                       'Credit Limit: ${sup.creditLimit.toStringAsFixed(2)} | Terms: ${sup.paymentTerms} days',
                     ].join('\n')),
                     isThreeLine: true,

@@ -43,11 +43,28 @@ class InventoryRepository {
     return const [];
   }
 
-  Future<List<InventoryListItem>> getStock() async {
+  Map<String, dynamic> _extractMap(Response res) {
+    final body = res.data;
+    if (body is Map<String, dynamic>) {
+      final data = body['data'];
+      if (data is Map<String, dynamic>) return data;
+      return body;
+    }
+    if (body is Map) {
+      return body.cast<String, dynamic>();
+    }
+    return const {};
+  }
+
+  Future<List<InventoryListItem>> getStock({String? itemType}) async {
     final loc = _requireLocation();
+    final qp = <String, dynamic>{'location_id': loc};
+    if (itemType != null && itemType.trim().isNotEmpty) {
+      qp['item_type'] = itemType.trim().toUpperCase();
+    }
     final res = await _dio.get(
       '/inventory/stock',
-      queryParameters: {'location_id': loc},
+      queryParameters: qp,
     );
     final data = _extractList(res);
     return data
@@ -311,6 +328,21 @@ class InventoryRepository {
   Future<ProductDto> getProduct(int id) async {
     final res = await _dio.get('/products/$id');
     return ProductDto.fromJson(res.data['data'] as Map<String, dynamic>);
+  }
+
+  Future<List<ProductDto>> getProducts({String? itemType}) async {
+    final qp = <String, dynamic>{};
+    if (itemType != null && itemType.trim().isNotEmpty) {
+      qp['item_type'] = itemType.trim().toUpperCase();
+    }
+    final res = await _dio.get(
+      '/products',
+      queryParameters: qp.isEmpty ? null : qp,
+    );
+    final data = _extractList(res);
+    return data
+        .map((e) => ProductDto.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<ProductAttributeDefinitionDto>> getAttributeDefinitions() async {
@@ -594,6 +626,162 @@ class InventoryRepository {
 
   Future<void> cancelStockTransfer(int id) async {
     await _dio.delete('/inventory/transfers/$id');
+  }
+
+  Future<List<AssetCategoryDto>> getAssetCategories() async {
+    final res = await _dio.get('/inventory/asset-categories');
+    final data = _extractList(res);
+    return data
+        .map((e) => AssetCategoryDto.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<AssetCategoryDto> createAssetCategory({
+    required String name,
+    String? description,
+    int? ledgerAccountId,
+  }) async {
+    final res = await _dio.post(
+      '/inventory/asset-categories',
+      data: {
+        'name': name.trim(),
+        if ((description ?? '').trim().isNotEmpty)
+          'description': description!.trim(),
+        if (ledgerAccountId != null) 'ledger_account_id': ledgerAccountId,
+      },
+    );
+    return AssetCategoryDto.fromJson(_extractMap(res));
+  }
+
+  Future<AssetCategoryDto> updateAssetCategory({
+    required int id,
+    String? name,
+    String? description,
+    int? ledgerAccountId,
+    bool? isActive,
+  }) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name.trim();
+    if (description != null) {
+      body['description'] =
+          description.trim().isEmpty ? null : description.trim();
+    }
+    if (ledgerAccountId != null) body['ledger_account_id'] = ledgerAccountId;
+    if (isActive != null) body['is_active'] = isActive;
+    final res = await _dio.put('/inventory/asset-categories/$id', data: body);
+    return AssetCategoryDto.fromJson(_extractMap(res));
+  }
+
+  Future<void> deleteAssetCategory(int id) async {
+    await _dio.delete('/inventory/asset-categories/$id');
+  }
+
+  Future<List<ConsumableCategoryDto>> getConsumableCategories() async {
+    final res = await _dio.get('/inventory/consumable-categories');
+    final data = _extractList(res);
+    return data
+        .map((e) => ConsumableCategoryDto.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<ConsumableCategoryDto> createConsumableCategory({
+    required String name,
+    String? description,
+    int? ledgerAccountId,
+  }) async {
+    final res = await _dio.post(
+      '/inventory/consumable-categories',
+      data: {
+        'name': name.trim(),
+        if ((description ?? '').trim().isNotEmpty)
+          'description': description!.trim(),
+        if (ledgerAccountId != null) 'ledger_account_id': ledgerAccountId,
+      },
+    );
+    return ConsumableCategoryDto.fromJson(_extractMap(res));
+  }
+
+  Future<ConsumableCategoryDto> updateConsumableCategory({
+    required int id,
+    String? name,
+    String? description,
+    int? ledgerAccountId,
+    bool? isActive,
+  }) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name.trim();
+    if (description != null) {
+      body['description'] =
+          description.trim().isEmpty ? null : description.trim();
+    }
+    if (ledgerAccountId != null) body['ledger_account_id'] = ledgerAccountId;
+    if (isActive != null) body['is_active'] = isActive;
+    final res =
+        await _dio.put('/inventory/consumable-categories/$id', data: body);
+    return ConsumableCategoryDto.fromJson(_extractMap(res));
+  }
+
+  Future<void> deleteConsumableCategory(int id) async {
+    await _dio.delete('/inventory/consumable-categories/$id');
+  }
+
+  Future<List<AssetRegisterEntryDto>> getAssetRegister({String? search}) async {
+    final qp = <String, dynamic>{'location_id': _requireLocation()};
+    if ((search ?? '').trim().isNotEmpty) qp['search'] = search!.trim();
+    final res = await _dio.get('/inventory/assets', queryParameters: qp);
+    final data = _extractList(res);
+    return data
+        .map((e) => AssetRegisterEntryDto.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<AssetRegisterSummaryDto> getAssetRegisterSummary() async {
+    final res = await _dio.get(
+      '/inventory/assets/summary',
+      queryParameters: {'location_id': _requireLocation()},
+    );
+    return AssetRegisterSummaryDto.fromJson(_extractMap(res));
+  }
+
+  Future<AssetRegisterEntryDto> createAssetRegisterEntry(
+    CreateAssetRegisterEntryPayload payload,
+  ) async {
+    final res = await _dio.post(
+      '/inventory/assets',
+      queryParameters: {'location_id': _requireLocation()},
+      data: payload.toJson(),
+    );
+    return AssetRegisterEntryDto.fromJson(_extractMap(res));
+  }
+
+  Future<List<ConsumableEntryDto>> getConsumableEntries(
+      {String? search}) async {
+    final qp = <String, dynamic>{'location_id': _requireLocation()};
+    if ((search ?? '').trim().isNotEmpty) qp['search'] = search!.trim();
+    final res = await _dio.get('/inventory/consumptions', queryParameters: qp);
+    final data = _extractList(res);
+    return data
+        .map((e) => ConsumableEntryDto.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<ConsumableSummaryDto> getConsumableSummary() async {
+    final res = await _dio.get(
+      '/inventory/consumptions/summary',
+      queryParameters: {'location_id': _requireLocation()},
+    );
+    return ConsumableSummaryDto.fromJson(_extractMap(res));
+  }
+
+  Future<ConsumableEntryDto> createConsumableEntry(
+    CreateConsumableEntryPayload payload,
+  ) async {
+    final res = await _dio.post(
+      '/inventory/consumptions',
+      queryParameters: {'location_id': _requireLocation()},
+      data: payload.toJson(),
+    );
+    return ConsumableEntryDto.fromJson(_extractMap(res));
   }
 }
 

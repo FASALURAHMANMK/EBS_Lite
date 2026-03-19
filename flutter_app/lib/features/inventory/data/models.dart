@@ -578,6 +578,7 @@ class ProductTransactionDto {
 class ProductDto {
   final int productId;
   final int companyId;
+  final String itemType;
   final int? categoryId;
   final int? brandId;
   final int? unitId; // stock keeping UOM
@@ -607,6 +608,7 @@ class ProductDto {
   ProductDto({
     required this.productId,
     required this.companyId,
+    this.itemType = 'PRODUCT',
     this.categoryId,
     this.brandId,
     this.unitId,
@@ -637,6 +639,7 @@ class ProductDto {
   factory ProductDto.fromJson(Map<String, dynamic> json) => ProductDto(
         productId: json['product_id'] as int,
         companyId: json['company_id'] as int,
+        itemType: (json['item_type'] as String? ?? 'PRODUCT').toUpperCase(),
         categoryId: json['category_id'] as int?,
         brandId: json['brand_id'] as int?,
         unitId: json['unit_id'] as int?,
@@ -692,6 +695,7 @@ class ProductDto {
       );
 
   Map<String, dynamic> toUpdateJson() => {
+        'item_type': itemType,
         if (categoryId != null) 'category_id': categoryId,
         if (brandId != null) 'brand_id': brandId,
         if (unitId != null) 'unit_id': unitId,
@@ -723,6 +727,7 @@ class ProductDto {
 }
 
 class CreateProductPayload {
+  final String itemType;
   final int? categoryId;
   final int? brandId;
   final int? unitId; // stock keeping UOM
@@ -749,6 +754,7 @@ class CreateProductPayload {
   final int? defaultSupplierId;
 
   CreateProductPayload({
+    this.itemType = 'PRODUCT',
     this.categoryId,
     this.brandId,
     this.unitId,
@@ -776,6 +782,7 @@ class CreateProductPayload {
   });
 
   Map<String, dynamic> toJson() => {
+        'item_type': itemType,
         if (categoryId != null) 'category_id': categoryId,
         if (brandId != null) 'brand_id': brandId,
         if (unitId != null) 'unit_id': unitId,
@@ -801,6 +808,482 @@ class CreateProductPayload {
         if (attributes != null && attributes!.isNotEmpty)
           'attributes': attributes!.map((k, v) => MapEntry(k.toString(), v)),
         if (defaultSupplierId != null) 'default_supplier_id': defaultSupplierId,
+      };
+}
+
+class AssetCategoryDto {
+  final int categoryId;
+  final int companyId;
+  final String name;
+  final String? description;
+  final int? ledgerAccountId;
+  final String? ledgerCode;
+  final String? ledgerName;
+  final bool isActive;
+
+  const AssetCategoryDto({
+    required this.categoryId,
+    required this.companyId,
+    required this.name,
+    this.description,
+    this.ledgerAccountId,
+    this.ledgerCode,
+    this.ledgerName,
+    this.isActive = true,
+  });
+
+  String get ledgerDisplay {
+    final code = (ledgerCode ?? '').trim();
+    final name = (ledgerName ?? '').trim();
+    if (code.isEmpty && name.isEmpty) return 'Default fixed asset ledger';
+    if (code.isEmpty) return name;
+    if (name.isEmpty) return code;
+    return '$code $name';
+  }
+
+  factory AssetCategoryDto.fromJson(Map<String, dynamic> json) =>
+      AssetCategoryDto(
+        categoryId: json['category_id'] as int? ?? 0,
+        companyId: json['company_id'] as int? ?? 0,
+        name: json['name'] as String? ?? '',
+        description: json['description'] as String?,
+        ledgerAccountId: json['ledger_account_id'] as int?,
+        ledgerCode: json['ledger_code'] as String?,
+        ledgerName: json['ledger_name'] as String?,
+        isActive: json['is_active'] as bool? ?? true,
+      );
+}
+
+class ConsumableCategoryDto {
+  final int categoryId;
+  final int companyId;
+  final String name;
+  final String? description;
+  final int? ledgerAccountId;
+  final String? ledgerCode;
+  final String? ledgerName;
+  final bool isActive;
+
+  const ConsumableCategoryDto({
+    required this.categoryId,
+    required this.companyId,
+    required this.name,
+    this.description,
+    this.ledgerAccountId,
+    this.ledgerCode,
+    this.ledgerName,
+    this.isActive = true,
+  });
+
+  String get ledgerDisplay {
+    final code = (ledgerCode ?? '').trim();
+    final name = (ledgerName ?? '').trim();
+    if (code.isEmpty && name.isEmpty) return 'Default consumables expense';
+    if (code.isEmpty) return name;
+    if (name.isEmpty) return code;
+    return '$code $name';
+  }
+
+  factory ConsumableCategoryDto.fromJson(Map<String, dynamic> json) =>
+      ConsumableCategoryDto(
+        categoryId: json['category_id'] as int? ?? 0,
+        companyId: json['company_id'] as int? ?? 0,
+        name: json['name'] as String? ?? '',
+        description: json['description'] as String?,
+        ledgerAccountId: json['ledger_account_id'] as int?,
+        ledgerCode: json['ledger_code'] as String?,
+        ledgerName: json['ledger_name'] as String?,
+        isActive: json['is_active'] as bool? ?? true,
+      );
+}
+
+class AssetRegisterEntryDto {
+  final int assetEntryId;
+  final int companyId;
+  final int locationId;
+  final String assetTag;
+  final int? productId;
+  final int? barcodeId;
+  final int? categoryId;
+  final int? supplierId;
+  final String itemName;
+  final String sourceMode;
+  final double quantity;
+  final double unitCost;
+  final double totalValue;
+  final DateTime? acquisitionDate;
+  final DateTime? inServiceDate;
+  final String status;
+  final int? offsetAccountId;
+  final String? offsetAccountCode;
+  final String? offsetAccountName;
+  final String? notes;
+  final List<String> serialNumbers;
+  final List<InventoryBatchAllocationDto> batchAllocations;
+  final String? categoryName;
+  final String? productName;
+  final String? supplierName;
+  final int createdBy;
+  final DateTime? createdAt;
+
+  const AssetRegisterEntryDto({
+    required this.assetEntryId,
+    required this.companyId,
+    required this.locationId,
+    required this.assetTag,
+    this.productId,
+    this.barcodeId,
+    this.categoryId,
+    this.supplierId,
+    required this.itemName,
+    required this.sourceMode,
+    required this.quantity,
+    required this.unitCost,
+    required this.totalValue,
+    this.acquisitionDate,
+    this.inServiceDate,
+    required this.status,
+    this.offsetAccountId,
+    this.offsetAccountCode,
+    this.offsetAccountName,
+    this.notes,
+    this.serialNumbers = const [],
+    this.batchAllocations = const [],
+    this.categoryName,
+    this.productName,
+    this.supplierName,
+    required this.createdBy,
+    this.createdAt,
+  });
+
+  String get sourceModeLabel =>
+      sourceMode == 'STOCK' ? 'Stock Issue' : 'Direct Entry';
+
+  String get statusLabel {
+    final raw = status.trim();
+    if (raw.isEmpty) return 'Unknown';
+    return raw
+        .split('_')
+        .map((part) => part.isEmpty
+            ? part
+            : part[0].toUpperCase() + part.substring(1).toLowerCase())
+        .join(' ');
+  }
+
+  String get offsetLedgerDisplay {
+    final code = (offsetAccountCode ?? '').trim();
+    final name = (offsetAccountName ?? '').trim();
+    if (code.isEmpty && name.isEmpty) return 'Not assigned';
+    if (code.isEmpty) return name;
+    if (name.isEmpty) return code;
+    return '$code $name';
+  }
+
+  factory AssetRegisterEntryDto.fromJson(Map<String, dynamic> json) =>
+      AssetRegisterEntryDto(
+        assetEntryId: json['asset_entry_id'] as int? ?? 0,
+        companyId: json['company_id'] as int? ?? 0,
+        locationId: json['location_id'] as int? ?? 0,
+        assetTag: json['asset_tag'] as String? ?? '',
+        productId: json['product_id'] as int?,
+        barcodeId: json['barcode_id'] as int?,
+        categoryId: json['category_id'] as int?,
+        supplierId: json['supplier_id'] as int?,
+        itemName: json['item_name'] as String? ?? '',
+        sourceMode: json['source_mode'] as String? ?? 'DIRECT',
+        quantity: (json['quantity'] as num?)?.toDouble() ?? 0,
+        unitCost: (json['unit_cost'] as num?)?.toDouble() ?? 0,
+        totalValue: (json['total_value'] as num?)?.toDouble() ?? 0,
+        acquisitionDate: json['acquisition_date'] != null
+            ? DateTime.tryParse(json['acquisition_date'] as String)
+            : null,
+        inServiceDate: json['in_service_date'] != null
+            ? DateTime.tryParse(json['in_service_date'] as String)
+            : null,
+        status: json['status'] as String? ?? 'ACTIVE',
+        offsetAccountId: json['offset_account_id'] as int?,
+        offsetAccountCode: json['offset_account_code'] as String?,
+        offsetAccountName: json['offset_account_name'] as String?,
+        notes: json['notes'] as String?,
+        serialNumbers: (json['serial_numbers'] as List?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const [],
+        batchAllocations: (json['batch_allocations'] as List?)
+                ?.map((e) => InventoryBatchAllocationDto.fromJson(
+                    e as Map<String, dynamic>))
+                .toList() ??
+            const [],
+        categoryName: json['category_name'] as String?,
+        productName: json['product_name'] as String?,
+        supplierName: json['supplier_name'] as String?,
+        createdBy: json['created_by'] as int? ?? 0,
+        createdAt: json['created_at'] != null
+            ? DateTime.tryParse(json['created_at'] as String)
+            : null,
+      );
+}
+
+class AssetRegisterSummaryDto {
+  final int totalItems;
+  final int activeItems;
+  final double totalValue;
+  final double averageItemCost;
+
+  const AssetRegisterSummaryDto({
+    required this.totalItems,
+    required this.activeItems,
+    required this.totalValue,
+    required this.averageItemCost,
+  });
+
+  factory AssetRegisterSummaryDto.fromJson(Map<String, dynamic> json) =>
+      AssetRegisterSummaryDto(
+        totalItems: json['total_items'] as int? ?? 0,
+        activeItems: json['active_items'] as int? ?? 0,
+        totalValue: (json['total_value'] as num?)?.toDouble() ?? 0,
+        averageItemCost: (json['average_item_cost'] as num?)?.toDouble() ?? 0,
+      );
+}
+
+class CreateAssetRegisterEntryPayload {
+  final int? categoryId;
+  final int? productId;
+  final int? barcodeId;
+  final int? supplierId;
+  final String? itemName;
+  final String? assetTag;
+  final String sourceMode;
+  final double quantity;
+  final double? unitCost;
+  final DateTime acquisitionDate;
+  final DateTime? inServiceDate;
+  final String? status;
+  final int? offsetAccountId;
+  final String? notes;
+  final List<String> serialNumbers;
+  final List<InventoryBatchAllocationDto> batchAllocations;
+
+  const CreateAssetRegisterEntryPayload({
+    this.categoryId,
+    this.productId,
+    this.barcodeId,
+    this.supplierId,
+    this.itemName,
+    this.assetTag,
+    required this.sourceMode,
+    required this.quantity,
+    this.unitCost,
+    required this.acquisitionDate,
+    this.inServiceDate,
+    this.status,
+    this.offsetAccountId,
+    this.notes,
+    this.serialNumbers = const [],
+    this.batchAllocations = const [],
+  });
+
+  Map<String, dynamic> toJson() => {
+        if (categoryId != null) 'category_id': categoryId,
+        if (productId != null) 'product_id': productId,
+        if (barcodeId != null) 'barcode_id': barcodeId,
+        if (supplierId != null) 'supplier_id': supplierId,
+        if (itemName != null && itemName!.trim().isNotEmpty)
+          'item_name': itemName!.trim(),
+        if (assetTag != null && assetTag!.trim().isNotEmpty)
+          'asset_tag': assetTag!.trim(),
+        'source_mode': sourceMode,
+        'quantity': quantity,
+        if (unitCost != null) 'unit_cost': unitCost,
+        'acquisition_date': acquisitionDate.toIso8601String(),
+        if (inServiceDate != null)
+          'in_service_date': inServiceDate!.toIso8601String(),
+        if (status != null && status!.trim().isNotEmpty) 'status': status,
+        if (offsetAccountId != null) 'offset_account_id': offsetAccountId,
+        if (notes != null && notes!.trim().isNotEmpty) 'notes': notes!.trim(),
+        if (serialNumbers.isNotEmpty) 'serial_numbers': serialNumbers,
+        if (batchAllocations.isNotEmpty)
+          'batch_allocations': batchAllocations.map((e) => e.toJson()).toList(),
+      };
+}
+
+class ConsumableEntryDto {
+  final int consumptionId;
+  final int companyId;
+  final int locationId;
+  final String entryNumber;
+  final int? categoryId;
+  final int? productId;
+  final int? barcodeId;
+  final int? supplierId;
+  final String itemName;
+  final String sourceMode;
+  final double quantity;
+  final double unitCost;
+  final double totalCost;
+  final DateTime? consumedAt;
+  final int? offsetAccountId;
+  final String? offsetAccountCode;
+  final String? offsetAccountName;
+  final String? notes;
+  final List<String> serialNumbers;
+  final List<InventoryBatchAllocationDto> batchAllocations;
+  final String? categoryName;
+  final String? productName;
+  final String? supplierName;
+  final int createdBy;
+  final DateTime? createdAt;
+
+  const ConsumableEntryDto({
+    required this.consumptionId,
+    required this.companyId,
+    required this.locationId,
+    required this.entryNumber,
+    this.categoryId,
+    this.productId,
+    this.barcodeId,
+    this.supplierId,
+    required this.itemName,
+    required this.sourceMode,
+    required this.quantity,
+    required this.unitCost,
+    required this.totalCost,
+    this.consumedAt,
+    this.offsetAccountId,
+    this.offsetAccountCode,
+    this.offsetAccountName,
+    this.notes,
+    this.serialNumbers = const [],
+    this.batchAllocations = const [],
+    this.categoryName,
+    this.productName,
+    this.supplierName,
+    required this.createdBy,
+    this.createdAt,
+  });
+
+  String get sourceModeLabel =>
+      sourceMode == 'STOCK' ? 'Stock Issue' : 'Direct Entry';
+
+  String get offsetLedgerDisplay {
+    final code = (offsetAccountCode ?? '').trim();
+    final name = (offsetAccountName ?? '').trim();
+    if (code.isEmpty && name.isEmpty) return 'Not assigned';
+    if (code.isEmpty) return name;
+    if (name.isEmpty) return code;
+    return '$code $name';
+  }
+
+  factory ConsumableEntryDto.fromJson(Map<String, dynamic> json) =>
+      ConsumableEntryDto(
+        consumptionId: json['consumption_id'] as int? ?? 0,
+        companyId: json['company_id'] as int? ?? 0,
+        locationId: json['location_id'] as int? ?? 0,
+        entryNumber: json['entry_number'] as String? ?? '',
+        categoryId: json['category_id'] as int?,
+        productId: json['product_id'] as int?,
+        barcodeId: json['barcode_id'] as int?,
+        supplierId: json['supplier_id'] as int?,
+        itemName: json['item_name'] as String? ?? '',
+        sourceMode: json['source_mode'] as String? ?? 'DIRECT',
+        quantity: (json['quantity'] as num?)?.toDouble() ?? 0,
+        unitCost: (json['unit_cost'] as num?)?.toDouble() ?? 0,
+        totalCost: (json['total_cost'] as num?)?.toDouble() ?? 0,
+        consumedAt: json['consumed_at'] != null
+            ? DateTime.tryParse(json['consumed_at'] as String)
+            : null,
+        offsetAccountId: json['offset_account_id'] as int?,
+        offsetAccountCode: json['offset_account_code'] as String?,
+        offsetAccountName: json['offset_account_name'] as String?,
+        notes: json['notes'] as String?,
+        serialNumbers: (json['serial_numbers'] as List?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            const [],
+        batchAllocations: (json['batch_allocations'] as List?)
+                ?.map((e) => InventoryBatchAllocationDto.fromJson(
+                    e as Map<String, dynamic>))
+                .toList() ??
+            const [],
+        categoryName: json['category_name'] as String?,
+        productName: json['product_name'] as String?,
+        supplierName: json['supplier_name'] as String?,
+        createdBy: json['created_by'] as int? ?? 0,
+        createdAt: json['created_at'] != null
+            ? DateTime.tryParse(json['created_at'] as String)
+            : null,
+      );
+}
+
+class ConsumableSummaryDto {
+  final int totalEntries;
+  final double totalQuantity;
+  final double totalCost;
+  final double averageUnitCost;
+
+  const ConsumableSummaryDto({
+    required this.totalEntries,
+    required this.totalQuantity,
+    required this.totalCost,
+    required this.averageUnitCost,
+  });
+
+  factory ConsumableSummaryDto.fromJson(Map<String, dynamic> json) =>
+      ConsumableSummaryDto(
+        totalEntries: json['total_entries'] as int? ?? 0,
+        totalQuantity: (json['total_quantity'] as num?)?.toDouble() ?? 0,
+        totalCost: (json['total_cost'] as num?)?.toDouble() ?? 0,
+        averageUnitCost: (json['average_unit_cost'] as num?)?.toDouble() ?? 0,
+      );
+}
+
+class CreateConsumableEntryPayload {
+  final int? categoryId;
+  final int? productId;
+  final int? barcodeId;
+  final int? supplierId;
+  final String? itemName;
+  final String sourceMode;
+  final double quantity;
+  final double? unitCost;
+  final DateTime consumedAt;
+  final int? offsetAccountId;
+  final String? notes;
+  final List<String> serialNumbers;
+  final List<InventoryBatchAllocationDto> batchAllocations;
+
+  const CreateConsumableEntryPayload({
+    this.categoryId,
+    this.productId,
+    this.barcodeId,
+    this.supplierId,
+    this.itemName,
+    required this.sourceMode,
+    required this.quantity,
+    this.unitCost,
+    required this.consumedAt,
+    this.offsetAccountId,
+    this.notes,
+    this.serialNumbers = const [],
+    this.batchAllocations = const [],
+  });
+
+  Map<String, dynamic> toJson() => {
+        if (categoryId != null) 'category_id': categoryId,
+        if (productId != null) 'product_id': productId,
+        if (barcodeId != null) 'barcode_id': barcodeId,
+        if (supplierId != null) 'supplier_id': supplierId,
+        if (itemName != null && itemName!.trim().isNotEmpty)
+          'item_name': itemName!.trim(),
+        'source_mode': sourceMode,
+        'quantity': quantity,
+        if (unitCost != null) 'unit_cost': unitCost,
+        'consumed_at': consumedAt.toIso8601String(),
+        if (offsetAccountId != null) 'offset_account_id': offsetAccountId,
+        if (notes != null && notes!.trim().isNotEmpty) 'notes': notes!.trim(),
+        if (serialNumbers.isNotEmpty) 'serial_numbers': serialNumbers,
+        if (batchAllocations.isNotEmpty)
+          'batch_allocations': batchAllocations.map((e) => e.toJson()).toList(),
       };
 }
 

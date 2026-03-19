@@ -121,7 +121,7 @@ func (s *InventoryService) loadTransferIssueUnitCostTx(tx *sql.Tx, companyID, fr
 	return unitCost, nil
 }
 
-func (s *InventoryService) GetStock(companyID, locationID int, productID *int) ([]models.StockWithProduct, error) {
+func (s *InventoryService) GetStock(companyID, locationID int, productID *int, itemType *string) ([]models.StockWithProduct, error) {
 	// Select products in the company and left-join stock for the requested location.
 	// COALESCE stock fields to avoid NULL scans and to return zero-quantity rows.
 	query := `
@@ -167,6 +167,11 @@ func (s *InventoryService) GetStock(companyID, locationID int, productID *int) (
 		argCount++
 		query += fmt.Sprintf(" AND p.product_id = $%d", argCount)
 		args = append(args, *productID)
+	}
+	if itemType != nil && strings.TrimSpace(*itemType) != "" {
+		argCount++
+		query += fmt.Sprintf(" AND COALESCE(p.item_type, 'PRODUCT') = $%d", argCount)
+		args = append(args, normalizeProductItemType(*itemType))
 	}
 
 	query += " ORDER BY p.name"
@@ -2469,6 +2474,58 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
              AND sa.reason LIKE d.document_number || '%'
             WHERE l.company_id = $1 AND sa.product_id = $2`
 		with, a, _ := buildWhere(base, "sa.location_id", "sa.created_at")
+		selects = append(selects, with)
+		selectArgs = append(selectArgs, a...)
+	}
+
+	// Asset capitalization from stock (outgoing)
+	{
+		base := `
+            SELECT
+                'ASSET_CAPITALIZATION' AS type,
+                im.occurred_at AS occurred_at,
+                COALESCE(ae.asset_tag, im.source_ref, CONCAT('AST-', im.movement_id)) AS reference,
+                im.quantity AS quantity,
+                im.location_id AS location_id,
+                l.name AS location_name,
+                NULL AS partner_name,
+                'asset_register' AS entity,
+                COALESCE(ae.asset_entry_id, 0) AS entity_id,
+                COALESCE(im.notes, ae.notes) AS notes
+            FROM inventory_movements im
+            JOIN locations l ON im.location_id = l.location_id
+            LEFT JOIN asset_register_entries ae
+              ON im.source_type = 'asset_register_entry'
+             AND ae.company_id = im.company_id
+             AND ae.asset_tag = im.source_ref
+            WHERE im.company_id = $1 AND im.product_id = $2 AND im.source_type = 'asset_register_entry'`
+		with, a, _ := buildWhere(base, "im.location_id", "im.occurred_at")
+		selects = append(selects, with)
+		selectArgs = append(selectArgs, a...)
+	}
+
+	// Consumable usage from stock (outgoing)
+	{
+		base := `
+            SELECT
+                'CONSUMPTION' AS type,
+                im.occurred_at AS occurred_at,
+                COALESCE(ce.entry_number, im.source_ref, CONCAT('CON-', im.movement_id)) AS reference,
+                im.quantity AS quantity,
+                im.location_id AS location_id,
+                l.name AS location_name,
+                NULL AS partner_name,
+                'consumable_entry' AS entity,
+                COALESCE(ce.consumption_id, 0) AS entity_id,
+                COALESCE(im.notes, ce.notes) AS notes
+            FROM inventory_movements im
+            JOIN locations l ON im.location_id = l.location_id
+            LEFT JOIN consumable_entries ce
+              ON im.source_type = 'consumable_entry'
+             AND ce.company_id = im.company_id
+             AND ce.entry_number = im.source_ref
+            WHERE im.company_id = $1 AND im.product_id = $2 AND im.source_type = 'consumable_entry'`
+		with, a, _ := buildWhere(base, "im.location_id", "im.occurred_at")
 		selects = append(selects, with)
 		selectArgs = append(selectArgs, a...)
 	}

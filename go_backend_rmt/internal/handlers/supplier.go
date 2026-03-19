@@ -35,6 +35,12 @@ func (h *SupplierHandler) GetSuppliers(c *gin.Context) {
 	if isActive := c.Query("is_active"); isActive != "" {
 		filters["is_active"] = isActive
 	}
+	if isMercantile := c.Query("is_mercantile"); isMercantile != "" {
+		filters["is_mercantile"] = isMercantile
+	}
+	if isNonMercantile := c.Query("is_non_mercantile"); isNonMercantile != "" {
+		filters["is_non_mercantile"] = isNonMercantile
+	}
 	if search := c.Query("search"); search != "" {
 		filters["search"] = search
 	}

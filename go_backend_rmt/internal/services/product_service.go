@@ -105,7 +105,7 @@ func barcodeLookupKey(value string) string {
 
 func (s *ProductService) GetProducts(companyID int, filters map[string]string) ([]models.Product, error) {
 	query := `
-                SELECT product_id, company_id, category_id, brand_id, unit_id, purchase_unit_id, selling_unit_id,
+                SELECT product_id, company_id, item_type, category_id, brand_id, unit_id, purchase_unit_id, selling_unit_id,
                            purchase_uom_mode, selling_uom_mode, purchase_to_stock_factor, selling_to_stock_factor, is_weighable, name, sku,
                            description, cost_price, selling_price, reorder_level, weight, dimensions,
                            is_serialized, tracking_type, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted
@@ -134,6 +134,11 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 		query += fmt.Sprintf(" AND is_active = $%d", argCount)
 		args = append(args, isActive == "true")
 	}
+	if itemType := filters["item_type"]; itemType != "" {
+		argCount++
+		query += fmt.Sprintf(" AND COALESCE(item_type, 'PRODUCT') = $%d", argCount)
+		args = append(args, normalizeProductItemType(itemType))
+	}
 
 	query += " ORDER BY name"
 
@@ -148,7 +153,7 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 	for rows.Next() {
 		var product models.Product
 		err := rows.Scan(
-			&product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
+			&product.ProductID, &product.CompanyID, &product.ItemType, &product.CategoryID, &product.BrandID,
 			&product.UnitID, &product.PurchaseUnitID, &product.SellingUnitID,
 			&product.PurchaseUOMMode, &product.SellingUOMMode, &product.PurchaseToStock, &product.SellingToStock, &product.IsWeighable,
 			&product.Name, &product.SKU, &product.Description,
@@ -159,6 +164,7 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan product: %w", err)
 		}
+		product.ItemType = normalizeProductItemType(product.ItemType)
 		rawTrackingType := product.TrackingType
 		product.TrackingType = normalizeTrackingType(rawTrackingType)
 		product.IsSerialized = normalizeSerializedFlag(product.IsSerialized, rawTrackingType)
@@ -192,7 +198,7 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 
 func (s *ProductService) GetProductByID(productID, companyID int) (*models.Product, error) {
 	query := `
-                SELECT product_id, company_id, category_id, brand_id, unit_id, purchase_unit_id, selling_unit_id,
+                SELECT product_id, company_id, item_type, category_id, brand_id, unit_id, purchase_unit_id, selling_unit_id,
                            purchase_uom_mode, selling_uom_mode, purchase_to_stock_factor, selling_to_stock_factor, is_weighable, name, sku,
                            description, cost_price, selling_price, reorder_level, weight, dimensions,
                            is_serialized, tracking_type, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted,
@@ -203,7 +209,7 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
 
 	var product models.Product
 	err := s.db.QueryRow(query, productID, companyID).Scan(
-		&product.ProductID, &product.CompanyID, &product.CategoryID, &product.BrandID,
+		&product.ProductID, &product.CompanyID, &product.ItemType, &product.CategoryID, &product.BrandID,
 		&product.UnitID, &product.PurchaseUnitID, &product.SellingUnitID,
 		&product.PurchaseUOMMode, &product.SellingUOMMode, &product.PurchaseToStock, &product.SellingToStock, &product.IsWeighable,
 		&product.Name, &product.SKU, &product.Description,
@@ -219,6 +225,7 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
 	if err != nil {
 		return nil, fmt.Errorf("failed to get product: %w", err)
 	}
+	product.ItemType = normalizeProductItemType(product.ItemType)
 	rawTrackingType := product.TrackingType
 	product.TrackingType = normalizeTrackingType(rawTrackingType)
 	product.IsSerialized = normalizeSerializedFlag(product.IsSerialized, rawTrackingType)
@@ -288,17 +295,17 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 
 	query := `
                 INSERT INTO products (
-                        company_id, category_id, brand_id, unit_id, purchase_unit_id, selling_unit_id,
+                        company_id, item_type, category_id, brand_id, unit_id, purchase_unit_id, selling_unit_id,
                         purchase_uom_mode, selling_uom_mode, purchase_to_stock_factor, selling_to_stock_factor,
                         is_weighable, tax_id, name, sku, description, cost_price, selling_price, reorder_level,
                         weight, dimensions, is_serialized, tracking_type, created_by, updated_by, default_supplier_id
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
                 RETURNING product_id, created_at
         `
 
 	var product models.Product
 	err = tx.QueryRow(query,
-		companyID, req.CategoryID, req.BrandID, req.UnitID, purchaseUnitID, sellingUnitID,
+		companyID, normalizeProductItemType(valueOrNil(req.ItemType)), req.CategoryID, req.BrandID, req.UnitID, purchaseUnitID, sellingUnitID,
 		purchaseMode, sellingMode, purchaseFactor, sellingFactor, req.IsWeighable, req.TaxID, req.Name, req.SKU,
 		req.Description, req.CostPrice, req.SellingPrice, req.ReorderLevel, req.Weight,
 		req.Dimensions, isSerialized, trackingType, userID, userID, req.DefaultSupplierID,
@@ -327,6 +334,7 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 
 	// Set the response fields
 	product.CompanyID = companyID
+	product.ItemType = normalizeProductItemType(valueOrNil(req.ItemType))
 	product.CategoryID = req.CategoryID
 	product.BrandID = req.BrandID
 	product.UnitID = req.UnitID
@@ -402,6 +410,13 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 		setParts = append(setParts, fmt.Sprintf("category_id = $%d", argCount))
 		args = append(args, *req.CategoryID)
 		changes["category_id"] = *req.CategoryID
+	}
+	if req.ItemType != nil {
+		itemType := normalizeProductItemType(*req.ItemType)
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("item_type = $%d", argCount))
+		args = append(args, itemType)
+		changes["item_type"] = itemType
 	}
 	if req.BrandID != nil {
 		argCount++

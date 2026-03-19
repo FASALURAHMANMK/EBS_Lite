@@ -3,6 +3,7 @@ package models
 type Product struct {
 	ProductID         int                     `json:"product_id" db:"product_id"`
 	CompanyID         int                     `json:"company_id" db:"company_id"`
+	ItemType          string                  `json:"item_type" db:"item_type"`
 	CategoryID        *int                    `json:"category_id,omitempty" db:"category_id"`
 	BrandID           *int                    `json:"brand_id,omitempty" db:"brand_id"`
 	UnitID            *int                    `json:"unit_id,omitempty" db:"unit_id"`
@@ -34,6 +35,7 @@ type Product struct {
 }
 
 type CreateProductRequest struct {
+	ItemType          *string          `json:"item_type,omitempty"`
 	CategoryID        *int             `json:"category_id,omitempty"`
 	BrandID           *int             `json:"brand_id,omitempty"`
 	UnitID            *int             `json:"unit_id,omitempty"`
@@ -61,6 +63,7 @@ type CreateProductRequest struct {
 }
 
 type UpdateProductRequest struct {
+	ItemType          *string          `json:"item_type,omitempty"`
 	CategoryID        *int             `json:"category_id,omitempty"`
 	BrandID           *int             `json:"brand_id,omitempty"`
 	UnitID            *int             `json:"unit_id,omitempty"`

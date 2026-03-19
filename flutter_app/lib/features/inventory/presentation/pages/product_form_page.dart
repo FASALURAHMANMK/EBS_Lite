@@ -12,9 +12,16 @@ import '../../../dashboard/data/taxes_repository.dart';
 import '../../../dashboard/controllers/location_notifier.dart';
 
 class ProductFormPage extends ConsumerStatefulWidget {
-  const ProductFormPage({super.key, this.initialName});
+  const ProductFormPage({
+    super.key,
+    this.initialName,
+    this.initialItemType,
+    this.title,
+  });
 
   final String? initialName;
+  final String? initialItemType;
+  final String? title;
 
   @override
   ConsumerState<ProductFormPage> createState() => _ProductFormPageState();
@@ -64,6 +71,23 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   // Barcodes handled via dialog
   final List<ProductBarcodeDto> _barcodes = [];
   List<ProductStorageAssignmentPayload> _storageAssignments = const [];
+
+  String get _itemType =>
+      (widget.initialItemType ?? 'PRODUCT').trim().toUpperCase();
+
+  String get _pageTitle {
+    if ((widget.title ?? '').trim().isNotEmpty) {
+      return widget.title!.trim();
+    }
+    switch (_itemType) {
+      case 'ASSET':
+        return 'New Asset Item';
+      case 'CONSUMABLE':
+        return 'New Consumable Item';
+      default:
+        return 'New Product';
+    }
+  }
 
   @override
   void dispose() {
@@ -190,6 +214,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       }
 
       final payload = CreateProductPayload(
+        itemType: _itemType,
         name: _name.text.trim(),
         sku: _sku.text.trim().isEmpty ? null : _sku.text.trim(),
         sellingPrice: double.tryParse(_price.text.trim()),
@@ -319,7 +344,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       length: 5,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('New Product'),
+          title: Text(_pageTitle),
           bottom: const TabBar(
             isScrollable: true,
             tabs: [
@@ -764,6 +789,20 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        InputDecorator(
+          decoration: const InputDecoration(
+            labelText: 'Item Type',
+            border: OutlineInputBorder(),
+          ),
+          child: Text(
+            _itemType == 'ASSET'
+                ? 'Asset Item'
+                : _itemType == 'CONSUMABLE'
+                    ? 'Consumable Item'
+                    : 'Product',
+          ),
+        ),
+        const SizedBox(height: 12),
         TextFormField(
           controller: _name,
           decoration: const InputDecoration(labelText: 'Name'),

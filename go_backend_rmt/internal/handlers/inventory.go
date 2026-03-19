@@ -52,8 +52,12 @@ func (h *InventoryHandler) GetStock(c *gin.Context) {
 			productID = &id
 		}
 	}
+	var itemType *string
+	if raw := c.Query("item_type"); raw != "" {
+		itemType = &raw
+	}
 
-	stock, err := h.inventoryService.GetStock(companyID, locationID, productID)
+	stock, err := h.inventoryService.GetStock(companyID, locationID, productID, itemType)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get stock", err)
 		return

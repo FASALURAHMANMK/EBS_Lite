@@ -17,12 +17,14 @@ var minimalDefaultChartOfAccounts = []defaultAccount{
 	{Code: "1010", Name: "Bank", Type: "ASSET", Subtype: "BANK"},
 	{Code: "1100", Name: "Accounts Receivable", Type: "ASSET", Subtype: "AR"},
 	{Code: "1200", Name: "Inventory", Type: "ASSET", Subtype: "INVENTORY"},
+	{Code: "1210", Name: "Fixed Assets", Type: "ASSET", Subtype: "FIXED_ASSET"},
 	{Code: "2000", Name: "Accounts Payable", Type: "LIABILITY", Subtype: "AP"},
 	{Code: "2100", Name: "Tax Payable", Type: "LIABILITY", Subtype: "TAX_PAYABLE"},
 	{Code: "2200", Name: "Tax Receivable", Type: "ASSET", Subtype: "TAX_RECEIVABLE"},
 	{Code: "4000", Name: "Sales Revenue", Type: "REVENUE", Subtype: "SALES"},
 	{Code: "5000", Name: "Cost of Goods Sold", Type: "EXPENSE", Subtype: "COGS"},
 	{Code: "6000", Name: "Expenses", Type: "EXPENSE", Subtype: "EXPENSES"},
+	{Code: "6010", Name: "Consumables Expense", Type: "EXPENSE", Subtype: "CONSUMABLE_EXPENSE"},
 }
 
 func seedMinimalChartOfAccountsTx(tx *sql.Tx, companyID int) error {

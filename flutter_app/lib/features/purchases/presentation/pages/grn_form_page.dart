@@ -603,6 +603,8 @@ class _SupplierPicker extends ConsumerWidget {
                             address: null,
                             paymentTerms: 0,
                             creditLimit: 0,
+                            isMercantile: true,
+                            isNonMercantile: false,
                             isActive: true,
                             totalPurchases: 0,
                             totalReturns: 0,

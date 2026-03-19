@@ -7,7 +7,9 @@ import 'stock_transfers_page.dart';
 import 'category_management_page.dart';
 import 'brand_management_page.dart';
 import 'attribute_management_page.dart';
+import 'asset_management_page.dart';
 import 'combo_definitions_page.dart';
+import 'consumable_management_page.dart';
 
 class InventoryPage extends StatelessWidget {
   const InventoryPage({super.key});
@@ -69,6 +71,20 @@ class InventoryPage extends StatelessWidget {
         label: 'Combos',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const ComboDefinitionsPage()),
+        ),
+      ),
+      FeatureItem(
+        icon: Icons.apartment_rounded,
+        label: 'Asset Register',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AssetManagementPage()),
+        ),
+      ),
+      FeatureItem(
+        icon: Icons.science_rounded,
+        label: 'Consumables',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ConsumableManagementPage()),
         ),
       ),
     ];

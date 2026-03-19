@@ -7,6 +7,8 @@ class SupplierDto {
   final String? address;
   final int paymentTerms; // days
   final double creditLimit;
+  final bool isMercantile;
+  final bool isNonMercantile;
   final bool isActive;
   final double totalPurchases;
   final double totalReturns;
@@ -22,6 +24,8 @@ class SupplierDto {
     this.address,
     required this.paymentTerms,
     required this.creditLimit,
+    required this.isMercantile,
+    required this.isNonMercantile,
     required this.isActive,
     required this.totalPurchases,
     required this.totalReturns,
@@ -38,6 +42,8 @@ class SupplierDto {
         address: json['address'] as String?,
         paymentTerms: json['payment_terms'] as int? ?? 0,
         creditLimit: (json['credit_limit'] as num?)?.toDouble() ?? 0,
+        isMercantile: json['is_mercantile'] as bool? ?? true,
+        isNonMercantile: json['is_non_mercantile'] as bool? ?? false,
         isActive: json['is_active'] as bool? ?? true,
         totalPurchases: (json['total_purchases'] as num?)?.toDouble() ?? 0,
         totalReturns: (json['total_returns'] as num?)?.toDouble() ?? 0,
@@ -47,6 +53,13 @@ class SupplierDto {
             ? DateTime.tryParse(json['last_purchase_date'] as String)
             : null,
       );
+
+  String get usageLabel {
+    final labels = <String>[];
+    if (isMercantile) labels.add('Mercantile');
+    if (isNonMercantile) labels.add('Non-Mercantile');
+    return labels.isEmpty ? 'Unassigned' : labels.join(' • ');
+  }
 }
 
 class SupplierSummaryDto {

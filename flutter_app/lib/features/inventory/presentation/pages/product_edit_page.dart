@@ -63,6 +63,18 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   // description/weight/dimensions removed; use attributes
   List<ProductStorageAssignmentPayload> _storageAssignments = const [];
 
+  String get _pageTitle {
+    final itemType = (_product?.itemType ?? 'PRODUCT').toUpperCase();
+    switch (itemType) {
+      case 'ASSET':
+        return 'Edit Asset Item';
+      case 'CONSUMABLE':
+        return 'Edit Consumable Item';
+      default:
+        return 'Edit Product';
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -277,6 +289,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       final updated = ProductDto(
         productId: p.productId,
         companyId: p.companyId,
+        itemType: p.itemType,
         categoryId: _categoryId,
         brandId: _brandId,
         unitId: _unitId,
@@ -394,7 +407,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       length: 5,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Edit Product'),
+          title: Text(_pageTitle),
           actions: [
             IconButton(
               tooltip: 'Delete',
@@ -513,6 +526,25 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        InputDecorator(
+          decoration: const InputDecoration(
+            labelText: 'Item Type',
+            border: OutlineInputBorder(),
+          ),
+          child: Text(
+            (() {
+              switch ((_product?.itemType ?? 'PRODUCT').toUpperCase()) {
+                case 'ASSET':
+                  return 'Asset Item';
+                case 'CONSUMABLE':
+                  return 'Consumable Item';
+                default:
+                  return 'Product';
+              }
+            })(),
+          ),
+        ),
+        const SizedBox(height: 12),
         TextFormField(
           controller: _name,
           decoration: const InputDecoration(labelText: 'Name'),

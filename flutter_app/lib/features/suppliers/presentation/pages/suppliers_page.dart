@@ -143,7 +143,8 @@ class _SupplierTile extends StatelessWidget {
           style: theme.textTheme.titleMedium
               ?.copyWith(fontWeight: FontWeight.w700)),
       subtitle: Text(
-          'Purchases: ${item.totalPurchases.toStringAsFixed(2)} • Outstanding: ${item.outstandingAmount.toStringAsFixed(2)}'),
+          '${item.usageLabel}\nPurchases: ${item.totalPurchases.toStringAsFixed(2)} • Outstanding: ${item.outstandingAmount.toStringAsFixed(2)}'),
+      isThreeLine: true,
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
