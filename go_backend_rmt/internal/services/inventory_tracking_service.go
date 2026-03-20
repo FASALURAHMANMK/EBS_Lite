@@ -30,6 +30,9 @@ type inventorySelection struct {
 	ProductID        int
 	BarcodeID        *int
 	ComboProductID   *int
+	SupplierID       *int
+	PurchaseID       *int
+	GoodsReceiptID   *int
 	Quantity         float64
 	SerialNumbers    []string
 	BatchAllocations []models.InventoryBatchSelectionInput
@@ -356,9 +359,10 @@ func (s *inventoryTrackingService) createLotTx(tx *sql.Tx, companyID, locationID
 			quantity, remaining_quantity, cost_price, received_date,
 			expiry_date, batch_number, serial_numbers, company_id, barcode_id
 		)
-		VALUES ($1, $2, NULL, NULL, NULL, $3, $3, $4, $5, $6, $7, $8, $9, $10)
+		VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, $9, $10, $11, $12, $13)
 		RETURNING lot_id
-	`, variant.ProductID, locationID, selection.Quantity, selection.UnitCost, receivedDate, selection.ExpiryDate,
+	`, variant.ProductID, locationID, selection.SupplierID, selection.PurchaseID, selection.GoodsReceiptID,
+		selection.Quantity, selection.UnitCost, receivedDate, selection.ExpiryDate,
 		selection.BatchNumber, pq.Array(selection.SerialNumbers), companyID, variant.BarcodeID,
 	).Scan(&lotID)
 	if err != nil {
@@ -769,7 +773,7 @@ func serialStatusForMovement(movementType string) string {
 	switch strings.ToUpper(strings.TrimSpace(movementType)) {
 	case "TRANSFER_OUT":
 		return "TRANSFER_IN_TRANSIT"
-	case "PURCHASE_RETURN", "ADJUSTMENT_OUT":
+	case "PURCHASE_RETURN", "ADJUSTMENT_OUT", "SUPPLIER_DEBIT_NOTE":
 		return "ADJUSTED_OUT"
 	default:
 		return "SOLD"

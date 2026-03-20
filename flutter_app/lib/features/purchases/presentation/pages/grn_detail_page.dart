@@ -17,6 +17,7 @@ class GoodsReceiptDetailPage extends ConsumerStatefulWidget {
 class _GoodsReceiptDetailPageState
     extends ConsumerState<GoodsReceiptDetailPage> {
   GoodsReceiptDetailDto? _detail;
+  List<PurchaseCostAdjustmentDto> _addons = const [];
   bool _loading = true;
 
   @override
@@ -30,8 +31,12 @@ class _GoodsReceiptDetailPageState
     try {
       final repo = ref.read(grnRepositoryProvider);
       final d = await repo.getGoodsReceipt(widget.goodsReceiptId);
+      final addons = await repo.getGoodsReceiptAddons(widget.goodsReceiptId);
       if (!mounted) return;
-      setState(() => _detail = d);
+      setState(() {
+        _detail = d;
+        _addons = addons;
+      });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -58,6 +63,8 @@ class _GoodsReceiptDetailPageState
                       _Header(detail: d),
                       const SizedBox(height: 12),
                       _Items(items: d.items),
+                      const SizedBox(height: 12),
+                      _Addons(addons: _addons),
                     ],
                   ),
       ),
@@ -129,6 +136,46 @@ class _Items extends StatelessWidget {
                   style: theme.textTheme.titleMedium),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _Addons extends StatelessWidget {
+  const _Addons({required this.addons});
+
+  final List<PurchaseCostAdjustmentDto> addons;
+
+  @override
+  Widget build(BuildContext context) {
+    if (addons.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Card(
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Add-ons', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            for (final addon in addons) ...[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(addon.adjustmentNumber),
+                subtitle: Text(
+                  addon.items
+                      .map((item) => item.adjustmentLabel)
+                      .where((label) => label.isNotEmpty)
+                      .join(' • '),
+                ),
+                trailing: Text(addon.totalAmount.toStringAsFixed(2)),
+              ),
+              if (addon != addons.last) const Divider(height: 1),
+            ],
+          ],
+        ),
       ),
     );
   }

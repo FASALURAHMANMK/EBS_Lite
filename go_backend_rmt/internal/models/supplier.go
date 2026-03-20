@@ -27,6 +27,7 @@ type SupplierWithStats struct {
 	Supplier
 	TotalPurchases    float64    `json:"total_purchases"`
 	TotalReturns      float64    `json:"total_returns"`
+	TotalDebitNotes   float64    `json:"total_debit_notes"`
 	OutstandingAmount float64    `json:"outstanding_amount"`
 	LastPurchaseDate  *time.Time `json:"last_purchase_date,omitempty"`
 }
@@ -37,6 +38,7 @@ type SupplierSummary struct {
 	TotalPurchases     float64 `json:"total_purchases"`
 	TotalPayments      float64 `json:"total_payments"`
 	TotalReturns       float64 `json:"total_returns"`
+	TotalDebitNotes    float64 `json:"total_debit_notes"`
 	OutstandingBalance float64 `json:"outstanding_balance"`
 }
 

@@ -12,12 +12,14 @@ import (
 )
 
 type GoodsReceiptHandler struct {
-	purchaseService *services.PurchaseService
+	purchaseService               *services.PurchaseService
+	purchaseCostAdjustmentService *services.PurchaseCostAdjustmentService
 }
 
 func NewGoodsReceiptHandler() *GoodsReceiptHandler {
 	return &GoodsReceiptHandler{
-		purchaseService: services.NewPurchaseService(),
+		purchaseService:               services.NewPurchaseService(),
+		purchaseCostAdjustmentService: services.NewPurchaseCostAdjustmentService(),
 	}
 }
 
@@ -31,12 +33,13 @@ func (h *GoodsReceiptHandler) RecordGoodsReceipt(c *gin.Context) {
 		return
 	}
 
-	if err := h.purchaseService.RecordGoodsReceipt(req.PurchaseID, companyID, userID, &req); err != nil {
+	receipt, err := h.purchaseService.RecordGoodsReceiptDetailed(req.PurchaseID, companyID, userID, &req)
+	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to record goods receipt", err)
 		return
 	}
 
-	utils.SuccessResponse(c, "Goods receipt recorded successfully", nil)
+	utils.SuccessResponse(c, "Goods receipt recorded successfully", receipt)
 }
 
 // GET /goods-receipts
@@ -91,4 +94,52 @@ func (h *GoodsReceiptHandler) GetGoodsReceipt(c *gin.Context) {
 		return
 	}
 	utils.SuccessResponse(c, "Goods receipt retrieved successfully", gr)
+}
+
+func (h *GoodsReceiptHandler) CreateGoodsReceiptAddons(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid GRN ID", err)
+		return
+	}
+	var req models.CreateGoodsReceiptAddonRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+	result, err := h.purchaseCostAdjustmentService.CreateGoodsReceiptAddons(companyID, id, userID, &req)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to add GRN add-ons", err)
+		return
+	}
+	utils.CreatedResponse(c, "Goods receipt add-ons recorded successfully", result)
+}
+
+func (h *GoodsReceiptHandler) GetGoodsReceiptAddons(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid GRN ID", err)
+		return
+	}
+	items, err := h.purchaseCostAdjustmentService.GetGoodsReceiptAddons(companyID, id)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get GRN add-ons", err)
+		return
+	}
+	utils.SuccessResponse(c, "Goods receipt add-ons retrieved successfully", items)
 }

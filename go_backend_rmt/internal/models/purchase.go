@@ -182,24 +182,26 @@ type PurchaseOrderItem struct {
 
 // Goods Receipt Models
 type GoodsReceipt struct {
-	GoodsReceiptID  int                `json:"goods_receipt_id" db:"goods_receipt_id"`
-	ReceiptNumber   string             `json:"receipt_number" db:"receipt_number"`
-	PurchaseOrderID *int               `json:"purchase_order_id,omitempty" db:"purchase_order_id"`
-	PurchaseID      *int               `json:"purchase_id,omitempty" db:"purchase_id"`
-	LocationID      int                `json:"location_id" db:"location_id"`
-	SupplierID      int                `json:"supplier_id" db:"supplier_id"`
-	ReceivedDate    time.Time          `json:"received_date" db:"received_date"`
-	ReceivedBy      int                `json:"received_by" db:"received_by"`
-	WorkflowStateID *int               `json:"workflow_state_id,omitempty" db:"workflow_state_id"`
-	Items           []GoodsReceiptItem `json:"items,omitempty"`
-	Supplier        *Supplier          `json:"supplier,omitempty"`
-	Location        *Location          `json:"location,omitempty"`
+	GoodsReceiptID  int                      `json:"goods_receipt_id" db:"goods_receipt_id"`
+	ReceiptNumber   string                   `json:"receipt_number" db:"receipt_number"`
+	PurchaseOrderID *int                     `json:"purchase_order_id,omitempty" db:"purchase_order_id"`
+	PurchaseID      *int                     `json:"purchase_id,omitempty" db:"purchase_id"`
+	LocationID      int                      `json:"location_id" db:"location_id"`
+	SupplierID      int                      `json:"supplier_id" db:"supplier_id"`
+	ReceivedDate    time.Time                `json:"received_date" db:"received_date"`
+	ReceivedBy      int                      `json:"received_by" db:"received_by"`
+	WorkflowStateID *int                     `json:"workflow_state_id,omitempty" db:"workflow_state_id"`
+	Items           []GoodsReceiptItem       `json:"items,omitempty"`
+	Adjustments     []PurchaseCostAdjustment `json:"adjustments,omitempty"`
+	Supplier        *Supplier                `json:"supplier,omitempty"`
+	Location        *Location                `json:"location,omitempty"`
 }
 
 type GoodsReceiptItem struct {
 	GoodsReceiptItemID  int      `json:"goods_receipt_item_id" db:"goods_receipt_item_id"`
 	GoodsReceiptID      int      `json:"goods_receipt_id" db:"goods_receipt_id"`
 	PurchaseOrderItemID *int     `json:"purchase_order_item_id,omitempty" db:"purchase_order_item_id"`
+	BarcodeID           *int     `json:"barcode_id,omitempty" db:"barcode_id"`
 	ProductID           int      `json:"product_id" db:"product_id"`
 	ReceivedQuantity    float64  `json:"received_quantity" db:"received_quantity"`
 	UnitPrice           float64  `json:"unit_price" db:"unit_price"`
@@ -211,9 +213,11 @@ type GoodsReceiptItem struct {
 }
 
 type RecordGoodsReceiptRequest struct {
-	PurchaseID    int                          `json:"purchase_id" validate:"required"`
-	ReceiptNumber *string                      `json:"receipt_number,omitempty"`
-	ReceiptDate   *time.Time                   `json:"receipt_date,omitempty"`
-	Notes         *string                      `json:"notes,omitempty"`
-	Items         []ReceivePurchaseItemRequest `json:"items" validate:"required,min=1"`
+	PurchaseID        int                                       `json:"purchase_id" validate:"required"`
+	ReceiptNumber     *string                                   `json:"receipt_number,omitempty"`
+	ReceiptDate       *time.Time                                `json:"receipt_date,omitempty"`
+	Notes             *string                                   `json:"notes,omitempty"`
+	Items             []ReceivePurchaseItemRequest              `json:"items" validate:"required,min=1"`
+	HeaderAdjustments []CreateCostAdjustmentComponentRequest    `json:"header_adjustments,omitempty"`
+	ItemAdjustments   []CreateGoodsReceiptItemAdjustmentRequest `json:"item_adjustments,omitempty"`
 }

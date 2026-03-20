@@ -429,6 +429,14 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				purchases.DELETE("/:id", middleware.RequirePermission("DELETE_PURCHASES"), purchaseHandler.DeletePurchase)
 			}
 
+			supplierDebitNotes := protected.Group("/supplier-debit-notes")
+			supplierDebitNotes.Use(middleware.RequireCompanyAccess())
+			{
+				supplierDebitNotes.GET("", middleware.RequirePermission("VIEW_PURCHASES"), purchaseHandler.GetSupplierDebitNotes)
+				supplierDebitNotes.GET("/:id", middleware.RequirePermission("VIEW_PURCHASES"), purchaseHandler.GetSupplierDebitNote)
+				supplierDebitNotes.POST("", middleware.RequirePermission("CREATE_PURCHASES"), purchaseHandler.CreateSupplierDebitNote)
+			}
+
 			purchaseOrders := protected.Group("/purchase-orders")
 			purchaseOrders.Use(middleware.RequireCompanyAccess())
 			{
@@ -443,7 +451,9 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			{
 				goodsReceipts.GET("", middleware.RequirePermission("VIEW_PURCHASES"), goodsReceiptHandler.GetGoodsReceipts)
 				goodsReceipts.GET("/:id", middleware.RequirePermission("VIEW_PURCHASES"), goodsReceiptHandler.GetGoodsReceipt)
+				goodsReceipts.GET("/:id/addons", middleware.RequirePermission("VIEW_PURCHASES"), goodsReceiptHandler.GetGoodsReceiptAddons)
 				goodsReceipts.POST("", middleware.RequirePermission("RECEIVE_PURCHASES"), goodsReceiptHandler.RecordGoodsReceipt)
+				goodsReceipts.POST("/:id/addons", middleware.RequirePermission("UPDATE_PURCHASES"), goodsReceiptHandler.CreateGoodsReceiptAddons)
 			}
 
 			// Purchase Returns management routes (require company and location)

@@ -127,6 +127,7 @@ class _SupplierDetailPageState extends ConsumerState<SupplierDetailPage> {
                         _metric('Purchased', sum.totalPurchases),
                         _metric('Payments', sum.totalPayments),
                         _metric('Returns', sum.totalReturns),
+                        _metric('Debit Notes', sum.totalDebitNotes),
                         _metric('Balance', sum.outstandingBalance),
                       ],
                     ),

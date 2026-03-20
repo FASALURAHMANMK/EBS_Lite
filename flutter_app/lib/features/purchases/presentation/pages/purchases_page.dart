@@ -3,6 +3,7 @@ import 'package:ebs_lite/shared/widgets/feature_menu.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/purchase_returns_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/purchase_orders_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/goods_receipts_page.dart';
+import 'package:ebs_lite/features/purchases/presentation/pages/supplier_debit_notes_page.dart';
 import '../../../suppliers/presentation/pages/suppliers_page.dart';
 
 class PurchasesPage extends StatelessWidget {
@@ -30,6 +31,13 @@ class PurchasesPage extends StatelessWidget {
         label: 'Purchase Returns',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const PurchaseReturnsPage()),
+        ),
+      ),
+      FeatureItem(
+        icon: Icons.request_quote_rounded,
+        label: 'Supplier Debit Notes',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SupplierDebitNotesPage()),
         ),
       ),
       FeatureItem(

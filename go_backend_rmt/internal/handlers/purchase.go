@@ -14,14 +14,16 @@ import (
 )
 
 type PurchaseHandler struct {
-	purchaseService       *services.PurchaseService
-	purchaseReturnService *services.PurchaseReturnService
+	purchaseService               *services.PurchaseService
+	purchaseReturnService         *services.PurchaseReturnService
+	purchaseCostAdjustmentService *services.PurchaseCostAdjustmentService
 }
 
 func NewPurchaseHandler() *PurchaseHandler {
 	return &PurchaseHandler{
-		purchaseService:       services.NewPurchaseService(),
-		purchaseReturnService: services.NewPurchaseReturnService(),
+		purchaseService:               services.NewPurchaseService(),
+		purchaseReturnService:         services.NewPurchaseReturnService(),
+		purchaseCostAdjustmentService: services.NewPurchaseCostAdjustmentService(),
 	}
 }
 
@@ -321,6 +323,97 @@ func (h *PurchaseHandler) DeletePurchase(c *gin.Context) {
 	utils.SuccessResponse(c, "Purchase deleted successfully", nil)
 }
 
+// GET /supplier-debit-notes
+func (h *PurchaseHandler) GetSupplierDebitNotes(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	if locationParam := c.Query("location_id"); locationParam != "" {
+		if id, err := strconv.Atoi(locationParam); err == nil {
+			locationID = id
+		}
+	}
+	if locationID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+		return
+	}
+	filters := map[string]string{}
+	if supplierID := c.Query("supplier_id"); supplierID != "" {
+		filters["supplier_id"] = supplierID
+	}
+	if purchaseID := c.Query("purchase_id"); purchaseID != "" {
+		filters["purchase_id"] = purchaseID
+	}
+	items, err := h.purchaseCostAdjustmentService.ListSupplierDebitNotes(companyID, locationID, filters)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get supplier debit notes", err)
+		return
+	}
+	utils.SuccessResponse(c, "Supplier debit notes retrieved successfully", items)
+}
+
+// GET /supplier-debit-notes/:id
+func (h *PurchaseHandler) GetSupplierDebitNote(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid supplier debit note ID", err)
+		return
+	}
+	item, err := h.purchaseCostAdjustmentService.GetSupplierDebitNoteByID(companyID, id)
+	if err != nil {
+		if err.Error() == "purchase cost adjustment not found" {
+			utils.NotFoundResponse(c, "Supplier debit note not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get supplier debit note", err)
+		return
+	}
+	utils.SuccessResponse(c, "Supplier debit note retrieved successfully", item)
+}
+
+// POST /supplier-debit-notes
+func (h *PurchaseHandler) CreateSupplierDebitNote(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+	userID := c.GetInt("user_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	if locationParam := c.Query("location_id"); locationParam != "" {
+		if id, err := strconv.Atoi(locationParam); err == nil {
+			locationID = id
+		}
+	}
+	if locationID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+		return
+	}
+	var req models.CreateSupplierDebitNoteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+	item, err := h.purchaseCostAdjustmentService.CreateSupplierDebitNote(companyID, locationID, userID, &req)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create supplier debit note", err)
+		return
+	}
+	utils.CreatedResponse(c, "Supplier debit note created successfully", item)
+}
+
 // GET /purchase-returns
 func (h *PurchaseHandler) GetPurchaseReturns(c *gin.Context) {
 	companyID := c.GetInt("company_id")
@@ -549,7 +642,7 @@ func (h *PurchaseHandler) ReceivePurchase(c *gin.Context) {
 		return
 	}
 
-	err = h.purchaseService.ReceivePurchase(purchaseID, companyID, userID, &req)
+	_, err = h.purchaseService.ReceivePurchase(purchaseID, companyID, userID, &req)
 	if err != nil {
 		if err.Error() == "purchase not found" {
 			utils.NotFoundResponse(c, "Purchase not found")

@@ -577,11 +577,11 @@ func (s *PurchaseService) getPurchaseByIdempotencyKey(key string, companyID, loc
 }
 
 // ReceivePurchase marks a purchase as received and updates inventory
-func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req *models.ReceivePurchaseRequest) error {
+func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req *models.ReceivePurchaseRequest) (*models.GoodsReceipt, error) {
 	// Start transaction
 	tx, err := s.db.Begin()
 	if err != nil {
-		return fmt.Errorf("failed to start transaction: %w", err)
+		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback()
 	trackingSvc := newInventoryTrackingService(s.db)
@@ -598,9 +598,9 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
     `, purchaseID, companyID).Scan(&currentStatus, &locationID, &supplierID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return fmt.Errorf("purchase not found")
+			return nil, fmt.Errorf("purchase not found")
 		}
-		return fmt.Errorf("failed to verify purchase: %w", err)
+		return nil, fmt.Errorf("failed to verify purchase: %w", err)
 	}
 
 	// Allow receiving when purchase is new/approved/partially received
@@ -608,9 +608,9 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 	case "PENDING", "APPROVED", "PARTIALLY_RECEIVED":
 		// ok
 	case "RECEIVED", "CANCELLED":
-		return fmt.Errorf("purchase with status %s cannot be received", currentStatus)
+		return nil, fmt.Errorf("purchase with status %s cannot be received", currentStatus)
 	default:
-		return fmt.Errorf("purchase with status %s cannot be received", currentStatus)
+		return nil, fmt.Errorf("purchase with status %s cannot be received", currentStatus)
 	}
 
 	// Create Goods Receipt header (auto-numbered) if table exists
@@ -633,8 +633,17 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 			// Table or column missing; gracefully disable GRN persistence
 			grSupported = false
 		} else {
-			return fmt.Errorf("failed to insert goods receipt: %w", err)
+			return nil, fmt.Errorf("failed to insert goods receipt: %w", err)
 		}
+	}
+	receiptHeader := &models.GoodsReceipt{
+		GoodsReceiptID: goodsReceiptID,
+		ReceiptNumber:  receiptNumber,
+		PurchaseID:     &purchaseID,
+		LocationID:     locationID,
+		SupplierID:     supplierID,
+		ReceivedDate:   time.Now(),
+		ReceivedBy:     userID,
 	}
 
 	detailIDs := make([]int, 0, len(req.Items))
@@ -643,7 +652,7 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 	}
 	detailSnapshots, err := fetchPurchaseDetailSnapshots(tx, companyID, detailIDs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Update purchase details with received quantities
@@ -661,18 +670,18 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
         `, item.PurchaseDetailID, purchaseID, companyID).Scan(&orderedQty, &receivedSoFar, &existingBarcode)
 		if err != nil {
 			if err == sql.ErrNoRows {
-				return fmt.Errorf("purchase detail with ID %d not found", item.PurchaseDetailID)
+				return nil, fmt.Errorf("purchase detail with ID %d not found", item.PurchaseDetailID)
 			}
-			return fmt.Errorf("failed to verify purchase detail: %w", err)
+			return nil, fmt.Errorf("failed to verify purchase detail: %w", err)
 		}
 
 		if item.ReceivedQuantity <= 0 {
-			return fmt.Errorf("received quantity must be greater than zero for detail ID %d", item.PurchaseDetailID)
+			return nil, fmt.Errorf("received quantity must be greater than zero for detail ID %d", item.PurchaseDetailID)
 		}
 
 		// Validate we don't exceed ordered quantity
 		if receivedSoFar+item.ReceivedQuantity > orderedQty+1e-9 { // small epsilon for float
-			return fmt.Errorf("received quantity exceeds remaining quantity for detail ID %d", item.PurchaseDetailID)
+			return nil, fmt.Errorf("received quantity exceeds remaining quantity for detail ID %d", item.PurchaseDetailID)
 		}
 
 		// Increment received quantity atomically
@@ -684,12 +693,12 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
             WHERE pd.purchase_detail_id = $2 AND pd.purchase_id = p.purchase_id AND p.purchase_id = $3 AND s.company_id = $4
         `, item.ReceivedQuantity, item.PurchaseDetailID, purchaseID, companyID)
 		if err != nil {
-			return fmt.Errorf("failed to update received quantity: %w", err)
+			return nil, fmt.Errorf("failed to update received quantity: %w", err)
 		}
 
 		detailSnapshot, ok := detailSnapshots[item.PurchaseDetailID]
 		if !ok {
-			return fmt.Errorf("purchase detail with ID %d not found", item.PurchaseDetailID)
+			return nil, fmt.Errorf("purchase detail with ID %d not found", item.PurchaseDetailID)
 		}
 		productID := detailSnapshot.ProductID
 		costPrice := detailSnapshot.UnitPrice
@@ -698,7 +707,7 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 		if item.BarcodeID != nil && *item.BarcodeID > 0 &&
 			existingBarcodeID != nil && *existingBarcodeID != *item.BarcodeID &&
 			receivedSoFar > 1e-9 {
-			return fmt.Errorf("cannot change variation for detail ID %d after receiving has started", item.PurchaseDetailID)
+			return nil, fmt.Errorf("cannot change variation for detail ID %d after receiving has started", item.PurchaseDetailID)
 		}
 		effectiveBarcodeID := firstNonNilInt(item.BarcodeID, existingBarcodeID, detailSnapshot.BarcodeID)
 
@@ -713,66 +722,89 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 			WHERE product_id = $1 AND company_id = $2 AND is_deleted = FALSE
 		`, productID, companyID).Scan(&isSerialized); err != nil {
 			if err == sql.ErrNoRows {
-				return fmt.Errorf("product not found")
+				return nil, fmt.Errorf("product not found")
 			}
-			return fmt.Errorf("failed to verify product: %w", err)
+			return nil, fmt.Errorf("failed to verify product: %w", err)
 		}
 		receivedStockQuantity := quantityInStockUOM(item.ReceivedQuantity, detailSnapshot.PurchaseToStock)
 		if isSerialized {
 			if receivedStockQuantity != float64(int(receivedStockQuantity)) {
-				return fmt.Errorf("received quantity must be a whole number for serialized products")
+				return nil, fmt.Errorf("received quantity must be a whole number for serialized products")
 			}
 			if len(item.SerialNumbers) != int(receivedStockQuantity) {
-				return fmt.Errorf("serial numbers count must equal received quantity for serialized products")
+				return nil, fmt.Errorf("serial numbers count must equal received quantity for serialized products")
 			}
 			seen := make(map[string]struct{}, len(item.SerialNumbers))
 			for _, srl := range item.SerialNumbers {
 				if srl == "" {
-					return fmt.Errorf("serial numbers cannot be empty for serialized products")
+					return nil, fmt.Errorf("serial numbers cannot be empty for serialized products")
 				}
 				if _, ok := seen[srl]; ok {
-					return fmt.Errorf("duplicate serial number '%s' in received items", srl)
+					return nil, fmt.Errorf("duplicate serial number '%s' in received items", srl)
 				}
 				seen[srl] = struct{}{}
 			}
 		} else if len(item.SerialNumbers) > 0 {
-			return fmt.Errorf("serial numbers provided for a non-serialized product")
+			return nil, fmt.Errorf("serial numbers provided for a non-serialized product")
 		}
 
 		// Insert goods receipt item row (if supported)
+		var receiptItemID int
 		if grSupported {
 			lineTotal := item.ReceivedQuantity * costPrice
-			if _, err := tx.Exec(`
-                INSERT INTO goods_receipt_items (goods_receipt_id, product_id, received_quantity, unit_price, line_total)
-                VALUES ($1, $2, $3, $4, $5)
-            `, goodsReceiptID, productID, item.ReceivedQuantity, costPrice, lineTotal); err != nil {
+			if err := tx.QueryRow(`
+                INSERT INTO goods_receipt_items (goods_receipt_id, purchase_detail_id, product_id, barcode_id, received_quantity, unit_price, line_total)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING goods_receipt_item_id
+            `, goodsReceiptID, item.PurchaseDetailID, productID, effectiveBarcodeID, item.ReceivedQuantity, costPrice, lineTotal).Scan(&receiptItemID); err != nil {
 				if pqErr, ok := err.(*pq.Error); ok && (string(pqErr.Code) == "42P01" || string(pqErr.Code) == "42703") {
 					grSupported = false
 				} else {
-					return fmt.Errorf("failed to insert goods receipt item: %w", err)
+					return nil, fmt.Errorf("failed to insert goods receipt item: %w", err)
 				}
 			}
+			receiptHeader.Items = append(receiptHeader.Items, models.GoodsReceiptItem{
+				GoodsReceiptItemID: receiptItemID,
+				GoodsReceiptID:     goodsReceiptID,
+				PurchaseDetailID:   item.PurchaseDetailID,
+				ProductID:          productID,
+				BarcodeID:          effectiveBarcodeID,
+				ReceivedQuantity:   item.ReceivedQuantity,
+				UnitPrice:          costPrice,
+				LineTotal:          lineTotal,
+			})
 		}
 
 		if receivedStockQuantity > 0 {
 			variant, err := trackingSvc.ReceiveStockTx(tx, companyID, locationID, userID, "PURCHASE_RECEIPT", "purchase_detail", &item.PurchaseDetailID, nil, inventorySelection{
-				ProductID:     productID,
-				BarcodeID:     effectiveBarcodeID,
-				Quantity:      receivedStockQuantity,
-				SerialNumbers: item.SerialNumbers,
-				BatchNumber:   item.BatchNumber,
-				ExpiryDate:    item.ExpiryDate,
-				UnitCost:      costPricePerStock,
+				ProductID:      productID,
+				BarcodeID:      effectiveBarcodeID,
+				SupplierID:     &supplierID,
+				PurchaseID:     &purchaseID,
+				GoodsReceiptID: &goodsReceiptID,
+				Quantity:       receivedStockQuantity,
+				SerialNumbers:  item.SerialNumbers,
+				BatchNumber:    item.BatchNumber,
+				ExpiryDate:     item.ExpiryDate,
+				UnitCost:       costPricePerStock,
 			})
 			if err != nil {
-				return fmt.Errorf("failed to receive inventory: %w", err)
+				return nil, fmt.Errorf("failed to receive inventory: %w", err)
 			}
 			if _, err := tx.Exec(`
 				UPDATE purchase_details
 				SET barcode_id = $1
 				WHERE purchase_detail_id = $2
 			`, variant.BarcodeID, item.PurchaseDetailID); err != nil {
-				return fmt.Errorf("failed to update purchase detail variation: %w", err)
+				return nil, fmt.Errorf("failed to update purchase detail variation: %w", err)
+			}
+			if receiptItemID > 0 {
+				for idx := range receiptHeader.Items {
+					if receiptHeader.Items[idx].GoodsReceiptItemID == receiptItemID {
+						receiptHeader.Items[idx].BarcodeID = &variant.BarcodeID
+						break
+					}
+				}
 			}
 		}
 	}
@@ -786,7 +818,7 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 		WHERE pd.purchase_id = $1 AND s.company_id = $2 AND pd.quantity > pd.received_quantity
 	`, purchaseID, companyID).Scan(&pendingItems)
 	if err != nil {
-		return fmt.Errorf("failed to check pending items: %w", err)
+		return nil, fmt.Errorf("failed to check pending items: %w", err)
 	}
 
 	// Update purchase status
@@ -802,10 +834,13 @@ func (s *PurchaseService) ReceivePurchase(purchaseID, companyID, userID int, req
 		WHERE p.purchase_id = $3 AND p.supplier_id = s.supplier_id AND s.company_id = $4
 	`, newStatus, userID, purchaseID, companyID)
 	if err != nil {
-		return fmt.Errorf("failed to update purchase status: %w", err)
+		return nil, fmt.Errorf("failed to update purchase status: %w", err)
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return receiptHeader, nil
 }
 
 // Add this method to get pending purchases for receiving
@@ -875,7 +910,7 @@ func (s *PurchaseService) GetGoodsReceiptByID(companyID, id int) (*models.GoodsR
 
 	// Items
 	rows, err := s.db.Query(`
-        SELECT gri.goods_receipt_item_id, gri.goods_receipt_id, gri.product_id,
+        SELECT gri.goods_receipt_item_id, gri.goods_receipt_id, gri.purchase_detail_id, gri.barcode_id, gri.product_id,
                gri.received_quantity, gri.unit_price, gri.line_total,
                p.name, p.sku
         FROM goods_receipt_items gri
@@ -892,11 +927,13 @@ func (s *PurchaseService) GetGoodsReceiptByID(companyID, id int) (*models.GoodsR
 
 	for rows.Next() {
 		var it models.GoodsReceiptItem
+		var barcodeID sql.NullInt64
 		var name, sku sql.NullString
-		if err := rows.Scan(&it.GoodsReceiptItemID, &it.GoodsReceiptID, &it.ProductID,
+		if err := rows.Scan(&it.GoodsReceiptItemID, &it.GoodsReceiptID, &it.PurchaseDetailID, &barcodeID, &it.ProductID,
 			&it.ReceivedQuantity, &it.UnitPrice, &it.LineTotal, &name, &sku); err != nil {
 			return nil, fmt.Errorf("failed to scan goods receipt item: %w", err)
 		}
+		it.BarcodeID = intPtrFromNullInt64(barcodeID)
 		it.Product = &models.Product{ProductID: it.ProductID, Name: name.String, SKU: nullStringToStringPtr(sku)}
 		gr.Items = append(gr.Items, it)
 	}
@@ -1233,6 +1270,29 @@ func (s *PurchaseService) ApprovePurchaseOrder(purchaseID, companyID, userID int
 
 // RecordGoodsReceipt records a goods receipt note for a purchase
 func (s *PurchaseService) RecordGoodsReceipt(purchaseID, companyID, userID int, req *models.RecordGoodsReceiptRequest) error {
+	_, err := s.RecordGoodsReceiptDetailed(purchaseID, companyID, userID, req)
+	return err
+}
+
+func (s *PurchaseService) RecordGoodsReceiptDetailed(purchaseID, companyID, userID int, req *models.RecordGoodsReceiptRequest) (*models.GoodsReceipt, error) {
 	receiveReq := &models.ReceivePurchaseRequest{Items: req.Items}
-	return s.ReceivePurchase(purchaseID, companyID, userID, receiveReq)
+	receipt, err := s.ReceivePurchase(purchaseID, companyID, userID, receiveReq)
+	if err != nil {
+		return nil, err
+	}
+	if receipt != nil && (len(req.HeaderAdjustments) > 0 || len(req.ItemAdjustments) > 0) {
+		adjSvc := NewPurchaseCostAdjustmentService()
+		addonReq := &models.CreateGoodsReceiptAddonRequest{
+			ReferenceNumber:   req.ReceiptNumber,
+			Notes:             req.Notes,
+			HeaderAdjustments: req.HeaderAdjustments,
+			ItemAdjustments:   req.ItemAdjustments,
+		}
+		addon, err := adjSvc.CreateGoodsReceiptAddons(companyID, receipt.GoodsReceiptID, userID, addonReq)
+		if err != nil {
+			return nil, err
+		}
+		receipt.Adjustments = append(receipt.Adjustments, *addon)
+	}
+	return receipt, nil
 }

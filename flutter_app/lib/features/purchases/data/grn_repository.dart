@@ -50,11 +50,25 @@ class GrnRepository {
     return GoodsReceiptDetailDto.fromJson(body);
   }
 
+  Future<List<PurchaseCostAdjustmentDto>> getGoodsReceiptAddons(int id) async {
+    final res = await _dio.get('/goods-receipts/$id/addons');
+    final data = _extractList(res);
+    return data
+        .map(
+          (e) => PurchaseCostAdjustmentDto.fromJson(
+            e as Map<String, dynamic>,
+          ),
+        )
+        .toList();
+  }
+
   // Creates a purchase without PO and immediately records a GRN against it.
   // Returns the created purchaseId.
   Future<int> createGrnWithoutPo({
     required int supplierId,
     required List<GrnCreateItem> items,
+    List<CostAdjustmentDraft> headerAdjustments = const [],
+    Map<int, List<CostAdjustmentDraft>> itemAdjustments = const {},
     String? invoiceNumber,
     String? notes,
     String? invoiceFilePath, // local file path to upload
@@ -159,11 +173,13 @@ class GrnRepository {
     // was just created, so detail order is the only reliable mapping when the
     // same product can appear on multiple barcode-based lines.
     final receiveItems = <Map<String, dynamic>>[];
+    final detailIdByProductIndex = <int, int>{};
     final limit = items.length < details.length ? items.length : details.length;
     for (var index = 0; index < limit; index++) {
       final it = items[index];
       final pdid = details[index]['purchase_detail_id'] as int?;
       if (pdid == null) continue;
+      detailIdByProductIndex[index] = pdid;
       receiveItems.add({
         'purchase_detail_id': pdid,
         if (it.barcodeId != null && it.barcodeId! > 0)
@@ -177,10 +193,28 @@ class GrnRepository {
       });
     }
 
+    final itemAdjustmentPayload = <Map<String, dynamic>>[];
+    itemAdjustments.forEach((index, adjustments) {
+      final purchaseDetailId = detailIdByProductIndex[index];
+      if (purchaseDetailId == null) return;
+      for (final adjustment in adjustments) {
+        itemAdjustmentPayload.add({
+          'purchase_detail_id': purchaseDetailId,
+          ...adjustment.toJson(),
+        });
+      }
+    });
+
     // 3) Record goods receipt
     await _dio.post('/goods-receipts', data: {
       'purchase_id': purchaseId,
       'items': receiveItems,
+      if (headerAdjustments.isNotEmpty)
+        'header_adjustments': [
+          for (final adjustment in headerAdjustments) adjustment.toJson(),
+        ],
+      if (itemAdjustmentPayload.isNotEmpty)
+        'item_adjustments': itemAdjustmentPayload,
     });
 
     // 4) Optionally upload invoice file
@@ -192,6 +226,32 @@ class GrnRepository {
     }
 
     return purchaseId;
+  }
+
+  Future<PurchaseCostAdjustmentDto> addGoodsReceiptAddons({
+    required int goodsReceiptId,
+    List<CostAdjustmentDraft> headerAdjustments = const [],
+    List<Map<String, dynamic>> itemAdjustments = const [],
+    String? notes,
+    String? referenceNumber,
+  }) async {
+    final res = await _dio.post(
+      '/goods-receipts/$goodsReceiptId/addons',
+      data: {
+        if (referenceNumber != null && referenceNumber.isNotEmpty)
+          'reference_number': referenceNumber,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+        if (headerAdjustments.isNotEmpty)
+          'header_adjustments': [
+            for (final adjustment in headerAdjustments) adjustment.toJson(),
+          ],
+        if (itemAdjustments.isNotEmpty) 'item_adjustments': itemAdjustments,
+      },
+    );
+    final body = res.data is Map && (res.data['data'] != null)
+        ? res.data['data'] as Map<String, dynamic>
+        : res.data as Map<String, dynamic>;
+    return PurchaseCostAdjustmentDto.fromJson(body);
   }
 }
 

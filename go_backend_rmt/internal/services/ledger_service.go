@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"math"
 	"time"
 
 	"erp-backend/internal/database"
@@ -699,6 +700,126 @@ func (s *LedgerService) RecordPurchaseReturn(companyID, returnID, userID int) er
 		ref3 := fmt.Sprintf("purchase_return:%d:%s", returnID, accountCodeTaxReceivable)
 		if err := s.insertEntryIfMissing(companyID, ref3, taxRecID, returnDate, 0, taxAmount, "purchase_return", returnID, nil, nil, userID); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func (s *LedgerService) RecordPurchaseCostAdjustment(companyID, adjustmentID, userID int) error {
+	var adjustmentDate time.Time
+	var totalSigned float64
+	var inventoryPortion float64
+	var consumedPortion float64
+	if err := s.db.QueryRow(`
+		SELECT
+			pca.adjustment_date,
+			COALESCE(SUM(pcai.signed_amount), 0)::float8 AS total_signed,
+			COALESCE(SUM(
+				CASE
+					WHEN pcai.stock_action = 'REDUCE_STOCK' THEN pcai.signed_amount
+					WHEN COALESCE(lot.remaining_qty, 0) > 0 AND COALESCE(base.received_stock_qty, 0) > 0
+						THEN pcai.signed_amount * (lot.remaining_qty / base.received_stock_qty)
+					ELSE 0
+				END
+			), 0)::float8 AS inventory_portion
+		FROM purchase_cost_adjustments pca
+		JOIN purchase_cost_adjustment_items pcai ON pcai.adjustment_id = pca.adjustment_id
+		LEFT JOIN (
+			SELECT
+				pcai_inner.adjustment_item_id,
+				COALESCE(SUM(sl.remaining_quantity), 0)::float8 AS remaining_qty
+			FROM purchase_cost_adjustment_items pcai_inner
+			LEFT JOIN stock_lots sl
+			  ON sl.lot_id IN (
+			    SELECT DISTINCT im.stock_lot_id
+			    FROM inventory_movements im
+			    WHERE im.source_type = 'purchase_detail'
+			      AND im.source_line_id = pcai_inner.purchase_detail_id
+			      AND im.movement_type = 'PURCHASE_RECEIPT'
+			      AND im.stock_lot_id IS NOT NULL
+			  )
+			 AND (
+			   pcai_inner.goods_receipt_item_id IS NULL
+			   OR sl.goods_receipt_id = (
+			     SELECT goods_receipt_id
+			     FROM goods_receipt_items
+			     WHERE goods_receipt_item_id = pcai_inner.goods_receipt_item_id
+			   )
+			 )
+			 AND sl.remaining_quantity > 0
+			GROUP BY pcai_inner.adjustment_item_id
+		) lot ON lot.adjustment_item_id = pcai.adjustment_item_id
+		LEFT JOIN (
+			SELECT
+				pcai_inner.adjustment_item_id,
+				COALESCE((
+					SELECT SUM(im.quantity)::float8
+					FROM inventory_movements im
+					WHERE im.source_type = 'purchase_detail'
+					  AND im.source_line_id = pcai_inner.purchase_detail_id
+					  AND im.movement_type = 'PURCHASE_RECEIPT'
+				), 0)::float8 AS received_stock_qty
+			FROM purchase_cost_adjustment_items pcai_inner
+		) base ON base.adjustment_item_id = pcai.adjustment_item_id
+		WHERE pca.adjustment_id = $1
+		  AND pca.is_deleted = FALSE
+		GROUP BY pca.adjustment_date
+	`, adjustmentID).Scan(&adjustmentDate, &totalSigned, &inventoryPortion); err != nil {
+		return fmt.Errorf("failed to load purchase cost adjustment for ledger posting: %w", err)
+	}
+	consumedPortion = totalSigned - inventoryPortion
+	if math.Abs(totalSigned) < 0.0001 {
+		return nil
+	}
+
+	apID, err := s.ensureDefaultAccountID(companyID, accountCodeAP)
+	if err != nil {
+		return err
+	}
+	inventoryID, err := s.ensureDefaultAccountID(companyID, accountCodeInventory)
+	if err != nil {
+		return err
+	}
+	cogsID, err := s.ensureDefaultAccountID(companyID, accountCodeCOGS)
+	if err != nil {
+		return err
+	}
+
+	if totalSigned > 0 {
+		ref := fmt.Sprintf("purchase_adjustment:%d:%s", adjustmentID, accountCodeAP)
+		if err := s.insertEntryIfMissing(companyID, ref, apID, adjustmentDate, 0, round2(totalSigned), "purchase_cost_adjustment", adjustmentID, nil, nil, userID); err != nil {
+			return err
+		}
+	} else {
+		ref := fmt.Sprintf("purchase_adjustment:%d:%s", adjustmentID, accountCodeAP)
+		if err := s.insertEntryIfMissing(companyID, ref, apID, adjustmentDate, round2(-totalSigned), 0, "purchase_cost_adjustment", adjustmentID, nil, nil, userID); err != nil {
+			return err
+		}
+	}
+
+	if math.Abs(inventoryPortion) > 0.0001 {
+		ref := fmt.Sprintf("purchase_adjustment:%d:%s", adjustmentID, accountCodeInventory)
+		if inventoryPortion > 0 {
+			if err := s.insertEntryIfMissing(companyID, ref, inventoryID, adjustmentDate, round2(inventoryPortion), 0, "purchase_cost_adjustment", adjustmentID, nil, nil, userID); err != nil {
+				return err
+			}
+		} else {
+			if err := s.insertEntryIfMissing(companyID, ref, inventoryID, adjustmentDate, 0, round2(-inventoryPortion), "purchase_cost_adjustment", adjustmentID, nil, nil, userID); err != nil {
+				return err
+			}
+		}
+	}
+
+	if math.Abs(consumedPortion) > 0.0001 {
+		ref := fmt.Sprintf("purchase_adjustment:%d:%s", adjustmentID, accountCodeCOGS)
+		if consumedPortion > 0 {
+			if err := s.insertEntryIfMissing(companyID, ref, cogsID, adjustmentDate, round2(consumedPortion), 0, "purchase_cost_adjustment", adjustmentID, nil, nil, userID); err != nil {
+				return err
+			}
+		} else {
+			if err := s.insertEntryIfMissing(companyID, ref, cogsID, adjustmentDate, 0, round2(-consumedPortion), "purchase_cost_adjustment", adjustmentID, nil, nil, userID); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/error_handler.dart';
 import '../../../inventory/data/models.dart';
 import '../../../inventory/presentation/widgets/inventory_tracking_selector.dart';
+import '../../data/models.dart';
 import '../../data/purchases_repository.dart';
+import '../widgets/cost_adjustment_editor.dart';
 
 class PurchaseReceiptPage extends ConsumerStatefulWidget {
   const PurchaseReceiptPage({super.key, required this.purchaseId});
@@ -21,6 +23,7 @@ class _PurchaseReceiptPageState extends ConsumerState<PurchaseReceiptPage> {
   bool _loading = true;
   bool _saving = false;
   final List<_ReceiptLineDraft> _lines = [];
+  final List<EditableCostAdjustmentRow> _headerAdjustments = [];
 
   @override
   void initState() {
@@ -30,6 +33,9 @@ class _PurchaseReceiptPageState extends ConsumerState<PurchaseReceiptPage> {
 
   @override
   void dispose() {
+    for (final row in _headerAdjustments) {
+      row.dispose();
+    }
     for (final line in _lines) {
       line.dispose();
     }
@@ -89,6 +95,7 @@ class _PurchaseReceiptPageState extends ConsumerState<PurchaseReceiptPage> {
     setState(() => _saving = true);
     try {
       final payload = <Map<String, dynamic>>[];
+      final itemAdjustments = <Map<String, dynamic>>[];
       for (final line in _lines) {
         final qty = double.tryParse(line.qty.text.trim()) ?? 0;
         if (qty <= 0) continue;
@@ -105,6 +112,14 @@ class _PurchaseReceiptPageState extends ConsumerState<PurchaseReceiptPage> {
           'received_quantity': cappedQty,
           ...tracking.toReceiveJson(),
         });
+        for (final adjustment in line.adjustments) {
+          final draft = adjustment.toDraft();
+          if (draft == null) continue;
+          itemAdjustments.add({
+            'purchase_detail_id': line.purchaseDetailId,
+            ...draft.toJson(),
+          });
+        }
       }
       if (payload.isEmpty) {
         ScaffoldMessenger.of(context)
@@ -117,6 +132,11 @@ class _PurchaseReceiptPageState extends ConsumerState<PurchaseReceiptPage> {
       await ref.read(purchasesRepositoryProvider).receiveAgainstPO(
             purchaseId: widget.purchaseId,
             items: payload,
+            headerAdjustments: _headerAdjustments
+                .map((row) => row.toDraft())
+                .whereType<CostAdjustmentDraft>()
+                .toList(),
+            itemAdjustments: itemAdjustments,
           );
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -145,6 +165,21 @@ class _PurchaseReceiptPageState extends ConsumerState<PurchaseReceiptPage> {
             : ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  CostAdjustmentListEditor(
+                    title: 'Header Add-ons',
+                    rows: _headerAdjustments,
+                    onAdd: () => setState(
+                      () => _headerAdjustments.add(EditableCostAdjustmentRow()),
+                    ),
+                    onChanged: () => setState(() {}),
+                    onRemove: (index) => setState(() {
+                      _headerAdjustments[index].dispose();
+                      _headerAdjustments.removeAt(index);
+                    }),
+                    emptyLabel:
+                        'Distribute freight, duty, rebate, or other GRN-level adjustments across received lines.',
+                  ),
+                  const SizedBox(height: 12),
                   if (_lines.isEmpty)
                     const Card(
                       elevation: 0,
@@ -205,6 +240,22 @@ class _PurchaseReceiptPageState extends ConsumerState<PurchaseReceiptPage> {
                                           ),
                                   ),
                                 ),
+                              ),
+                              const SizedBox(height: 8),
+                              CostAdjustmentListEditor(
+                                title: 'Item Add-ons',
+                                rows: line.adjustments,
+                                onAdd: () => setState(
+                                  () => line.adjustments
+                                      .add(EditableCostAdjustmentRow()),
+                                ),
+                                onChanged: () => setState(() {}),
+                                onRemove: (index) => setState(() {
+                                  line.adjustments[index].dispose();
+                                  line.adjustments.removeAt(index);
+                                }),
+                                emptyLabel:
+                                    'Optional cost or income adjustments for this received line.',
                               ),
                             ],
                           ),
@@ -272,10 +323,14 @@ class _ReceiptLineDraft {
   final int? lockedBarcodeId;
   final TextEditingController qty;
   InventoryTrackingSelection? tracking;
+  final List<EditableCostAdjustmentRow> adjustments = [];
 
   InventoryTrackingSelection? get initialSelection => tracking;
 
   void dispose() {
+    for (final adjustment in adjustments) {
+      adjustment.dispose();
+    }
     qty.dispose();
   }
 }

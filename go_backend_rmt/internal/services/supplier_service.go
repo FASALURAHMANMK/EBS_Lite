@@ -68,6 +68,7 @@ func (s *SupplierService) GetSuppliers(companyID int, filters map[string]string)
                           s.created_by, s.updated_by, s.sync_status, s.created_at, s.updated_at,
                           COALESCE(stats.total_purchases, 0) as total_purchases,
                           COALESCE(stats.total_returns, 0) as total_returns,
+                          COALESCE(stats.total_debit_notes, 0) as total_debit_notes,
                           COALESCE(stats.outstanding_amount, 0) as outstanding_amount,
 			   stats.last_purchase_date
 		FROM suppliers s
@@ -75,6 +76,13 @@ func (s *SupplierService) GetSuppliers(companyID int, filters map[string]string)
 			SELECT p.supplier_id,
 				   SUM(CASE WHEN p.status != 'CANCELLED' THEN p.total_amount ELSE 0 END) as total_purchases,
 				   SUM(COALESCE(pr.total_amount, 0)) as total_returns,
+				   COALESCE((
+				       SELECT SUM(ABS(pca.total_amount))
+				       FROM purchase_cost_adjustments pca
+				       WHERE pca.supplier_id = p.supplier_id
+				         AND pca.adjustment_type = 'SUPPLIER_DEBIT_NOTE'
+				         AND pca.is_deleted = FALSE
+				   ), 0) as total_debit_notes,
 				   SUM(CASE WHEN p.status != 'CANCELLED' THEN (p.total_amount - p.paid_amount) ELSE 0 END) as outstanding_amount,
 				   MAX(p.purchase_date) as last_purchase_date
 			FROM purchases p
@@ -133,7 +141,7 @@ func (s *SupplierService) GetSuppliers(companyID int, filters map[string]string)
 			&supplier.PaymentTerms, &supplier.CreditLimit, &supplier.IsMercantile,
 			&supplier.IsNonMercantile, &supplier.IsActive,
 			&supplier.CreatedBy, &supplier.UpdatedBy, &supplier.SyncStatus, &supplier.CreatedAt, &supplier.UpdatedAt,
-			&supplier.TotalPurchases, &supplier.TotalReturns, &supplier.OutstandingAmount,
+			&supplier.TotalPurchases, &supplier.TotalReturns, &supplier.TotalDebitNotes, &supplier.OutstandingAmount,
 			&supplier.LastPurchaseDate,
 		)
 		if err != nil {
@@ -154,6 +162,7 @@ func (s *SupplierService) GetSupplierByID(supplierID, companyID int) (*models.Su
                           s.created_by, s.updated_by, s.sync_status, s.created_at, s.updated_at,
                           COALESCE(stats.total_purchases, 0) as total_purchases,
                           COALESCE(stats.total_returns, 0) as total_returns,
+                          COALESCE(stats.total_debit_notes, 0) as total_debit_notes,
                           COALESCE(stats.outstanding_amount, 0) as outstanding_amount,
 			   stats.last_purchase_date
 		FROM suppliers s
@@ -161,6 +170,13 @@ func (s *SupplierService) GetSupplierByID(supplierID, companyID int) (*models.Su
 			SELECT p.supplier_id,
 				   SUM(CASE WHEN p.status != 'CANCELLED' THEN p.total_amount ELSE 0 END) as total_purchases,
 				   SUM(COALESCE(pr.total_amount, 0)) as total_returns,
+				   COALESCE((
+				       SELECT SUM(ABS(pca.total_amount))
+				       FROM purchase_cost_adjustments pca
+				       WHERE pca.supplier_id = p.supplier_id
+				         AND pca.adjustment_type = 'SUPPLIER_DEBIT_NOTE'
+				         AND pca.is_deleted = FALSE
+				   ), 0) as total_debit_notes,
 				   SUM(CASE WHEN p.status != 'CANCELLED' THEN (p.total_amount - p.paid_amount) ELSE 0 END) as outstanding_amount,
 				   MAX(p.purchase_date) as last_purchase_date
 			FROM purchases p
@@ -178,7 +194,7 @@ func (s *SupplierService) GetSupplierByID(supplierID, companyID int) (*models.Su
 		&supplier.PaymentTerms, &supplier.CreditLimit, &supplier.IsMercantile,
 		&supplier.IsNonMercantile, &supplier.IsActive,
 		&supplier.CreatedBy, &supplier.UpdatedBy, &supplier.SyncStatus, &supplier.CreatedAt, &supplier.UpdatedAt,
-		&supplier.TotalPurchases, &supplier.TotalReturns, &supplier.OutstandingAmount,
+		&supplier.TotalPurchases, &supplier.TotalReturns, &supplier.TotalDebitNotes, &supplier.OutstandingAmount,
 		&supplier.LastPurchaseDate,
 	)
 	if err != nil {
@@ -667,6 +683,13 @@ func (s *SupplierService) GetSupplierSummary(supplierID, companyID int) (*models
 		supplierID,
 	).Scan(&summary.TotalReturns); err != nil {
 		return nil, fmt.Errorf("failed to get returns total: %w", err)
+	}
+
+	if err := s.db.QueryRow(
+		"SELECT COALESCE(SUM(ABS(total_amount)),0) FROM purchase_cost_adjustments WHERE supplier_id = $1 AND adjustment_type = 'SUPPLIER_DEBIT_NOTE' AND is_deleted = FALSE",
+		supplierID,
+	).Scan(&summary.TotalDebitNotes); err != nil {
+		return nil, fmt.Errorf("failed to get debit notes total: %w", err)
 	}
 
 	summary.OutstandingBalance = summary.TotalPurchases - summary.TotalPayments - summary.TotalReturns

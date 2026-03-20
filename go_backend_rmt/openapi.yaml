@@ -2976,6 +2976,17 @@ paths:
   /goods-receipts:
     get:
       summary: GET /api/v1/goods-receipts
+      parameters:
+      - name: location_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
       responses:
         '200':
           description: Successful response
@@ -2996,10 +3007,108 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/RecordGoodsReceiptRequest'
   /goods-receipts/{id}:
     get:
       summary: GET /api/v1/goods-receipts/{id}
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /goods-receipts/{id}/addons:
+    get:
+      summary: GET /api/v1/goods-receipts/{id}/addons
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: POST /api/v1/goods-receipts/{id}/addons
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGoodsReceiptAddonRequest'
+  /supplier-debit-notes:
+    get:
+      summary: GET /api/v1/supplier-debit-notes
+      parameters:
+      - name: location_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: supplier_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: purchase_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+    post:
+      summary: POST /api/v1/supplier-debit-notes
+      parameters:
+      - name: location_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSupplierDebitNoteRequest'
+  /supplier-debit-notes/{id}:
+    get:
+      summary: GET /api/v1/supplier-debit-notes/{id}
       responses:
         '200':
           description: Successful response
@@ -6063,6 +6172,284 @@ components:
           type: array
           items:
             type: string
+    CreateCostAdjustmentComponentRequest:
+      type: object
+      required:
+        - label
+        - amount
+        - direction
+      properties:
+        label:
+          type: string
+        amount:
+          type: number
+          format: float
+        direction:
+          type: string
+          enum:
+            - EXPENSE
+            - INCOME
+    CreateGoodsReceiptItemAdjustmentRequest:
+      type: object
+      required:
+        - purchase_detail_id
+        - label
+        - amount
+        - direction
+      properties:
+        purchase_detail_id:
+          type: integer
+        label:
+          type: string
+        amount:
+          type: number
+          format: float
+        direction:
+          type: string
+          enum:
+            - EXPENSE
+            - INCOME
+    CreateGoodsReceiptAddonRequest:
+      type: object
+      properties:
+        reference_number:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        header_adjustments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateCostAdjustmentComponentRequest'
+        item_adjustments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateGoodsReceiptItemAdjustmentRequest'
+    CreateSupplierDebitNoteItemRequest:
+      type: object
+      required:
+        - product_id
+        - label
+        - stock_action
+      properties:
+        purchase_detail_id:
+          type: integer
+          nullable: true
+        product_id:
+          type: integer
+        barcode_id:
+          type: integer
+          nullable: true
+        label:
+          type: string
+        stock_action:
+          type: string
+          enum:
+            - COST_ONLY
+            - REDUCE_STOCK
+        amount:
+          type: number
+          format: float
+          nullable: true
+        quantity:
+          type: number
+          format: float
+          nullable: true
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        batch_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryBatchSelectionInput'
+        line_note:
+          type: string
+          nullable: true
+    CreateSupplierDebitNoteRequest:
+      type: object
+      required:
+        - supplier_id
+        - purchase_id
+        - items
+      properties:
+        supplier_id:
+          type: integer
+        purchase_id:
+          type: integer
+        reference_number:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateSupplierDebitNoteItemRequest'
+    PurchaseCostAdjustmentItem:
+      type: object
+      properties:
+        adjustment_item_id:
+          type: integer
+        adjustment_id:
+          type: integer
+        source_scope:
+          type: string
+          enum:
+            - HEADER
+            - ITEM
+        goods_receipt_item_id:
+          type: integer
+          nullable: true
+        purchase_detail_id:
+          type: integer
+          nullable: true
+        product_id:
+          type: integer
+        barcode_id:
+          type: integer
+          nullable: true
+        adjustment_label:
+          type: string
+        stock_action:
+          type: string
+          enum:
+            - COST_ONLY
+            - REDUCE_STOCK
+        signed_amount:
+          type: number
+          format: float
+        quantity:
+          type: number
+          format: float
+          nullable: true
+        stock_quantity:
+          type: number
+          format: float
+          nullable: true
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        batch_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryBatchSelectionInput'
+        line_note:
+          type: string
+          nullable: true
+        product:
+          $ref: '#/components/schemas/Product'
+    PurchaseCostAdjustment:
+      type: object
+      properties:
+        adjustment_id:
+          type: integer
+        adjustment_number:
+          type: string
+        adjustment_type:
+          type: string
+          enum:
+            - GRN_ADDON
+            - SUPPLIER_DEBIT_NOTE
+        goods_receipt_id:
+          type: integer
+          nullable: true
+        purchase_id:
+          type: integer
+          nullable: true
+        location_id:
+          type: integer
+        supplier_id:
+          type: integer
+        adjustment_date:
+          type: string
+          format: date-time
+        reference_number:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        total_amount:
+          type: number
+          format: float
+        created_by:
+          type: integer
+        updated_by:
+          type: integer
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseCostAdjustmentItem'
+        supplier:
+          $ref: '#/components/schemas/Supplier'
+    GoodsReceiptItem:
+      type: object
+      properties:
+        goods_receipt_item_id:
+          type: integer
+        goods_receipt_id:
+          type: integer
+        purchase_order_item_id:
+          type: integer
+          nullable: true
+        purchase_detail_id:
+          type: integer
+        barcode_id:
+          type: integer
+          nullable: true
+        product_id:
+          type: integer
+        received_quantity:
+          type: number
+          format: float
+        unit_price:
+          type: number
+          format: float
+        line_total:
+          type: number
+          format: float
+        product:
+          $ref: '#/components/schemas/Product'
+    GoodsReceipt:
+      type: object
+      properties:
+        goods_receipt_id:
+          type: integer
+        receipt_number:
+          type: string
+        purchase_order_id:
+          type: integer
+          nullable: true
+        purchase_id:
+          type: integer
+          nullable: true
+        location_id:
+          type: integer
+        supplier_id:
+          type: integer
+        received_date:
+          type: string
+          format: date-time
+        received_by:
+          type: integer
+        workflow_state_id:
+          type: integer
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GoodsReceiptItem'
+        adjustments:
+          type: array
+          items:
+            $ref: '#/components/schemas/PurchaseCostAdjustment'
+        supplier:
+          $ref: '#/components/schemas/Supplier'
     RecordGoodsReceiptRequest:
       type: object
       required:
@@ -6085,6 +6472,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ReceivePurchaseItemRequest'
+        header_adjustments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateCostAdjustmentComponentRequest'
+        item_adjustments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateGoodsReceiptItemAdjustmentRequest'
     LoginRequest:
       type: object
       properties:

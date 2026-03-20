@@ -12,6 +12,7 @@ import '../../../inventory/data/inventory_repository.dart';
 import '../../../inventory/presentation/widgets/inventory_tracking_selector.dart';
 import '../../data/grn_repository.dart';
 import '../../data/models.dart';
+import '../widgets/cost_adjustment_editor.dart';
 import '../../../pos/data/pos_repository.dart';
 import '../../../dashboard/data/payment_methods_repository.dart';
 
@@ -28,6 +29,7 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
   final _invoiceNumber = TextEditingController();
   final _notes = TextEditingController();
   String? _invoiceFilePath;
+  final List<EditableCostAdjustmentRow> _headerAdjustments = [];
 
   bool _paidNow = false;
   final _paidAmount = TextEditingController();
@@ -46,6 +48,9 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
     _invoiceNumber.dispose();
     _notes.dispose();
     _paidAmount.dispose();
+    for (final row in _headerAdjustments) {
+      row.dispose();
+    }
     for (final l in _lines) {
       l.dispose();
     }
@@ -106,6 +111,21 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
                 labelText: 'Notes (optional)',
                 prefixIcon: Icon(Icons.description_outlined),
               ),
+            ),
+            const SizedBox(height: 12),
+            CostAdjustmentListEditor(
+              title: 'Header Add-ons',
+              rows: _headerAdjustments,
+              onAdd: () => setState(
+                () => _headerAdjustments.add(EditableCostAdjustmentRow()),
+              ),
+              onChanged: () => setState(() {}),
+              onRemove: (index) => setState(() {
+                _headerAdjustments[index].dispose();
+                _headerAdjustments.removeAt(index);
+              }),
+              emptyLabel:
+                  'Add freight, duty, rebate, or other header-level costs.',
             ),
             const SizedBox(height: 12),
             _buildPaymentCard(theme),
@@ -257,6 +277,16 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
       final price = double.tryParse(l.price.text.trim()) ?? 0;
       if (l.product == null || qty <= 0 || price < 0) continue;
       total += qty * price;
+      for (final adjustment in l.adjustments) {
+        final draft = adjustment.toDraft();
+        if (draft == null) continue;
+        total += draft.direction == 'INCOME' ? -draft.amount : draft.amount;
+      }
+    }
+    for (final adjustment in _headerAdjustments) {
+      final draft = adjustment.toDraft();
+      if (draft == null) continue;
+      total += draft.direction == 'INCOME' ? -draft.amount : draft.amount;
     }
     return total;
   }
@@ -344,6 +374,22 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 8),
+                CostAdjustmentListEditor(
+                  title: 'Item Add-ons',
+                  rows: _lines[i].adjustments,
+                  onAdd: () => setState(
+                    () =>
+                        _lines[i].adjustments.add(EditableCostAdjustmentRow()),
+                  ),
+                  onChanged: () => setState(() {}),
+                  onRemove: (index) => setState(() {
+                    _lines[i].adjustments[index].dispose();
+                    _lines[i].adjustments.removeAt(index);
+                  }),
+                  emptyLabel:
+                      'Add line-level charges or supplier income adjustments for this item.',
+                ),
               ],
             ),
           ),
@@ -425,21 +471,38 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
         }
       }
       final repo = ref.read(grnRepositoryProvider);
+      final headerAdjustments = _headerAdjustments
+          .map((row) => row.toDraft())
+          .whereType<CostAdjustmentDraft>()
+          .toList();
+      final itemAdjustments = <int, List<CostAdjustmentDraft>>{};
       final items = [
-        for (final l in validLines)
-          GrnCreateItem(
-            productId: l.product!.productId,
-            quantity: double.tryParse(l.qty.text.trim()) ?? 0,
-            unitPrice: double.tryParse(l.price.text.trim()) ?? 0,
-            barcodeId: l.tracking?.barcodeId,
-            serialNumbers: l.tracking?.serialNumbers ?? const [],
-            batchNumber: l.tracking?.batchNumber,
-            expiryDate: l.tracking?.expiryDate,
-          )
+        for (int index = 0; index < validLines.length; index++)
+          () {
+            final l = validLines[index];
+            final drafts = l.adjustments
+                .map((row) => row.toDraft())
+                .whereType<CostAdjustmentDraft>()
+                .toList();
+            if (drafts.isNotEmpty) {
+              itemAdjustments[index] = drafts;
+            }
+            return GrnCreateItem(
+              productId: l.product!.productId,
+              quantity: double.tryParse(l.qty.text.trim()) ?? 0,
+              unitPrice: double.tryParse(l.price.text.trim()) ?? 0,
+              barcodeId: l.tracking?.barcodeId,
+              serialNumbers: l.tracking?.serialNumbers ?? const [],
+              batchNumber: l.tracking?.batchNumber,
+              expiryDate: l.tracking?.expiryDate,
+            );
+          }(),
       ];
       await repo.createGrnWithoutPo(
         supplierId: supplierId,
         items: items,
+        headerAdjustments: headerAdjustments,
+        itemAdjustments: itemAdjustments,
         invoiceNumber: _invoiceNumber.text.trim().isEmpty
             ? null
             : _invoiceNumber.text.trim(),
@@ -632,7 +695,11 @@ class _GrnLine {
   InventoryTrackingSelection? tracking;
   final qty = TextEditingController();
   final price = TextEditingController();
+  final adjustments = <EditableCostAdjustmentRow>[];
   void dispose() {
+    for (final adjustment in adjustments) {
+      adjustment.dispose();
+    }
     qty.dispose();
     price.dispose();
   }

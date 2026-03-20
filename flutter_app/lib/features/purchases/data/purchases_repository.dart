@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api_client.dart';
 import '../../dashboard/controllers/location_notifier.dart';
+import 'models.dart';
 
 class PurchasesRepository {
   PurchasesRepository(this._dio, this._ref);
@@ -82,11 +83,77 @@ class PurchasesRepository {
 
   Future<void> receiveAgainstPO(
       {required int purchaseId,
-      required List<Map<String, dynamic>> items}) async {
+      required List<Map<String, dynamic>> items,
+      List<CostAdjustmentDraft> headerAdjustments = const [],
+      List<Map<String, dynamic>> itemAdjustments = const []}) async {
     await _dio.post('/goods-receipts', data: {
       'purchase_id': purchaseId,
       'items': items,
+      if (headerAdjustments.isNotEmpty)
+        'header_adjustments': [
+          for (final adjustment in headerAdjustments) adjustment.toJson(),
+        ],
+      if (itemAdjustments.isNotEmpty) 'item_adjustments': itemAdjustments,
     });
+  }
+
+  Future<List<PurchaseCostAdjustmentDto>> getSupplierDebitNotes({
+    int? supplierId,
+    int? purchaseId,
+  }) async {
+    final qp = <String, dynamic>{};
+    if (supplierId != null) qp['supplier_id'] = supplierId;
+    if (purchaseId != null) qp['purchase_id'] = purchaseId;
+    final loc = _locationId;
+    if (loc != null) qp['location_id'] = loc;
+    final res = await _dio.get(
+      '/supplier-debit-notes',
+      queryParameters: qp.isEmpty ? null : qp,
+    );
+    final data = _extractList(res);
+    return data
+        .map(
+          (e) => PurchaseCostAdjustmentDto.fromJson(
+            e as Map<String, dynamic>,
+          ),
+        )
+        .toList();
+  }
+
+  Future<PurchaseCostAdjustmentDto> getSupplierDebitNote(int id) async {
+    final res = await _dio.get('/supplier-debit-notes/$id');
+    final body = res.data is Map && (res.data['data'] != null)
+        ? res.data['data'] as Map<String, dynamic>
+        : res.data as Map<String, dynamic>;
+    return PurchaseCostAdjustmentDto.fromJson(body);
+  }
+
+  Future<PurchaseCostAdjustmentDto> createSupplierDebitNote({
+    required int supplierId,
+    required int purchaseId,
+    required List<Map<String, dynamic>> items,
+    String? referenceNumber,
+    String? notes,
+  }) async {
+    final qp = <String, dynamic>{};
+    final loc = _locationId;
+    if (loc != null) qp['location_id'] = loc;
+    final res = await _dio.post(
+      '/supplier-debit-notes',
+      queryParameters: qp.isEmpty ? null : qp,
+      data: {
+        'supplier_id': supplierId,
+        'purchase_id': purchaseId,
+        'items': items,
+        if (referenceNumber != null && referenceNumber.isNotEmpty)
+          'reference_number': referenceNumber,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+      },
+    );
+    final body = res.data is Map && (res.data['data'] != null)
+        ? res.data['data'] as Map<String, dynamic>
+        : res.data as Map<String, dynamic>;
+    return PurchaseCostAdjustmentDto.fromJson(body);
   }
 }
 

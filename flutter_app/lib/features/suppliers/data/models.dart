@@ -12,6 +12,7 @@ class SupplierDto {
   final bool isActive;
   final double totalPurchases;
   final double totalReturns;
+  final double totalDebitNotes;
   final double outstandingAmount;
   final DateTime? lastPurchaseDate;
 
@@ -29,6 +30,7 @@ class SupplierDto {
     required this.isActive,
     required this.totalPurchases,
     required this.totalReturns,
+    this.totalDebitNotes = 0,
     required this.outstandingAmount,
     this.lastPurchaseDate,
   });
@@ -47,6 +49,7 @@ class SupplierDto {
         isActive: json['is_active'] as bool? ?? true,
         totalPurchases: (json['total_purchases'] as num?)?.toDouble() ?? 0,
         totalReturns: (json['total_returns'] as num?)?.toDouble() ?? 0,
+        totalDebitNotes: (json['total_debit_notes'] as num?)?.toDouble() ?? 0,
         outstandingAmount:
             (json['outstanding_amount'] as num?)?.toDouble() ?? 0,
         lastPurchaseDate: json['last_purchase_date'] != null
@@ -67,6 +70,7 @@ class SupplierSummaryDto {
   final double totalPurchases;
   final double totalPayments;
   final double totalReturns;
+  final double totalDebitNotes;
   final double outstandingBalance;
 
   SupplierSummaryDto({
@@ -74,6 +78,7 @@ class SupplierSummaryDto {
     required this.totalPurchases,
     required this.totalPayments,
     required this.totalReturns,
+    required this.totalDebitNotes,
     required this.outstandingBalance,
   });
 
@@ -83,6 +88,7 @@ class SupplierSummaryDto {
         totalPurchases: (json['total_purchases'] as num?)?.toDouble() ?? 0,
         totalPayments: (json['total_payments'] as num?)?.toDouble() ?? 0,
         totalReturns: (json['total_returns'] as num?)?.toDouble() ?? 0,
+        totalDebitNotes: (json['total_debit_notes'] as num?)?.toDouble() ?? 0,
         outstandingBalance:
             (json['outstanding_balance'] as num?)?.toDouble() ?? 0,
       );
