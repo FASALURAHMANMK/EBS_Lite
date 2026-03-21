@@ -36,7 +36,16 @@ func parseReportOrTxnDate(raw string) (time.Time, error) {
 	if raw == "" {
 		return time.Time{}, fmt.Errorf("date is required")
 	}
-	layouts := []string{time.RFC3339, "2006-01-02", "2006-01-02 15:04:05"}
+	layouts := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02T15:04:05.999999999",
+		"2006-01-02T15:04:05.999999",
+		"2006-01-02T15:04:05.999",
+		"2006-01-02T15:04:05",
+		"2006-01-02",
+		"2006-01-02 15:04:05",
+	}
 	for _, layout := range layouts {
 		if parsed, err := time.Parse(layout, raw); err == nil {
 			return parsed, nil
@@ -147,10 +156,10 @@ func (s *AssetConsumableService) insertLedgerEntryIfMissingTx(tx *sql.Tx, compan
 			transaction_type, transaction_id, description, reference,
 			created_by, updated_by
 		)
-		SELECT $1,$2,$3,$4,$5,0,$6,$7,$8,$9,$10,$10
+		SELECT $1,$2,$3,$4,$5,0,$6,$7,$8::text,$9::text,$10::int,$10::int
 		WHERE NOT EXISTS (
 			SELECT 1 FROM ledger_entries
-			WHERE company_id = $1 AND reference = $9
+			WHERE company_id = $1 AND reference = $9::text
 		)
 	`, companyID, accountID, date, debit, credit, transactionType, transactionID, description, reference, userID)
 	if err != nil {
@@ -256,6 +265,13 @@ func valueOrNil(value *string) string {
 		return ""
 	}
 	return strings.TrimSpace(*value)
+}
+
+func stringArrayOrEmpty(values []string) []string {
+	if len(values) == 0 {
+		return []string{}
+	}
+	return values
 }
 
 func (s *AssetConsumableService) GetAssetCategories(companyID int) ([]models.AssetCategory, error) {
@@ -666,7 +682,7 @@ func (s *AssetConsumableService) CreateAssetRegisterEntry(companyID, locationID,
 		          batch_allocations, created_by, created_at
 	`, companyID, locationID, assetTag, req.ProductID, req.BarcodeID, req.CategoryID, itemName, req.SourceMode,
 		req.Quantity, unitCost, totalValue, acquisitionDate, inServiceDate, status, supplierID, offsetAccountID,
-		req.Notes, pq.Array(req.SerialNumbers), encodeBatchAllocations(req.BatchAllocations), userID).Scan(
+		req.Notes, pq.Array(stringArrayOrEmpty(req.SerialNumbers)), encodeBatchAllocations(req.BatchAllocations), userID).Scan(
 		&entry.AssetEntryID, &entry.CompanyID, &entry.LocationID, &entry.AssetTag, &entry.ProductID, &entry.BarcodeID,
 		&entry.CategoryID, &entry.SupplierID, &entry.ItemName, &entry.SourceMode, &entry.Quantity, &entry.UnitCost, &entry.TotalValue,
 		&entry.AcquisitionDate, &entry.InServiceDate, &entry.Status, &entry.OffsetAccountID, &entry.Notes,
@@ -874,7 +890,7 @@ func (s *AssetConsumableService) CreateConsumableEntry(companyID, locationID, us
 		          offset_account_id, notes, serial_numbers, batch_allocations, created_by, created_at
 	`, companyID, locationID, entryNumber, req.CategoryID, req.ProductID, req.BarcodeID, itemName, req.SourceMode,
 		req.Quantity, unitCost, totalCost, consumedAt, supplierID, offsetAccountID, req.Notes,
-		pq.Array(req.SerialNumbers), encodeBatchAllocations(req.BatchAllocations), userID).Scan(
+		pq.Array(stringArrayOrEmpty(req.SerialNumbers)), encodeBatchAllocations(req.BatchAllocations), userID).Scan(
 		&entry.ConsumptionID, &entry.CompanyID, &entry.LocationID, &entry.EntryNumber, &entry.CategoryID, &entry.ProductID,
 		&entry.BarcodeID, &entry.SupplierID, &entry.ItemName, &entry.SourceMode, &entry.Quantity, &entry.UnitCost, &entry.TotalCost,
 		&entry.ConsumedAt, &entry.OffsetAccountID, &entry.Notes, pq.Array(&entry.SerialNumbers), &batchRaw,

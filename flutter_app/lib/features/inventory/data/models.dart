@@ -543,6 +543,7 @@ class ProductTransactionDto {
   final String
       entity; // sale, purchase, stock_adjustment, transfer, sale_return, purchase_return
   final int entityId;
+  final double? amount;
   final String? notes;
 
   ProductTransactionDto({
@@ -555,6 +556,7 @@ class ProductTransactionDto {
     this.partnerName,
     required this.entity,
     required this.entityId,
+    this.amount,
     this.notes,
   });
 
@@ -571,6 +573,7 @@ class ProductTransactionDto {
         partnerName: json['partner_name'] as String?,
         entity: json['entity'] as String? ?? '',
         entityId: json['entity_id'] as int? ?? 0,
+        amount: (json['amount'] as num?)?.toDouble(),
         notes: json['notes'] as String?,
       );
 }
@@ -598,6 +601,8 @@ class ProductDto {
   final int reorderLevel;
   final double? weight;
   final String? dimensions;
+  final bool hasWarranty;
+  final int? warrantyPeriodMonths;
   final bool isSerialized;
   final String trackingType;
   final bool isActive;
@@ -628,6 +633,8 @@ class ProductDto {
     required this.reorderLevel,
     this.weight,
     this.dimensions,
+    this.hasWarranty = false,
+    this.warrantyPeriodMonths,
     required this.isSerialized,
     this.trackingType = 'VARIANT',
     required this.isActive,
@@ -661,6 +668,8 @@ class ProductDto {
         reorderLevel: json['reorder_level'] as int? ?? 0,
         weight: (json['weight'] as num?)?.toDouble(),
         dimensions: json['dimensions'] as String?,
+        hasWarranty: json['has_warranty'] as bool? ?? false,
+        warrantyPeriodMonths: json['warranty_period_months'] as int?,
         isSerialized: json['is_serialized'] as bool? ?? false,
         trackingType: json['tracking_type'] as String? ?? 'VARIANT',
         isActive: json['is_active'] as bool? ?? true,
@@ -715,6 +724,8 @@ class ProductDto {
         'reorder_level': reorderLevel,
         if (weight != null) 'weight': weight,
         if (dimensions != null) 'dimensions': dimensions,
+        'has_warranty': hasWarranty,
+        'warranty_period_months': hasWarranty ? warrantyPeriodMonths : null,
         'is_serialized': isSerialized,
         'tracking_type': trackingType,
         'is_active': isActive,
@@ -747,6 +758,8 @@ class CreateProductPayload {
   final int reorderLevel;
   final double? weight;
   final String? dimensions;
+  final bool hasWarranty;
+  final int? warrantyPeriodMonths;
   final bool isSerialized;
   final String trackingType;
   final List<ProductBarcodeDto> barcodes;
@@ -774,6 +787,8 @@ class CreateProductPayload {
     this.reorderLevel = 0,
     this.weight,
     this.dimensions,
+    this.hasWarranty = false,
+    this.warrantyPeriodMonths,
     this.isSerialized = false,
     this.trackingType = 'VARIANT',
     required this.barcodes,
@@ -802,6 +817,8 @@ class CreateProductPayload {
         'reorder_level': reorderLevel,
         if (weight != null) 'weight': weight,
         if (dimensions != null) 'dimensions': dimensions,
+        'has_warranty': hasWarranty,
+        'warranty_period_months': hasWarranty ? warrantyPeriodMonths : null,
         'is_serialized': isSerialized,
         'tracking_type': trackingType,
         'barcodes': barcodes.map((e) => e.toJson()).toList(),

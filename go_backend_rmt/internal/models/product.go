@@ -1,94 +1,100 @@
 package models
 
 type Product struct {
-	ProductID         int                     `json:"product_id" db:"product_id"`
-	CompanyID         int                     `json:"company_id" db:"company_id"`
-	ItemType          string                  `json:"item_type" db:"item_type"`
-	CategoryID        *int                    `json:"category_id,omitempty" db:"category_id"`
-	BrandID           *int                    `json:"brand_id,omitempty" db:"brand_id"`
-	UnitID            *int                    `json:"unit_id,omitempty" db:"unit_id"`
-	PurchaseUnitID    *int                    `json:"purchase_unit_id,omitempty" db:"purchase_unit_id"`
-	SellingUnitID     *int                    `json:"selling_unit_id,omitempty" db:"selling_unit_id"`
-	PurchaseUOMMode   string                  `json:"purchase_uom_mode" db:"purchase_uom_mode"`
-	SellingUOMMode    string                  `json:"selling_uom_mode" db:"selling_uom_mode"`
-	PurchaseToStock   float64                 `json:"purchase_to_stock_factor" db:"purchase_to_stock_factor"`
-	SellingToStock    float64                 `json:"selling_to_stock_factor" db:"selling_to_stock_factor"`
-	IsWeighable       bool                    `json:"is_weighable" db:"is_weighable"`
-	TaxID             int                     `json:"tax_id" db:"tax_id"`
-	Name              string                  `json:"name" db:"name" validate:"required,min=2,max=255"`
-	SKU               *string                 `json:"sku,omitempty" db:"sku"`
-	Barcodes          []ProductBarcode        `json:"barcodes,omitempty" db:"-"`
-	Description       *string                 `json:"description,omitempty" db:"description"`
-	CostPrice         *float64                `json:"cost_price,omitempty" db:"cost_price"`
-	SellingPrice      *float64                `json:"selling_price,omitempty" db:"selling_price"`
-	ReorderLevel      int                     `json:"reorder_level" db:"reorder_level"`
-	Weight            *float64                `json:"weight,omitempty" db:"weight"`
-	Dimensions        *string                 `json:"dimensions,omitempty" db:"dimensions"`
-	IsSerialized      bool                    `json:"is_serialized" db:"is_serialized"`
-	TrackingType      string                  `json:"tracking_type" db:"tracking_type"`
-	IsActive          bool                    `json:"is_active" db:"is_active"`
-	CreatedBy         int                     `json:"created_by" db:"created_by"`
-	UpdatedBy         *int                    `json:"updated_by,omitempty" db:"updated_by"`
-	Attributes        []ProductAttributeValue `json:"attributes,omitempty" db:"-"`
-	DefaultSupplierID *int                    `json:"default_supplier_id,omitempty" db:"default_supplier_id"`
+	ProductID            int                     `json:"product_id" db:"product_id"`
+	CompanyID            int                     `json:"company_id" db:"company_id"`
+	ItemType             string                  `json:"item_type" db:"item_type"`
+	CategoryID           *int                    `json:"category_id,omitempty" db:"category_id"`
+	BrandID              *int                    `json:"brand_id,omitempty" db:"brand_id"`
+	UnitID               *int                    `json:"unit_id,omitempty" db:"unit_id"`
+	PurchaseUnitID       *int                    `json:"purchase_unit_id,omitempty" db:"purchase_unit_id"`
+	SellingUnitID        *int                    `json:"selling_unit_id,omitempty" db:"selling_unit_id"`
+	PurchaseUOMMode      string                  `json:"purchase_uom_mode" db:"purchase_uom_mode"`
+	SellingUOMMode       string                  `json:"selling_uom_mode" db:"selling_uom_mode"`
+	PurchaseToStock      float64                 `json:"purchase_to_stock_factor" db:"purchase_to_stock_factor"`
+	SellingToStock       float64                 `json:"selling_to_stock_factor" db:"selling_to_stock_factor"`
+	IsWeighable          bool                    `json:"is_weighable" db:"is_weighable"`
+	TaxID                int                     `json:"tax_id" db:"tax_id"`
+	Name                 string                  `json:"name" db:"name" validate:"required,min=2,max=255"`
+	SKU                  *string                 `json:"sku,omitempty" db:"sku"`
+	Barcodes             []ProductBarcode        `json:"barcodes,omitempty" db:"-"`
+	Description          *string                 `json:"description,omitempty" db:"description"`
+	CostPrice            *float64                `json:"cost_price,omitempty" db:"cost_price"`
+	SellingPrice         *float64                `json:"selling_price,omitempty" db:"selling_price"`
+	ReorderLevel         int                     `json:"reorder_level" db:"reorder_level"`
+	Weight               *float64                `json:"weight,omitempty" db:"weight"`
+	Dimensions           *string                 `json:"dimensions,omitempty" db:"dimensions"`
+	HasWarranty          bool                    `json:"has_warranty" db:"has_warranty"`
+	WarrantyPeriodMonths *int                    `json:"warranty_period_months,omitempty" db:"warranty_period_months"`
+	IsSerialized         bool                    `json:"is_serialized" db:"is_serialized"`
+	TrackingType         string                  `json:"tracking_type" db:"tracking_type"`
+	IsActive             bool                    `json:"is_active" db:"is_active"`
+	CreatedBy            int                     `json:"created_by" db:"created_by"`
+	UpdatedBy            *int                    `json:"updated_by,omitempty" db:"updated_by"`
+	Attributes           []ProductAttributeValue `json:"attributes,omitempty" db:"-"`
+	DefaultSupplierID    *int                    `json:"default_supplier_id,omitempty" db:"default_supplier_id"`
 	SyncModel
 }
 
 type CreateProductRequest struct {
-	ItemType          *string          `json:"item_type,omitempty"`
-	CategoryID        *int             `json:"category_id,omitempty"`
-	BrandID           *int             `json:"brand_id,omitempty"`
-	UnitID            *int             `json:"unit_id,omitempty"`
-	PurchaseUnitID    *int             `json:"purchase_unit_id,omitempty"`
-	SellingUnitID     *int             `json:"selling_unit_id,omitempty"`
-	PurchaseUOMMode   *string          `json:"purchase_uom_mode,omitempty"`
-	SellingUOMMode    *string          `json:"selling_uom_mode,omitempty"`
-	PurchaseToStock   *float64         `json:"purchase_to_stock_factor,omitempty"`
-	SellingToStock    *float64         `json:"selling_to_stock_factor,omitempty"`
-	IsWeighable       bool             `json:"is_weighable"`
-	TaxID             int              `json:"tax_id" validate:"required"`
-	Name              string           `json:"name" validate:"required,min=2,max=255"`
-	SKU               *string          `json:"sku,omitempty"`
-	Barcodes          []ProductBarcode `json:"barcodes" validate:"required,min=1,dive"`
-	Description       *string          `json:"description,omitempty"`
-	CostPrice         *float64         `json:"cost_price,omitempty"`
-	SellingPrice      *float64         `json:"selling_price,omitempty"`
-	ReorderLevel      int              `json:"reorder_level"`
-	Weight            *float64         `json:"weight,omitempty"`
-	Dimensions        *string          `json:"dimensions,omitempty"`
-	IsSerialized      bool             `json:"is_serialized"`
-	TrackingType      string           `json:"tracking_type"`
-	Attributes        map[int]string   `json:"attributes,omitempty"`
-	DefaultSupplierID *int             `json:"default_supplier_id,omitempty"`
+	ItemType             *string          `json:"item_type,omitempty"`
+	CategoryID           *int             `json:"category_id,omitempty"`
+	BrandID              *int             `json:"brand_id,omitempty"`
+	UnitID               *int             `json:"unit_id,omitempty"`
+	PurchaseUnitID       *int             `json:"purchase_unit_id,omitempty"`
+	SellingUnitID        *int             `json:"selling_unit_id,omitempty"`
+	PurchaseUOMMode      *string          `json:"purchase_uom_mode,omitempty"`
+	SellingUOMMode       *string          `json:"selling_uom_mode,omitempty"`
+	PurchaseToStock      *float64         `json:"purchase_to_stock_factor,omitempty"`
+	SellingToStock       *float64         `json:"selling_to_stock_factor,omitempty"`
+	IsWeighable          bool             `json:"is_weighable"`
+	TaxID                int              `json:"tax_id" validate:"required"`
+	Name                 string           `json:"name" validate:"required,min=2,max=255"`
+	SKU                  *string          `json:"sku,omitempty"`
+	Barcodes             []ProductBarcode `json:"barcodes" validate:"required,min=1,dive"`
+	Description          *string          `json:"description,omitempty"`
+	CostPrice            *float64         `json:"cost_price,omitempty"`
+	SellingPrice         *float64         `json:"selling_price,omitempty"`
+	ReorderLevel         int              `json:"reorder_level"`
+	Weight               *float64         `json:"weight,omitempty"`
+	Dimensions           *string          `json:"dimensions,omitempty"`
+	HasWarranty          bool             `json:"has_warranty"`
+	WarrantyPeriodMonths *int             `json:"warranty_period_months,omitempty"`
+	IsSerialized         bool             `json:"is_serialized"`
+	TrackingType         string           `json:"tracking_type"`
+	Attributes           map[int]string   `json:"attributes,omitempty"`
+	DefaultSupplierID    *int             `json:"default_supplier_id,omitempty"`
 }
 
 type UpdateProductRequest struct {
-	ItemType          *string          `json:"item_type,omitempty"`
-	CategoryID        *int             `json:"category_id,omitempty"`
-	BrandID           *int             `json:"brand_id,omitempty"`
-	UnitID            *int             `json:"unit_id,omitempty"`
-	PurchaseUnitID    *int             `json:"purchase_unit_id,omitempty"`
-	SellingUnitID     *int             `json:"selling_unit_id,omitempty"`
-	PurchaseUOMMode   *string          `json:"purchase_uom_mode,omitempty"`
-	SellingUOMMode    *string          `json:"selling_uom_mode,omitempty"`
-	PurchaseToStock   *float64         `json:"purchase_to_stock_factor,omitempty"`
-	SellingToStock    *float64         `json:"selling_to_stock_factor,omitempty"`
-	IsWeighable       *bool            `json:"is_weighable,omitempty"`
-	TaxID             *int             `json:"tax_id,omitempty"`
-	Name              *string          `json:"name,omitempty" validate:"omitempty,min=2,max=255"`
-	SKU               *string          `json:"sku,omitempty"`
-	Barcodes          []ProductBarcode `json:"barcodes,omitempty" validate:"omitempty,dive"`
-	Description       *string          `json:"description,omitempty"`
-	CostPrice         *float64         `json:"cost_price,omitempty"`
-	SellingPrice      *float64         `json:"selling_price,omitempty"`
-	ReorderLevel      *int             `json:"reorder_level,omitempty"`
-	Weight            *float64         `json:"weight,omitempty"`
-	Dimensions        *string          `json:"dimensions,omitempty"`
-	IsSerialized      *bool            `json:"is_serialized,omitempty"`
-	TrackingType      *string          `json:"tracking_type,omitempty"`
-	IsActive          *bool            `json:"is_active,omitempty"`
-	Attributes        map[int]string   `json:"attributes,omitempty"`
-	DefaultSupplierID *int             `json:"default_supplier_id,omitempty"`
+	ItemType             *string          `json:"item_type,omitempty"`
+	CategoryID           *int             `json:"category_id,omitempty"`
+	BrandID              *int             `json:"brand_id,omitempty"`
+	UnitID               *int             `json:"unit_id,omitempty"`
+	PurchaseUnitID       *int             `json:"purchase_unit_id,omitempty"`
+	SellingUnitID        *int             `json:"selling_unit_id,omitempty"`
+	PurchaseUOMMode      *string          `json:"purchase_uom_mode,omitempty"`
+	SellingUOMMode       *string          `json:"selling_uom_mode,omitempty"`
+	PurchaseToStock      *float64         `json:"purchase_to_stock_factor,omitempty"`
+	SellingToStock       *float64         `json:"selling_to_stock_factor,omitempty"`
+	IsWeighable          *bool            `json:"is_weighable,omitempty"`
+	TaxID                *int             `json:"tax_id,omitempty"`
+	Name                 *string          `json:"name,omitempty" validate:"omitempty,min=2,max=255"`
+	SKU                  *string          `json:"sku,omitempty"`
+	Barcodes             []ProductBarcode `json:"barcodes,omitempty" validate:"omitempty,dive"`
+	Description          *string          `json:"description,omitempty"`
+	CostPrice            *float64         `json:"cost_price,omitempty"`
+	SellingPrice         *float64         `json:"selling_price,omitempty"`
+	ReorderLevel         *int             `json:"reorder_level,omitempty"`
+	Weight               *float64         `json:"weight,omitempty"`
+	Dimensions           *string          `json:"dimensions,omitempty"`
+	HasWarranty          *bool            `json:"has_warranty,omitempty"`
+	WarrantyPeriodMonths *int             `json:"warranty_period_months,omitempty"`
+	IsSerialized         *bool            `json:"is_serialized,omitempty"`
+	TrackingType         *string          `json:"tracking_type,omitempty"`
+	IsActive             *bool            `json:"is_active,omitempty"`
+	Attributes           map[int]string   `json:"attributes,omitempty"`
+	DefaultSupplierID    *int             `json:"default_supplier_id,omitempty"`
 }
 
 type Category struct {

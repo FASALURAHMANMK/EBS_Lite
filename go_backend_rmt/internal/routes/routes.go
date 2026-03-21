@@ -42,6 +42,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 	supplierHandler := handlers.NewSupplierHandler()
 	paymentHandler := handlers.NewPaymentHandler()
 	customerHandler := handlers.NewCustomerHandler()
+	warrantyHandler := handlers.NewWarrantyHandler()
 	collectionHandler := handlers.NewCollectionHandler()
 	cashRegisterHandler := handlers.NewCashRegisterHandler()
 	expenseHandler := handlers.NewExpenseHandler()
@@ -488,6 +489,16 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 					credit.GET("", middleware.RequirePermission("VIEW_CUSTOMERS"), customerHandler.GetCreditHistory)
 					credit.POST("", middleware.RequirePermission("UPDATE_CUSTOMERS"), customerHandler.RecordCreditTransaction)
 				}
+			}
+
+			warranties := protected.Group("/warranties")
+			warranties.Use(middleware.RequireCompanyAccess())
+			{
+				warranties.GET("/prepare", middleware.RequirePermission("VIEW_CUSTOMERS"), warrantyHandler.PrepareWarranty)
+				warranties.GET("/search", middleware.RequirePermission("VIEW_CUSTOMERS"), warrantyHandler.LookupWarranties)
+				warranties.GET("/:id", middleware.RequirePermission("VIEW_CUSTOMERS"), warrantyHandler.GetWarranty)
+				warranties.GET("/:id/card", middleware.RequirePermission("VIEW_CUSTOMERS"), warrantyHandler.GetWarrantyCardData)
+				warranties.POST("", middleware.RequirePermission("CREATE_CUSTOMERS"), warrantyHandler.CreateWarranty)
 			}
 
 			// Employee management routes (require company)

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../../../shared/widgets/app_selection_dialog.dart';
@@ -360,8 +362,13 @@ class _SupplierDebitNoteFormPageState
 
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('New Supplier Debit Note')),
+      appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
+        title: const Text('New Supplier Debit Note'),
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),

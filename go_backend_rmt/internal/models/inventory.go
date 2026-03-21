@@ -329,5 +329,6 @@ type ProductTransaction struct {
 	PartnerName  *string   `json:"partner_name,omitempty"`
 	Entity       string    `json:"entity"`
 	EntityID     int       `json:"entity_id"`
+	Amount       *float64  `json:"amount,omitempty"`
 	Notes        *string   `json:"notes,omitempty"`
 }

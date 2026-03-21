@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../data/models.dart';
@@ -51,6 +53,7 @@ class _SupplierDebitNotesPageState
 
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final query = _search.text.trim().toLowerCase();
     final filtered = query.isEmpty
         ? _items
@@ -59,8 +62,12 @@ class _SupplierDebitNotesPageState
                 (item.supplierName ?? '').toLowerCase().contains(query);
           }).toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('Supplier Debit Notes')),
-      floatingActionButton: FloatingActionButton.extended(
+      appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
+        title: const Text('Supplier Debit Notes'),
+      ),
+      floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final created = await Navigator.of(context).push<bool>(
             MaterialPageRoute(
@@ -71,8 +78,8 @@ class _SupplierDebitNotesPageState
             _load();
           }
         },
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Create'),
+        tooltip: 'Create Debit Note',
+        child: const Icon(Icons.add_rounded),
       ),
       body: SafeArea(
         child: Column(

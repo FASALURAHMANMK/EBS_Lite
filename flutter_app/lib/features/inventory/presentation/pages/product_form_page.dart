@@ -36,10 +36,12 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   final _itemCode = TextEditingController();
   final _reorder = TextEditingController(text: '0');
   final _initialStock = TextEditingController(text: '0');
+  final _warrantyPeriodMonths = TextEditingController();
   final _purchaseFactor = TextEditingController(text: '1');
   final _sellingFactor = TextEditingController(text: '1');
 
   bool _saving = false;
+  bool _hasWarranty = false;
   bool _serialTracked = false;
   bool _batchTracked = false;
   bool _loading = true;
@@ -98,6 +100,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _itemCode.dispose();
     _reorder.dispose();
     _initialStock.dispose();
+    _warrantyPeriodMonths.dispose();
     _purchaseFactor.dispose();
     _sellingFactor.dispose();
     for (final c in _attrText.values) {
@@ -220,6 +223,10 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         sellingPrice: double.tryParse(_price.text.trim()),
         costPrice: double.tryParse(_cost.text.trim()),
         reorderLevel: int.tryParse(_reorder.text.trim()) ?? 0,
+        hasWarranty: _hasWarranty,
+        warrantyPeriodMonths: _hasWarranty
+            ? int.tryParse(_warrantyPeriodMonths.text.trim())
+            : null,
         isSerialized: _serialTracked,
         trackingType: _batchTracked ? 'BATCH' : 'VARIANT',
         barcodes: barcodes,
@@ -936,6 +943,39 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           style: Theme.of(context).textTheme.bodySmall,
         ),
         const SizedBox(height: 8),
+        SwitchListTile.adaptive(
+          value: _hasWarranty,
+          onChanged: (v) => setState(() {
+            _hasWarranty = v;
+            if (!v) {
+              _warrantyPeriodMonths.clear();
+            }
+          }),
+          title: const Text('Warranty enabled'),
+          subtitle: const Text(
+            'Mark this product as warranty-eligible for invoice-based registrations.',
+          ),
+          contentPadding: EdgeInsets.zero,
+        ),
+        if (_hasWarranty) ...[
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _warrantyPeriodMonths,
+            decoration: const InputDecoration(
+              labelText: 'Warranty Period (months)',
+              helperText: 'Example: 6, 12, or 24 months',
+            ),
+            keyboardType: TextInputType.number,
+            validator: (value) {
+              if (!_hasWarranty) return null;
+              final months = int.tryParse((value ?? '').trim());
+              if (months == null || months <= 0) {
+                return 'Enter a valid warranty period';
+              }
+              return null;
+            },
+          ),
+        ],
         SwitchListTile.adaptive(
           value: _weighable,
           onChanged: (v) => setState(() => _weighable = v),

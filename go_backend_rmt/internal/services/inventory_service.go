@@ -2370,6 +2370,7 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
                 c.name AS partner_name,
                 'sale' AS entity,
                 s.sale_id AS entity_id,
+                NULL::float8 AS amount,
                 s.notes AS notes
             FROM sale_details sd
             JOIN sales s ON sd.sale_id = s.sale_id
@@ -2394,6 +2395,7 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
                 c.name AS partner_name,
                 'sale_return' AS entity,
                 sr.return_id AS entity_id,
+                NULL::float8 AS amount,
                 NULL AS notes
             FROM sale_return_details srd
             JOIN sale_returns sr ON srd.return_id = sr.return_id
@@ -2418,6 +2420,7 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
                 s.name AS partner_name,
                 'goods_receipt' AS entity,
                 gr.goods_receipt_id AS entity_id,
+                NULL::float8 AS amount,
                 NULL AS notes
             FROM goods_receipt_items gri
             JOIN goods_receipts gr ON gri.goods_receipt_id = gr.goods_receipt_id
@@ -2442,6 +2445,7 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
                 s.name AS partner_name,
                 'purchase_return' AS entity,
                 pr.return_id AS entity_id,
+                NULL::float8 AS amount,
                 NULL AS notes
             FROM purchase_return_details prd
             JOIN purchase_returns pr ON prd.return_id = pr.return_id
@@ -2449,6 +2453,38 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
             LEFT JOIN suppliers s ON pr.supplier_id = s.supplier_id
             WHERE l.company_id = $1 AND prd.product_id = $2 AND pr.is_deleted = FALSE`
 		with, a, _ := buildWhere(base, "pr.location_id", "pr.created_at")
+		selects = append(selects, with)
+		selectArgs = append(selectArgs, a...)
+	}
+
+	// Supplier debit notes. Cost-only lines have zero quantity and a signed amount,
+	// while stock-reduction lines also carry the negative stock quantity.
+	{
+		base := `
+            SELECT
+                'SUPPLIER_DEBIT_NOTE' AS type,
+                pca.adjustment_date AS occurred_at,
+                pca.adjustment_number AS reference,
+                CASE
+                    WHEN pcai.stock_action = 'REDUCE_STOCK' THEN -COALESCE(pcai.stock_quantity, 0)::float8
+                    ELSE 0::float8
+                END AS quantity,
+                pca.location_id AS location_id,
+                l.name AS location_name,
+                s.name AS partner_name,
+                'supplier_debit_note' AS entity,
+                pca.adjustment_id AS entity_id,
+                pcai.signed_amount::float8 AS amount,
+                COALESCE(pcai.line_note, NULLIF(pcai.adjustment_label, '')) AS notes
+            FROM purchase_cost_adjustment_items pcai
+            JOIN purchase_cost_adjustments pca ON pcai.adjustment_id = pca.adjustment_id
+            JOIN locations l ON pca.location_id = l.location_id
+            LEFT JOIN suppliers s ON pca.supplier_id = s.supplier_id
+            WHERE l.company_id = $1
+              AND pcai.product_id = $2
+              AND pca.adjustment_type = 'SUPPLIER_DEBIT_NOTE'
+              AND COALESCE(pca.is_deleted, FALSE) = FALSE`
+		with, a, _ := buildWhere(base, "pca.location_id", "pca.adjustment_date")
 		selects = append(selects, with)
 		selectArgs = append(selectArgs, a...)
 	}
@@ -2466,6 +2502,7 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
                 NULL AS partner_name,
                 CASE WHEN d.document_id IS NULL THEN 'stock_adjustment' ELSE 'stock_adjustment_document' END AS entity,
                 COALESCE(d.document_id, sa.adjustment_id) AS entity_id,
+                NULL::float8 AS amount,
                 sa.reason AS notes
             FROM stock_adjustments sa
             JOIN locations l ON sa.location_id = l.location_id
@@ -2491,6 +2528,7 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
                 NULL AS partner_name,
                 'asset_register' AS entity,
                 COALESCE(ae.asset_entry_id, 0) AS entity_id,
+                NULL::float8 AS amount,
                 COALESCE(im.notes, ae.notes) AS notes
             FROM inventory_movements im
             JOIN locations l ON im.location_id = l.location_id
@@ -2517,6 +2555,7 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
                 NULL AS partner_name,
                 'consumable_entry' AS entity,
                 COALESCE(ce.consumption_id, 0) AS entity_id,
+                NULL::float8 AS amount,
                 COALESCE(im.notes, ce.notes) AS notes
             FROM inventory_movements im
             JOIN locations l ON im.location_id = l.location_id
@@ -2543,6 +2582,7 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
                 NULL AS partner_name,
                 'transfer' AS entity,
                 st.transfer_id AS entity_id,
+                NULL::float8 AS amount,
                 st.notes AS notes
             FROM stock_transfer_details std
             JOIN stock_transfers st ON std.transfer_id = st.transfer_id
@@ -2567,6 +2607,7 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
                 NULL AS partner_name,
                 'transfer' AS entity,
                 st.transfer_id AS entity_id,
+                NULL::float8 AS amount,
                 st.notes AS notes
             FROM stock_transfer_details std
             JOIN stock_transfers st ON std.transfer_id = st.transfer_id
@@ -2604,14 +2645,19 @@ func (s *InventoryService) GetProductTransactions(companyID int, productID int, 
 		var t models.ProductTransaction
 		var occurredAt time.Time
 		var partner *string
+		var amount sql.NullFloat64
 		var notes *string
 		var locationName string
-		if err := rows.Scan(&t.Type, &occurredAt, &t.Reference, &t.Quantity, &t.LocationID, &locationName, &partner, &t.Entity, &t.EntityID, &notes); err != nil {
+		if err := rows.Scan(&t.Type, &occurredAt, &t.Reference, &t.Quantity, &t.LocationID, &locationName, &partner, &t.Entity, &t.EntityID, &amount, &notes); err != nil {
 			return nil, fmt.Errorf("failed to scan product transaction: %w", err)
 		}
 		t.OccurredAt = occurredAt
 		t.LocationName = locationName
 		t.PartnerName = partner
+		if amount.Valid {
+			value := amount.Float64
+			t.Amount = &value
+		}
 		t.Notes = notes
 		res = append(res, t)
 	}

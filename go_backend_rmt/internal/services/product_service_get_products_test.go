@@ -8,14 +8,14 @@ import (
 
 func productRowWithID(id int, name string) []driver.Value {
 	return []driver.Value{
-		id, 1, "PRODUCT", nil, nil, nil, nil, nil, "LOOSE", "LOOSE", 1.0, 1.0, false, name, nil, nil, nil, nil, 0, nil, nil, false, "VARIANT", true, 1, nil, 1, time.Now(), time.Now(), false,
+		id, 1, "PRODUCT", nil, nil, nil, nil, nil, "LOOSE", "LOOSE", 1.0, 1.0, false, name, nil, nil, nil, nil, 0, nil, nil, false, nil, false, "VARIANT", true, 1, nil, 1, time.Now(), time.Now(), false, nil, 1,
 	}
 }
 
 func TestGetProducts_BatchedBarcodesAndAttributes(t *testing.T) {
 	db := mockDB(map[string]stubResp{
 		"FROM products": {
-			columns: []string{"product_id", "company_id", "item_type", "category_id", "brand_id", "unit_id", "purchase_unit_id", "selling_unit_id", "purchase_uom_mode", "selling_uom_mode", "purchase_to_stock_factor", "selling_to_stock_factor", "is_weighable", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "is_serialized", "tracking_type", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted"},
+			columns: []string{"product_id", "company_id", "item_type", "category_id", "brand_id", "unit_id", "purchase_unit_id", "selling_unit_id", "purchase_uom_mode", "selling_uom_mode", "purchase_to_stock_factor", "selling_to_stock_factor", "is_weighable", "name", "sku", "description", "cost_price", "selling_price", "reorder_level", "weight", "dimensions", "has_warranty", "warranty_period_months", "is_serialized", "tracking_type", "is_active", "created_by", "updated_by", "sync_status", "created_at", "updated_at", "is_deleted", "default_supplier_id", "tax_id"},
 			rows: [][]driver.Value{
 				productRowWithID(1, "First"),
 				productRowWithID(2, "Second"),

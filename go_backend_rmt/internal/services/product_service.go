@@ -108,7 +108,8 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
                 SELECT product_id, company_id, item_type, category_id, brand_id, unit_id, purchase_unit_id, selling_unit_id,
                            purchase_uom_mode, selling_uom_mode, purchase_to_stock_factor, selling_to_stock_factor, is_weighable, name, sku,
                            description, cost_price, selling_price, reorder_level, weight, dimensions,
-                           is_serialized, tracking_type, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted
+                           has_warranty, warranty_period_months, is_serialized, tracking_type, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted,
+                           default_supplier_id, tax_id
                 FROM products
                 WHERE company_id = $1 AND is_deleted = FALSE
         `
@@ -158,8 +159,9 @@ func (s *ProductService) GetProducts(companyID int, filters map[string]string) (
 			&product.PurchaseUOMMode, &product.SellingUOMMode, &product.PurchaseToStock, &product.SellingToStock, &product.IsWeighable,
 			&product.Name, &product.SKU, &product.Description,
 			&product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
-			&product.Dimensions, &product.IsSerialized, &product.TrackingType, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
+			&product.Dimensions, &product.HasWarranty, &product.WarrantyPeriodMonths, &product.IsSerialized, &product.TrackingType, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
 			&product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
+			&product.DefaultSupplierID, &product.TaxID,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan product: %w", err)
@@ -201,7 +203,7 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
                 SELECT product_id, company_id, item_type, category_id, brand_id, unit_id, purchase_unit_id, selling_unit_id,
                            purchase_uom_mode, selling_uom_mode, purchase_to_stock_factor, selling_to_stock_factor, is_weighable, name, sku,
                            description, cost_price, selling_price, reorder_level, weight, dimensions,
-                           is_serialized, tracking_type, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted,
+                           has_warranty, warranty_period_months, is_serialized, tracking_type, is_active, created_by, updated_by, sync_status, created_at, updated_at, is_deleted,
                            default_supplier_id, tax_id
                 FROM products
                 WHERE product_id = $1 AND company_id = $2 AND is_deleted = FALSE
@@ -214,7 +216,7 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
 		&product.PurchaseUOMMode, &product.SellingUOMMode, &product.PurchaseToStock, &product.SellingToStock, &product.IsWeighable,
 		&product.Name, &product.SKU, &product.Description,
 		&product.CostPrice, &product.SellingPrice, &product.ReorderLevel, &product.Weight,
-		&product.Dimensions, &product.IsSerialized, &product.TrackingType, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
+		&product.Dimensions, &product.HasWarranty, &product.WarrantyPeriodMonths, &product.IsSerialized, &product.TrackingType, &product.IsActive, &product.CreatedBy, &product.UpdatedBy,
 		&product.SyncStatus, &product.CreatedAt, &product.UpdatedAt, &product.IsDeleted,
 		&product.DefaultSupplierID, &product.TaxID,
 	)
@@ -244,6 +246,13 @@ func (s *ProductService) GetProductByID(productID, companyID int) (*models.Produ
 }
 
 func (s *ProductService) CreateProduct(companyID, userID int, req *models.CreateProductRequest) (*models.Product, error) {
+	if req.HasWarranty {
+		if req.WarrantyPeriodMonths == nil || *req.WarrantyPeriodMonths <= 0 {
+			return nil, fmt.Errorf("warranty_period_months must be greater than zero when warranty is enabled")
+		}
+	} else {
+		req.WarrantyPeriodMonths = nil
+	}
 	if err := validateSinglePrimaryBarcode(req.Barcodes); err != nil {
 		return nil, err
 	}
@@ -298,8 +307,8 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
                         company_id, item_type, category_id, brand_id, unit_id, purchase_unit_id, selling_unit_id,
                         purchase_uom_mode, selling_uom_mode, purchase_to_stock_factor, selling_to_stock_factor,
                         is_weighable, tax_id, name, sku, description, cost_price, selling_price, reorder_level,
-                        weight, dimensions, is_serialized, tracking_type, created_by, updated_by, default_supplier_id
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+                        weight, dimensions, has_warranty, warranty_period_months, is_serialized, tracking_type, created_by, updated_by, default_supplier_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
                 RETURNING product_id, created_at
         `
 
@@ -308,7 +317,7 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 		companyID, normalizeProductItemType(valueOrNil(req.ItemType)), req.CategoryID, req.BrandID, req.UnitID, purchaseUnitID, sellingUnitID,
 		purchaseMode, sellingMode, purchaseFactor, sellingFactor, req.IsWeighable, req.TaxID, req.Name, req.SKU,
 		req.Description, req.CostPrice, req.SellingPrice, req.ReorderLevel, req.Weight,
-		req.Dimensions, isSerialized, trackingType, userID, userID, req.DefaultSupplierID,
+		req.Dimensions, req.HasWarranty, req.WarrantyPeriodMonths, isSerialized, trackingType, userID, userID, req.DefaultSupplierID,
 	).Scan(&product.ProductID, &product.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create product: %w", err)
@@ -355,6 +364,8 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 	product.ReorderLevel = req.ReorderLevel
 	product.Weight = req.Weight
 	product.Dimensions = req.Dimensions
+	product.HasWarranty = req.HasWarranty
+	product.WarrantyPeriodMonths = req.WarrantyPeriodMonths
 	product.IsSerialized = isSerialized
 	product.TrackingType = trackingType
 	product.IsActive = true
@@ -367,6 +378,18 @@ func (s *ProductService) CreateProduct(companyID, userID int, req *models.Create
 }
 
 func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *models.UpdateProductRequest) (*models.Product, error) {
+	if req.HasWarranty != nil {
+		if *req.HasWarranty {
+			if req.WarrantyPeriodMonths == nil || *req.WarrantyPeriodMonths <= 0 {
+				return nil, fmt.Errorf("warranty_period_months must be greater than zero when warranty is enabled")
+			}
+		} else {
+			nilValue := (*int)(nil)
+			req.WarrantyPeriodMonths = nilValue
+		}
+	} else if req.WarrantyPeriodMonths != nil && *req.WarrantyPeriodMonths <= 0 {
+		return nil, fmt.Errorf("warranty_period_months must be greater than zero")
+	}
 	if req.Barcodes != nil {
 		if err := validateSinglePrimaryBarcode(req.Barcodes); err != nil {
 			return nil, err
@@ -529,6 +552,24 @@ func (s *ProductService) UpdateProduct(productID, companyID, userID int, req *mo
 		setParts = append(setParts, fmt.Sprintf("dimensions = $%d", argCount))
 		args = append(args, *req.Dimensions)
 		changes["dimensions"] = *req.Dimensions
+	}
+	if req.HasWarranty != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("has_warranty = $%d", argCount))
+		args = append(args, *req.HasWarranty)
+		changes["has_warranty"] = *req.HasWarranty
+		if !*req.HasWarranty && req.WarrantyPeriodMonths == nil {
+			argCount++
+			setParts = append(setParts, fmt.Sprintf("warranty_period_months = $%d", argCount))
+			args = append(args, nil)
+			changes["warranty_period_months"] = nil
+		}
+	}
+	if req.WarrantyPeriodMonths != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("warranty_period_months = $%d", argCount))
+		args = append(args, *req.WarrantyPeriodMonths)
+		changes["warranty_period_months"] = *req.WarrantyPeriodMonths
 	}
 	if req.TrackingType != nil {
 		trackingType := normalizeTrackingType(*req.TrackingType)

@@ -1,6 +1,7 @@
 import 'package:ebs_lite/features/auth/controllers/auth_notifier.dart';
 import 'package:ebs_lite/features/auth/controllers/auth_permissions_provider.dart';
 import 'package:ebs_lite/features/customers/presentation/pages/customer_management_page.dart';
+import 'package:ebs_lite/features/customers/presentation/pages/customer_warranty_page.dart';
 import 'package:ebs_lite/features/customers/presentation/pages/loyalty_management_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/attribute_management_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/asset_management_page.dart';
@@ -17,6 +18,7 @@ import 'package:ebs_lite/features/promotions/presentation/pages/promotions_page.
 import 'package:ebs_lite/features/purchases/presentation/pages/goods_receipts_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/purchase_orders_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/purchase_returns_page.dart';
+import 'package:ebs_lite/features/purchases/presentation/pages/supplier_debit_notes_page.dart';
 import 'package:ebs_lite/features/reports/presentation/pages/report_category_page.dart';
 import 'package:ebs_lite/features/reports/presentation/report_categories.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/invoices_page.dart';
@@ -200,6 +202,12 @@ class DashboardDesktopSidebar extends ConsumerWidget {
                 ),
                 _child(
                   context,
+                  icon: Icons.request_quote_rounded,
+                  label: 'Supplier Debit Notes',
+                  onTap: () => onOpen(const SupplierDebitNotesPage()),
+                ),
+                _child(
+                  context,
                   icon: Icons.local_shipping_rounded,
                   label: 'Supplier Management',
                   onTap: () => onOpen(const SuppliersPage()),
@@ -289,6 +297,12 @@ class DashboardDesktopSidebar extends ConsumerWidget {
                   icon: Icons.loyalty_rounded,
                   label: 'Loyalty Management',
                   onTap: () => onOpen(const LoyaltyManagementPage()),
+                ),
+                _child(
+                  context,
+                  icon: Icons.verified_user_rounded,
+                  label: 'Warranty Management',
+                  onTap: () => onOpen(const CustomerWarrantyPage()),
                 ),
               ],
             ),

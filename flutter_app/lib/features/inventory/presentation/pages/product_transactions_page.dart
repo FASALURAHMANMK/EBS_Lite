@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ebs_lite/core/layout/app_breakpoints.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import '../../../purchases/presentation/pages/grn_detail_page.dart';
 import '../../../purchases/presentation/pages/purchase_return_detail_page.dart';
+import '../../../purchases/presentation/pages/supplier_debit_notes_page.dart';
+import '../../../dashboard/controllers/location_notifier.dart';
 import 'stock_transfer_view_page.dart';
 import 'stock_adjustments_page.dart';
 import 'stock_adjustment_document_detail_page.dart';
@@ -25,9 +29,15 @@ class ProductTransactionsPage extends ConsumerStatefulWidget {
 class _ProductBundle {
   final ProductDto product;
   final InventoryListItem? stock;
+  final List<InventoryVariantStockDto> variants;
+  final List<ProductStorageAssignmentDto> storageAssignments;
   final List<ProductTransactionDto> transactions;
   _ProductBundle(
-      {required this.product, required this.stock, required this.transactions});
+      {required this.product,
+      required this.stock,
+      required this.variants,
+      required this.storageAssignments,
+      required this.transactions});
 }
 
 class _ProductTransactionsPageState
@@ -80,6 +90,12 @@ class _ProductTransactionsPageState
           MaterialPageRoute(builder: (_) => const StockAdjustmentsPage()),
         );
         break;
+      case 'supplier_debit_note':
+        if (!mounted) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SupplierDebitNotesPage()),
+        );
+        break;
       // Future: add sale/sale_return/purchase_return when detail pages exist
       default:
         if (!mounted) return;
@@ -92,15 +108,29 @@ class _ProductTransactionsPageState
 
   Future<_ProductBundle> _load() async {
     final repo = ref.read(inventoryRepositoryProvider);
+    final locationId = ref.read(locationNotifierProvider).selected?.locationId;
     final results = await Future.wait<dynamic>([
       repo.getProduct(widget.productId),
       repo.getStockForProduct(widget.productId),
+      repo.getStockVariants(widget.productId),
+      repo.getProductStorageAssignments(
+        widget.productId,
+        locationId: locationId,
+      ),
       repo.getProductTransactions(widget.productId, limit: 200),
     ]);
     final product = results[0] as ProductDto;
     final stock = results[1] as InventoryListItem?;
-    final txns = results[2] as List<ProductTransactionDto>;
-    return _ProductBundle(product: product, stock: stock, transactions: txns);
+    final variants = results[2] as List<InventoryVariantStockDto>;
+    final storageAssignments = results[3] as List<ProductStorageAssignmentDto>;
+    final txns = results[4] as List<ProductTransactionDto>;
+    return _ProductBundle(
+      product: product,
+      stock: stock,
+      variants: variants,
+      storageAssignments: storageAssignments,
+      transactions: txns,
+    );
   }
 
   Future<void> _refresh() async {
@@ -112,8 +142,11 @@ class _ProductTransactionsPageState
 
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: isWide ? 104 : null,
+        leading: isWide ? const DesktopSidebarToggleLeading() : null,
         title: const Text('Transactions'),
       ),
       body: RefreshIndicator(
@@ -144,7 +177,12 @@ class _ProductTransactionsPageState
             return ListView(
               padding: const EdgeInsets.all(12),
               children: [
-                _ProductHeader(product: data.product, stock: data.stock),
+                _ProductHeader(
+                  product: data.product,
+                  stock: data.stock,
+                  variants: data.variants,
+                  storageAssignments: data.storageAssignments,
+                ),
                 const SizedBox(height: 12),
                 if (items.isEmpty)
                   const Center(
@@ -168,14 +206,57 @@ class _ProductTransactionsPageState
 }
 
 class _ProductHeader extends StatelessWidget {
-  const _ProductHeader({required this.product, required this.stock});
+  const _ProductHeader({
+    required this.product,
+    required this.stock,
+    required this.variants,
+    required this.storageAssignments,
+  });
   final ProductDto product;
   final InventoryListItem? stock;
+  final List<InventoryVariantStockDto> variants;
+  final List<ProductStorageAssignmentDto> storageAssignments;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final low = stock?.isLowStock ?? false;
+    final primaryStorage = () {
+      final primary = storageAssignments.where((e) => e.isPrimary);
+      if (primary.isNotEmpty) return primary.first.storageLabel;
+      if (storageAssignments.isNotEmpty) {
+        return storageAssignments.first.storageLabel;
+      }
+      return stock?.primaryStorage;
+    }();
+    final totalVariantQty =
+        variants.fold<double>(0, (sum, item) => sum + item.quantity);
+    final averageCost = () {
+      if (variants.isNotEmpty && totalVariantQty > 0) {
+        final weighted = variants.fold<double>(
+          0,
+          (sum, item) => sum + (item.quantity * item.averageCost),
+        );
+        return weighted / totalVariantQty;
+      }
+      final firstPositiveCost = variants
+          .map((e) => e.averageCost)
+          .where((value) => value > 0)
+          .cast<double?>()
+          .firstOrNull;
+      return firstPositiveCost ?? product.costPrice;
+    }();
+    final sellingPrice = () {
+      final primaryBarcode =
+          product.barcodes.cast<ProductBarcodeDto?>().firstWhere(
+                (item) => item?.isPrimary ?? false,
+                orElse: () => null,
+              );
+      return primaryBarcode?.sellingPrice ?? product.sellingPrice;
+    }();
+    final stockValue = averageCost == null || stock == null
+        ? null
+        : averageCost * stock!.stock;
     return Card(
       elevation: 0,
       color: theme.colorScheme.surfaceContainerHighest,
@@ -233,6 +314,29 @@ class _ProductHeader extends StatelessWidget {
                       icon: Icons.branding_watermark_rounded,
                       label: 'Brand',
                       value: stock!.brandName!),
+                _InfoRow(
+                  icon: Icons.route_rounded,
+                  label: 'Tracking',
+                  value: product.trackingType,
+                ),
+                if (averageCost != null)
+                  _InfoRow(
+                    icon: Icons.payments_outlined,
+                    label: 'Avg Cost',
+                    value: averageCost.toStringAsFixed(2),
+                  ),
+                if (sellingPrice != null)
+                  _InfoRow(
+                    icon: Icons.sell_outlined,
+                    label: 'Sell',
+                    value: sellingPrice.toStringAsFixed(2),
+                  ),
+                if ((primaryStorage ?? '').isNotEmpty)
+                  _InfoRow(
+                    icon: Icons.warehouse_outlined,
+                    label: 'Storage',
+                    value: primaryStorage!,
+                  ),
               ],
             ),
             const SizedBox(height: 8),
@@ -251,7 +355,15 @@ class _ProductHeader extends StatelessWidget {
                       ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
               ],
-            )
+            ),
+            if (stockValue != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Stock value: ${stockValue.toStringAsFixed(2)}',
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
           ],
         ),
       ),
@@ -291,7 +403,14 @@ class _TransactionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final qtyColor = t.quantity >= 0 ? Colors.green : theme.colorScheme.error;
+    final hasQuantity = t.quantity.abs() >= 0.0005;
+    final hasAmount = (t.amount ?? 0).abs() >= 0.0005;
+    final qtyColor = hasQuantity
+        ? (t.quantity > 0 ? Colors.green : theme.colorScheme.error)
+        : theme.colorScheme.onSurfaceVariant;
+    final amountColor = hasAmount
+        ? ((t.amount ?? 0) > 0 ? Colors.green : theme.colorScheme.error)
+        : theme.colorScheme.onSurfaceVariant;
     final ts = t.occurredAt != null ? '${t.occurredAt!.toLocal()}' : '';
     return ListTile(
       tileColor: theme.colorScheme.surfaceContainerHighest,
@@ -307,12 +426,26 @@ class _TransactionTile extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          const SizedBox(width: 8),
+        ],
+      ),
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
           Text(
-            (t.quantity >= 0 ? '+ ' : '− ') +
-                t.quantity.abs().toStringAsFixed(3),
+            hasQuantity
+                ? '${t.quantity > 0 ? '+' : '-'} ${t.quantity.abs().toStringAsFixed(3)}'
+                : t.quantity.abs().toStringAsFixed(3),
             style: TextStyle(fontWeight: FontWeight.w700, color: qtyColor),
           ),
+          if (hasAmount)
+            Text(
+              'Cost ${t.amount! > 0 ? '+' : '-'}${t.amount!.abs().toStringAsFixed(2)}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: amountColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
         ],
       ),
       subtitle: Column(
@@ -374,6 +507,8 @@ class _TypeChip extends StatelessWidget {
       case 'PURCHASE_RETURN':
       case 'TRANSFER_OUT':
         return theme.colorScheme.errorContainer;
+      case 'SUPPLIER_DEBIT_NOTE':
+        return Colors.orange.withValues(alpha: 0.18);
       case 'ADJUSTMENT':
       default:
         return theme.colorScheme.surfaceContainerHighest;
@@ -391,6 +526,8 @@ class _TypeChip extends StatelessWidget {
       case 'PURCHASE_RETURN':
       case 'TRANSFER_OUT':
         return theme.colorScheme.onErrorContainer;
+      case 'SUPPLIER_DEBIT_NOTE':
+        return Colors.orange.shade900;
       case 'ADJUSTMENT':
       default:
         return theme.colorScheme.onSurfaceVariant;

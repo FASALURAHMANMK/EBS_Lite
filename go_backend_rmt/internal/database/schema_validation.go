@@ -40,6 +40,9 @@ func ValidateSchema(db *sql.DB) error {
 		{table: "salary_components", columns: []string{"payroll_id", "type", "amount"}},
 		{table: "payroll_advances", columns: []string{"payroll_id", "amount", "date"}},
 		{table: "payroll_deductions", columns: []string{"payroll_id", "type", "amount", "date"}},
+		{table: "products", columns: []string{"has_warranty", "warranty_period_months"}},
+		{table: "warranty_registrations", columns: []string{"warranty_id", "company_id", "sale_id", "sale_number", "customer_name", "registered_at"}},
+		{table: "warranty_items", columns: []string{"warranty_item_id", "warranty_id", "sale_detail_id", "product_id", "quantity", "warranty_end_date"}},
 	}
 
 	missing := make([]string, 0)

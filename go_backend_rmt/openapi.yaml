@@ -3419,6 +3419,90 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
+  /warranties/prepare:
+    get:
+      summary: GET /api/v1/warranties/prepare
+      parameters:
+      - name: sale_number
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /warranties:
+    post:
+      summary: POST /api/v1/warranties
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWarrantyRequest'
+  /warranties/search:
+    get:
+      summary: GET /api/v1/warranties/search
+      parameters:
+      - name: sale_number
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: phone
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /warranties/{id}:
+    get:
+      summary: GET /api/v1/warranties/{id}
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /warranties/{id}/card:
+    get:
+      summary: GET /api/v1/warranties/{id}/card
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
   /employees:
     get:
       summary: GET /api/v1/employees
@@ -7223,6 +7307,8 @@ components:
           format: float
         is_weighable:
           type: boolean
+        tax_id:
+          type: integer
         name:
           type: string
         sku:
@@ -7248,10 +7334,20 @@ components:
         dimensions:
           type: string
           nullable: true
+        has_warranty:
+          type: boolean
+        warranty_period_months:
+          type: integer
+          nullable: true
         is_serialized:
           type: boolean
+        tracking_type:
+          type: string
         is_active:
           type: boolean
+        default_supplier_id:
+          type: integer
+          nullable: true
     CreateProductRequest:
       type: object
       properties:
@@ -7293,6 +7389,8 @@ components:
           nullable: true
         is_weighable:
           type: boolean
+        tax_id:
+          type: integer
         name:
           type: string
         sku:
@@ -7318,8 +7416,18 @@ components:
         dimensions:
           type: string
           nullable: true
+        has_warranty:
+          type: boolean
+        warranty_period_months:
+          type: integer
+          nullable: true
         is_serialized:
           type: boolean
+        tracking_type:
+          type: string
+        default_supplier_id:
+          type: integer
+          nullable: true
     UpdateProductRequest:
       type: object
       properties:
@@ -7362,6 +7470,9 @@ components:
         is_weighable:
           type: boolean
           nullable: true
+        tax_id:
+          type: integer
+          nullable: true
         name:
           type: string
           nullable: true
@@ -7389,12 +7500,251 @@ components:
         dimensions:
           type: string
           nullable: true
+        has_warranty:
+          type: boolean
+          nullable: true
+        warranty_period_months:
+          type: integer
+          nullable: true
         is_serialized:
           type: boolean
+          nullable: true
+        tracking_type:
+          type: string
           nullable: true
         is_active:
           type: boolean
           nullable: true
+        default_supplier_id:
+          type: integer
+          nullable: true
+    WarrantyCustomerSnapshot:
+      type: object
+      properties:
+        customer_id:
+          type: integer
+          nullable: true
+        name:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+    WarrantyCandidate:
+      type: object
+      properties:
+        sale_detail_id:
+          type: integer
+        product_id:
+          type: integer
+        barcode_id:
+          type: integer
+          nullable: true
+        product_name:
+          type: string
+        barcode:
+          type: string
+          nullable: true
+        variant_name:
+          type: string
+          nullable: true
+        tracking_type:
+          type: string
+        is_serialized:
+          type: boolean
+        quantity:
+          type: number
+          format: float
+        serial_number:
+          type: string
+          nullable: true
+        stock_lot_id:
+          type: integer
+          nullable: true
+        batch_number:
+          type: string
+          nullable: true
+        batch_expiry_date:
+          type: string
+          format: date-time
+          nullable: true
+        warranty_period_months:
+          type: integer
+        warranty_start_date:
+          type: string
+          format: date-time
+        warranty_end_date:
+          type: string
+          format: date-time
+        already_registered:
+          type: boolean
+    WarrantyItem:
+      type: object
+      properties:
+        warranty_item_id:
+          type: integer
+        warranty_id:
+          type: integer
+        sale_detail_id:
+          type: integer
+        product_id:
+          type: integer
+        barcode_id:
+          type: integer
+          nullable: true
+        product_name:
+          type: string
+        barcode:
+          type: string
+          nullable: true
+        variant_name:
+          type: string
+          nullable: true
+        tracking_type:
+          type: string
+        is_serialized:
+          type: boolean
+        quantity:
+          type: number
+          format: float
+        serial_number:
+          type: string
+          nullable: true
+        stock_lot_id:
+          type: integer
+          nullable: true
+        batch_number:
+          type: string
+          nullable: true
+        batch_expiry_date:
+          type: string
+          format: date-time
+          nullable: true
+        warranty_period_months:
+          type: integer
+        warranty_start_date:
+          type: string
+          format: date-time
+        warranty_end_date:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          nullable: true
+    WarrantyRegistration:
+      type: object
+      properties:
+        warranty_id:
+          type: integer
+        company_id:
+          type: integer
+        sale_id:
+          type: integer
+        sale_number:
+          type: string
+        customer_id:
+          type: integer
+          nullable: true
+        customer_name:
+          type: string
+        customer_phone:
+          type: string
+          nullable: true
+        customer_email:
+          type: string
+          nullable: true
+        customer_address:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        registered_at:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/WarrantyItem'
+    PrepareWarrantyResponse:
+      type: object
+      properties:
+        sale_id:
+          type: integer
+        sale_number:
+          type: string
+        sale_date:
+          type: string
+          format: date-time
+        invoice_customer:
+          $ref: '#/components/schemas/WarrantyCustomerSnapshot'
+        eligible_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/WarrantyCandidate'
+        existing_warranties:
+          type: array
+          items:
+            $ref: '#/components/schemas/WarrantyRegistration'
+    CreateWarrantyItemRequest:
+      type: object
+      required:
+      - sale_detail_id
+      - quantity
+      properties:
+        sale_detail_id:
+          type: integer
+        quantity:
+          type: number
+          format: float
+        serial_number:
+          type: string
+          nullable: true
+        stock_lot_id:
+          type: integer
+          nullable: true
+    CreateWarrantyRequest:
+      type: object
+      required:
+      - sale_number
+      - items
+      properties:
+        sale_number:
+          type: string
+        customer_id:
+          type: integer
+          nullable: true
+        customer_name:
+          type: string
+          nullable: true
+        customer_phone:
+          type: string
+          nullable: true
+        customer_email:
+          type: string
+          nullable: true
+        customer_address:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateWarrantyItemRequest'
+    WarrantyCardDataResponse:
+      type: object
+      properties:
+        warranty:
+          $ref: '#/components/schemas/WarrantyRegistration'
+        company:
+          $ref: '#/components/schemas/Company'
     AssetCategory:
       type: object
       properties:
