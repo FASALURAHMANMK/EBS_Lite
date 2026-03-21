@@ -24,6 +24,7 @@ type SettingsService struct {
 type inventorySettingsRecord struct {
 	InventoryCostingMethod            string `json:"inventory_costing_method,omitempty"`
 	NegativeStockPolicy               string `json:"negative_stock_policy,omitempty"`
+	NegativeProfitPolicy              string `json:"negative_profit_policy,omitempty"`
 	NegativeStockApprovalPasswordHash string `json:"negative_stock_approval_password_hash,omitempty"`
 }
 
@@ -186,9 +187,11 @@ func (s *SettingsService) GetInventorySettings(companyID int) (*models.Inventory
 	}
 	record.InventoryCostingMethod = normalizeCostingMethod(record.InventoryCostingMethod)
 	record.NegativeStockPolicy = normalizeNegativeStockPolicy(record.NegativeStockPolicy)
+	record.NegativeProfitPolicy = normalizeNegativeStockPolicy(record.NegativeProfitPolicy)
 	return &models.InventorySettings{
 		InventoryCostingMethod:           record.InventoryCostingMethod,
 		NegativeStockPolicy:              record.NegativeStockPolicy,
+		NegativeProfitPolicy:             record.NegativeProfitPolicy,
 		HasNegativeStockApprovalPassword: strings.TrimSpace(record.NegativeStockApprovalPasswordHash) != "",
 	}, nil
 }
@@ -207,22 +210,29 @@ func (s *SettingsService) UpdateInventorySettings(companyID int, req models.Upda
 	}
 	existing.InventoryCostingMethod = normalizeCostingMethod(existing.InventoryCostingMethod)
 	existing.NegativeStockPolicy = normalizeNegativeStockPolicy(req.NegativeStockPolicy)
+	existing.NegativeProfitPolicy = normalizeNegativeStockPolicy(req.NegativeProfitPolicy)
 	if existing.NegativeStockPolicy == "" {
 		existing.NegativeStockPolicy = negativeStockPolicyDisallow
 	}
+	if existing.NegativeProfitPolicy == "" {
+		existing.NegativeProfitPolicy = negativeStockPolicyDisallow
+	}
 
-	if existing.NegativeStockPolicy == negativeStockPolicyApproval {
+	requiresApprovalPassword := existing.NegativeStockPolicy == negativeStockPolicyApproval ||
+		existing.NegativeProfitPolicy == negativeStockPolicyApproval
+
+	if requiresApprovalPassword {
 		password := ""
 		if req.NegativeStockApprovalPassword != nil {
 			password = strings.TrimSpace(*req.NegativeStockApprovalPassword)
 		}
 		if password == "" && strings.TrimSpace(existing.NegativeStockApprovalPasswordHash) == "" {
-			return fmt.Errorf("negative stock approval password is required")
+			return fmt.Errorf("approval password is required")
 		}
 		if password != "" {
 			hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 			if err != nil {
-				return fmt.Errorf("failed to hash negative stock approval password: %w", err)
+				return fmt.Errorf("failed to hash approval password: %w", err)
 			}
 			existing.NegativeStockApprovalPasswordHash = string(hash)
 		}

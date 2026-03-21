@@ -90,6 +90,10 @@ type ShareQuoteRequest struct {
 	Email *string `json:"email,omitempty" validate:"omitempty,email"`
 }
 
+type ConvertQuoteToSaleRequest struct {
+	OverridePassword *string `json:"override_password,omitempty"`
+}
+
 // QuotePrintDataResponse is returned to client apps so they can render
 // and print/share quotes locally.
 type QuotePrintDataResponse struct {

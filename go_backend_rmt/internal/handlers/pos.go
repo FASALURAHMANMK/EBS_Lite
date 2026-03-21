@@ -160,6 +160,22 @@ func (h *POSHandler) ProcessCheckout(c *gin.Context) {
 			}, nil)
 			return
 		}
+		var profitApprovalErr *services.NegativeProfitApprovalRequiredError
+		if errors.As(err, &profitApprovalErr) {
+			utils.JSONResponse(c, http.StatusForbidden, false, profitApprovalErr.Error(), gin.H{
+				"code":    "NEGATIVE_PROFIT_APPROVAL_REQUIRED",
+				"details": profitApprovalErr.Details,
+			}, nil)
+			return
+		}
+		var profitBlockedErr *services.NegativeProfitNotAllowedError
+		if errors.As(err, &profitBlockedErr) {
+			utils.JSONResponse(c, http.StatusBadRequest, false, profitBlockedErr.Error(), gin.H{
+				"code":    "NEGATIVE_PROFIT_NOT_ALLOWED",
+				"details": profitBlockedErr.Details,
+			}, nil)
+			return
+		}
 		var cl *services.CreditLimitExceededError
 		if errors.As(err, &cl) {
 			utils.JSONResponse(c, http.StatusBadRequest, false, "Credit limit exceeded", gin.H{
@@ -282,7 +298,16 @@ func (h *POSHandler) PrintInvoice(c *gin.Context) {
 		return
 	}
 
-	utils.SuccessResponse(c, "Print data", models.POSPrintDataResponse{Sale: *sale, Company: *company})
+	raffleCoupons, err := services.NewLoyaltyService().GetRaffleCoupons(companyID, nil, &sale.SaleID)
+	if err != nil {
+		raffleCoupons = nil
+	}
+
+	utils.SuccessResponse(c, "Print data", models.POSPrintDataResponse{
+		Sale:          *sale,
+		Company:       *company,
+		RaffleCoupons: raffleCoupons,
+	})
 }
 
 // GET /pos/held-sales

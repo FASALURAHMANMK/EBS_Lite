@@ -157,6 +157,22 @@ func (h *SalesHandler) CreateSale(c *gin.Context) {
 			}, nil)
 			return
 		}
+		var profitApprovalErr *services.NegativeProfitApprovalRequiredError
+		if errors.As(err, &profitApprovalErr) {
+			utils.JSONResponse(c, http.StatusForbidden, false, profitApprovalErr.Error(), gin.H{
+				"code":    "NEGATIVE_PROFIT_APPROVAL_REQUIRED",
+				"details": profitApprovalErr.Details,
+			}, nil)
+			return
+		}
+		var profitBlockedErr *services.NegativeProfitNotAllowedError
+		if errors.As(err, &profitBlockedErr) {
+			utils.JSONResponse(c, http.StatusBadRequest, false, profitBlockedErr.Error(), gin.H{
+				"code":    "NEGATIVE_PROFIT_NOT_ALLOWED",
+				"details": profitBlockedErr.Details,
+			}, nil)
+			return
+		}
 		if err.Error() == "customer not found" {
 			utils.NotFoundResponse(c, "Customer not found")
 			return
@@ -682,8 +698,37 @@ func (h *SalesHandler) ConvertQuoteToSale(c *gin.Context) {
 		return
 	}
 
-	sale, err := h.salesService.ConvertQuoteToSale(quoteID, companyID, userID)
+	var req models.ConvertQuoteToSaleRequest
+	if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+
+	sale, err := h.salesService.ConvertQuoteToSale(quoteID, companyID, userID, req.OverridePassword)
 	if err != nil {
+		var stockApprovalErr *services.NegativeStockApprovalRequiredError
+		if errors.As(err, &stockApprovalErr) {
+			utils.JSONResponse(c, http.StatusForbidden, false, stockApprovalErr.Error(), gin.H{
+				"code": "NEGATIVE_STOCK_APPROVAL_REQUIRED",
+			}, nil)
+			return
+		}
+		var profitApprovalErr *services.NegativeProfitApprovalRequiredError
+		if errors.As(err, &profitApprovalErr) {
+			utils.JSONResponse(c, http.StatusForbidden, false, profitApprovalErr.Error(), gin.H{
+				"code":    "NEGATIVE_PROFIT_APPROVAL_REQUIRED",
+				"details": profitApprovalErr.Details,
+			}, nil)
+			return
+		}
+		var profitBlockedErr *services.NegativeProfitNotAllowedError
+		if errors.As(err, &profitBlockedErr) {
+			utils.JSONResponse(c, http.StatusBadRequest, false, profitBlockedErr.Error(), gin.H{
+				"code":    "NEGATIVE_PROFIT_NOT_ALLOWED",
+				"details": profitBlockedErr.Details,
+			}, nil)
+			return
+		}
 		switch err.Error() {
 		case "quote not found":
 			utils.NotFoundResponse(c, "Quote not found")

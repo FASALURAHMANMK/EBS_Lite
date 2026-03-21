@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"io"
 	"net/http"
 	"strconv"
 
@@ -252,6 +253,70 @@ func (h *LoyaltyHandler) DeletePromotion(c *gin.Context) {
 	utils.SuccessResponse(c, "Promotion deleted successfully", nil)
 }
 
+func (h *LoyaltyHandler) ImportPromotions(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "File is required", err)
+		return
+	}
+	f, err := file.Open()
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to open file", err)
+		return
+	}
+	defer f.Close()
+
+	data, err := io.ReadAll(f)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to read file", err)
+		return
+	}
+
+	result, err := h.loyaltyService.ImportPromotionProductRules(companyID, userID, data)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to import promotions", err)
+		return
+	}
+	utils.SuccessResponse(c, "Promotions import completed", result)
+}
+
+func (h *LoyaltyHandler) PromotionImportTemplate(c *gin.Context) {
+	if c.GetInt("company_id") == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	data, err := h.loyaltyService.PromotionImportTemplateXLSX()
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate template", err)
+		return
+	}
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", "attachment; filename=promotions_template.xlsx")
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+}
+
+func (h *LoyaltyHandler) PromotionImportExample(c *gin.Context) {
+	if c.GetInt("company_id") == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	data, err := h.loyaltyService.PromotionImportExampleXLSX()
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to generate example", err)
+		return
+	}
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", "attachment; filename=promotions_example.xlsx")
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
+}
+
 // POST /promotions/check-eligibility
 func (h *LoyaltyHandler) CheckPromotionEligibility(c *gin.Context) {
 	companyID := c.GetInt("company_id")
@@ -280,6 +345,262 @@ func (h *LoyaltyHandler) CheckPromotionEligibility(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, "Promotion eligibility checked successfully", eligibility)
+}
+
+func (h *LoyaltyHandler) GetCouponSeries(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	activeOnly := c.Query("active") == "true"
+	items, err := h.loyaltyService.GetCouponSeries(companyID, activeOnly)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get coupon series", err)
+		return
+	}
+	utils.SuccessResponse(c, "Coupon series retrieved successfully", items)
+}
+
+func (h *LoyaltyHandler) CreateCouponSeries(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	var req models.CreateCouponSeriesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+	item, err := h.loyaltyService.CreateCouponSeries(companyID, userID, &req)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create coupon series", err)
+		return
+	}
+	utils.CreatedResponse(c, "Coupon series created successfully", item)
+}
+
+func (h *LoyaltyHandler) UpdateCouponSeries(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid coupon series ID", err)
+		return
+	}
+	var req models.UpdateCouponSeriesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+	if err := h.loyaltyService.UpdateCouponSeries(companyID, id, &req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update coupon series", err)
+		return
+	}
+	utils.SuccessResponse(c, "Coupon series updated successfully", nil)
+}
+
+func (h *LoyaltyHandler) DeleteCouponSeries(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid coupon series ID", err)
+		return
+	}
+	if err := h.loyaltyService.DeleteCouponSeries(companyID, id); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to delete coupon series", err)
+		return
+	}
+	utils.SuccessResponse(c, "Coupon series deleted successfully", nil)
+}
+
+func (h *LoyaltyHandler) GetCouponCodes(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid coupon series ID", err)
+		return
+	}
+	items, err := h.loyaltyService.GetCouponCodes(companyID, id)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get coupon codes", err)
+		return
+	}
+	utils.SuccessResponse(c, "Coupon codes retrieved successfully", items)
+}
+
+func (h *LoyaltyHandler) ValidateCouponCode(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	var req models.ValidateCouponCodeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+	item, err := h.loyaltyService.ValidateCouponCode(companyID, &req)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to validate coupon", err)
+		return
+	}
+	utils.SuccessResponse(c, "Coupon validated successfully", item)
+}
+
+func (h *LoyaltyHandler) GetRaffleDefinitions(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	activeOnly := c.Query("active") == "true"
+	items, err := h.loyaltyService.GetRaffleDefinitions(companyID, activeOnly)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get raffle definitions", err)
+		return
+	}
+	utils.SuccessResponse(c, "Raffle definitions retrieved successfully", items)
+}
+
+func (h *LoyaltyHandler) CreateRaffleDefinition(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	var req models.CreateRaffleDefinitionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+	item, err := h.loyaltyService.CreateRaffleDefinition(companyID, userID, &req)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create raffle definition", err)
+		return
+	}
+	utils.CreatedResponse(c, "Raffle definition created successfully", item)
+}
+
+func (h *LoyaltyHandler) UpdateRaffleDefinition(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid raffle definition ID", err)
+		return
+	}
+	var req models.UpdateRaffleDefinitionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+	if err := h.loyaltyService.UpdateRaffleDefinition(companyID, id, &req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update raffle definition", err)
+		return
+	}
+	utils.SuccessResponse(c, "Raffle definition updated successfully", nil)
+}
+
+func (h *LoyaltyHandler) DeleteRaffleDefinition(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid raffle definition ID", err)
+		return
+	}
+	if err := h.loyaltyService.DeleteRaffleDefinition(companyID, id); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to delete raffle definition", err)
+		return
+	}
+	utils.SuccessResponse(c, "Raffle definition deleted successfully", nil)
+}
+
+func (h *LoyaltyHandler) GetRaffleCoupons(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid raffle definition ID", err)
+		return
+	}
+	items, err := h.loyaltyService.GetRaffleCoupons(companyID, &id, nil)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get raffle coupons", err)
+		return
+	}
+	utils.SuccessResponse(c, "Raffle coupons retrieved successfully", items)
+}
+
+func (h *LoyaltyHandler) MarkRaffleWinner(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid raffle coupon ID", err)
+		return
+	}
+	var req models.MarkRaffleWinnerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+	if err := h.loyaltyService.MarkRaffleWinner(companyID, id, &req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to mark raffle winner", err)
+		return
+	}
+	utils.SuccessResponse(c, "Raffle winner saved successfully", nil)
 }
 
 // GET /loyalty/settings

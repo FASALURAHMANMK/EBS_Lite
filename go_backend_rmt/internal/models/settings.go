@@ -35,11 +35,13 @@ type CompanySettings struct {
 type InventorySettings struct {
 	InventoryCostingMethod           string `json:"inventory_costing_method,omitempty"`
 	NegativeStockPolicy              string `json:"negative_stock_policy,omitempty"`
+	NegativeProfitPolicy             string `json:"negative_profit_policy,omitempty"`
 	HasNegativeStockApprovalPassword bool   `json:"has_negative_stock_approval_password"`
 }
 
 type UpdateInventorySettingsRequest struct {
 	NegativeStockPolicy           string  `json:"negative_stock_policy"`
+	NegativeProfitPolicy          string  `json:"negative_profit_policy"`
 	NegativeStockApprovalPassword *string `json:"negative_stock_approval_password,omitempty"`
 }
 

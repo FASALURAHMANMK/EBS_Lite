@@ -64,6 +64,7 @@ Future<void> printThermalOverTcp({
   required Map<String, dynamic> company,
   required PrinterDevice settings,
   required String paperSize, // '58mm' or '80mm'
+  List<Map<String, dynamic>> raffleCoupons = const [],
 }) async {
   final width = paperSize == '58mm' ? 32 : 48; // typical char widths
   final p = _ticketFromSale(
@@ -71,6 +72,7 @@ Future<void> printThermalOverTcp({
     company: company,
     charsPerLine: width,
     kickDrawer: settings.cashDrawerKick,
+    raffleCoupons: raffleCoupons,
   );
 
   if (settings.connectionType == 'network' &&
@@ -90,6 +92,7 @@ Future<void> printThermalOverBluetooth({
   required Map<String, dynamic> company,
   required PrinterDevice settings,
   required String paperSize,
+  List<Map<String, dynamic>> raffleCoupons = const [],
 }) async {
   final width = paperSize == '58mm' ? 32 : 48;
   final ticket = _ticketFromSale(
@@ -97,6 +100,7 @@ Future<void> printThermalOverBluetooth({
     company: company,
     charsPerLine: width,
     kickDrawer: settings.cashDrawerKick,
+    raffleCoupons: raffleCoupons,
   );
   final printerManager = PrinterManager.instance;
   final btName = settings.btName ?? '';
@@ -115,6 +119,7 @@ Future<void> printThermalOverUsb({
   required Map<String, dynamic> company,
   required PrinterDevice settings,
   required String paperSize,
+  List<Map<String, dynamic>> raffleCoupons = const [],
 }) async {
   final width = paperSize == '58mm' ? 32 : 48;
   final ticket = _ticketFromSale(
@@ -122,6 +127,7 @@ Future<void> printThermalOverUsb({
     company: company,
     charsPerLine: width,
     kickDrawer: settings.cashDrawerKick,
+    raffleCoupons: raffleCoupons,
   );
   final printerManager = PrinterManager.instance;
   await printerManager.connect(
@@ -141,6 +147,7 @@ EscPos _ticketFromSale({
   required Map<String, dynamic> company,
   required int charsPerLine,
   required bool kickDrawer,
+  List<Map<String, dynamic>> raffleCoupons = const [],
 }) {
   final p = EscPos(charsPerLine: charsPerLine)..init();
 
@@ -197,6 +204,20 @@ EscPos _ticketFromSale({
   p.feed(2);
   p.setAlign(1);
   p.text('Thank you!');
+  if (raffleCoupons.isNotEmpty) {
+    for (final coupon in raffleCoupons) {
+      p.feed(2);
+      p.hr();
+      p.setBold(true);
+      p.text((coupon['raffle_definition_name'] as String?) ?? 'Raffle Coupon');
+      p.setBold(false);
+      p.text('Code: ${(coupon['coupon_code'] as String?) ?? ''}');
+      p.text('Customer: ${(coupon['customer_name'] as String?) ?? ''}');
+      p.text('Phone: ${(coupon['customer_phone'] as String?) ?? ''}');
+      p.text('Sale: ${(coupon['sale_number'] as String?) ?? ''}');
+      p.hr();
+    }
+  }
   p.feed(3);
   if (kickDrawer) {
     p.kickDrawer();

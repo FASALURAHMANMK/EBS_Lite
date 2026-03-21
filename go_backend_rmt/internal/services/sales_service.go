@@ -887,6 +887,7 @@ func (s *SalesService) CreateSaleWithOptions(
 	if err != nil {
 		return nil, err
 	}
+	actualCosts := make([]issuedSaleLineCost, 0, len(preparedLines))
 
 	for _, line := range preparedLines {
 		var saleDetailID int
@@ -906,6 +907,11 @@ func (s *SalesService) CreateSaleWithOptions(
 		}
 
 		if opts.IsTraining || line.ProductID == nil {
+			actualCosts = append(actualCosts, issuedSaleLineCost{
+				BarcodeID:        line.BarcodeID,
+				CostPricePerUnit: line.Snapshot.CostPricePerUnit,
+				TotalCost:        line.Snapshot.CostPricePerUnit * line.Quantity,
+			})
 			continue
 		}
 
@@ -924,14 +930,23 @@ func (s *SalesService) CreateSaleWithOptions(
 		if err != nil {
 			return nil, fmt.Errorf("failed to update stock: %w", err)
 		}
+		actualCost := actualSaleLineCost(line, issue)
+		actualCosts = append(actualCosts, actualCost)
 		if _, err := tx.Exec(`
 			UPDATE sale_details
 			SET barcode_id = COALESCE($1, barcode_id),
 			    cost_price = $2,
 			    serial_numbers = $3
 			WHERE sale_detail_id = $4
-		`, issue.BarcodeID, issue.UnitCost, pq.Array(selection.SerialNumbers), saleDetailID); err != nil {
+		`, issue.BarcodeID, actualCost.CostPricePerUnit, pq.Array(selection.SerialNumbers), saleDetailID); err != nil {
 			return nil, fmt.Errorf("failed to update sale item cost snapshot: %w", err)
+		}
+	}
+
+	if !opts.IsTraining {
+		profitDetails := buildProfitGuardDetails(preparedLines, actualCosts, req.DiscountAmount)
+		if err := s.enforceNegativeProfitPolicyTx(tx, companyID, req.OverridePassword, profitDetails); err != nil {
+			return nil, err
 		}
 	}
 
@@ -2053,7 +2068,7 @@ func (s *SalesService) GetQuotePrintData(quoteID, companyID int) (*models.QuoteP
 	}, nil
 }
 
-func (s *SalesService) ConvertQuoteToSale(quoteID, companyID, userID int) (*models.Sale, error) {
+func (s *SalesService) ConvertQuoteToSale(quoteID, companyID, userID int, overridePassword *string) (*models.Sale, error) {
 	var (
 		locationID     int
 		quoteNumber    string
@@ -2118,11 +2133,12 @@ func (s *SalesService) ConvertQuoteToSale(quoteID, companyID, userID int) (*mode
 	finalNotes := combinedNotes
 
 	req := &models.CreateSaleRequest{
-		CustomerID:     customerID,
-		Items:          saleItems,
-		PaidAmount:     0,
-		DiscountAmount: discountAmount,
-		Notes:          &finalNotes,
+		CustomerID:       customerID,
+		Items:            saleItems,
+		PaidAmount:       0,
+		DiscountAmount:   discountAmount,
+		Notes:            &finalNotes,
+		OverridePassword: overridePassword,
 	}
 
 	idemKey := fmt.Sprintf("quote:%d", quoteID)

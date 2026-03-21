@@ -48,14 +48,55 @@ func (s *DashboardService) GetMetrics(companyID int, locationID *int) (*models.D
 		}
 	}
 
-	// Inventory value = sum(stock.qty * product.cost_price)
+	// Inventory value follows the company's configured costing method.
 	{
+		method, err := loadCompanyCostingMethod(s.db, companyID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get inventory costing method: %w", err)
+		}
+
 		q := fmt.Sprintf(`
-            SELECT COALESCE(SUM(st.quantity * COALESCE(p.cost_price,0)),0)
-            FROM stock st
-            JOIN locations l ON st.location_id = l.location_id
-            JOIN products p ON st.product_id = p.product_id
-            WHERE l.company_id = $1%s`, locClause("st"))
+            SELECT COALESCE(SUM(sv.quantity * COALESCE(sv.average_cost,0)),0)
+            FROM stock_variants sv
+            JOIN locations l ON sv.location_id = l.location_id
+            WHERE l.company_id = $1%s`, locClause("sv"))
+		if method == costingMethodFIFO {
+			q = fmt.Sprintf(`
+                WITH variant_stock AS (
+                    SELECT
+                        sv.location_id,
+                        sv.barcode_id,
+                        COALESCE(sv.quantity, 0)::float8 AS quantity,
+                        COALESCE(sv.average_cost, 0)::float8 AS average_cost
+                    FROM stock_variants sv
+                    JOIN locations l ON sv.location_id = l.location_id
+                    WHERE l.company_id = $1%s
+                ),
+                lot_stock AS (
+                    SELECT
+                        sl.location_id,
+                        sl.barcode_id,
+                        COALESCE(SUM(sl.remaining_quantity), 0)::float8 AS lot_quantity,
+                        COALESCE(SUM(sl.remaining_quantity * sl.cost_price), 0)::float8 AS lot_value
+                    FROM stock_lots sl
+                    JOIN locations l ON sl.location_id = l.location_id
+                    WHERE l.company_id = $1%s
+                    GROUP BY sl.location_id, sl.barcode_id
+                ),
+                variant_valuation AS (
+                    SELECT
+                        (
+                            COALESCE(ls.lot_value, 0) +
+                            ((vs.quantity - COALESCE(ls.lot_quantity, 0)) * vs.average_cost)
+                        )::float8 AS stock_value
+                    FROM variant_stock vs
+                    LEFT JOIN lot_stock ls
+                        ON ls.location_id = vs.location_id
+                       AND ls.barcode_id = vs.barcode_id
+                )
+                SELECT COALESCE(SUM(stock_value), 0)::float8
+                FROM variant_valuation`, locClause("sv"), locClause("sl"))
+		}
 		if err := s.db.QueryRow(q, args...).Scan(&metrics.InventoryValue); err != nil {
 			return nil, fmt.Errorf("failed to get inventory value: %w", err)
 		}

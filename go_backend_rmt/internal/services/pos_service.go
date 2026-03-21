@@ -253,9 +253,27 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 		}
 	}
 
+	var plannedCouponDiscount float64
+	if !trainingEnabled && req.CouponCode != nil && strings.TrimSpace(*req.CouponCode) != "" {
+		couponAmountBase := preTotal - manualDiscount - plannedRedeemValue
+		if couponAmountBase < 0 {
+			couponAmountBase = 0
+		}
+		validation, err := NewLoyaltyService().ValidateCouponCode(companyID, &models.ValidateCouponCodeRequest{
+			Code:       strings.TrimSpace(*req.CouponCode),
+			CustomerID: req.CustomerID,
+			SaleAmount: couponAmountBase,
+		})
+		if err != nil {
+			return nil, err
+		}
+		plannedCouponDiscount = validation.DiscountAmount
+		saleReq.DiscountAmount += plannedCouponDiscount
+	}
+
 	// Credit limit check when the sale is not fully paid (i.e., creating new outstanding).
 	if !trainingEnabled && req.CustomerID != nil {
-		finalTotal := preTotal - manualDiscount - plannedRedeemValue
+		finalTotal := preTotal - manualDiscount - plannedRedeemValue - plannedCouponDiscount
 		if finalTotal < 0 {
 			finalTotal = 0
 		}
@@ -291,6 +309,18 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 		if _, _, err := loyalty.RedeemPointsForSale(companyID, *req.CustomerID, sale.SaleID, plannedRedeemPoints); err != nil {
 			// Log but do not fail sale; mismatch could happen if race condition
 			log.Printf("Warning: failed to persist loyalty redemption for sale %d: %v", sale.SaleID, err)
+		}
+	}
+
+	if !trainingEnabled && sale != nil && req.CouponCode != nil && strings.TrimSpace(*req.CouponCode) != "" {
+		if err := NewLoyaltyService().RedeemCouponCode(companyID, strings.TrimSpace(*req.CouponCode), sale.SaleID, req.CustomerID); err != nil {
+			log.Printf("warning: failed to redeem coupon %q for sale %d: %v", strings.TrimSpace(*req.CouponCode), sale.SaleID, err)
+		}
+	}
+
+	if !trainingEnabled && sale != nil {
+		if _, err := NewLoyaltyService().IssueRaffleCouponsForSale(companyID, sale.SaleID, req.CustomerID, req.AutoFillRaffleCustomerData); err != nil {
+			log.Printf("warning: failed to issue raffle coupons for sale %d: %v", sale.SaleID, err)
 		}
 	}
 
@@ -874,6 +904,7 @@ func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int,
 	if err != nil {
 		return nil, err
 	}
+	actualCosts := make([]issuedSaleLineCost, 0, len(preparedLines))
 
 	// Insert details and update stock
 	for _, line := range preparedLines {
@@ -890,6 +921,11 @@ func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int,
 		}
 
 		if isTraining || line.ProductID == nil {
+			actualCosts = append(actualCosts, issuedSaleLineCost{
+				BarcodeID:        line.BarcodeID,
+				CostPricePerUnit: line.Snapshot.CostPricePerUnit,
+				TotalCost:        line.Snapshot.CostPricePerUnit * line.Quantity,
+			})
 			continue
 		}
 
@@ -908,14 +944,23 @@ func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int,
 		if err != nil {
 			return nil, fmt.Errorf("failed to update stock: %w", err)
 		}
+		actualCost := actualSaleLineCost(line, issue)
+		actualCosts = append(actualCosts, actualCost)
 		if _, err := tx.Exec(`
 			UPDATE sale_details
 			SET barcode_id = COALESCE($1, barcode_id),
 			    cost_price = $2,
 			    serial_numbers = $3
 			WHERE sale_detail_id = $4
-		`, issue.BarcodeID, issue.UnitCost, pq.Array(selection.SerialNumbers), saleDetailID); err != nil {
+		`, issue.BarcodeID, actualCost.CostPricePerUnit, pq.Array(selection.SerialNumbers), saleDetailID); err != nil {
 			return nil, fmt.Errorf("failed to update sale detail cost snapshot: %w", err)
+		}
+	}
+
+	if !isTraining {
+		profitDetails := buildProfitGuardDetails(preparedLines, actualCosts, req.DiscountAmount)
+		if err := s.salesService.enforceNegativeProfitPolicyTx(tx, companyID, req.OverridePassword, profitDetails); err != nil {
+			return nil, err
 		}
 	}
 

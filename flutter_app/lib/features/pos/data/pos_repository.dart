@@ -255,6 +255,8 @@ class PosRepository {
     int? saleId,
     List<PosPaymentLineDto>? payments,
     double? redeemPoints,
+    String? couponCode,
+    bool? autoFillRaffleCustomerData,
     String? idempotencyKey,
     String? managerOverrideToken,
     String? overrideReason,
@@ -293,6 +295,10 @@ class PosRepository {
         'payments': payments.map((p) => p.toJson()).toList(),
       if (redeemPoints != null && redeemPoints > 0)
         'redeem_points': redeemPoints,
+      if ((couponCode ?? '').trim().isNotEmpty)
+        'coupon_code': couponCode!.trim(),
+      if (autoFillRaffleCustomerData != null)
+        'auto_fill_raffle_customer_data': autoFillRaffleCustomerData,
       if (managerOverrideToken != null &&
           managerOverrideToken.trim().isNotEmpty)
         'manager_override_token': managerOverrideToken.trim(),
@@ -335,10 +341,10 @@ class PosRepository {
         options: headers.isEmpty ? null : Options(headers: headers),
       );
     } on DioException catch (e) {
-      final approval = parseNegativeStockApprovalRequired(e);
-      if (approval != null) {
-        throw approval;
-      }
+      final stockApproval = parseNegativeStockApprovalRequired(e);
+      if (stockApproval != null) throw stockApproval;
+      final profitApproval = parseNegativeProfitApprovalRequired(e);
+      if (profitApproval != null) throw profitApproval;
       if (outbox.isNetworkError(e)) {
         if (trainingEnabled) rethrow;
         await outbox.enqueue(
@@ -362,6 +368,25 @@ class PosRepository {
     final sale =
         (data?['sale'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     return PosCheckoutResult.fromSale(sale);
+  }
+
+  Future<PosCouponValidationDto> validateCoupon({
+    required String code,
+    required double saleAmount,
+    int? customerId,
+  }) async {
+    final res = await _dio.post(
+      '/promotions/coupon-series/validate',
+      data: {
+        'code': code.trim(),
+        'sale_amount': saleAmount,
+        if (customerId != null) 'customer_id': customerId,
+      },
+    );
+    final map = (res.data is Map<String, dynamic>)
+        ? (res.data['data'] as Map<String, dynamic>?) ?? <String, dynamic>{}
+        : <String, dynamic>{};
+    return PosCouponValidationDto.fromJson(map);
   }
 
   Future<Map<String, double>> calculateTotals({

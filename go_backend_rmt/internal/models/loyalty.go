@@ -38,18 +38,21 @@ type LoyaltyTransaction struct {
 
 // Promotion Models
 type Promotion struct {
-	PromotionID  int       `json:"promotion_id" db:"promotion_id"`
-	CompanyID    int       `json:"company_id" db:"company_id"`
-	Name         string    `json:"name" db:"name" validate:"required,min=2,max=255"`
-	Description  *string   `json:"description,omitempty" db:"description"`
-	DiscountType *string   `json:"discount_type,omitempty" db:"discount_type"`
-	Value        *float64  `json:"value,omitempty" db:"value"`
-	MinAmount    *float64  `json:"min_amount,omitempty" db:"min_amount"`
-	StartDate    time.Time `json:"start_date" db:"start_date"`
-	EndDate      time.Time `json:"end_date" db:"end_date"`
-	ApplicableTo *string   `json:"applicable_to,omitempty" db:"applicable_to"`
-	Conditions   *JSONB    `json:"conditions,omitempty" db:"conditions"`
-	IsActive     bool      `json:"is_active" db:"is_active"`
+	PromotionID   int                    `json:"promotion_id" db:"promotion_id"`
+	CompanyID     int                    `json:"company_id" db:"company_id"`
+	Name          string                 `json:"name" db:"name" validate:"required,min=2,max=255"`
+	Description   *string                `json:"description,omitempty" db:"description"`
+	DiscountType  *string                `json:"discount_type,omitempty" db:"discount_type"`
+	DiscountScope string                 `json:"discount_scope" db:"discount_scope"`
+	Value         *float64               `json:"value,omitempty" db:"value"`
+	MinAmount     *float64               `json:"min_amount,omitempty" db:"min_amount"`
+	StartDate     time.Time              `json:"start_date" db:"start_date"`
+	EndDate       time.Time              `json:"end_date" db:"end_date"`
+	ApplicableTo  *string                `json:"applicable_to,omitempty" db:"applicable_to"`
+	Conditions    *JSONB                 `json:"conditions,omitempty" db:"conditions"`
+	Priority      int                    `json:"priority" db:"priority"`
+	IsActive      bool                   `json:"is_active" db:"is_active"`
+	ProductRules  []PromotionProductRule `json:"product_rules,omitempty" db:"-"`
 	BaseModel
 }
 
@@ -70,28 +73,34 @@ type LoyaltyRedemptionResponse struct {
 }
 
 type CreatePromotionRequest struct {
-	Name         string   `json:"name" validate:"required,min=2,max=255"`
-	Description  *string  `json:"description,omitempty"`
-	DiscountType *string  `json:"discount_type,omitempty" validate:"omitempty,oneof=PERCENTAGE FIXED BUY_X_GET_Y"`
-	Value        *float64 `json:"value,omitempty"`
-	MinAmount    *float64 `json:"min_amount,omitempty"`
-	StartDate    string   `json:"start_date" validate:"required"`
-	EndDate      string   `json:"end_date" validate:"required"`
-	ApplicableTo *string  `json:"applicable_to,omitempty" validate:"omitempty,oneof=ALL PRODUCTS CATEGORIES CUSTOMERS"`
-	Conditions   *JSONB   `json:"conditions,omitempty"`
+	Name          string                        `json:"name" validate:"required,min=2,max=255"`
+	Description   *string                       `json:"description,omitempty"`
+	DiscountType  *string                       `json:"discount_type,omitempty" validate:"omitempty,oneof=PERCENTAGE FIXED FIXED_PRICE BUY_X_GET_Y"`
+	DiscountScope *string                       `json:"discount_scope,omitempty" validate:"omitempty,oneof=ORDER ITEM"`
+	Value         *float64                      `json:"value,omitempty"`
+	MinAmount     *float64                      `json:"min_amount,omitempty"`
+	StartDate     string                        `json:"start_date" validate:"required"`
+	EndDate       string                        `json:"end_date" validate:"required"`
+	ApplicableTo  *string                       `json:"applicable_to,omitempty" validate:"omitempty,oneof=ALL PRODUCTS CATEGORIES CUSTOMERS"`
+	Conditions    *JSONB                        `json:"conditions,omitempty"`
+	Priority      *int                          `json:"priority,omitempty" validate:"omitempty,gte=0,lte=1000"`
+	ProductRules  []PromotionProductRuleRequest `json:"product_rules,omitempty"`
 }
 
 type UpdatePromotionRequest struct {
-	Name         *string  `json:"name,omitempty" validate:"omitempty,min=2,max=255"`
-	Description  *string  `json:"description,omitempty"`
-	DiscountType *string  `json:"discount_type,omitempty" validate:"omitempty,oneof=PERCENTAGE FIXED BUY_X_GET_Y"`
-	Value        *float64 `json:"value,omitempty"`
-	MinAmount    *float64 `json:"min_amount,omitempty"`
-	StartDate    *string  `json:"start_date,omitempty"`
-	EndDate      *string  `json:"end_date,omitempty"`
-	ApplicableTo *string  `json:"applicable_to,omitempty" validate:"omitempty,oneof=ALL PRODUCTS CATEGORIES CUSTOMERS"`
-	Conditions   *JSONB   `json:"conditions,omitempty"`
-	IsActive     *bool    `json:"is_active,omitempty"`
+	Name          *string                       `json:"name,omitempty" validate:"omitempty,min=2,max=255"`
+	Description   *string                       `json:"description,omitempty"`
+	DiscountType  *string                       `json:"discount_type,omitempty" validate:"omitempty,oneof=PERCENTAGE FIXED FIXED_PRICE BUY_X_GET_Y"`
+	DiscountScope *string                       `json:"discount_scope,omitempty" validate:"omitempty,oneof=ORDER ITEM"`
+	Value         *float64                      `json:"value,omitempty"`
+	MinAmount     *float64                      `json:"min_amount,omitempty"`
+	StartDate     *string                       `json:"start_date,omitempty"`
+	EndDate       *string                       `json:"end_date,omitempty"`
+	ApplicableTo  *string                       `json:"applicable_to,omitempty" validate:"omitempty,oneof=ALL PRODUCTS CATEGORIES CUSTOMERS"`
+	Conditions    *JSONB                        `json:"conditions,omitempty"`
+	Priority      *int                          `json:"priority,omitempty" validate:"omitempty,gte=0,lte=1000"`
+	ProductRules  []PromotionProductRuleRequest `json:"product_rules,omitempty"`
+	IsActive      *bool                         `json:"is_active,omitempty"`
 }
 
 type CustomerLoyaltyResponse struct {
@@ -113,21 +122,16 @@ type CustomerLoyaltyResponse struct {
 //	  "category_ids": [10,20]   // optional - categories represented in the transaction
 //	}
 type PromotionEligibilityRequest struct {
-	CustomerID  *int    `json:"customer_id,omitempty"`
-	TotalAmount float64 `json:"total_amount" validate:"required,gt=0"`
-	ProductIDs  []int   `json:"product_ids,omitempty"`
-	CategoryIDs []int   `json:"category_ids,omitempty"`
+	CustomerID  *int                       `json:"customer_id,omitempty"`
+	TotalAmount float64                    `json:"total_amount" validate:"required,gt=0"`
+	ProductIDs  []int                      `json:"product_ids,omitempty"`
+	CategoryIDs []int                      `json:"category_ids,omitempty"`
+	Items       []PromotionEligibilityItem `json:"items,omitempty"`
 }
 
 type PromotionEligibilityResponse struct {
-	EligiblePromotions []struct {
-		PromotionID    int     `json:"promotion_id"`
-		Name           string  `json:"name"`
-		DiscountType   string  `json:"discount_type"`
-		Value          float64 `json:"value"`
-		DiscountAmount float64 `json:"discount_amount"`
-	} `json:"eligible_promotions"`
-	TotalDiscount float64 `json:"total_discount"`
+	EligiblePromotions []PromotionApplication `json:"eligible_promotions"`
+	TotalDiscount      float64                `json:"total_discount"`
 }
 
 type LoyaltySettingsResponse struct {

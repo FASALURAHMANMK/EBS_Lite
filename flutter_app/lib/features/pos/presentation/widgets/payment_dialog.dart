@@ -529,6 +529,27 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                           );
                       if (!context.mounted) return;
                       Navigator.of(context).pop(result);
+                    } on NegativeProfitApprovalRequiredException catch (e) {
+                      if (!context.mounted) return;
+                      final password = await showNegativeProfitApprovalDialog(
+                        context,
+                        message: e.message,
+                      );
+                      if (password == null || password.isEmpty) {
+                        setState(() => _submitting = false);
+                        return;
+                      }
+                      final result = await ref
+                          .read(posNotifierProvider.notifier)
+                          .processCheckout(
+                            paymentMethodId: primaryMethod,
+                            paidAmount: paid,
+                            payments: payments,
+                            redeemPoints: redeemPoints,
+                            overridePassword: password,
+                          );
+                      if (!context.mounted) return;
+                      Navigator.of(context).pop(result);
                     } on OutboxQueuedException catch (e) {
                       if (!context.mounted) return;
                       setState(() => _submitting = false);

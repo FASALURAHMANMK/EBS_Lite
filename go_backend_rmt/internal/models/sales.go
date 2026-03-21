@@ -165,17 +165,19 @@ type POSCheckoutRequest struct {
 	SaleID *int `json:"sale_id,omitempty"`
 	// SaleNumber is optional. When provided (e.g. offline checkout), the server
 	// will persist it instead of allocating a new number.
-	SaleNumber           *string                   `json:"sale_number,omitempty"`
-	CustomerID           *int                      `json:"customer_id,omitempty"`
-	Items                []CreateSaleDetailRequest `json:"items" validate:"required,min=1"`
-	PaymentMethodID      *int                      `json:"payment_method_id,omitempty"`
-	DiscountAmount       float64                   `json:"discount_amount"`
-	PaidAmount           float64                   `json:"paid_amount" validate:"gte=0"`
-	Payments             []POSPaymentLine          `json:"payments,omitempty"`
-	RedeemPoints         *float64                  `json:"redeem_points,omitempty"`
-	ManagerOverrideToken *string                   `json:"manager_override_token,omitempty"`
-	OverrideReason       *string                   `json:"override_reason,omitempty"`
-	OverridePassword     *string                   `json:"override_password,omitempty"`
+	SaleNumber                 *string                   `json:"sale_number,omitempty"`
+	CustomerID                 *int                      `json:"customer_id,omitempty"`
+	Items                      []CreateSaleDetailRequest `json:"items" validate:"required,min=1"`
+	PaymentMethodID            *int                      `json:"payment_method_id,omitempty"`
+	DiscountAmount             float64                   `json:"discount_amount"`
+	PaidAmount                 float64                   `json:"paid_amount" validate:"gte=0"`
+	Payments                   []POSPaymentLine          `json:"payments,omitempty"`
+	RedeemPoints               *float64                  `json:"redeem_points,omitempty"`
+	CouponCode                 *string                   `json:"coupon_code,omitempty"`
+	AutoFillRaffleCustomerData *bool                     `json:"auto_fill_raffle_customer_data,omitempty"`
+	ManagerOverrideToken       *string                   `json:"manager_override_token,omitempty"`
+	OverrideReason             *string                   `json:"override_reason,omitempty"`
+	OverridePassword           *string                   `json:"override_password,omitempty"`
 }
 
 type POSPrintRequest struct {
@@ -191,8 +193,9 @@ type POSVoidRequest struct {
 // POSPrintDataResponse is returned to client apps so they can render
 // and print invoices locally.
 type POSPrintDataResponse struct {
-	Sale    Sale    `json:"sale"`
-	Company Company `json:"company"`
+	Sale          Sale           `json:"sale"`
+	Company       Company        `json:"company"`
+	RaffleCoupons []RaffleCoupon `json:"raffle_coupons,omitempty"`
 }
 
 type POSProductResponse struct {

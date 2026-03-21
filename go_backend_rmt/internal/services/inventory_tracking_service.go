@@ -46,7 +46,9 @@ type inventorySelection struct {
 type companyInventoryPolicy struct {
 	CostingMethod                     string `json:"inventory_costing_method,omitempty"`
 	NegativeStockPolicy               string `json:"negative_stock_policy,omitempty"`
+	NegativeProfitPolicy              string `json:"negative_profit_policy,omitempty"`
 	NegativeStockApprovalPasswordHash string `json:"negative_stock_approval_password_hash,omitempty"`
+	ApprovalPasswordHash              string `json:"approval_password_hash,omitempty"`
 }
 
 type NegativeStockApprovalRequiredError struct {
@@ -129,44 +131,28 @@ func firstNonNilInt(values ...*int) *int {
 }
 
 func (s *inventoryTrackingService) getCompanyCostingMethodTx(tx *sql.Tx, companyID int) (string, error) {
-	policy, err := s.getCompanyInventoryPolicyTx(tx, companyID)
-	if err != nil {
-		return "", err
-	}
-	return policy.CostingMethod, nil
+	return loadCompanyCostingMethod(tx, companyID)
 }
 
 func (s *inventoryTrackingService) getCompanyInventoryPolicyTx(tx *sql.Tx, companyID int) (*companyInventoryPolicy, error) {
-	var raw models.JSONB
-	err := tx.QueryRow(`SELECT value FROM settings WHERE company_id = $1 AND key = 'inventory'`, companyID).Scan(&raw)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("failed to get inventory settings: %w", err)
-	}
-	policy := &companyInventoryPolicy{
-		CostingMethod:       costingMethodFIFO,
-		NegativeStockPolicy: negativeStockPolicyDisallow,
-	}
-	if err == nil {
-		if value, ok := raw["inventory_costing_method"].(string); ok {
-			policy.CostingMethod = normalizeCostingMethod(value)
-		}
-		if value, ok := raw["negative_stock_policy"].(string); ok {
-			policy.NegativeStockPolicy = normalizeNegativeStockPolicy(value)
-		}
-		if value, ok := raw["negative_stock_approval_password_hash"].(string); ok {
-			policy.NegativeStockApprovalPasswordHash = strings.TrimSpace(value)
-		}
-	}
+	return loadCompanyInventoryPolicy(tx, companyID)
+}
 
-	var legacy models.JSONB
-	if err := tx.QueryRow(`SELECT value FROM settings WHERE company_id = $1 AND key = 'company'`, companyID).Scan(&legacy); err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("failed to get company settings: %w", err)
-	} else if err == nil && policy.CostingMethod == costingMethodFIFO {
-		if value, ok := legacy["inventory_costing_method"].(string); ok {
-			policy.CostingMethod = normalizeCostingMethod(value)
-		}
+func verifyApprovalPassword(hash string, overridePassword *string) (bool, error) {
+	password := ""
+	if overridePassword != nil {
+		password = strings.TrimSpace(*overridePassword)
 	}
-	return policy, nil
+	if password == "" {
+		return false, nil
+	}
+	if strings.TrimSpace(hash) == "" {
+		return false, fmt.Errorf("approval password is not configured")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
+		return false, fmt.Errorf("invalid approval password")
+	}
+	return true, nil
 }
 
 func (s *inventoryTrackingService) validateNegativeStockPolicyTx(tx *sql.Tx, companyID int, overridePassword *string) error {
@@ -178,18 +164,12 @@ func (s *inventoryTrackingService) validateNegativeStockPolicyTx(tx *sql.Tx, com
 	case negativeStockPolicyAllow:
 		return nil
 	case negativeStockPolicyApproval:
-		password := ""
-		if overridePassword != nil {
-			password = strings.TrimSpace(*overridePassword)
+		approved, err := verifyApprovalPassword(policy.ApprovalPasswordHash, overridePassword)
+		if err != nil {
+			return err
 		}
-		if password == "" {
+		if !approved {
 			return &NegativeStockApprovalRequiredError{Message: "negative stock approval password required"}
-		}
-		if strings.TrimSpace(policy.NegativeStockApprovalPasswordHash) == "" {
-			return fmt.Errorf("negative stock approval password is not configured")
-		}
-		if err := bcrypt.CompareHashAndPassword([]byte(policy.NegativeStockApprovalPasswordHash), []byte(password)); err != nil {
-			return fmt.Errorf("invalid negative stock approval password")
 		}
 		return nil
 	default:
@@ -326,27 +306,83 @@ func (s *inventoryTrackingService) adjustVariantBalanceTx(tx *sql.Tx, companyID,
 }
 
 func (s *inventoryTrackingService) updateProductCostSnapshotTx(tx *sql.Tx, companyID, productID int) error {
-	_, err := tx.Exec(`
-		WITH variant_cost AS (
+	method, err := s.getCompanyCostingMethodTx(tx, companyID)
+	if err != nil {
+		return err
+	}
+
+	query := `
+		UPDATE products p
+		SET cost_price = COALESCE((
 			SELECT
-				sv.product_id,
 				CASE
-					WHEN SUM(sv.quantity) > 0 THEN SUM(sv.quantity * sv.average_cost) / SUM(sv.quantity)
+					WHEN ABS(COALESCE(SUM(sv.quantity), 0)) > 1e-9
+						THEN COALESCE(SUM(sv.quantity * COALESCE(sv.average_cost, 0)), 0) / SUM(sv.quantity)
 					ELSE 0
-				END AS avg_cost
+				END
 			FROM stock_variants sv
 			JOIN locations l ON l.location_id = sv.location_id
 			WHERE l.company_id = $1
 			  AND sv.product_id = $2
-			GROUP BY sv.product_id
-		)
-		UPDATE products p
-		SET cost_price = vc.avg_cost,
+		), 0),
 		    updated_at = CURRENT_TIMESTAMP
-		FROM variant_cost vc
-		WHERE p.product_id = vc.product_id
-		  AND p.company_id = $1
-	`, companyID, productID)
+		WHERE p.company_id = $1
+		  AND p.product_id = $2
+	`
+	if method == costingMethodFIFO {
+		query = `
+			UPDATE products p
+			SET cost_price = COALESCE((
+				WITH variant_stock AS (
+					SELECT
+						sv.location_id,
+						sv.barcode_id,
+						COALESCE(sv.quantity, 0)::float8 AS quantity,
+						COALESCE(sv.average_cost, 0)::float8 AS average_cost
+					FROM stock_variants sv
+					JOIN locations l ON l.location_id = sv.location_id
+					WHERE l.company_id = $1
+					  AND sv.product_id = $2
+				),
+				lot_stock AS (
+					SELECT
+						sl.location_id,
+						sl.barcode_id,
+						COALESCE(SUM(sl.remaining_quantity), 0)::float8 AS lot_quantity,
+						COALESCE(SUM(sl.remaining_quantity * sl.cost_price), 0)::float8 AS lot_value
+					FROM stock_lots sl
+					JOIN locations l ON l.location_id = sl.location_id
+					WHERE l.company_id = $1
+					  AND sl.product_id = $2
+					GROUP BY sl.location_id, sl.barcode_id
+				),
+				variant_valuation AS (
+					SELECT
+						vs.quantity,
+						(
+							COALESCE(ls.lot_value, 0) +
+							((vs.quantity - COALESCE(ls.lot_quantity, 0)) * vs.average_cost)
+						)::float8 AS stock_value
+					FROM variant_stock vs
+					LEFT JOIN lot_stock ls
+						ON ls.location_id = vs.location_id
+					   AND ls.barcode_id = vs.barcode_id
+				)
+				SELECT
+					CASE
+						WHEN ABS(COALESCE(SUM(quantity), 0)) > 1e-9
+							THEN COALESCE(SUM(stock_value), 0) / SUM(quantity)
+						ELSE 0
+					END
+				FROM variant_valuation
+			), 0),
+			    updated_at = CURRENT_TIMESTAMP
+			WHERE p.company_id = $1
+			  AND p.product_id = $2
+		`
+	}
+
+	_, err = tx.Exec(query, companyID, productID)
 	return err
 }
 

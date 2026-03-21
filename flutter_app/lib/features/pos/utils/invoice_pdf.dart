@@ -13,6 +13,7 @@ class InvoicePdfBuilder {
     Map<String, dynamic> company, {
     PdfPageFormat? format,
     String? logoUrl,
+    List<Map<String, dynamic>> raffleCoupons = const [],
   }) async {
     final doc = pw.Document(theme: await PdfTheme.inter());
 
@@ -59,6 +60,15 @@ class InvoicePdfBuilder {
         ],
       ),
     );
+
+    for (final coupon in raffleCoupons) {
+      doc.addPage(
+        pw.Page(
+          pageFormat: format ?? PdfPageFormat.a4,
+          build: (context) => _raffleCouponPage(coupon, company),
+        ),
+      );
+    }
 
     return doc.save();
   }
@@ -201,12 +211,94 @@ class InvoicePdfBuilder {
     Map<String, dynamic> company, {
     PdfPageFormat? format,
     String? logoUrl,
+    List<Map<String, dynamic>> raffleCoupons = const [],
   }) async {
     return buildPdfFromWidgets(
       sale,
       company,
       format: format,
       logoUrl: logoUrl,
+      raffleCoupons: raffleCoupons,
+    );
+  }
+
+  static pw.Widget _raffleCouponPage(
+    Map<String, dynamic> coupon,
+    Map<String, dynamic> company,
+  ) {
+    final companyName = (company['name'] as String?) ?? '';
+    final raffleName =
+        (coupon['raffle_definition_name'] as String?) ?? 'Raffle';
+    final code = (coupon['coupon_code'] as String?) ?? '';
+    final customerName = (coupon['customer_name'] as String?) ?? '';
+    final customerPhone = (coupon['customer_phone'] as String?) ?? '';
+    final saleNumber = (coupon['sale_number'] as String?) ?? '';
+
+    pw.Widget line(String label, String value) => pw.Container(
+          margin: const pw.EdgeInsets.only(bottom: 10),
+          padding: const pw.EdgeInsets.only(bottom: 4),
+          decoration: const pw.BoxDecoration(
+            border: pw.Border(
+              bottom: pw.BorderSide(color: PdfColors.grey500, width: 0.5),
+            ),
+          ),
+          child: pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.end,
+            children: [
+              pw.SizedBox(
+                width: 100,
+                child: pw.Text(
+                  label,
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                ),
+              ),
+              pw.Expanded(child: pw.Text(value)),
+            ],
+          ),
+        );
+
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(28),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            companyName,
+            style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Text(
+            raffleName,
+            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Text(
+            'Coupon Code: $code',
+            style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+          ),
+          if (saleNumber.isNotEmpty) ...[
+            pw.SizedBox(height: 4),
+            pw.Text('Issued from invoice: $saleNumber'),
+          ],
+          pw.SizedBox(height: 20),
+          line('Customer', customerName),
+          line('Phone', customerPhone),
+          line('Address', ''),
+          line('Email', ''),
+          pw.SizedBox(height: 20),
+          pw.Text(
+            'Draw Notes',
+            style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Container(
+            height: 140,
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.grey500, width: 0.8),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

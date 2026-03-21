@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error_handler.dart';
+import '../../../../core/negative_stock_override.dart';
 import '../../data/sales_repository.dart';
 import '../utils/quote_actions.dart';
 import 'quote_form_page.dart';
@@ -103,7 +104,7 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
 
     setState(() => _converting = true);
     try {
-      final saleId = await ref.read(salesRepositoryProvider).convertQuoteToSale(
+      var saleId = await ref.read(salesRepositoryProvider).convertQuoteToSale(
             widget.quoteId,
           );
       if (!mounted) return;
@@ -111,6 +112,62 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
         MaterialPageRoute(builder: (_) => SaleDetailPage(saleId: saleId)),
       );
       await _load();
+    } on NegativeStockApprovalRequiredException catch (e) {
+      if (!mounted) return;
+      final password = await showNegativeStockApprovalDialog(
+        context,
+        message: e.message,
+      );
+      if (!mounted) return;
+      if (password == null || password.isEmpty) {
+        setState(() => _converting = false);
+        return;
+      }
+      try {
+        final saleId =
+            await ref.read(salesRepositoryProvider).convertQuoteToSale(
+                  widget.quoteId,
+                  overridePassword: password,
+                );
+        if (!mounted) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => SaleDetailPage(saleId: saleId)),
+        );
+        await _load();
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ErrorHandler.message(e))),
+        );
+      }
+    } on NegativeProfitApprovalRequiredException catch (e) {
+      if (!mounted) return;
+      final password = await showNegativeProfitApprovalDialog(
+        context,
+        message: e.message,
+      );
+      if (!mounted) return;
+      if (password == null || password.isEmpty) {
+        setState(() => _converting = false);
+        return;
+      }
+      try {
+        final saleId =
+            await ref.read(salesRepositoryProvider).convertQuoteToSale(
+                  widget.quoteId,
+                  overridePassword: password,
+                );
+        if (!mounted) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => SaleDetailPage(saleId: saleId)),
+        );
+        await _load();
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ErrorHandler.message(e))),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

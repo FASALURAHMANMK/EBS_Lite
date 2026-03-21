@@ -52,11 +52,25 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   double _minReserve = 0.0;
   double _pointValue = 0.01;
   final TextEditingController _redeemCtrl = TextEditingController(text: '0');
+  final TextEditingController _couponCtrl = TextEditingController();
+  PosCouponValidationDto? _validatedCoupon;
+  bool _validatingCoupon = false;
+  bool _autoFillRaffleCustomerData = true;
 
   @override
   void initState() {
     super.initState();
     _bootstrap();
+  }
+
+  @override
+  void dispose() {
+    _redeemCtrl.dispose();
+    _couponCtrl.dispose();
+    for (final line in _lines) {
+      line.controller.dispose();
+    }
+    super.dispose();
   }
 
   Future<void> _bootstrap() async {
@@ -144,6 +158,71 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     }
   }
 
+  void _syncPrimaryLineToTotal(double total) {
+    if (_lines.isEmpty) return;
+    _lines.first.controller.text = total.toStringAsFixed(2);
+  }
+
+  Future<void> _validateCoupon(double saleAmount) async {
+    final code = _couponCtrl.text.trim();
+    if (code.isEmpty) {
+      _showMessage('Enter a coupon code');
+      return;
+    }
+    setState(() => _validatingCoupon = true);
+    try {
+      final coupon = await ref.read(posRepositoryProvider).validateCoupon(
+            code: code,
+            saleAmount: saleAmount,
+            customerId: ref.read(posNotifierProvider).customer?.customerId,
+          );
+      if (!mounted) return;
+      setState(() => _validatedCoupon = coupon);
+      _syncPrimaryLineToTotal(
+        (ref.read(posNotifierProvider).total -
+                ((_useLoyalty
+                            ? (double.tryParse(_redeemCtrl.text.trim()) ?? 0.0)
+                            : 0.0)
+                        .clamp(0.0, _availablePoints) *
+                    _pointValue) -
+                coupon.discountAmount)
+            .clamp(0.0, double.infinity),
+      );
+      _showMessage(
+        'Coupon applied: ${coupon.discountAmount.toStringAsFixed(2)} off',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _validatedCoupon = null);
+      _showError(e);
+    } finally {
+      if (mounted) {
+        setState(() => _validatingCoupon = false);
+      }
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  void _showError(Object error) {
+    _showMessage(ErrorHandler.message(error));
+  }
+
+  List<Map<String, dynamic>> _printableRaffleCoupons(
+      Map<String, dynamic> data) {
+    final raw = (data['raffle_coupons'] as List<dynamic>? ?? const []);
+    return raw
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .where((item) => item['print_after_invoice'] == true)
+        .toList(growable: false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(posNotifierProvider);
@@ -152,7 +231,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         _useLoyalty ? (double.tryParse(_redeemCtrl.text.trim()) ?? 0.0) : 0.0;
     final redeemClamped = redeemPts.clamp(0.0, _availablePoints);
     final redeemValue = redeemClamped * _pointValue;
-    final effectiveTotal = (total - redeemValue).clamp(0.0, double.infinity);
+    final couponDiscount = _validatedCoupon?.discountAmount ?? 0.0;
+    final effectiveTotal =
+        (total - redeemValue - couponDiscount).clamp(0.0, double.infinity);
     final paidBase = _sumPaidInBase();
     final balance = (effectiveTotal - paidBase);
     final isChange = balance < 0;
@@ -180,6 +261,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                 value: _useLoyalty,
                                 onChanged: (v) => setState(() {
                                       _useLoyalty = (v ?? false);
+                                      _validatedCoupon = null;
                                       if (_lines.isNotEmpty) {
                                         final newTotal = (state.total -
                                                 ((_useLoyalty
@@ -218,6 +300,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                 decoration: const InputDecoration(
                                     labelText: 'Points to redeem'),
                                 onChanged: (_) => setState(() {
+                                  _validatedCoupon = null;
                                   if (_lines.isNotEmpty) {
                                     final newTotal = (state.total -
                                             ((double.tryParse(_redeemCtrl.text
@@ -246,8 +329,16 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                           : 0.0;
                                       final clamped =
                                           needed.clamp(0.0, _availablePoints);
-                                      setState(() => _redeemCtrl.text =
-                                          clamped.toStringAsFixed(0));
+                                      setState(() {
+                                        _redeemCtrl.text =
+                                            clamped.toStringAsFixed(0);
+                                        _validatedCoupon = null;
+                                        _syncPrimaryLineToTotal(
+                                          (state.total -
+                                                  (clamped * _pointValue))
+                                              .clamp(0.0, double.infinity),
+                                        );
+                                      });
                                     },
                               child: const Text('Full bill'),
                             ),
@@ -256,8 +347,17 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                               onPressed: !_useLoyalty
                                   ? null
                                   : () {
-                                      setState(() => _redeemCtrl.text =
-                                          _availablePoints.toStringAsFixed(0));
+                                      setState(() {
+                                        _redeemCtrl.text =
+                                            _availablePoints.toStringAsFixed(0);
+                                        _validatedCoupon = null;
+                                        _syncPrimaryLineToTotal(
+                                          (state.total -
+                                                  (_availablePoints *
+                                                      _pointValue))
+                                              .clamp(0.0, double.infinity),
+                                        );
+                                      });
                                     },
                               child: const Text('Full available'),
                             ),
@@ -277,6 +377,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                               label: _redeemCtrl.text,
                               onChanged: (v) => setState(() {
                                 _redeemCtrl.text = v.toStringAsFixed(0);
+                                _validatedCoupon = null;
                                 if (_lines.isNotEmpty) {
                                   final newTotal = (state.total -
                                           (v.clamp(0.0, _availablePoints) *
@@ -290,6 +391,132 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                           ],
                           const Divider(height: 24),
                         ],
+
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _couponCtrl,
+                                        decoration: InputDecoration(
+                                          labelText: 'Coupon Code',
+                                          hintText:
+                                              'Validate coupon for this payment',
+                                          suffixIcon: IconButton(
+                                            tooltip: 'Clear coupon',
+                                            onPressed: () {
+                                              setState(() {
+                                                _couponCtrl.clear();
+                                                _validatedCoupon = null;
+                                                _syncPrimaryLineToTotal(
+                                                  (state.total - redeemValue)
+                                                      .clamp(
+                                                          0.0, double.infinity),
+                                                );
+                                              });
+                                            },
+                                            icon:
+                                                const Icon(Icons.clear_rounded),
+                                          ),
+                                        ),
+                                        onChanged: (_) {
+                                          if (_validatedCoupon != null) {
+                                            setState(() {
+                                              _validatedCoupon = null;
+                                              _syncPrimaryLineToTotal(
+                                                (state.total - redeemValue)
+                                                    .clamp(
+                                                        0.0, double.infinity),
+                                              );
+                                            });
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    FilledButton.icon(
+                                      onPressed: _validatingCoupon
+                                          ? null
+                                          : () => _validateCoupon(
+                                                (total - redeemValue).clamp(
+                                                  0.0,
+                                                  double.infinity,
+                                                ),
+                                              ),
+                                      icon: _validatingCoupon
+                                          ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : const Icon(
+                                              Icons.local_offer_outlined),
+                                      label: const Text('Apply'),
+                                    ),
+                                  ],
+                                ),
+                                if (_validatedCoupon != null) ...[
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primaryContainer
+                                          .withValues(alpha: 0.45),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _validatedCoupon!.seriesName,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleSmall,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Code ${_validatedCoupon!.code} • '
+                                          '${_validatedCoupon!.discountType} • '
+                                          'Discount ${_validatedCoupon!.discountAmount.toStringAsFixed(2)}',
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: _autoFillRaffleCustomerData,
+                          onChanged: state.customer == null
+                              ? null
+                              : (value) {
+                                  setState(() =>
+                                      _autoFillRaffleCustomerData = value);
+                                },
+                          title: const Text(
+                            'Auto-fill raffle customer data',
+                          ),
+                          subtitle: Text(
+                            state.customer == null
+                                ? 'Select a customer to pre-fill raffle slips after invoice.'
+                                : 'Use the selected customer on issued raffle coupons.',
+                          ),
+                        ),
 
                         // Payments header + Add button
                         Row(
@@ -421,6 +648,54 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
+                            Text('Bill Total',
+                                style: Theme.of(context).textTheme.bodyLarge),
+                            Text(total.toStringAsFixed(2),
+                                style: Theme.of(context).textTheme.bodyLarge),
+                          ],
+                        ),
+                        if (redeemValue > 0) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Loyalty Discount',
+                                  style:
+                                      Theme.of(context).textTheme.bodyMedium),
+                              Text('- ${redeemValue.toStringAsFixed(2)}',
+                                  style:
+                                      Theme.of(context).textTheme.bodyMedium),
+                            ],
+                          ),
+                        ],
+                        if (couponDiscount > 0) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Coupon Discount',
+                                  style:
+                                      Theme.of(context).textTheme.bodyMedium),
+                              Text('- ${couponDiscount.toStringAsFixed(2)}',
+                                  style:
+                                      Theme.of(context).textTheme.bodyMedium),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Amount Due',
+                                style: Theme.of(context).textTheme.titleMedium),
+                            Text(effectiveTotal.toStringAsFixed(2),
+                                style: Theme.of(context).textTheme.titleMedium),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
                             Text('Total Paid',
                                 style: Theme.of(context).textTheme.titleMedium),
                             Text(_sumPaidInBase().toStringAsFixed(2),
@@ -494,6 +769,14 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                               'Configure batch / serial details for all tracked items before checkout.',
                                             );
                                           }
+                                          if (_couponCtrl.text
+                                                  .trim()
+                                                  .isNotEmpty &&
+                                              _validatedCoupon == null) {
+                                            throw StateError(
+                                              'Validate the coupon before checkout.',
+                                            );
+                                          }
                                           return ref
                                               .read(
                                                   posNotifierProvider.notifier)
@@ -502,6 +785,13 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                                 paidAmount: paid,
                                                 payments: payments,
                                                 redeemPoints: redeemPoints,
+                                                couponCode:
+                                                    _validatedCoupon?.code,
+                                                autoFillRaffleCustomerData: state
+                                                            .customer ==
+                                                        null
+                                                    ? null
+                                                    : _autoFillRaffleCustomerData,
                                                 managerOverrideToken:
                                                     overrideToken,
                                                 overrideReason: overrideReason,
@@ -575,6 +865,22 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                           result = await runCheckout(
                                             overridePassword: password,
                                           );
+                                        } on NegativeProfitApprovalRequiredException catch (e) {
+                                          if (!context.mounted) return;
+                                          final password =
+                                              await showNegativeProfitApprovalDialog(
+                                            context,
+                                            message: e.message,
+                                          );
+                                          if (!context.mounted) return;
+                                          if (password == null ||
+                                              password.isEmpty) {
+                                            setState(() => _submitting = false);
+                                            return;
+                                          }
+                                          result = await runCheckout(
+                                            overridePassword: password,
+                                          );
                                         }
                                         if (!mounted) return;
                                         setState(() => _submitting = false);
@@ -634,13 +940,28 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   }
 
   Future<void> _showSuccessDialog(PosCheckoutResult result) async {
+    Map<String, dynamic>? printData;
+    try {
+      printData = await ref
+          .read(posRepositoryProvider)
+          .getPrintData(invoiceId: result.saleId);
+    } catch (_) {
+      printData = null;
+    }
+    final raffleCount =
+        printData == null ? 0 : _printableRaffleCoupons(printData).length;
+    if (!mounted) return;
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
         return AlertDialog(
           title: const Text('Payment Successful'),
-          content: Text('Invoice ${result.saleNumber} created'),
+          content: Text(
+            raffleCount > 0
+                ? 'Invoice ${result.saleNumber} created.\n$raffleCount raffle coupon(s) issued.'
+                : 'Invoice ${result.saleNumber} created',
+          ),
           actions: [
             TextButton(
               onPressed: () async {
@@ -657,10 +978,13 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                   final sale = (data['sale'] as Map<String, dynamic>? ?? {});
                   final company =
                       (data['company'] as Map<String, dynamic>? ?? {});
+                  final raffleCoupons = _printableRaffleCoupons(data);
                   final logoUrl = _resolveLogoUrl(company);
                   final bytes = await InvoicePdfBuilder.buildPdfFromHtml(
                       sale, company,
-                      format: PdfPageFormat.a4, logoUrl: logoUrl);
+                      format: PdfPageFormat.a4,
+                      logoUrl: logoUrl,
+                      raffleCoupons: raffleCoupons);
                   final dir = await getTemporaryDirectory();
                   final fileName =
                       'Invoice-${sale['sale_number'] ?? result.saleNumber}.pdf';
@@ -699,6 +1023,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         .getPrintData(invoiceId: result.saleId);
     final sale = (data['sale'] as Map<String, dynamic>? ?? {});
     final company = (data['company'] as Map<String, dynamic>? ?? {});
+    final raffleCoupons = _printableRaffleCoupons(data);
     final printers =
         await ref.read(printerSettingsRepositoryProvider).loadAll();
 
@@ -720,7 +1045,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         Text('${p.kind.toUpperCase()} • ${p.connectionType}'),
                     onTap: () async {
                       Navigator.of(ctx).pop();
-                      await _printToPrinter(p, sale, company);
+                      await _printToPrinter(p, sale, company, raffleCoupons);
                     },
                   )),
               if (printers.isEmpty)
@@ -737,7 +1062,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                           onLayout: (format) =>
                               InvoicePdfBuilder.buildPdfFromWidgets(
                                   sale, company,
-                                  format: PdfPageFormat.a4, logoUrl: logoUrl),
+                                  format: PdfPageFormat.a4,
+                                  logoUrl: logoUrl,
+                                  raffleCoupons: raffleCoupons),
                         );
                       },
                       child: const Text('Print A4 Now'),
@@ -757,6 +1084,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         .getPrintData(invoiceId: result.saleId);
     final sale = (data['sale'] as Map<String, dynamic>? ?? {});
     final company = (data['company'] as Map<String, dynamic>? ?? {});
+    final raffleCoupons = _printableRaffleCoupons(data);
     final printers =
         await ref.read(printerSettingsRepositoryProvider).loadAll();
     PrinterDevice? target;
@@ -769,14 +1097,17 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       if (target.id.isEmpty) target = null;
     }
     if (target != null) {
-      await _printToPrinter(target, sale, company);
+      await _printToPrinter(target, sale, company, raffleCoupons);
     } else {
       await _showPrintOptions(result);
     }
   }
 
-  Future<void> _printToPrinter(PrinterDevice p, Map<String, dynamic> sale,
-      Map<String, dynamic> company) async {
+  Future<void> _printToPrinter(
+      PrinterDevice p,
+      Map<String, dynamic> sale,
+      Map<String, dynamic> company,
+      List<Map<String, dynamic>> raffleCoupons) async {
     try {
       switch (p.kind) {
         case 'thermal_80':
@@ -788,6 +1119,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
               company: company,
               settings: p,
               paperSize: size,
+              raffleCoupons: raffleCoupons,
             );
           } else if (p.connectionType == 'bluetooth') {
             await printThermalOverBluetooth(
@@ -795,6 +1127,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
               company: company,
               settings: p,
               paperSize: size,
+              raffleCoupons: raffleCoupons,
             );
           } else if (p.connectionType == 'usb') {
             await printThermalOverUsb(
@@ -802,6 +1135,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
               company: company,
               settings: p,
               paperSize: size,
+              raffleCoupons: raffleCoupons,
             );
           } else {
             throw Exception('Unsupported connection type: ${p.connectionType}');
@@ -812,7 +1146,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
           await Printing.layoutPdf(
             onLayout: (format) => InvoicePdfBuilder.buildPdfFromWidgets(
                 sale, company,
-                format: PdfPageFormat.a5, logoUrl: logoUrl),
+                format: PdfPageFormat.a5,
+                logoUrl: logoUrl,
+                raffleCoupons: raffleCoupons),
           );
           break;
         case 'a4':
@@ -821,7 +1157,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
           await Printing.layoutPdf(
             onLayout: (format) => InvoicePdfBuilder.buildPdfFromWidgets(
                 sale, company,
-                format: PdfPageFormat.a4, logoUrl: logoUrl),
+                format: PdfPageFormat.a4,
+                logoUrl: logoUrl,
+                raffleCoupons: raffleCoupons),
           );
       }
       if (mounted) {

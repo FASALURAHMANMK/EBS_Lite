@@ -352,6 +352,41 @@ class PosCheckoutResult {
       );
 }
 
+class PosCouponValidationDto {
+  final int couponSeriesId;
+  final String seriesName;
+  final String code;
+  final String discountType;
+  final double discountValue;
+  final double discountAmount;
+  final double minPurchaseAmount;
+  final double? maxDiscountAmount;
+
+  const PosCouponValidationDto({
+    required this.couponSeriesId,
+    required this.seriesName,
+    required this.code,
+    required this.discountType,
+    required this.discountValue,
+    required this.discountAmount,
+    required this.minPurchaseAmount,
+    this.maxDiscountAmount,
+  });
+
+  factory PosCouponValidationDto.fromJson(Map<String, dynamic> json) =>
+      PosCouponValidationDto(
+        couponSeriesId: (json['coupon_series_id'] as num?)?.toInt() ?? 0,
+        seriesName: json['series_name'] as String? ?? '',
+        code: json['code'] as String? ?? '',
+        discountType: json['discount_type'] as String? ?? '',
+        discountValue: (json['discount_value'] as num?)?.toDouble() ?? 0.0,
+        discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0.0,
+        minPurchaseAmount:
+            (json['min_purchase_amount'] as num?)?.toDouble() ?? 0.0,
+        maxDiscountAmount: (json['max_discount_amount'] as num?)?.toDouble(),
+      );
+}
+
 class HeldSaleDto {
   final int saleId;
   final String saleNumber;

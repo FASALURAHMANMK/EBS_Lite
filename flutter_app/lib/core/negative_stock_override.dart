@@ -10,6 +10,15 @@ class NegativeStockApprovalRequiredException implements Exception {
   String toString() => message;
 }
 
+class NegativeProfitApprovalRequiredException implements Exception {
+  const NegativeProfitApprovalRequiredException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 NegativeStockApprovalRequiredException? parseNegativeStockApprovalRequired(
   Object error,
 ) {
@@ -30,9 +39,29 @@ NegativeStockApprovalRequiredException? parseNegativeStockApprovalRequired(
   return NegativeStockApprovalRequiredException(message);
 }
 
-Future<String?> showNegativeStockApprovalDialog(
+NegativeProfitApprovalRequiredException? parseNegativeProfitApprovalRequired(
+  Object error,
+) {
+  if (error is! DioException) return null;
+  if (error.response?.statusCode != 403) return null;
+  final data = error.response?.data;
+  if (data is! Map<String, dynamic>) return null;
+  final payload = data['data'];
+  if (payload is! Map<String, dynamic>) return null;
+  if (payload['code']?.toString() != 'NEGATIVE_PROFIT_APPROVAL_REQUIRED') {
+    return null;
+  }
+  final message = data['error']?.toString().trim().isNotEmpty == true
+      ? data['error'].toString().trim()
+      : (data['message']?.toString().trim().isNotEmpty == true
+          ? data['message'].toString().trim()
+          : 'Negative profit approval password required');
+  return NegativeProfitApprovalRequiredException(message);
+}
+
+Future<String?> showApprovalPasswordDialog(
   BuildContext context, {
-  String title = 'Negative Stock Approval',
+  required String title,
   String? message,
 }) {
   final passwordController = TextEditingController();
@@ -48,7 +77,7 @@ Future<String?> showNegativeStockApprovalDialog(
           Text(
             message?.trim().isNotEmpty == true
                 ? message!.trim()
-                : 'This action would reduce stock below zero. Enter the inventory approval password to continue.',
+                : 'Enter the approval password to continue.',
           ),
           const SizedBox(height: 12),
           TextField(
@@ -80,5 +109,33 @@ Future<String?> showNegativeStockApprovalDialog(
         ),
       ],
     ),
+  );
+}
+
+Future<String?> showNegativeStockApprovalDialog(
+  BuildContext context, {
+  String title = 'Negative Stock Approval',
+  String? message,
+}) {
+  return showApprovalPasswordDialog(
+    context,
+    title: title,
+    message: message?.trim().isNotEmpty == true
+        ? message
+        : 'This action would reduce stock below zero. Enter the approval password to continue.',
+  );
+}
+
+Future<String?> showNegativeProfitApprovalDialog(
+  BuildContext context, {
+  String title = 'Negative Profit Approval',
+  String? message,
+}) {
+  return showApprovalPasswordDialog(
+    context,
+    title: title,
+    message: message?.trim().isNotEmpty == true
+        ? message
+        : 'This sale would result in a loss. Enter the approval password to continue.',
   );
 }

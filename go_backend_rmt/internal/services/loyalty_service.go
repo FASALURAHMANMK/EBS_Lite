@@ -433,8 +433,8 @@ func (s *LoyaltyService) updateCustomerTierTx(tx *sql.Tx, companyID, customerID 
 // Promotions
 func (s *LoyaltyService) GetPromotions(companyID int, activeOnly bool) ([]models.Promotion, error) {
 	query := `
-		SELECT promotion_id, company_id, name, description, discount_type, value, min_amount,
-			   start_date, end_date, applicable_to, conditions, is_active, created_at, updated_at
+		SELECT promotion_id, company_id, name, description, discount_type, discount_scope, value, min_amount,
+			   start_date, end_date, applicable_to, conditions, priority, is_active, created_at, updated_at
 		FROM promotions 
 		WHERE company_id = $1
 	`
@@ -460,21 +460,26 @@ func (s *LoyaltyService) GetPromotions(companyID int, activeOnly bool) ([]models
 		var promotion models.Promotion
 		err := rows.Scan(
 			&promotion.PromotionID, &promotion.CompanyID, &promotion.Name, &promotion.Description,
-			&promotion.DiscountType, &promotion.Value, &promotion.MinAmount, &promotion.StartDate,
-			&promotion.EndDate, &promotion.ApplicableTo, &promotion.Conditions, &promotion.IsActive,
+			&promotion.DiscountType, &promotion.DiscountScope, &promotion.Value, &promotion.MinAmount, &promotion.StartDate,
+			&promotion.EndDate, &promotion.ApplicableTo, &promotion.Conditions, &promotion.Priority, &promotion.IsActive,
 			&promotion.CreatedAt, &promotion.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan promotion: %w", err)
 		}
+		if strings.TrimSpace(promotion.DiscountScope) == "" {
+			promotion.DiscountScope = "ORDER"
+		}
 		promotions = append(promotions, promotion)
 	}
 
+	if err := s.attachPromotionProductRules(promotions); err != nil {
+		return nil, err
+	}
 	return promotions, nil
 }
 
 func (s *LoyaltyService) CreatePromotion(companyID int, req *models.CreatePromotionRequest) (*models.Promotion, error) {
-	// Parse dates
 	startDate, err := time.Parse("2006-01-02", req.StartDate)
 	if err != nil {
 		return nil, fmt.Errorf("invalid start date format: %w", err)
@@ -489,35 +494,57 @@ func (s *LoyaltyService) CreatePromotion(companyID int, req *models.CreatePromot
 		return nil, fmt.Errorf("end date cannot be before start date")
 	}
 
+	discountScope := "ORDER"
+	if req.DiscountScope != nil && strings.TrimSpace(*req.DiscountScope) != "" {
+		discountScope = strings.ToUpper(strings.TrimSpace(*req.DiscountScope))
+	}
+	priority := 0
+	if req.Priority != nil {
+		priority = *req.Priority
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin promotion transaction: %w", err)
+	}
+	defer tx.Rollback()
+
 	query := `
-		INSERT INTO promotions (company_id, name, description, discount_type, value, min_amount,
-							   start_date, end_date, applicable_to, conditions)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO promotions (company_id, name, description, discount_type, discount_scope, value, min_amount,
+							   start_date, end_date, applicable_to, conditions, priority)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING promotion_id, created_at
 	`
 
 	var promotion models.Promotion
-	err = s.db.QueryRow(query,
-		companyID, req.Name, req.Description, req.DiscountType, req.Value, req.MinAmount,
-		startDate, endDate, req.ApplicableTo, req.Conditions,
+	err = tx.QueryRow(query,
+		companyID, req.Name, req.Description, req.DiscountType, discountScope, req.Value, req.MinAmount,
+		startDate, endDate, req.ApplicableTo, req.Conditions, priority,
 	).Scan(&promotion.PromotionID, &promotion.CreatedAt)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to create promotion: %w", err)
+	}
+
+	if err := s.savePromotionProductRulesTx(tx, promotion.PromotionID, req.ProductRules); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit promotion: %w", err)
 	}
 
 	promotion.CompanyID = companyID
 	promotion.Name = req.Name
 	promotion.Description = req.Description
 	promotion.DiscountType = req.DiscountType
+	promotion.DiscountScope = discountScope
 	promotion.Value = req.Value
 	promotion.MinAmount = req.MinAmount
 	promotion.StartDate = startDate
 	promotion.EndDate = endDate
 	promotion.ApplicableTo = req.ApplicableTo
 	promotion.Conditions = req.Conditions
+	promotion.Priority = priority
 	promotion.IsActive = true
-
 	return &promotion, nil
 }
 
@@ -546,6 +573,11 @@ func (s *LoyaltyService) UpdatePromotion(promotionID, companyID int, req *models
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("discount_type = $%d", argCount))
 		args = append(args, *req.DiscountType)
+	}
+	if req.DiscountScope != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("discount_scope = $%d", argCount))
+		args = append(args, strings.ToUpper(strings.TrimSpace(*req.DiscountScope)))
 	}
 	if req.Value != nil {
 		argCount++
@@ -585,34 +617,56 @@ func (s *LoyaltyService) UpdatePromotion(promotionID, companyID int, req *models
 		setParts = append(setParts, fmt.Sprintf("conditions = $%d", argCount))
 		args = append(args, *req.Conditions)
 	}
+	if req.Priority != nil {
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("priority = $%d", argCount))
+		args = append(args, *req.Priority)
+	}
 	if req.IsActive != nil {
 		argCount++
 		setParts = append(setParts, fmt.Sprintf("is_active = $%d", argCount))
 		args = append(args, *req.IsActive)
 	}
 
-	if len(setParts) == 0 {
+	if len(setParts) == 0 && req.ProductRules == nil {
 		return fmt.Errorf("no fields to update")
 	}
 
-	setParts = append(setParts, "updated_at = CURRENT_TIMESTAMP")
-
-	query := fmt.Sprintf("UPDATE promotions SET %s WHERE promotion_id = $%d",
-		strings.Join(setParts, ", "), argCount+1)
-	args = append(args, promotionID)
-
-	result, err := s.db.Exec(query, args...)
+	tx, err := s.db.Begin()
 	if err != nil {
-		return fmt.Errorf("failed to update promotion: %w", err)
+		return fmt.Errorf("failed to start promotion update transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	if len(setParts) > 0 {
+		setParts = append(setParts, "updated_at = CURRENT_TIMESTAMP")
+		query := fmt.Sprintf("UPDATE promotions SET %s WHERE promotion_id = $%d",
+			strings.Join(setParts, ", "), argCount+1)
+		args = append(args, promotionID)
+
+		result, err := tx.Exec(query, args...)
+		if err != nil {
+			return fmt.Errorf("failed to update promotion: %w", err)
+		}
+
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to get rows affected: %w", err)
+		}
+
+		if rowsAffected == 0 {
+			return fmt.Errorf("promotion not found")
+		}
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
+	if req.ProductRules != nil {
+		if err := s.savePromotionProductRulesTx(tx, promotionID, req.ProductRules); err != nil {
+			return err
+		}
 	}
 
-	if rowsAffected == 0 {
-		return fmt.Errorf("promotion not found")
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit promotion update: %w", err)
 	}
 
 	return nil
@@ -645,133 +699,7 @@ func (s *LoyaltyService) DeletePromotion(promotionID, companyID int) error {
 }
 
 func (s *LoyaltyService) CheckPromotionEligibility(companyID int, req *models.PromotionEligibilityRequest) (*models.PromotionEligibilityResponse, error) {
-	// Get active promotions
-	promotions, err := getPromotions(s, companyID, true)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get promotions: %w", err)
-	}
-
-	var eligiblePromotions []struct {
-		PromotionID    int     `json:"promotion_id"`
-		Name           string  `json:"name"`
-		DiscountType   string  `json:"discount_type"`
-		Value          float64 `json:"value"`
-		DiscountAmount float64 `json:"discount_amount"`
-	}
-
-	totalDiscount := float64(0)
-
-	for _, promotion := range promotions {
-		// Check minimum amount requirement
-		if promotion.MinAmount != nil && req.TotalAmount < *promotion.MinAmount {
-			continue
-		}
-
-		// Check applicability
-		if promotion.ApplicableTo != nil && *promotion.ApplicableTo != "ALL" {
-			switch *promotion.ApplicableTo {
-			case "PRODUCTS":
-				if promotion.Conditions == nil {
-					continue
-				}
-				rawIDs, ok := (*promotion.Conditions)["product_ids"]
-				if !ok {
-					continue
-				}
-				idsSlice, ok := rawIDs.([]interface{})
-				if !ok {
-					continue
-				}
-				condSet := make(map[int]struct{})
-				for _, v := range idsSlice {
-					switch id := v.(type) {
-					case float64:
-						condSet[int(id)] = struct{}{}
-					case int:
-						condSet[id] = struct{}{}
-					}
-				}
-				match := false
-				for _, pid := range req.ProductIDs {
-					if _, exists := condSet[pid]; exists {
-						match = true
-						break
-					}
-				}
-				if !match {
-					continue
-				}
-			case "CATEGORIES":
-				if promotion.Conditions == nil {
-					continue
-				}
-				rawIDs, ok := (*promotion.Conditions)["category_ids"]
-				if !ok {
-					continue
-				}
-				idsSlice, ok := rawIDs.([]interface{})
-				if !ok {
-					continue
-				}
-				condSet := make(map[int]struct{})
-				for _, v := range idsSlice {
-					switch id := v.(type) {
-					case float64:
-						condSet[int(id)] = struct{}{}
-					case int:
-						condSet[id] = struct{}{}
-					}
-				}
-				match := false
-				for _, cid := range req.CategoryIDs {
-					if _, exists := condSet[cid]; exists {
-						match = true
-						break
-					}
-				}
-				if !match {
-					continue
-				}
-			default:
-				continue
-			}
-		}
-
-		var discountAmount float64
-		if promotion.DiscountType != nil && promotion.Value != nil {
-			switch *promotion.DiscountType {
-			case "PERCENTAGE":
-				discountAmount = req.TotalAmount * (*promotion.Value / 100)
-			case "FIXED":
-				discountAmount = *promotion.Value
-			default:
-				continue // Skip unknown discount types
-			}
-		}
-
-		if discountAmount > 0 {
-			eligiblePromotions = append(eligiblePromotions, struct {
-				PromotionID    int     `json:"promotion_id"`
-				Name           string  `json:"name"`
-				DiscountType   string  `json:"discount_type"`
-				Value          float64 `json:"value"`
-				DiscountAmount float64 `json:"discount_amount"`
-			}{
-				PromotionID:    promotion.PromotionID,
-				Name:           promotion.Name,
-				DiscountType:   *promotion.DiscountType,
-				Value:          *promotion.Value,
-				DiscountAmount: discountAmount,
-			})
-
-			totalDiscount += discountAmount
-		}
-	}
-
-	return &models.PromotionEligibilityResponse{
-		EligiblePromotions: eligiblePromotions,
-		TotalDiscount:      totalDiscount,
-	}, nil
+	return s.EvaluatePromotionEligibility(companyID, req)
 }
 
 // Helper methods

@@ -210,7 +210,7 @@ class SettingsPage extends ConsumerWidget {
             leading: const Icon(Icons.inventory_2_rounded),
             title: const Text('Inventory Configuration'),
             subtitle: const Text(
-                'View costing method and manage negative stock rules'),
+                'View costing method and manage stock and profit guards'),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: theme.colorScheme.surface,

@@ -79,27 +79,92 @@ func (s *ReportsService) GetSalesSummary(companyID int, fromDate, toDate, groupB
 
 // GetStockSummary returns stock levels and values
 func (s *ReportsService) GetStockSummary(companyID int, locationID, productID *int) ([]models.StockSummary, error) {
+	method, err := loadCompanyCostingMethod(s.db, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get inventory costing method: %w", err)
+	}
+
 	query := `
-        SELECT st.product_id, st.location_id, st.quantity,
-               st.quantity * COALESCE(p.cost_price,0) AS stock_value
-        FROM stock st
-        JOIN locations l ON st.location_id = l.location_id
-        JOIN products p ON st.product_id = p.product_id
+        SELECT
+            sv.product_id,
+            sv.location_id,
+            COALESCE(SUM(sv.quantity), 0)::float8 AS quantity,
+            COALESCE(SUM(sv.quantity * COALESCE(sv.average_cost, 0)), 0)::float8 AS stock_value
+        FROM stock_variants sv
+        JOIN locations l ON sv.location_id = l.location_id
         WHERE l.company_id = $1
     `
+	if method == costingMethodFIFO {
+		query = `
+            WITH variant_stock AS (
+                SELECT
+                    sv.product_id,
+                    sv.location_id,
+                    sv.barcode_id,
+                    COALESCE(sv.quantity, 0)::float8 AS quantity,
+                    COALESCE(sv.average_cost, 0)::float8 AS average_cost
+                FROM stock_variants sv
+                JOIN locations l ON sv.location_id = l.location_id
+                WHERE l.company_id = $1
+            ),
+            lot_stock AS (
+                SELECT
+                    sl.product_id,
+                    sl.location_id,
+                    sl.barcode_id,
+                    COALESCE(SUM(sl.remaining_quantity), 0)::float8 AS lot_quantity,
+                    COALESCE(SUM(sl.remaining_quantity * sl.cost_price), 0)::float8 AS lot_value
+                FROM stock_lots sl
+                JOIN locations l ON sl.location_id = l.location_id
+                WHERE l.company_id = $1
+                GROUP BY sl.product_id, sl.location_id, sl.barcode_id
+            ),
+            variant_valuation AS (
+                SELECT
+                    vs.product_id,
+                    vs.location_id,
+                    vs.quantity,
+                    (
+                        COALESCE(ls.lot_value, 0) +
+                        ((vs.quantity - COALESCE(ls.lot_quantity, 0)) * vs.average_cost)
+                    )::float8 AS stock_value
+                FROM variant_stock vs
+                LEFT JOIN lot_stock ls
+                    ON ls.product_id = vs.product_id
+                   AND ls.location_id = vs.location_id
+                   AND ls.barcode_id = vs.barcode_id
+            )
+            SELECT
+                product_id,
+                location_id,
+                COALESCE(SUM(quantity), 0)::float8 AS quantity,
+                COALESCE(SUM(stock_value), 0)::float8 AS stock_value
+            FROM variant_valuation
+            WHERE 1 = 1
+        `
+	}
 
 	args := []interface{}{companyID}
 	idx := 2
 	if locationID != nil {
-		query += fmt.Sprintf(" AND st.location_id = $%d", idx)
+		locationClause := " AND sv.location_id = $%d"
+		if method == costingMethodFIFO {
+			locationClause = " AND location_id = $%d"
+		}
+		query += fmt.Sprintf(locationClause, idx)
 		args = append(args, *locationID)
 		idx++
 	}
 	if productID != nil {
-		query += fmt.Sprintf(" AND st.product_id = $%d", idx)
+		productClause := " AND sv.product_id = $%d"
+		if method == costingMethodFIFO {
+			productClause = " AND product_id = $%d"
+		}
+		query += fmt.Sprintf(productClause, idx)
 		args = append(args, *productID)
 		idx++
 	}
+	query += " GROUP BY product_id, location_id"
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
@@ -396,19 +461,96 @@ func (s *ReportsService) GetItemMovement(companyID int, locationID *int, fromDat
 
 // GetValuationReport returns inventory valuation information
 func (s *ReportsService) GetValuationReport(companyID int, locationID *int) ([]map[string]interface{}, error) {
+	method, err := loadCompanyCostingMethod(s.db, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get inventory costing method: %w", err)
+	}
+
 	query := `
+		WITH valuation AS (
+			SELECT
+				sv.product_id,
+				sv.location_id,
+				COALESCE(SUM(sv.quantity), 0)::float8 AS quantity,
+				COALESCE(SUM(sv.quantity * COALESCE(sv.average_cost, 0)), 0)::float8 AS stock_value
+			FROM stock_variants sv
+			JOIN locations l ON l.location_id = sv.location_id
+			WHERE l.company_id = $1
+			  AND ($2::int IS NULL OR sv.location_id = $2)
+			GROUP BY sv.product_id, sv.location_id
+		)
 		SELECT p.product_id,
 		       p.name AS product_name,
-		       COALESCE(SUM(st.quantity),0)::float8 AS quantity,
-		       COALESCE(SUM(st.quantity * COALESCE(p.cost_price,0)),0)::float8 AS stock_value
+		       COALESCE(SUM(v.quantity), 0)::float8 AS quantity,
+		       COALESCE(SUM(v.stock_value), 0)::float8 AS stock_value
 		FROM products p
-		LEFT JOIN stock st ON st.product_id = p.product_id
-		LEFT JOIN locations l ON l.location_id = st.location_id
+		LEFT JOIN valuation v ON v.product_id = p.product_id
 		WHERE p.company_id = $1 AND p.is_deleted = FALSE
-		  AND ($2::int IS NULL OR st.location_id = $2)
 		GROUP BY p.product_id, p.name
 		ORDER BY stock_value DESC, product_name
 	`
+	if method == costingMethodFIFO {
+		query = `
+			WITH variant_stock AS (
+				SELECT
+					sv.product_id,
+					sv.location_id,
+					sv.barcode_id,
+					COALESCE(sv.quantity, 0)::float8 AS quantity,
+					COALESCE(sv.average_cost, 0)::float8 AS average_cost
+				FROM stock_variants sv
+				JOIN locations l ON l.location_id = sv.location_id
+				WHERE l.company_id = $1
+				  AND ($2::int IS NULL OR sv.location_id = $2)
+			),
+			lot_stock AS (
+				SELECT
+					sl.product_id,
+					sl.location_id,
+					sl.barcode_id,
+					COALESCE(SUM(sl.remaining_quantity), 0)::float8 AS lot_quantity,
+					COALESCE(SUM(sl.remaining_quantity * sl.cost_price), 0)::float8 AS lot_value
+				FROM stock_lots sl
+				JOIN locations l ON l.location_id = sl.location_id
+				WHERE l.company_id = $1
+				  AND ($2::int IS NULL OR sl.location_id = $2)
+				GROUP BY sl.product_id, sl.location_id, sl.barcode_id
+			),
+			variant_valuation AS (
+				SELECT
+					vs.product_id,
+					vs.location_id,
+					vs.quantity,
+					(
+						COALESCE(ls.lot_value, 0) +
+						((vs.quantity - COALESCE(ls.lot_quantity, 0)) * vs.average_cost)
+					)::float8 AS stock_value
+				FROM variant_stock vs
+				LEFT JOIN lot_stock ls
+					ON ls.product_id = vs.product_id
+				   AND ls.location_id = vs.location_id
+				   AND ls.barcode_id = vs.barcode_id
+			),
+			valuation AS (
+				SELECT
+					product_id,
+					location_id,
+					COALESCE(SUM(quantity), 0)::float8 AS quantity,
+					COALESCE(SUM(stock_value), 0)::float8 AS stock_value
+				FROM variant_valuation
+				GROUP BY product_id, location_id
+			)
+			SELECT p.product_id,
+			       p.name AS product_name,
+			       COALESCE(SUM(v.quantity), 0)::float8 AS quantity,
+			       COALESCE(SUM(v.stock_value), 0)::float8 AS stock_value
+			FROM products p
+			LEFT JOIN valuation v ON v.product_id = p.product_id
+			WHERE p.company_id = $1 AND p.is_deleted = FALSE
+			GROUP BY p.product_id, p.name
+			ORDER BY stock_value DESC, product_name
+		`
+	}
 	var locArg interface{}
 	if locationID != nil {
 		locArg = *locationID
@@ -914,22 +1056,111 @@ func (s *ReportsService) GetConsumableConsumptionReport(companyID int, locationI
 }
 
 func (s *ReportsService) GetConsumableBalanceReport(companyID int, locationID *int) ([]map[string]interface{}, error) {
+	method, err := loadCompanyCostingMethod(s.db, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get inventory costing method: %w", err)
+	}
+
 	query := `
+		WITH valuation AS (
+			SELECT
+				sv.product_id,
+				sv.location_id,
+				COALESCE(SUM(sv.quantity), 0)::float8 AS quantity,
+				COALESCE(SUM(sv.quantity * COALESCE(sv.average_cost, 0)), 0)::float8 AS stock_value
+			FROM stock_variants sv
+			JOIN locations l ON l.location_id = sv.location_id
+			JOIN products p ON p.product_id = sv.product_id
+			WHERE l.company_id = $1
+			  AND p.is_deleted = FALSE
+			  AND COALESCE(p.item_type, 'PRODUCT') = 'CONSUMABLE'
+			  AND ($2::int IS NULL OR sv.location_id = $2)
+			GROUP BY sv.product_id, sv.location_id
+		)
 		SELECT
 			p.product_id,
 			p.name AS product_name,
-			COALESCE(st.location_id, $2::int) AS location_id,
-			COALESCE(SUM(st.quantity), 0)::float8 AS quantity,
-			COALESCE(SUM(st.quantity * COALESCE(p.cost_price, 0)), 0)::float8 AS stock_value
+			COALESCE(v.location_id, $2::int) AS location_id,
+			COALESCE(v.quantity, 0)::float8 AS quantity,
+			COALESCE(v.stock_value, 0)::float8 AS stock_value
 		FROM products p
-		LEFT JOIN stock st ON st.product_id = p.product_id
+		LEFT JOIN valuation v ON v.product_id = p.product_id
 		WHERE p.company_id = $1
 		  AND p.is_deleted = FALSE
 		  AND COALESCE(p.item_type, 'PRODUCT') = 'CONSUMABLE'
-		  AND ($2::int IS NULL OR st.location_id = $2)
-		GROUP BY p.product_id, p.name, COALESCE(st.location_id, $2::int)
 		ORDER BY stock_value DESC, product_name
 	`
+	if method == costingMethodFIFO {
+		query = `
+			WITH variant_stock AS (
+				SELECT
+					sv.product_id,
+					sv.location_id,
+					sv.barcode_id,
+					COALESCE(sv.quantity, 0)::float8 AS quantity,
+					COALESCE(sv.average_cost, 0)::float8 AS average_cost
+				FROM stock_variants sv
+				JOIN locations l ON l.location_id = sv.location_id
+				JOIN products p ON p.product_id = sv.product_id
+				WHERE l.company_id = $1
+				  AND p.is_deleted = FALSE
+				  AND COALESCE(p.item_type, 'PRODUCT') = 'CONSUMABLE'
+				  AND ($2::int IS NULL OR sv.location_id = $2)
+			),
+			lot_stock AS (
+				SELECT
+					sl.product_id,
+					sl.location_id,
+					sl.barcode_id,
+					COALESCE(SUM(sl.remaining_quantity), 0)::float8 AS lot_quantity,
+					COALESCE(SUM(sl.remaining_quantity * sl.cost_price), 0)::float8 AS lot_value
+				FROM stock_lots sl
+				JOIN locations l ON l.location_id = sl.location_id
+				JOIN products p ON p.product_id = sl.product_id
+				WHERE l.company_id = $1
+				  AND p.is_deleted = FALSE
+				  AND COALESCE(p.item_type, 'PRODUCT') = 'CONSUMABLE'
+				  AND ($2::int IS NULL OR sl.location_id = $2)
+				GROUP BY sl.product_id, sl.location_id, sl.barcode_id
+			),
+			variant_valuation AS (
+				SELECT
+					vs.product_id,
+					vs.location_id,
+					vs.quantity,
+					(
+						COALESCE(ls.lot_value, 0) +
+						((vs.quantity - COALESCE(ls.lot_quantity, 0)) * vs.average_cost)
+					)::float8 AS stock_value
+				FROM variant_stock vs
+				LEFT JOIN lot_stock ls
+					ON ls.product_id = vs.product_id
+				   AND ls.location_id = vs.location_id
+				   AND ls.barcode_id = vs.barcode_id
+			),
+			valuation AS (
+				SELECT
+					product_id,
+					location_id,
+					COALESCE(SUM(quantity), 0)::float8 AS quantity,
+					COALESCE(SUM(stock_value), 0)::float8 AS stock_value
+				FROM variant_valuation
+				GROUP BY product_id, location_id
+			)
+			SELECT
+				p.product_id,
+				p.name AS product_name,
+				COALESCE(v.location_id, $2::int) AS location_id,
+				COALESCE(v.quantity, 0)::float8 AS quantity,
+				COALESCE(v.stock_value, 0)::float8 AS stock_value
+			FROM products p
+			LEFT JOIN valuation v ON v.product_id = p.product_id
+			WHERE p.company_id = $1
+			  AND p.is_deleted = FALSE
+			  AND COALESCE(p.item_type, 'PRODUCT') = 'CONSUMABLE'
+			ORDER BY stock_value DESC, product_name
+		`
+	}
 	var locArg interface{}
 	if locationID != nil {
 		locArg = *locationID

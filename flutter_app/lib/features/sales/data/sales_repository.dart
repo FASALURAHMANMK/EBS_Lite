@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api_client.dart';
+import '../../../core/negative_stock_override.dart';
 import '../../../core/offline_cache/offline_cache_providers.dart';
 import '../../../core/outbox/outbox_notifier.dart';
 import '../../dashboard/controllers/location_notifier.dart';
@@ -240,8 +241,23 @@ class SalesRepository {
     return body;
   }
 
-  Future<int> convertQuoteToSale(int id) async {
-    final res = await _dio.post('/sales/quotes/$id/convert');
+  Future<int> convertQuoteToSale(int id, {String? overridePassword}) async {
+    Response res;
+    try {
+      res = await _dio.post(
+        '/sales/quotes/$id/convert',
+        data: {
+          if ((overridePassword ?? '').trim().isNotEmpty)
+            'override_password': overridePassword!.trim(),
+        },
+      );
+    } on DioException catch (e) {
+      final stockApproval = parseNegativeStockApprovalRequired(e);
+      if (stockApproval != null) throw stockApproval;
+      final profitApproval = parseNegativeProfitApprovalRequired(e);
+      if (profitApproval != null) throw profitApproval;
+      rethrow;
+    }
     final body = (res.data is Map<String, dynamic> && res.data['data'] != null)
         ? res.data['data'] as Map<String, dynamic>
         : res.data as Map<String, dynamic>;

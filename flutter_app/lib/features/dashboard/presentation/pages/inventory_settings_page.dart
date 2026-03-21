@@ -21,6 +21,7 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
   bool _saving = false;
   String _costingMethod = 'FIFO';
   String _negativeStockPolicy = 'DONT_ALLOW';
+  String _negativeProfitPolicy = 'DONT_ALLOW';
   bool _hasApprovalPassword = false;
 
   @override
@@ -45,6 +46,7 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
       setState(() {
         _costingMethod = settings.inventoryCostingMethod;
         _negativeStockPolicy = settings.negativeStockPolicy;
+        _negativeProfitPolicy = settings.negativeProfitPolicy;
         _hasApprovalPassword = settings.hasNegativeStockApprovalPassword;
       });
     } catch (e) {
@@ -60,12 +62,15 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
   Future<void> _save() async {
     final password = _password.text.trim();
     final confirmPassword = _confirmPassword.text.trim();
-    if (_negativeStockPolicy == 'ALLOW_WITH_APPROVAL') {
+    final requiresApprovalPassword =
+        _negativeStockPolicy == 'ALLOW_WITH_APPROVAL' ||
+            _negativeProfitPolicy == 'ALLOW_WITH_APPROVAL';
+    if (requiresApprovalPassword) {
       if (!_hasApprovalPassword && password.isEmpty) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(const SnackBar(
-            content: Text('Set an approval password before enabling this rule'),
+            content: Text('Set an approval password before enabling approval'),
           ));
         return;
       }
@@ -98,14 +103,14 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
       await ref.read(settingsRepositoryProvider).updateInventorySettings(
             UpdateInventorySettingsDto(
               negativeStockPolicy: _negativeStockPolicy,
+              negativeProfitPolicy: _negativeProfitPolicy,
               negativeStockApprovalPassword: password.isEmpty ? null : password,
             ),
           );
       if (!mounted) return;
       _password.clear();
       _confirmPassword.clear();
-      setState(() =>
-          _hasApprovalPassword = _negativeStockPolicy == 'ALLOW_WITH_APPROVAL');
+      setState(() => _hasApprovalPassword = requiresApprovalPassword);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
@@ -135,6 +140,16 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
       _ =>
         'Stock-out actions stop when the selected variation would go below zero.',
     };
+    final profitHelpText = switch (_negativeProfitPolicy) {
+      'ALLOW' =>
+        'Sales can complete even when the transaction finishes below tracked cost.',
+      'ALLOW_WITH_APPROVAL' =>
+        'An approval password is required when a sale would finish in a loss.',
+      _ => 'Sales that would finish in a loss are blocked.',
+    };
+    final requiresApprovalPassword =
+        _negativeStockPolicy == 'ALLOW_WITH_APPROVAL' ||
+            _negativeProfitPolicy == 'ALLOW_WITH_APPROVAL';
     return Scaffold(
       appBar: AppBar(title: const Text('Inventory Configuration')),
       body: SafeArea(
@@ -229,13 +244,62 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
                     'Applied to variation-level stock reductions in POS, stock adjustments, transfer dispatch, sales, and purchase returns.',
                     style: theme.textTheme.bodySmall,
                   ),
-                  if (_negativeStockPolicy == 'ALLOW_WITH_APPROVAL') ...[
+                  const SizedBox(height: 20),
+                  Text(
+                    'Negative profit control',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'When a sale would finish in a loss',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.trending_down_rounded),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: _negativeProfitPolicy,
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'DONT_ALLOW',
+                            child: Text('Block negative profit'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'ALLOW',
+                            child: Text('Allow negative profit'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'ALLOW_WITH_APPROVAL',
+                            child: Text('Allow with password approval'),
+                          ),
+                        ],
+                        onChanged: _saving
+                            ? null
+                            : (value) {
+                                if (value == null) return;
+                                setState(() => _negativeProfitPolicy = value);
+                              },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    profitHelpText,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Applied to completed sales, resumed held sales, POS checkout, and quote-to-sale conversion.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  if (requiresApprovalPassword) ...[
                     const SizedBox(height: 16),
                     if (_hasApprovalPassword)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Text(
-                          'An approval password is already set. Leave these fields blank to keep it unchanged.',
+                          'An approval password is already set. Leave these fields blank to keep it unchanged. The same password is used for stock and negative-profit approvals.',
                           style: theme.textTheme.bodySmall,
                         ),
                       ),
@@ -243,7 +307,7 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
                       controller: _password,
                       obscureText: true,
                       decoration: const InputDecoration(
-                        labelText: 'Approval password',
+                        labelText: 'Shared approval password',
                         hintText: 'Enter a new password',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.lock_rounded),
@@ -254,7 +318,7 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
                       controller: _confirmPassword,
                       obscureText: true,
                       decoration: const InputDecoration(
-                        labelText: 'Confirm approval password',
+                        labelText: 'Confirm shared approval password',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.lock_outline_rounded),
                       ),

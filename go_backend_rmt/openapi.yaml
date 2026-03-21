@@ -2137,6 +2137,12 @@ paths:
   /sales/quotes/{id}/convert:
     post:
       summary: POST /api/v1/sales/quotes/{id}/convert
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConvertQuoteToSaleRequest'
       responses:
         '200':
           description: Successful response
@@ -2574,6 +2580,238 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenericObject'
+  /promotions/import:
+    post:
+      summary: POST /api/v1/promotions/import
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Promotions imported
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /promotions/import-template:
+    get:
+      summary: GET /api/v1/promotions/import-template
+      responses:
+        '200':
+          description: Promotions import template
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+  /promotions/import-example:
+    get:
+      summary: GET /api/v1/promotions/import-example
+      responses:
+        '200':
+          description: Promotions import example workbook
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+  /promotions/coupon-series:
+    get:
+      summary: GET /api/v1/promotions/coupon-series
+      responses:
+        '200':
+          description: Coupon series list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+    post:
+      summary: POST /api/v1/promotions/coupon-series
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCouponSeriesRequest'
+      responses:
+        '201':
+          description: Coupon series created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /promotions/coupon-series/validate:
+    post:
+      summary: POST /api/v1/promotions/coupon-series/validate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateCouponCodeRequest'
+      responses:
+        '200':
+          description: Coupon validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /promotions/coupon-series/{id}:
+    put:
+      summary: PUT /api/v1/promotions/coupon-series/{id}
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCouponSeriesRequest'
+      responses:
+        '200':
+          description: Coupon series updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+    delete:
+      summary: DELETE /api/v1/promotions/coupon-series/{id}
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Coupon series deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /promotions/coupon-series/{id}/codes:
+    get:
+      summary: GET /api/v1/promotions/coupon-series/{id}/codes
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Coupon codes list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /promotions/raffles:
+    get:
+      summary: GET /api/v1/promotions/raffles
+      responses:
+        '200':
+          description: Raffle definitions list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+    post:
+      summary: POST /api/v1/promotions/raffles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRaffleDefinitionRequest'
+      responses:
+        '201':
+          description: Raffle definition created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /promotions/raffles/{id}:
+    put:
+      summary: PUT /api/v1/promotions/raffles/{id}
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRaffleDefinitionRequest'
+      responses:
+        '200':
+          description: Raffle definition updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+    delete:
+      summary: DELETE /api/v1/promotions/raffles/{id}
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Raffle definition deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /promotions/raffles/{id}/coupons:
+    get:
+      summary: GET /api/v1/promotions/raffles/{id}/coupons
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Issued raffle coupons list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /promotions/raffle-coupons/{id}/winner:
+    put:
+      summary: PUT /api/v1/promotions/raffle-coupons/{id}/winner
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarkRaffleWinnerRequest'
+      responses:
+        '200':
+          description: Raffle winner updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
   /sale-returns:
     get:
       summary: GET /api/v1/sale-returns
@@ -5858,14 +6096,19 @@ components:
           type: string
         negative_stock_policy:
           type: string
+        negative_profit_policy:
+          type: string
         has_negative_stock_approval_password:
           type: boolean
     UpdateInventorySettingsRequest:
       type: object
       required:
         - negative_stock_policy
+        - negative_profit_policy
       properties:
         negative_stock_policy:
+          type: string
+        negative_profit_policy:
           type: string
         negative_stock_approval_password:
           type: string
@@ -6732,6 +6975,12 @@ components:
         redeem_points:
           type: number
           nullable: true
+        coupon_code:
+          type: string
+          nullable: true
+        auto_fill_raffle_customer_data:
+          type: boolean
+          nullable: true
         manager_override_token:
           type: string
           nullable: true
@@ -6739,6 +6988,186 @@ components:
           type: string
           nullable: true
         override_password:
+          type: string
+          nullable: true
+    CreateCouponSeriesRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        prefix:
+          type: string
+        code_length:
+          type: integer
+        discount_type:
+          type: string
+        discount_value:
+          type: number
+          format: float
+        min_purchase_amount:
+          type: number
+          format: float
+        max_discount_amount:
+          type: number
+          format: float
+          nullable: true
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        total_coupons:
+          type: integer
+        usage_limit_per_coupon:
+          type: integer
+        usage_limit_per_customer:
+          type: integer
+        is_active:
+          type: boolean
+          nullable: true
+    UpdateCouponSeriesRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        prefix:
+          type: string
+          nullable: true
+        code_length:
+          type: integer
+          nullable: true
+        discount_type:
+          type: string
+          nullable: true
+        discount_value:
+          type: number
+          format: float
+          nullable: true
+        min_purchase_amount:
+          type: number
+          format: float
+          nullable: true
+        max_discount_amount:
+          type: number
+          format: float
+          nullable: true
+        start_date:
+          type: string
+          format: date
+          nullable: true
+        end_date:
+          type: string
+          format: date
+          nullable: true
+        usage_limit_per_coupon:
+          type: integer
+          nullable: true
+        usage_limit_per_customer:
+          type: integer
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
+    ValidateCouponCodeRequest:
+      type: object
+      properties:
+        code:
+          type: string
+        customer_id:
+          type: integer
+          nullable: true
+        sale_amount:
+          type: number
+          format: float
+    CreateRaffleDefinitionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        prefix:
+          type: string
+        code_length:
+          type: integer
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        trigger_amount:
+          type: number
+          format: float
+        coupons_per_trigger:
+          type: integer
+        max_coupons_per_sale:
+          type: integer
+          nullable: true
+        default_auto_fill_customer_data:
+          type: boolean
+        print_after_invoice:
+          type: boolean
+        is_active:
+          type: boolean
+          nullable: true
+    UpdateRaffleDefinitionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        prefix:
+          type: string
+          nullable: true
+        code_length:
+          type: integer
+          nullable: true
+        start_date:
+          type: string
+          format: date
+          nullable: true
+        end_date:
+          type: string
+          format: date
+          nullable: true
+        trigger_amount:
+          type: number
+          format: float
+          nullable: true
+        coupons_per_trigger:
+          type: integer
+          nullable: true
+        max_coupons_per_sale:
+          type: integer
+          nullable: true
+        default_auto_fill_customer_data:
+          type: boolean
+          nullable: true
+        print_after_invoice:
+          type: boolean
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
+    MarkRaffleWinnerRequest:
+      type: object
+      properties:
+        winner_name:
+          type: string
+        winner_notes:
           type: string
           nullable: true
     POSProductResponse:
@@ -6815,6 +7244,12 @@ components:
         notes:
           type: string
           nullable: true
+        override_password:
+          type: string
+          nullable: true
+    ConvertQuoteToSaleRequest:
+      type: object
+      properties:
         override_password:
           type: string
           nullable: true

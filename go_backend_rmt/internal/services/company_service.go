@@ -147,6 +147,7 @@ func (s *CompanyService) CreateCompany(req *models.CreateCompanyRequest, userID 
 	inventorySettings := models.JSONB{
 		"inventory_costing_method": normalizeCostingMethod(req.InventoryCostingMethod),
 		"negative_stock_policy":    negativeStockPolicyDisallow,
+		"negative_profit_policy":   negativeStockPolicyDisallow,
 	}
 	if _, err = tx.Exec(`
 		INSERT INTO settings (company_id, key, value)

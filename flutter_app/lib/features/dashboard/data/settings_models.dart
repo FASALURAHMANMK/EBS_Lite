@@ -30,11 +30,13 @@ class CompanySettingsDto {
 class InventorySettingsDto {
   final String inventoryCostingMethod;
   final String negativeStockPolicy;
+  final String negativeProfitPolicy;
   final bool hasNegativeStockApprovalPassword;
 
   const InventorySettingsDto({
     this.inventoryCostingMethod = 'FIFO',
     this.negativeStockPolicy = 'DONT_ALLOW',
+    this.negativeProfitPolicy = 'DONT_ALLOW',
     this.hasNegativeStockApprovalPassword = false,
   });
 
@@ -44,6 +46,8 @@ class InventorySettingsDto {
             json['inventory_costing_method'] as String? ?? 'FIFO',
         negativeStockPolicy:
             json['negative_stock_policy'] as String? ?? 'DONT_ALLOW',
+        negativeProfitPolicy:
+            json['negative_profit_policy'] as String? ?? 'DONT_ALLOW',
         hasNegativeStockApprovalPassword:
             json['has_negative_stock_approval_password'] as bool? ?? false,
       );
@@ -51,15 +55,18 @@ class InventorySettingsDto {
 
 class UpdateInventorySettingsDto {
   final String negativeStockPolicy;
+  final String negativeProfitPolicy;
   final String? negativeStockApprovalPassword;
 
   const UpdateInventorySettingsDto({
     required this.negativeStockPolicy,
+    required this.negativeProfitPolicy,
     this.negativeStockApprovalPassword,
   });
 
   Map<String, dynamic> toJson() => {
         'negative_stock_policy': negativeStockPolicy,
+        'negative_profit_policy': negativeProfitPolicy,
         if ((negativeStockApprovalPassword ?? '').trim().isNotEmpty)
           'negative_stock_approval_password':
               negativeStockApprovalPassword!.trim(),

@@ -12,6 +12,11 @@ type schemaRequirement struct {
 	columns []string
 }
 
+type uniqueIndexRequirement struct {
+	table   string
+	columns []string
+}
+
 // ValidateSchema checks for required tables/columns and returns a descriptive error
 // if the deployed schema is missing anything the backend relies on.
 func ValidateSchema(db *sql.DB) error {
@@ -67,6 +72,18 @@ func ValidateSchema(db *sql.DB) error {
 		return fmt.Errorf("schema validation failed; missing columns -> %s", strings.Join(missing, "; "))
 	}
 
+	uniqueRequirements := []uniqueIndexRequirement{
+		{table: "settings", columns: []string{"company_id", "key"}},
+	}
+
+	missingUnique, err := validateUniqueIndexes(db, uniqueRequirements)
+	if err != nil {
+		return err
+	}
+	if len(missingUnique) > 0 {
+		return fmt.Errorf("schema validation failed; missing unique indexes -> %s", strings.Join(missingUnique, "; "))
+	}
+
 	return nil
 }
 
@@ -92,4 +109,47 @@ func fetchTableColumns(db *sql.DB, table string) (map[string]struct{}, error) {
 		return nil, fmt.Errorf("failed to read columns for %s: %w", table, err)
 	}
 	return cols, nil
+}
+
+func validateUniqueIndexes(db *sql.DB, requirements []uniqueIndexRequirement) ([]string, error) {
+	missing := make([]string, 0)
+	for _, req := range requirements {
+		ok, err := hasUniqueIndex(db, req.table, req.columns)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			missing = append(missing, fmt.Sprintf("%s(%s)", req.table, strings.Join(req.columns, ", ")))
+		}
+	}
+	return missing, nil
+}
+
+func hasUniqueIndex(db *sql.DB, table string, columns []string) (bool, error) {
+	const query = `
+		SELECT EXISTS (
+			SELECT 1
+			FROM pg_class t
+			JOIN pg_namespace ns ON ns.oid = t.relnamespace
+			JOIN pg_index i ON i.indrelid = t.oid
+			JOIN LATERAL (
+				SELECT string_agg(a.attname, ',' ORDER BY keys.ordinality) AS cols
+				FROM unnest(i.indkey) WITH ORDINALITY AS keys(attnum, ordinality)
+				JOIN pg_attribute a
+					ON a.attrelid = t.oid
+					AND a.attnum = keys.attnum
+			) idx_cols ON TRUE
+			WHERE ns.nspname = 'public'
+				AND t.relname = $1
+				AND i.indisunique
+				AND i.indpred IS NULL
+				AND idx_cols.cols = $2
+		)
+	`
+
+	var exists bool
+	if err := db.QueryRow(query, table, strings.Join(columns, ",")).Scan(&exists); err != nil {
+		return false, fmt.Errorf("failed to inspect unique indexes for %s: %w", table, err)
+	}
+	return exists, nil
 }
