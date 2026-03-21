@@ -1,3 +1,5 @@
+-- +goose Up
+
 ALTER TABLE promotions
     DROP CONSTRAINT IF EXISTS promotions_discount_type_check;
 
@@ -128,3 +130,37 @@ CREATE INDEX IF NOT EXISTS idx_raffle_coupons_definition_sale
 
 CREATE INDEX IF NOT EXISTS idx_raffle_coupons_status
     ON raffle_coupons(status, issued_at DESC);
+
+-- +goose Down
+
+DROP INDEX IF EXISTS idx_raffle_coupons_status;
+DROP INDEX IF EXISTS idx_raffle_coupons_definition_sale;
+DROP TABLE IF EXISTS raffle_coupons;
+
+DROP INDEX IF EXISTS idx_raffle_definitions_company_active;
+DROP TABLE IF EXISTS raffle_definitions;
+
+DROP INDEX IF EXISTS idx_coupon_codes_customer;
+DROP INDEX IF EXISTS idx_coupon_codes_series_status;
+DROP TABLE IF EXISTS coupon_codes;
+
+DROP INDEX IF EXISTS idx_coupon_series_company_active;
+DROP TABLE IF EXISTS coupon_series;
+
+DROP INDEX IF EXISTS idx_promotion_product_rules_product;
+DROP INDEX IF EXISTS idx_promotion_product_rules_promotion;
+DROP TABLE IF EXISTS promotion_product_rules;
+
+ALTER TABLE promotions
+    DROP CONSTRAINT IF EXISTS promotions_discount_scope_check;
+
+ALTER TABLE promotions
+    DROP COLUMN IF EXISTS discount_scope,
+    DROP COLUMN IF EXISTS priority;
+
+ALTER TABLE promotions
+    DROP CONSTRAINT IF EXISTS promotions_discount_type_check;
+
+ALTER TABLE promotions
+    ADD CONSTRAINT promotions_discount_type_check
+    CHECK (discount_type IN ('PERCENTAGE', 'FIXED', 'BUY_X_GET_Y'));

@@ -20,12 +20,33 @@ func (j *JSONB) Scan(value interface{}) error {
 		return nil
 	}
 
-	bytes, ok := value.([]byte)
-	if !ok {
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
 		return fmt.Errorf("cannot scan %T into JSONB", value)
 	}
 
-	return json.Unmarshal(bytes, j)
+	if len(bytes) == 0 {
+		*j = make(map[string]interface{})
+		return nil
+	}
+
+	if err := json.Unmarshal(bytes, j); err == nil {
+		return nil
+	}
+
+	var scalar interface{}
+	if err := json.Unmarshal(bytes, &scalar); err == nil {
+		*j = JSONB{"value": scalar}
+		return nil
+	}
+
+	*j = JSONB{"value": string(bytes)}
+	return nil
 }
 
 // BaseModel contains common fields for all models

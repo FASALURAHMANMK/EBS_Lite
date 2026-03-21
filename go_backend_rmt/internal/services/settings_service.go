@@ -157,6 +157,13 @@ func (s *SettingsService) GetCompanySettings(companyID int) (*models.CompanySett
 	if err := s.getJSONSetting(companyID, "company", &cfg); err != nil {
 		return nil, err
 	}
+	if strings.TrimSpace(cfg.InventoryCostingMethod) == "" {
+		var inventoryCfg inventorySettingsRecord
+		if err := s.getJSONSetting(companyID, "inventory", &inventoryCfg); err != nil {
+			return nil, err
+		}
+		cfg.InventoryCostingMethod = inventoryCfg.InventoryCostingMethod
+	}
 	cfg.InventoryCostingMethod = normalizeCostingMethod(cfg.InventoryCostingMethod)
 	return &cfg, nil
 }

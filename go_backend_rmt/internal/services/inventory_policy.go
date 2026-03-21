@@ -51,6 +51,8 @@ func loadCompanyInventoryPolicy(querier settingsQueryRower, companyID int) (*com
 	} else if err == nil && policy.CostingMethod == costingMethodFIFO {
 		if value, ok := legacy["inventory_costing_method"].(string); ok {
 			policy.CostingMethod = normalizeCostingMethod(value)
+		} else if value, ok := legacy["value"].(string); ok {
+			policy.CostingMethod = normalizeCostingMethod(value)
 		}
 	}
 
