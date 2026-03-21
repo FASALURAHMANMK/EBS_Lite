@@ -3,6 +3,7 @@ import 'package:ebs_lite/features/auth/controllers/auth_permissions_provider.dar
 import 'package:ebs_lite/features/customers/presentation/pages/customer_management_page.dart';
 import 'package:ebs_lite/features/customers/presentation/pages/customer_warranty_page.dart';
 import 'package:ebs_lite/features/customers/presentation/pages/loyalty_management_page.dart';
+import 'package:ebs_lite/features/customers/presentation/pages/loyalty_gift_redeem_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/attribute_management_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/asset_management_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/brand_management_page.dart';
@@ -297,6 +298,12 @@ class DashboardDesktopSidebar extends ConsumerWidget {
                   icon: Icons.loyalty_rounded,
                   label: 'Loyalty Management',
                   onTap: () => onOpen(const LoyaltyManagementPage()),
+                ),
+                _child(
+                  context,
+                  icon: Icons.redeem_rounded,
+                  label: 'Gift Redeem',
+                  onTap: () => onOpen(const LoyaltyGiftRedeemPage()),
                 ),
                 _child(
                   context,

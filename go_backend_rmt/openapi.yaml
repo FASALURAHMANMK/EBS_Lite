@@ -2380,27 +2380,45 @@ paths:
   /loyalty-redemptions:
     get:
       summary: GET /api/v1/loyalty-redemptions
+      parameters:
+      - name: customer_id
+        in: query
+        required: false
+        schema:
+          type: integer
       responses:
         '200':
           description: Successful response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/LoyaltyRedemption'
     post:
       summary: POST /api/v1/loyalty-redemptions
       responses:
-        '200':
+        '201':
           description: Successful response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/LoyaltyRedemptionResponse'
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreateLoyaltyRedemptionRequest'
   /loyalty/settings:
     get:
       summary: GET /api/v1/loyalty/settings
@@ -2410,7 +2428,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/LoyaltySettingsResponse'
     put:
       summary: PUT /api/v1/loyalty/settings
       responses:
@@ -2579,7 +2602,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/UpdateLoyaltySettingsRequest'
   /promotions/import:
     post:
       summary: POST /api/v1/promotions/import
@@ -7219,6 +7242,222 @@ components:
         selling_unit_symbol:
           type: string
           nullable: true
+        is_loyalty_gift:
+          type: boolean
+        loyalty_points_required:
+          type: number
+          format: float
+    LoyaltySettingsResponse:
+      type: object
+      properties:
+        points_per_currency:
+          type: number
+          format: float
+        point_value:
+          type: number
+          format: float
+        min_redemption_points:
+          type: number
+          format: float
+        min_points_reserve:
+          type: integer
+        points_expiry_days:
+          type: integer
+        redemption_type:
+          type: string
+          enum:
+            - DISCOUNT
+            - GIFT
+    UpdateLoyaltySettingsRequest:
+      type: object
+      properties:
+        points_per_currency:
+          type: number
+          format: float
+          nullable: true
+        point_value:
+          type: number
+          format: float
+          nullable: true
+        min_redemption_points:
+          type: integer
+          nullable: true
+        min_points_reserve:
+          type: integer
+          nullable: true
+        points_expiry_days:
+          type: integer
+          nullable: true
+        redemption_type:
+          type: string
+          nullable: true
+          enum:
+            - DISCOUNT
+            - GIFT
+    CreateLoyaltyRedemptionRequest:
+      type: object
+      required:
+        - customer_id
+      properties:
+        customer_id:
+          type: integer
+        points_used:
+          type: number
+          format: float
+          nullable: true
+        reference:
+          type: string
+          nullable: true
+        redemption_type:
+          type: string
+          nullable: true
+          enum:
+            - DISCOUNT
+            - GIFT
+        location_id:
+          type: integer
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoyaltyRedemptionItemInput'
+        notes:
+          type: string
+          nullable: true
+        override_password:
+          type: string
+          nullable: true
+    LoyaltyRedemptionResponse:
+      type: object
+      properties:
+        redemption_id:
+          type: integer
+        customer_id:
+          type: integer
+        points_used:
+          type: number
+          format: float
+        value_redeemed:
+          type: number
+          format: float
+        remaining_points:
+          type: number
+          format: float
+        redemption_type:
+          type: string
+          enum:
+            - DISCOUNT
+            - GIFT
+        message:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoyaltyRedemptionItem'
+    LoyaltyRedemption:
+      type: object
+      properties:
+        redemption_id:
+          type: integer
+        sale_id:
+          type: integer
+          nullable: true
+        customer_id:
+          type: integer
+        points_used:
+          type: number
+          format: float
+        value_redeemed:
+          type: number
+          format: float
+        redeemed_at:
+          type: string
+          format: date-time
+        redemption_type:
+          type: string
+          enum:
+            - DISCOUNT
+            - GIFT
+        location_id:
+          type: integer
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        customer:
+          allOf:
+            - $ref: '#/components/schemas/Customer'
+          nullable: true
+        sale:
+          allOf:
+            - $ref: '#/components/schemas/Sale'
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoyaltyRedemptionItem'
+    LoyaltyRedemptionItem:
+      type: object
+      properties:
+        redemption_item_id:
+          type: integer
+        redemption_id:
+          type: integer
+        product_id:
+          type: integer
+        barcode_id:
+          type: integer
+          nullable: true
+        product_name:
+          type: string
+        variant_name:
+          type: string
+          nullable: true
+        quantity:
+          type: number
+          format: float
+        points_used:
+          type: number
+          format: float
+        value_redeemed:
+          type: number
+          format: float
+        unit_cost:
+          type: number
+          format: float
+        total_cost:
+          type: number
+          format: float
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        batch_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryBatchSelectionInput'
+    LoyaltyRedemptionItemInput:
+      type: object
+      required:
+        - product_id
+        - quantity
+      properties:
+        product_id:
+          type: integer
+        barcode_id:
+          type: integer
+          nullable: true
+        quantity:
+          type: number
+          format: float
+        serial_numbers:
+          type: array
+          items:
+            type: string
+        batch_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryBatchSelectionInput'
     CreateSaleRequest:
       type: object
       required:

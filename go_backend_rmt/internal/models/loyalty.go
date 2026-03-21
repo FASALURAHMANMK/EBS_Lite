@@ -16,14 +16,18 @@ type LoyaltyProgram struct {
 }
 
 type LoyaltyRedemption struct {
-	RedemptionID  int       `json:"redemption_id" db:"redemption_id"`
-	SaleID        *int      `json:"sale_id,omitempty" db:"sale_id"`
-	CustomerID    int       `json:"customer_id" db:"customer_id"`
-	PointsUsed    float64   `json:"points_used" db:"points_used"`
-	ValueRedeemed float64   `json:"value_redeemed" db:"value_redeemed"`
-	RedeemedAt    time.Time `json:"redeemed_at" db:"redeemed_at"`
-	Customer      *Customer `json:"customer,omitempty"`
-	Sale          *Sale     `json:"sale,omitempty"`
+	RedemptionID   int                     `json:"redemption_id" db:"redemption_id"`
+	SaleID         *int                    `json:"sale_id,omitempty" db:"sale_id"`
+	CustomerID     int                     `json:"customer_id" db:"customer_id"`
+	PointsUsed     float64                 `json:"points_used" db:"points_used"`
+	ValueRedeemed  float64                 `json:"value_redeemed" db:"value_redeemed"`
+	RedeemedAt     time.Time               `json:"redeemed_at" db:"redeemed_at"`
+	RedemptionType string                  `json:"redemption_type" db:"redemption_type"`
+	LocationID     *int                    `json:"location_id,omitempty" db:"location_id"`
+	Notes          *string                 `json:"notes,omitempty" db:"notes"`
+	Customer       *Customer               `json:"customer,omitempty"`
+	Sale           *Sale                   `json:"sale,omitempty"`
+	Items          []LoyaltyRedemptionItem `json:"items,omitempty" db:"-"`
 }
 
 type LoyaltyTransaction struct {
@@ -58,18 +62,25 @@ type Promotion struct {
 
 // Request/Response Models
 type CreateLoyaltyRedemptionRequest struct {
-	CustomerID int     `json:"customer_id" validate:"required"`
-	PointsUsed float64 `json:"points_used" validate:"required,gt=0"`
-	Reference  *string `json:"reference,omitempty"`
+	CustomerID       int                          `json:"customer_id" validate:"required"`
+	PointsUsed       float64                      `json:"points_used" validate:"omitempty,gt=0"`
+	Reference        *string                      `json:"reference,omitempty"`
+	RedemptionType   *string                      `json:"redemption_type,omitempty" validate:"omitempty,oneof=DISCOUNT GIFT"`
+	LocationID       *int                         `json:"location_id,omitempty"`
+	Items            []LoyaltyRedemptionItemInput `json:"items,omitempty"`
+	Notes            *string                      `json:"notes,omitempty"`
+	OverridePassword *string                      `json:"override_password,omitempty"`
 }
 
 type LoyaltyRedemptionResponse struct {
-	RedemptionID    int     `json:"redemption_id"`
-	CustomerID      int     `json:"customer_id"`
-	PointsUsed      float64 `json:"points_used"`
-	ValueRedeemed   float64 `json:"value_redeemed"`
-	RemainingPoints float64 `json:"remaining_points"`
-	Message         string  `json:"message"`
+	RedemptionID    int                     `json:"redemption_id"`
+	CustomerID      int                     `json:"customer_id"`
+	PointsUsed      float64                 `json:"points_used"`
+	ValueRedeemed   float64                 `json:"value_redeemed"`
+	RemainingPoints float64                 `json:"remaining_points"`
+	RedemptionType  string                  `json:"redemption_type"`
+	Message         string                  `json:"message"`
+	Items           []LoyaltyRedemptionItem `json:"items,omitempty"`
 }
 
 type CreatePromotionRequest struct {
@@ -140,4 +151,29 @@ type LoyaltySettingsResponse struct {
 	MinRedemptionPoints float64 `json:"min_redemption_points"`
 	MinPointsReserve    int     `json:"min_points_reserve"`
 	PointsExpiryDays    int     `json:"points_expiry_days"`
+	RedemptionType      string  `json:"redemption_type"`
+}
+
+type LoyaltyRedemptionItem struct {
+	RedemptionItemID int      `json:"redemption_item_id" db:"redemption_item_id"`
+	RedemptionID     int      `json:"redemption_id" db:"redemption_id"`
+	ProductID        int      `json:"product_id" db:"product_id"`
+	BarcodeID        *int     `json:"barcode_id,omitempty" db:"barcode_id"`
+	ProductName      string   `json:"product_name" db:"product_name"`
+	VariantName      *string  `json:"variant_name,omitempty" db:"variant_name"`
+	Quantity         float64  `json:"quantity" db:"quantity"`
+	PointsUsed       float64  `json:"points_used" db:"points_used"`
+	ValueRedeemed    float64  `json:"value_redeemed" db:"value_redeemed"`
+	UnitCost         float64  `json:"unit_cost" db:"unit_cost"`
+	TotalCost        float64  `json:"total_cost" db:"total_cost"`
+	SerialNumbers    []string `json:"serial_numbers,omitempty" db:"serial_numbers"`
+	BatchAllocations JSONB    `json:"batch_allocations,omitempty" db:"batch_allocations"`
+}
+
+type LoyaltyRedemptionItemInput struct {
+	ProductID        int                            `json:"product_id" validate:"required"`
+	BarcodeID        *int                           `json:"barcode_id,omitempty"`
+	Quantity         float64                        `json:"quantity" validate:"required,gt=0"`
+	SerialNumbers    []string                       `json:"serial_numbers,omitempty"`
+	BatchAllocations []InventoryBatchSelectionInput `json:"batch_allocations,omitempty"`
 }

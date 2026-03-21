@@ -39,6 +39,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   final _warrantyPeriodMonths = TextEditingController();
   final _purchaseFactor = TextEditingController(text: '1');
   final _sellingFactor = TextEditingController(text: '1');
+  final _primaryLoyaltyPoints = TextEditingController();
 
   bool _saving = false;
   bool _hasWarranty = false;
@@ -46,6 +47,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   bool _batchTracked = false;
   bool _loading = true;
   bool _autoItemCode = false;
+  bool _primaryLoyaltyGift = false;
 
   List<ProductAttributeDefinitionDto> _attrDefs = const [];
   final Map<int, TextEditingController> _attrText = {};
@@ -103,6 +105,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _warrantyPeriodMonths.dispose();
     _purchaseFactor.dispose();
     _sellingFactor.dispose();
+    _primaryLoyaltyPoints.dispose();
     for (final c in _attrText.values) {
       c.dispose();
     }
@@ -195,6 +198,9 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
             variantName: barcodes[idx].variantName,
             variantAttributes: barcodes[idx].variantAttributes,
             isActive: barcodes[idx].isActive,
+          ).copyWithLoyaltyGift(
+            enabled: _primaryLoyaltyGift,
+            pointsRequired: double.tryParse(_primaryLoyaltyPoints.text.trim()),
           );
         } else {
           barcodes.insert(
@@ -206,6 +212,10 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               sellingPrice: double.tryParse(_price.text.trim()),
               isPrimary: true,
               isActive: true,
+            ).copyWithLoyaltyGift(
+              enabled: _primaryLoyaltyGift,
+              pointsRequired:
+                  double.tryParse(_primaryLoyaltyPoints.text.trim()),
             ),
           );
         }
@@ -909,6 +919,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: 12),
+        _buildPrimaryGiftCard(),
+        const SizedBox(height: 12),
         Text(
           'Variation / barcode tracking is always enabled.',
           style: Theme.of(context).textTheme.bodySmall,
@@ -1011,6 +1023,59 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
         ),
       ],
+    );
+  }
+
+  Widget _buildPrimaryGiftCard() {
+    return Card(
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Primary Barcode Loyalty Gift',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile.adaptive(
+              value: _primaryLoyaltyGift,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Available for loyalty gift redemption'),
+              subtitle: const Text(
+                'Allow this primary barcode to be redeemed as a gift item.',
+              ),
+              onChanged: (value) => setState(() {
+                _primaryLoyaltyGift = value;
+                if (!value) {
+                  _primaryLoyaltyPoints.clear();
+                }
+              }),
+            ),
+            if (_primaryLoyaltyGift) ...[
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _primaryLoyaltyPoints,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Points Required',
+                  helperText: 'Points needed to redeem one unit of this item.',
+                ),
+                validator: (value) {
+                  if (!_primaryLoyaltyGift) return null;
+                  final points = double.tryParse((value ?? '').trim());
+                  if (points == null || points <= 0) {
+                    return 'Enter a valid points value';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -1134,7 +1199,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               child: ListTile(
                 title: Text(b.barcode),
                 subtitle: Text(
-                    '${(b.variantName ?? '').isEmpty ? '' : '${b.variantName} • '}Conversion: ${b.packSize ?? 1} • Selling: ${b.sellingPrice?.toStringAsFixed(2) ?? '-'}'),
+                    '${(b.variantName ?? '').isEmpty ? '' : '${b.variantName} • '}Conversion: ${b.packSize ?? 1} • Selling: ${b.sellingPrice?.toStringAsFixed(2) ?? '-'}${b.isLoyaltyGift ? ' • Gift: ${b.loyaltyPointsRequired?.toStringAsFixed(0) ?? '0'} pts' : ''}'),
                 trailing: Wrap(
                   spacing: 8,
                   children: [
@@ -1561,87 +1626,129 @@ Future<ProductBarcodeDto?> _showBarcodeDialog(BuildContext context,
   final pack = TextEditingController(text: (initial?.packSize ?? 1).toString());
   final sell =
       TextEditingController(text: initial?.sellingPrice?.toString() ?? '');
+  final points = TextEditingController(
+      text: initial?.loyaltyPointsRequired?.toStringAsFixed(0) ?? '');
+  var isLoyaltyGift = initial?.isLoyaltyGift ?? false;
   return showDialog<ProductBarcodeDto>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: Text(initial == null ? 'Add Barcode' : 'Edit Barcode'),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 900),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: code,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Barcode'),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: variant,
-              decoration: const InputDecoration(labelText: 'Variation Name'),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: pack,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Conversion'),
-                  ),
+    builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+              title: Text(initial == null ? 'Add Barcode' : 'Edit Barcode'),
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 900),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: code,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Barcode'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: variant,
+                      decoration:
+                          const InputDecoration(labelText: 'Variation Name'),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: pack,
+                            keyboardType: TextInputType.number,
+                            decoration:
+                                const InputDecoration(labelText: 'Conversion'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: sell,
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            decoration: const InputDecoration(
+                                labelText: 'Selling Price'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SwitchListTile.adaptive(
+                      value: isLoyaltyGift,
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Available as loyalty gift'),
+                      subtitle: const Text(
+                        'Redeem this barcode as a gift item for points.',
+                      ),
+                      onChanged: (value) => setState(() {
+                        isLoyaltyGift = value;
+                        if (!value) points.clear();
+                      }),
+                    ),
+                    if (isLoyaltyGift)
+                      TextField(
+                        controller: points,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration:
+                            const InputDecoration(labelText: 'Points Required'),
+                      ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: sell,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    decoration:
-                        const InputDecoration(labelText: 'Selling Price'),
-                  ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).maybePop(null),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final s = code.text.trim();
+                    if (s.isEmpty || !RegExp(r'^\d+$').hasMatch(s)) {
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(const SnackBar(
+                            content: Text('Barcode must be digits only')));
+                      return;
+                    }
+                    final p = int.tryParse(pack.text.trim()) ?? 1;
+                    if (p < 1) {
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(const SnackBar(
+                            content: Text('Conversion must be at least 1')));
+                      return;
+                    }
+                    final sp = double.tryParse(sell.text.trim());
+                    final giftPoints = double.tryParse(points.text.trim());
+                    if (isLoyaltyGift &&
+                        (giftPoints == null || giftPoints <= 0)) {
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(const SnackBar(
+                            content: Text('Enter valid loyalty gift points')));
+                      return;
+                    }
+                    Navigator.of(context).pop(
+                      ProductBarcodeDto(
+                        barcodeId: initial?.barcodeId,
+                        barcode: s,
+                        packSize: p,
+                        sellingPrice: sp,
+                        variantName: variant.text.trim().isEmpty
+                            ? null
+                            : variant.text.trim(),
+                        isPrimary: false,
+                      ).copyWithLoyaltyGift(
+                        enabled: isLoyaltyGift,
+                        pointsRequired: giftPoints,
+                      ),
+                    );
+                  },
+                  child: const Text('Save'),
                 ),
               ],
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).maybePop(null),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () {
-            final s = code.text.trim();
-            if (s.isEmpty || !RegExp(r'^\d+$').hasMatch(s)) {
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(const SnackBar(
-                    content: Text('Barcode must be digits only')));
-              return;
-            }
-            final p = int.tryParse(pack.text.trim()) ?? 1;
-            if (p < 1) {
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(const SnackBar(
-                    content: Text('Conversion must be at least 1')));
-              return;
-            }
-            final sp = double.tryParse(sell.text.trim());
-            Navigator.of(context).pop(ProductBarcodeDto(
-              barcodeId: initial?.barcodeId,
-              barcode: s,
-              packSize: p,
-              sellingPrice: sp,
-              variantName:
-                  variant.text.trim().isEmpty ? null : variant.text.trim(),
-              isPrimary: false,
-            ));
-          },
-          child: const Text('Save'),
-        ),
-      ],
-    ),
+            )),
   );
 }

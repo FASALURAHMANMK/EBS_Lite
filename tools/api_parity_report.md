@@ -1,6 +1,6 @@
 # API Parity Report (Flutter <-> OpenAPI)
 
-- Flutter unique paths: **222**
+- Flutter unique paths: **223**
 - OpenAPI unique paths: **259**
 
 ## Flutter paths missing from OpenAPI
@@ -27,7 +27,6 @@
 - `/languages/{}`
 - `/loyalty-programs`
 - `/loyalty-programs/{}`
-- `/loyalty-redemptions`
 - `/loyalty/award-points`
 - `/numbering-sequences/{}`
 - `/payrolls/{}/advances`

@@ -51,7 +51,9 @@ func (s *POSService) GetPOSProducts(companyID, locationID int, includeCombos boo
                            COALESCE(p.selling_uom_mode, 'LOOSE') as selling_uom_mode,
                            p.selling_unit_id,
                            su.name as selling_unit_name,
-                           su.symbol as selling_unit_symbol
+                           su.symbol as selling_unit_symbol,
+                           COALESCE((pb.variant_attributes->>'loyalty_gift_enabled')::boolean, FALSE) as is_loyalty_gift,
+                           COALESCE((pb.variant_attributes->>'loyalty_points_required')::float8, 0) as loyalty_points_required
                 FROM products p
                 LEFT JOIN product_barcodes pb ON p.product_id = pb.product_id AND pb.is_primary = TRUE
                 LEFT JOIN stock st ON p.product_id = st.product_id AND st.location_id = $2
@@ -84,7 +86,9 @@ func (s *POSService) GetPOSProducts(companyID, locationID int, includeCombos boo
                            'LOOSE' as selling_uom_mode,
                            NULL::int as selling_unit_id,
                            NULL::varchar as selling_unit_name,
-                           NULL::varchar as selling_unit_symbol
+                           NULL::varchar as selling_unit_symbol,
+                           FALSE as is_loyalty_gift,
+                           0::float8 as loyalty_points_required
                 FROM combo_products cp
                 LEFT JOIN LATERAL (
                   SELECT CASE
@@ -116,6 +120,7 @@ func (s *POSService) GetPOSProducts(companyID, locationID int, includeCombos boo
 			&product.Barcode, &product.VariantName, &product.CategoryName, &product.PrimaryStorage, &product.IsVirtualCombo,
 			&product.IsWeighable, &product.TrackingType, &product.IsSerialized, &product.SellingUOMMode,
 			&product.SellingUnitID, &product.SellingUnitName, &product.SellingUnitSymbol,
+			&product.IsLoyaltyGift, &product.LoyaltyPointsRequired,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan POS product: %w", err)
@@ -236,6 +241,9 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 		settings, err := loyalty.getLoyaltySettings(companyID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get loyalty settings: %w", err)
+		}
+		if settings.RedemptionType != "DISCOUNT" {
+			return nil, fmt.Errorf("discount redemption is disabled in loyalty settings")
 		}
 		redeemable := current - float64(settings.MinPointsReserve)
 		if redeemable > 0 {
@@ -536,7 +544,9 @@ func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string
                            COALESCE(p.selling_uom_mode, 'LOOSE') as selling_uom_mode,
                            p.selling_unit_id,
                            su.name as selling_unit_name,
-                           su.symbol as selling_unit_symbol
+                           su.symbol as selling_unit_symbol,
+                           COALESCE((pb.variant_attributes->>'loyalty_gift_enabled')::boolean, FALSE) as is_loyalty_gift,
+                           COALESCE((pb.variant_attributes->>'loyalty_points_required')::float8, 0) as loyalty_points_required
                 FROM products p
                 JOIN product_barcodes pb ON p.product_id = pb.product_id AND COALESCE(pb.is_active, TRUE) = TRUE
                 LEFT JOIN stock_variants sv ON pb.barcode_id = sv.barcode_id AND sv.location_id = $2
@@ -582,7 +592,9 @@ func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string
                            'LOOSE' as selling_uom_mode,
                            NULL::int as selling_unit_id,
                            NULL::varchar as selling_unit_name,
-                           NULL::varchar as selling_unit_symbol
+                           NULL::varchar as selling_unit_symbol,
+                           FALSE as is_loyalty_gift,
+                           0::float8 as loyalty_points_required
                 FROM combo_products cp
                 LEFT JOIN LATERAL (
                     SELECT CASE
@@ -621,6 +633,7 @@ func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string
 			&product.ProductID, &product.ComboProductID, &product.BarcodeID, &product.Name, &product.Price, &product.Stock,
 			&product.Barcode, &product.VariantName, &product.CategoryName, &product.PrimaryStorage, &product.IsVirtualCombo, &product.IsWeighable, &product.TrackingType, &product.IsSerialized, &product.SellingUOMMode,
 			&product.SellingUnitID, &product.SellingUnitName, &product.SellingUnitSymbol,
+			&product.IsLoyaltyGift, &product.LoyaltyPointsRequired,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan search result: %w", err)

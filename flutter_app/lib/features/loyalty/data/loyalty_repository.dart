@@ -9,6 +9,7 @@ class LoyaltySettingsDto {
   final int minRedemptionPoints;
   final int minPointsReserve;
   final int pointsExpiryDays;
+  final String redemptionType;
 
   LoyaltySettingsDto({
     required this.pointsPerCurrency,
@@ -16,6 +17,7 @@ class LoyaltySettingsDto {
     required this.minRedemptionPoints,
     required this.minPointsReserve,
     required this.pointsExpiryDays,
+    required this.redemptionType,
   });
 
   factory LoyaltySettingsDto.fromJson(Map<String, dynamic> json) =>
@@ -27,6 +29,80 @@ class LoyaltySettingsDto {
             (json['min_redemption_points'] as num?)?.toInt() ?? 0,
         minPointsReserve: (json['min_points_reserve'] as num?)?.toInt() ?? 0,
         pointsExpiryDays: (json['points_expiry_days'] as num?)?.toInt() ?? 0,
+        redemptionType:
+            (json['redemption_type'] as String? ?? 'DISCOUNT').toUpperCase(),
+      );
+}
+
+class LoyaltyGiftRedemptionItemDto {
+  final int redemptionItemId;
+  final int productId;
+  final int? barcodeId;
+  final String productName;
+  final String? variantName;
+  final double quantity;
+  final double pointsUsed;
+  final double valueRedeemed;
+
+  const LoyaltyGiftRedemptionItemDto({
+    required this.redemptionItemId,
+    required this.productId,
+    this.barcodeId,
+    required this.productName,
+    this.variantName,
+    required this.quantity,
+    required this.pointsUsed,
+    required this.valueRedeemed,
+  });
+
+  factory LoyaltyGiftRedemptionItemDto.fromJson(Map<String, dynamic> json) =>
+      LoyaltyGiftRedemptionItemDto(
+        redemptionItemId: json['redemption_item_id'] as int? ?? 0,
+        productId: json['product_id'] as int? ?? 0,
+        barcodeId: json['barcode_id'] as int?,
+        productName: json['product_name'] as String? ?? '',
+        variantName: json['variant_name'] as String?,
+        quantity: (json['quantity'] as num?)?.toDouble() ?? 0,
+        pointsUsed: (json['points_used'] as num?)?.toDouble() ?? 0,
+        valueRedeemed: (json['value_redeemed'] as num?)?.toDouble() ?? 0,
+      );
+}
+
+class LoyaltyRedemptionResultDto {
+  final int redemptionId;
+  final int customerId;
+  final double pointsUsed;
+  final double valueRedeemed;
+  final double remainingPoints;
+  final String redemptionType;
+  final String message;
+  final List<LoyaltyGiftRedemptionItemDto> items;
+
+  const LoyaltyRedemptionResultDto({
+    required this.redemptionId,
+    required this.customerId,
+    required this.pointsUsed,
+    required this.valueRedeemed,
+    required this.remainingPoints,
+    required this.redemptionType,
+    required this.message,
+    required this.items,
+  });
+
+  factory LoyaltyRedemptionResultDto.fromJson(Map<String, dynamic> json) =>
+      LoyaltyRedemptionResultDto(
+        redemptionId: json['redemption_id'] as int? ?? 0,
+        customerId: json['customer_id'] as int? ?? 0,
+        pointsUsed: (json['points_used'] as num?)?.toDouble() ?? 0,
+        valueRedeemed: (json['value_redeemed'] as num?)?.toDouble() ?? 0,
+        remainingPoints: (json['remaining_points'] as num?)?.toDouble() ?? 0,
+        redemptionType:
+            (json['redemption_type'] as String? ?? 'DISCOUNT').toUpperCase(),
+        message: json['message'] as String? ?? '',
+        items: (json['items'] as List? ?? const [])
+            .map((e) => LoyaltyGiftRedemptionItemDto.fromJson(
+                e as Map<String, dynamic>))
+            .toList(),
       );
 }
 
@@ -68,7 +144,8 @@ class LoyaltyRepository {
       double? pointValue,
       int? minRedemptionPoints,
       int? minPointsReserve,
-      int? pointsExpiryDays}) async {
+      int? pointsExpiryDays,
+      String? redemptionType}) async {
     final payload = <String, dynamic>{};
     if (pointsPerCurrency != null) {
       payload['points_per_currency'] = pointsPerCurrency;
@@ -82,6 +159,9 @@ class LoyaltyRepository {
     }
     if (pointsExpiryDays != null) {
       payload['points_expiry_days'] = pointsExpiryDays;
+    }
+    if (redemptionType != null && redemptionType.trim().isNotEmpty) {
+      payload['redemption_type'] = redemptionType.trim().toUpperCase();
     }
     await _dio.put('/loyalty/settings', data: payload);
   }
@@ -137,6 +217,31 @@ class LoyaltyRepository {
 
   Future<void> deleteTier(int tierId) async {
     await _dio.delete('/loyalty/tiers/$tierId');
+  }
+
+  Future<LoyaltyRedemptionResultDto> redeemGift({
+    required int customerId,
+    required int locationId,
+    required List<Map<String, dynamic>> items,
+    String? notes,
+    String? overridePassword,
+  }) async {
+    final res = await _dio.post(
+      '/loyalty-redemptions',
+      data: {
+        'customer_id': customerId,
+        'redemption_type': 'GIFT',
+        'location_id': locationId,
+        'items': items,
+        if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+        if (overridePassword != null && overridePassword.trim().isNotEmpty)
+          'override_password': overridePassword.trim(),
+      },
+    );
+    final body = res.data is Map<String, dynamic> ? res.data['data'] : res.data;
+    return LoyaltyRedemptionResultDto.fromJson(
+      Map<String, dynamic>.from(body as Map),
+    );
   }
 }
 

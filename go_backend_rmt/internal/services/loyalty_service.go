@@ -8,6 +8,8 @@ import (
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
+
+	"github.com/lib/pq"
 )
 
 type LoyaltyService struct {
@@ -21,6 +23,62 @@ func NewLoyaltyService() *LoyaltyService {
 }
 
 var getPromotions = (*LoyaltyService).GetPromotions
+
+func normalizeLoyaltyRedemptionType(value *string) string {
+	if value == nil {
+		return "DISCOUNT"
+	}
+	switch strings.ToUpper(strings.TrimSpace(*value)) {
+	case "GIFT":
+		return "GIFT"
+	default:
+		return "DISCOUNT"
+	}
+}
+
+func loyaltyGiftEnabled(attrs models.JSONB) bool {
+	if len(attrs) == 0 {
+		return false
+	}
+	raw, ok := attrs["loyalty_gift_enabled"]
+	if !ok {
+		return false
+	}
+	switch value := raw.(type) {
+	case bool:
+		return value
+	case string:
+		return strings.EqualFold(strings.TrimSpace(value), "true")
+	case float64:
+		return value > 0
+	default:
+		return false
+	}
+}
+
+func loyaltyGiftPointsRequired(attrs models.JSONB) float64 {
+	if len(attrs) == 0 {
+		return 0
+	}
+	raw, ok := attrs["loyalty_points_required"]
+	if !ok {
+		return 0
+	}
+	switch value := raw.(type) {
+	case float64:
+		return value
+	case int:
+		return float64(value)
+	case int64:
+		return float64(value)
+	case string:
+		var parsed float64
+		_, _ = fmt.Sscan(strings.TrimSpace(value), &parsed)
+		return parsed
+	default:
+		return 0
+	}
+}
 
 // Loyalty Programs
 func (s *LoyaltyService) GetCustomerLoyalty(customerID, companyID int) (*models.CustomerLoyaltyResponse, error) {
@@ -127,19 +185,19 @@ func (s *LoyaltyService) GetLoyaltyPrograms(companyID int) ([]models.LoyaltyProg
 	return programs, nil
 }
 
-func (s *LoyaltyService) RedeemPoints(companyID int, req *models.CreateLoyaltyRedemptionRequest) (*models.LoyaltyRedemptionResponse, error) {
-	// Verify customer belongs to company
-	err := s.validateCustomerInCompany(req.CustomerID, companyID)
-	if err != nil {
+func (s *LoyaltyService) RedeemPoints(companyID, userID int, req *models.CreateLoyaltyRedemptionRequest) (*models.LoyaltyRedemptionResponse, error) {
+	if normalizeLoyaltyRedemptionType(req.RedemptionType) == "GIFT" {
+		return s.redeemGiftPoints(companyID, userID, req)
+	}
+
+	if err := s.validateCustomerInCompany(req.CustomerID, companyID); err != nil {
 		return nil, err
 	}
 
-	// Get current points
 	var currentPoints float64
-	err = s.db.QueryRow(`
+	err := s.db.QueryRow(`
         SELECT COALESCE(points, 0) FROM loyalty_programs WHERE customer_id = $1
     `, req.CustomerID).Scan(&currentPoints)
-
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("customer has no loyalty program")
 	}
@@ -147,12 +205,14 @@ func (s *LoyaltyService) RedeemPoints(companyID int, req *models.CreateLoyaltyRe
 		return nil, fmt.Errorf("failed to get current points: %w", err)
 	}
 
-	// Get loyalty settings for point value and constraints
 	settings, err := s.getLoyaltySettings(companyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get loyalty settings: %w", err)
 	}
-	// Enforce reserve and min redemption thresholds
+	if settings.RedemptionType == "GIFT" {
+		return nil, fmt.Errorf("discount redemption is disabled in loyalty settings")
+	}
+
 	redeemable := currentPoints - float64(settings.MinPointsReserve)
 	if redeemable <= 0 {
 		return nil, fmt.Errorf("insufficient points available")
@@ -164,48 +224,46 @@ func (s *LoyaltyService) RedeemPoints(companyID int, req *models.CreateLoyaltyRe
 	if pointsToUse <= 0 {
 		return nil, fmt.Errorf("insufficient points available")
 	}
-	// Enforce minimum redemption threshold if configured
 	if settings.MinRedemptionPoints > 0 && pointsToUse < settings.MinRedemptionPoints {
 		return nil, fmt.Errorf("insufficient points available")
 	}
 
 	valueRedeemed := pointsToUse * settings.PointValue
 
-	// Start transaction
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	// Create redemption record
 	var redemptionID int
 	err = tx.QueryRow(`
-        INSERT INTO loyalty_redemptions (customer_id, points_used, value_redeemed)
-        VALUES ($1, $2, $3)
+        INSERT INTO loyalty_redemptions (customer_id, points_used, value_redeemed, redemption_type, location_id, notes)
+        VALUES ($1, $2, $3, 'DISCOUNT', NULL, $4)
         RETURNING redemption_id
-    `, req.CustomerID, pointsToUse, valueRedeemed).Scan(&redemptionID)
-
+    `, req.CustomerID, pointsToUse, valueRedeemed, req.Notes).Scan(&redemptionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create redemption: %w", err)
 	}
 
-	// Update loyalty program
-	_, err = tx.Exec(`
-        UPDATE loyalty_programs 
+	if _, err = tx.Exec(`
+        UPDATE loyalty_programs
         SET points = points - $1, total_redeemed = total_redeemed + $1, last_updated = CURRENT_TIMESTAMP
         WHERE customer_id = $2
-    `, pointsToUse, req.CustomerID)
-
-	if err != nil {
+    `, pointsToUse, req.CustomerID); err != nil {
 		return nil, fmt.Errorf("failed to update loyalty points: %w", err)
 	}
+
+	_, _ = tx.Exec(`
+        INSERT INTO loyalty_transactions (customer_id, transaction_type, points, description, reference_type, reference_id, balance_after)
+        SELECT $1, 'REDEEMED', -$2, 'Points redeemed as discount', 'LOYALTY_REDEMPTION', $3, lp.points
+        FROM loyalty_programs lp WHERE lp.customer_id = $1
+    `, req.CustomerID, pointsToUse, redemptionID)
 
 	if err := s.updateCustomerTierTx(tx, companyID, req.CustomerID); err != nil {
 		return nil, err
 	}
 
-	// Commit transaction
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
@@ -218,13 +276,276 @@ func (s *LoyaltyService) RedeemPoints(companyID int, req *models.CreateLoyaltyRe
 		PointsUsed:      pointsToUse,
 		ValueRedeemed:   valueRedeemed,
 		RemainingPoints: remainingPoints,
-		Message:         fmt.Sprintf("Successfully redeemed %.0f points for $%.2f", req.PointsUsed, valueRedeemed),
+		RedemptionType:  "DISCOUNT",
+		Message:         fmt.Sprintf("Successfully redeemed %.0f points for %.2f", pointsToUse, valueRedeemed),
 	}, nil
+}
+
+func (s *LoyaltyService) redeemGiftPoints(companyID, userID int, req *models.CreateLoyaltyRedemptionRequest) (*models.LoyaltyRedemptionResponse, error) {
+	if err := s.validateCustomerInCompany(req.CustomerID, companyID); err != nil {
+		return nil, err
+	}
+	if req.LocationID == nil || *req.LocationID <= 0 {
+		return nil, fmt.Errorf("location_id is required for gift redemption")
+	}
+	if len(req.Items) == 0 {
+		return nil, fmt.Errorf("at least one gift item is required")
+	}
+	if err := s.validateLocationInCompany(*req.LocationID, companyID); err != nil {
+		return nil, err
+	}
+
+	settings, err := s.getLoyaltySettings(companyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get loyalty settings: %w", err)
+	}
+	if settings.RedemptionType != "GIFT" {
+		return nil, fmt.Errorf("gift redemption is disabled in loyalty settings")
+	}
+
+	var currentPoints float64
+	err = s.db.QueryRow(`
+        SELECT COALESCE(points, 0) FROM loyalty_programs WHERE customer_id = $1
+    `, req.CustomerID).Scan(&currentPoints)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("customer has no loyalty program")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current points: %w", err)
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	type preparedGiftItem struct {
+		req          models.LoyaltyRedemptionItemInput
+		productName  string
+		variantName  *string
+		pointsPerQty float64
+	}
+
+	trackingSvc := newInventoryTrackingService(s.db)
+	preparedItems := make([]preparedGiftItem, 0, len(req.Items))
+	totalPoints := 0.0
+	totalValue := 0.0
+
+	for _, item := range req.Items {
+		variant, err := trackingSvc.resolveVariantTx(tx, companyID, item.ProductID, item.BarcodeID)
+		if err != nil {
+			return nil, err
+		}
+		if !loyaltyGiftEnabled(variant.VariantAttributes) {
+			return nil, fmt.Errorf("selected item is not enabled for loyalty gift redemption")
+		}
+		pointsPerQty := loyaltyGiftPointsRequired(variant.VariantAttributes)
+		if pointsPerQty <= 0 {
+			return nil, fmt.Errorf("selected item does not have a valid loyalty points requirement")
+		}
+		productName, err := s.getProductNameTx(tx, companyID, item.ProductID)
+		if err != nil {
+			return nil, err
+		}
+		preparedItems = append(preparedItems, preparedGiftItem{
+			req:          item,
+			productName:  productName,
+			variantName:  variant.VariantName,
+			pointsPerQty: pointsPerQty,
+		})
+		totalPoints += pointsPerQty * item.Quantity
+		totalValue += pointsPerQty * item.Quantity * settings.PointValue
+	}
+
+	redeemable := currentPoints - float64(settings.MinPointsReserve)
+	if redeemable <= 0 || totalPoints <= 0 || totalPoints > redeemable {
+		return nil, fmt.Errorf("insufficient points available")
+	}
+	if settings.MinRedemptionPoints > 0 && totalPoints < settings.MinRedemptionPoints {
+		return nil, fmt.Errorf("insufficient points available")
+	}
+
+	items := make([]models.LoyaltyRedemptionItem, 0, len(preparedItems))
+	profitDetails := &ProfitGuardDetails{
+		Lines: make([]ProfitGuardLine, 0, len(preparedItems)),
+	}
+
+	for _, prepared := range preparedItems {
+		selection := inventorySelection{
+			ProductID:        prepared.req.ProductID,
+			BarcodeID:        prepared.req.BarcodeID,
+			Quantity:         prepared.req.Quantity,
+			SerialNumbers:    prepared.req.SerialNumbers,
+			BatchAllocations: prepared.req.BatchAllocations,
+			Notes:            req.Notes,
+			OverridePassword: req.OverridePassword,
+		}
+		issue, err := trackingSvc.IssueStockTx(
+			tx,
+			companyID,
+			*req.LocationID,
+			userID,
+			"LOYALTY_GIFT",
+			"loyalty_redemption_item",
+			nil,
+			nil,
+			selection,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		itemPoints := prepared.pointsPerQty * prepared.req.Quantity
+		itemValue := itemPoints * settings.PointValue
+		item := models.LoyaltyRedemptionItem{
+			ProductID:     prepared.req.ProductID,
+			BarcodeID:     intPtr(issue.BarcodeID),
+			ProductName:   prepared.productName,
+			VariantName:   prepared.variantName,
+			Quantity:      prepared.req.Quantity,
+			PointsUsed:    itemPoints,
+			ValueRedeemed: itemValue,
+			UnitCost:      issue.UnitCost,
+			TotalCost:     issue.TotalCost,
+			SerialNumbers: append([]string(nil), prepared.req.SerialNumbers...),
+			BatchAllocations: batchAllocationsJSON(
+				prepared.req.BatchAllocations,
+			),
+		}
+		items = append(items, item)
+
+		profit := itemValue - issue.TotalCost
+		profitDetails.TotalRevenue += itemValue
+		profitDetails.TotalCost += issue.TotalCost
+		profitDetails.Lines = append(profitDetails.Lines, ProfitGuardLine{
+			ProductID:        intPtr(prepared.req.ProductID),
+			BarcodeID:        intPtr(issue.BarcodeID),
+			ProductName:      prepared.productName,
+			Quantity:         prepared.req.Quantity,
+			UnitPrice:        itemValue / prepared.req.Quantity,
+			Revenue:          itemValue,
+			Cost:             issue.TotalCost,
+			Profit:           profit,
+			CostPricePerUnit: issue.UnitCost,
+		})
+	}
+	profitDetails.Profit = profitDetails.TotalRevenue - profitDetails.TotalCost
+	if profitDetails.Profit < 0 {
+		profitDetails.LossAmount = -profitDetails.Profit
+	}
+	if err := (&SalesService{db: s.db}).enforceNegativeProfitPolicyTx(tx, companyID, req.OverridePassword, profitDetails); err != nil {
+		return nil, err
+	}
+
+	var redemptionID int
+	err = tx.QueryRow(`
+        INSERT INTO loyalty_redemptions (customer_id, points_used, value_redeemed, redemption_type, location_id, notes)
+        VALUES ($1, $2, $3, 'GIFT', $4, $5)
+        RETURNING redemption_id
+    `, req.CustomerID, totalPoints, totalValue, *req.LocationID, req.Notes).Scan(&redemptionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create redemption: %w", err)
+	}
+
+	for index := range items {
+		items[index].RedemptionID = redemptionID
+		err = tx.QueryRow(`
+            INSERT INTO loyalty_redemption_items (
+                redemption_id, product_id, barcode_id, product_name, variant_name,
+                quantity, points_used, value_redeemed, unit_cost, total_cost,
+                serial_numbers, batch_allocations
+            )
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+            RETURNING redemption_item_id
+        `,
+			redemptionID,
+			items[index].ProductID,
+			items[index].BarcodeID,
+			items[index].ProductName,
+			items[index].VariantName,
+			items[index].Quantity,
+			items[index].PointsUsed,
+			items[index].ValueRedeemed,
+			items[index].UnitCost,
+			items[index].TotalCost,
+			pq.Array(items[index].SerialNumbers),
+			items[index].BatchAllocations,
+		).Scan(&items[index].RedemptionItemID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to save gift redemption item: %w", err)
+		}
+	}
+
+	if _, err = tx.Exec(`
+        UPDATE loyalty_programs
+        SET points = points - $1, total_redeemed = total_redeemed + $1, last_updated = CURRENT_TIMESTAMP
+        WHERE customer_id = $2
+    `, totalPoints, req.CustomerID); err != nil {
+		return nil, fmt.Errorf("failed to update loyalty points: %w", err)
+	}
+
+	_, _ = tx.Exec(`
+        INSERT INTO loyalty_transactions (customer_id, transaction_type, points, description, reference_type, reference_id, balance_after)
+        SELECT $1, 'REDEEMED', -$2, 'Points redeemed for loyalty gifts', 'LOYALTY_REDEMPTION', $3, lp.points
+        FROM loyalty_programs lp WHERE lp.customer_id = $1
+    `, req.CustomerID, totalPoints, redemptionID)
+
+	if err := s.updateCustomerTierTx(tx, companyID, req.CustomerID); err != nil {
+		return nil, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	remainingPoints := currentPoints - totalPoints
+	return &models.LoyaltyRedemptionResponse{
+		RedemptionID:    redemptionID,
+		CustomerID:      req.CustomerID,
+		PointsUsed:      totalPoints,
+		ValueRedeemed:   totalValue,
+		RemainingPoints: remainingPoints,
+		RedemptionType:  "GIFT",
+		Message:         fmt.Sprintf("Successfully redeemed %.0f points for %d gift item(s)", totalPoints, len(items)),
+		Items:           items,
+	}, nil
+}
+
+func batchAllocationsJSON(items []models.InventoryBatchSelectionInput) models.JSONB {
+	if len(items) == 0 {
+		return models.JSONB{}
+	}
+	values := make([]map[string]interface{}, 0, len(items))
+	for _, item := range items {
+		values = append(values, map[string]interface{}{
+			"lot_id":   item.LotID,
+			"quantity": item.Quantity,
+		})
+	}
+	return models.JSONB{"items": values}
+}
+
+func (s *LoyaltyService) getProductNameTx(tx *sql.Tx, companyID, productID int) (string, error) {
+	var name string
+	err := tx.QueryRow(`
+        SELECT name
+        FROM products
+        WHERE company_id = $1 AND product_id = $2 AND is_deleted = FALSE
+    `, companyID, productID).Scan(&name)
+	if err == sql.ErrNoRows {
+		return "", fmt.Errorf("product not found")
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to get product name: %w", err)
+	}
+	return name, nil
 }
 
 func (s *LoyaltyService) GetLoyaltyRedemptions(companyID int, customerID *int) ([]models.LoyaltyRedemption, error) {
 	query := `
 		SELECT lr.redemption_id, lr.sale_id, lr.customer_id, lr.points_used, lr.value_redeemed, lr.redeemed_at,
+			   COALESCE(lr.redemption_type, 'DISCOUNT'), lr.location_id, lr.notes,
 			   c.name as customer_name
 		FROM loyalty_redemptions lr
 		JOIN customers c ON lr.customer_id = c.customer_id
@@ -256,6 +577,7 @@ func (s *LoyaltyService) GetLoyaltyRedemptions(companyID int, customerID *int) (
 		err := rows.Scan(
 			&redemption.RedemptionID, &redemption.SaleID, &redemption.CustomerID,
 			&redemption.PointsUsed, &redemption.ValueRedeemed, &redemption.RedeemedAt,
+			&redemption.RedemptionType, &redemption.LocationID, &redemption.Notes,
 			&customerName,
 		)
 		if err != nil {
@@ -266,11 +588,57 @@ func (s *LoyaltyService) GetLoyaltyRedemptions(companyID int, customerID *int) (
 			CustomerID: redemption.CustomerID,
 			Name:       customerName,
 		}
+		if redemption.RedemptionType == "GIFT" {
+			items, err := s.getLoyaltyRedemptionItems(redemption.RedemptionID)
+			if err != nil {
+				return nil, err
+			}
+			redemption.Items = items
+		}
 
 		redemptions = append(redemptions, redemption)
 	}
 
 	return redemptions, nil
+}
+
+func (s *LoyaltyService) getLoyaltyRedemptionItems(redemptionID int) ([]models.LoyaltyRedemptionItem, error) {
+	rows, err := s.db.Query(`
+        SELECT redemption_item_id, redemption_id, product_id, barcode_id, product_name, variant_name,
+               quantity::float8, points_used::float8, value_redeemed::float8, unit_cost::float8, total_cost::float8,
+               COALESCE(serial_numbers, ARRAY[]::text[]), COALESCE(batch_allocations, '{}'::jsonb)
+        FROM loyalty_redemption_items
+        WHERE redemption_id = $1
+        ORDER BY redemption_item_id
+    `, redemptionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get redemption items: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]models.LoyaltyRedemptionItem, 0)
+	for rows.Next() {
+		var item models.LoyaltyRedemptionItem
+		if err := rows.Scan(
+			&item.RedemptionItemID,
+			&item.RedemptionID,
+			&item.ProductID,
+			&item.BarcodeID,
+			&item.ProductName,
+			&item.VariantName,
+			&item.Quantity,
+			&item.PointsUsed,
+			&item.ValueRedeemed,
+			&item.UnitCost,
+			&item.TotalCost,
+			pq.Array(&item.SerialNumbers),
+			&item.BatchAllocations,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan redemption item: %w", err)
+		}
+		items = append(items, item)
+	}
+	return items, nil
 }
 
 func (s *LoyaltyService) AwardPoints(companyID, customerID int, saleAmount float64, saleID int) error {
@@ -721,6 +1089,21 @@ func (s *LoyaltyService) validateCustomerInCompany(customerID, companyID int) er
 	return nil
 }
 
+func (s *LoyaltyService) validateLocationInCompany(locationID, companyID int) error {
+	var count int
+	err := s.db.QueryRow(`
+        SELECT COUNT(*) FROM locations
+        WHERE location_id = $1 AND company_id = $2 AND is_active = TRUE
+    `, locationID, companyID).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to validate location: %w", err)
+	}
+	if count == 0 {
+		return fmt.Errorf("location not found")
+	}
+	return nil
+}
+
 func (s *LoyaltyService) verifyPromotionInCompany(promotionID, companyID int) error {
 	var count int
 	err := s.db.QueryRow(`
@@ -746,11 +1129,13 @@ func (s *LoyaltyService) getLoyaltySettings(companyID int) (*models.LoyaltySetti
 	var minRedemption int
 	var minReserve int
 	var expiry int
+	var redemptionType string
 
 	err := s.db.QueryRow(`
-        SELECT points_per_currency, point_value, min_redemption_points, COALESCE(min_points_reserve,0), points_expiry_days
+        SELECT points_per_currency, point_value, min_redemption_points, COALESCE(min_points_reserve,0), points_expiry_days,
+               COALESCE(redemption_type, 'DISCOUNT')
         FROM loyalty_settings WHERE company_id = $1 AND is_active = TRUE
-    `, companyID).Scan(&pointsPer, &pointValue, &minRedemption, &minReserve, &expiry)
+    `, companyID).Scan(&pointsPer, &pointValue, &minRedemption, &minReserve, &expiry, &redemptionType)
 
 	if err == sql.ErrNoRows {
 		// defaults
@@ -759,6 +1144,7 @@ func (s *LoyaltyService) getLoyaltySettings(companyID int) (*models.LoyaltySetti
 		minRedemption = 100
 		minReserve = 0
 		expiry = 365
+		redemptionType = "DISCOUNT"
 	} else if err != nil {
 		// Fallback for older DBs missing min_points_reserve column
 		var fallbackErr error
@@ -772,10 +1158,12 @@ func (s *LoyaltyService) getLoyaltySettings(companyID int) (*models.LoyaltySetti
 			minRedemption = 100
 			minReserve = 0
 			expiry = 365
+			redemptionType = "DISCOUNT"
 		} else if fallbackErr != nil {
 			return nil, fmt.Errorf("failed to get loyalty settings: %w", err)
 		}
 	}
+	redemptionType = normalizeLoyaltyRedemptionType(&redemptionType)
 
 	return &models.LoyaltySettingsResponse{
 		PointsPerCurrency:   pointsPer,
@@ -783,6 +1171,7 @@ func (s *LoyaltyService) getLoyaltySettings(companyID int) (*models.LoyaltySetti
 		MinRedemptionPoints: float64(minRedemption),
 		MinPointsReserve:    minReserve,
 		PointsExpiryDays:    expiry,
+		RedemptionType:      redemptionType,
 	}, nil
 }
 
@@ -921,6 +1310,11 @@ func (s *LoyaltyService) UpdateLoyaltySettings(companyID int, req *models.Update
 		idx++
 		setParts = append(setParts, fmt.Sprintf("points_expiry_days = $%d", idx))
 		args = append(args, *req.PointsExpiryDays)
+	}
+	if req.RedemptionType != nil {
+		idx++
+		setParts = append(setParts, fmt.Sprintf("redemption_type = $%d", idx))
+		args = append(args, normalizeLoyaltyRedemptionType(req.RedemptionType))
 	}
 
 	if len(setParts) == 0 {

@@ -79,6 +79,7 @@ type LoyaltySettings struct {
 	MinRedemptionPoints int     `json:"min_redemption_points" db:"min_redemption_points"`
 	MinPointsReserve    int     `json:"min_points_reserve" db:"min_points_reserve"`
 	PointsExpiryDays    int     `json:"points_expiry_days" db:"points_expiry_days"`
+	RedemptionType      string  `json:"redemption_type" db:"redemption_type"`
 	IsActive            bool    `json:"is_active" db:"is_active"`
 	BaseModel
 }
@@ -89,6 +90,7 @@ type UpdateLoyaltySettingsRequest struct {
 	MinRedemptionPoints *int     `json:"min_redemption_points,omitempty" validate:"omitempty,gt=0"`
 	MinPointsReserve    *int     `json:"min_points_reserve,omitempty" validate:"omitempty,gte=0"`
 	PointsExpiryDays    *int     `json:"points_expiry_days,omitempty" validate:"omitempty,gt=0"`
+	RedemptionType      *string  `json:"redemption_type,omitempty" validate:"omitempty,oneof=DISCOUNT GIFT"`
 }
 
 // Loyalty tiers

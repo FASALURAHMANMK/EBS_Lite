@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_menu.dart';
 import 'loyalty_management_page.dart';
+import 'loyalty_gift_redeem_page.dart';
 import 'customer_management_page.dart';
 import 'customer_warranty_page.dart';
 
@@ -22,6 +23,13 @@ class CustomersPage extends StatelessWidget {
         label: 'Loyalty Management',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const LoyaltyManagementPage()),
+        ),
+      ),
+      FeatureItem(
+        icon: Icons.redeem_rounded,
+        label: 'Gift Redeem',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const LoyaltyGiftRedeemPage()),
         ),
       ),
       FeatureItem(

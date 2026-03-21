@@ -199,24 +199,26 @@ type POSPrintDataResponse struct {
 }
 
 type POSProductResponse struct {
-	ProductID         int     `json:"product_id"`
-	ComboProductID    *int    `json:"combo_product_id,omitempty"`
-	BarcodeID         int     `json:"barcode_id"`
-	Name              string  `json:"name"`
-	Price             float64 `json:"price"`
-	Stock             float64 `json:"stock"`
-	Barcode           *string `json:"barcode,omitempty"`
-	VariantName       *string `json:"variant_name,omitempty"`
-	CategoryName      *string `json:"category_name,omitempty"`
-	PrimaryStorage    *string `json:"primary_storage,omitempty"`
-	IsVirtualCombo    bool    `json:"is_virtual_combo"`
-	IsWeighable       bool    `json:"is_weighable"`
-	TrackingType      string  `json:"tracking_type"`
-	IsSerialized      bool    `json:"is_serialized"`
-	SellingUOMMode    string  `json:"selling_uom_mode"`
-	SellingUnitID     *int    `json:"selling_unit_id,omitempty"`
-	SellingUnitName   *string `json:"selling_unit_name,omitempty"`
-	SellingUnitSymbol *string `json:"selling_unit_symbol,omitempty"`
+	ProductID             int     `json:"product_id"`
+	ComboProductID        *int    `json:"combo_product_id,omitempty"`
+	BarcodeID             int     `json:"barcode_id"`
+	Name                  string  `json:"name"`
+	Price                 float64 `json:"price"`
+	Stock                 float64 `json:"stock"`
+	Barcode               *string `json:"barcode,omitempty"`
+	VariantName           *string `json:"variant_name,omitempty"`
+	CategoryName          *string `json:"category_name,omitempty"`
+	PrimaryStorage        *string `json:"primary_storage,omitempty"`
+	IsVirtualCombo        bool    `json:"is_virtual_combo"`
+	IsWeighable           bool    `json:"is_weighable"`
+	TrackingType          string  `json:"tracking_type"`
+	IsSerialized          bool    `json:"is_serialized"`
+	SellingUOMMode        string  `json:"selling_uom_mode"`
+	SellingUnitID         *int    `json:"selling_unit_id,omitempty"`
+	SellingUnitName       *string `json:"selling_unit_name,omitempty"`
+	SellingUnitSymbol     *string `json:"selling_unit_symbol,omitempty"`
+	IsLoyaltyGift         bool    `json:"is_loyalty_gift"`
+	LoyaltyPointsRequired float64 `json:"loyalty_points_required"`
 }
 
 // POSPaymentLine represents an individual payment used in POS checkout, which

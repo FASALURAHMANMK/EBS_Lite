@@ -6,6 +6,7 @@ import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../../loyalty/data/loyalty_repository.dart';
 import '../../../../shared/widgets/app_error_view.dart';
+import 'loyalty_gift_redeem_page.dart';
 
 class LoyaltyManagementPage extends ConsumerStatefulWidget {
   const LoyaltyManagementPage({super.key});
@@ -24,6 +25,7 @@ class _LoyaltyManagementPageState extends ConsumerState<LoyaltyManagementPage> {
   final _minRedemption = TextEditingController();
   final _minReserve = TextEditingController();
   final _expiryDays = TextEditingController();
+  String _redemptionType = 'DISCOUNT';
 
   @override
   void initState() {
@@ -49,6 +51,7 @@ class _LoyaltyManagementPageState extends ConsumerState<LoyaltyManagementPage> {
         minRedemptionPoints: int.tryParse(_minRedemption.text.trim()),
         minPointsReserve: int.tryParse(_minReserve.text.trim()),
         pointsExpiryDays: int.tryParse(_expiryDays.text.trim()),
+        redemptionType: _redemptionType,
       );
       setState(_reload);
       if (!mounted) return;
@@ -168,6 +171,7 @@ class _LoyaltyManagementPageState extends ConsumerState<LoyaltyManagementPage> {
                 _minRedemption.text = s.minRedemptionPoints.toString();
                 _minReserve.text = s.minPointsReserve.toString();
                 _expiryDays.text = s.pointsExpiryDays.toString();
+                _redemptionType = s.redemptionType;
                 return Card(
                   margin: const EdgeInsets.only(bottom: 16),
                   child: Padding(
@@ -203,7 +207,7 @@ class _LoyaltyManagementPageState extends ConsumerState<LoyaltyManagementPage> {
                               TextFormField(
                                   controller: _pointValue,
                                   decoration: const InputDecoration(
-                                      labelText: 'Point value'),
+                                      labelText: 'Redemption value per point'),
                                   keyboardType:
                                       const TextInputType.numberWithOptions(
                                           decimal: true),
@@ -265,12 +269,60 @@ class _LoyaltyManagementPageState extends ConsumerState<LoyaltyManagementPage> {
                                     return null;
                                   }),
                               const SizedBox(height: 12),
-                              Align(
-                                  alignment: Alignment.centerRight,
-                                  child: FilledButton.icon(
+                              InputDecorator(
+                                decoration: const InputDecoration(
+                                  labelText: 'Redemption Type',
+                                ),
+                                child: SegmentedButton<String>(
+                                  segments: const [
+                                    ButtonSegment<String>(
+                                      value: 'DISCOUNT',
+                                      icon: Icon(Icons.point_of_sale_rounded),
+                                      label: Text('Discount at Payment'),
+                                    ),
+                                    ButtonSegment<String>(
+                                      value: 'GIFT',
+                                      icon: Icon(Icons.redeem_rounded),
+                                      label: Text('Gift Redemption'),
+                                    ),
+                                  ],
+                                  selected: {_redemptionType},
+                                  onSelectionChanged: (selection) {
+                                    setState(() {
+                                      _redemptionType = selection.first;
+                                    });
+                                  },
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _redemptionType == 'GIFT'
+                                    ? 'Customers redeem points from the gift redeem page. Payment-page point discounts are hidden.'
+                                    : 'Customers redeem points as a checkout discount on the payment page.',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 12),
+                              Wrap(
+                                alignment: WrapAlignment.end,
+                                spacing: 12,
+                                runSpacing: 12,
+                                children: [
+                                  OutlinedButton.icon(
+                                    onPressed: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const LoyaltyGiftRedeemPage(),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.redeem_rounded),
+                                    label: const Text('Open Gift Redeem'),
+                                  ),
+                                  FilledButton.icon(
                                       onPressed: _saveSettings,
                                       icon: const Icon(Icons.save_rounded),
-                                      label: const Text('Save Settings'))),
+                                      label: const Text('Save Settings')),
+                                ],
+                              ),
                             ])),
                   ),
                 );

@@ -19,6 +19,8 @@ class PosProductDto {
   final int? sellingUnitId;
   final String? sellingUnitName;
   final String? sellingUnitSymbol;
+  final bool isLoyaltyGift;
+  final double loyaltyPointsRequired;
 
   PosProductDto({
     required this.productId,
@@ -39,6 +41,8 @@ class PosProductDto {
     this.sellingUnitId,
     this.sellingUnitName,
     this.sellingUnitSymbol,
+    this.isLoyaltyGift = false,
+    this.loyaltyPointsRequired = 0,
   });
 
   factory PosProductDto.fromJson(Map<String, dynamic> json) => PosProductDto(
@@ -60,6 +64,9 @@ class PosProductDto {
         sellingUnitId: json['selling_unit_id'] as int?,
         sellingUnitName: json['selling_unit_name'] as String?,
         sellingUnitSymbol: json['selling_unit_symbol'] as String?,
+        isLoyaltyGift: json['is_loyalty_gift'] as bool? ?? false,
+        loyaltyPointsRequired:
+            (json['loyalty_points_required'] as num?)?.toDouble() ?? 0,
       );
 
   String get identityKey => comboProductId != null && comboProductId! > 0

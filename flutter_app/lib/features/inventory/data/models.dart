@@ -396,6 +396,45 @@ class ProductBarcodeDto {
     this.isActive = true,
   });
 
+  bool get isLoyaltyGift {
+    final raw = variantAttributes?['loyalty_gift_enabled'];
+    if (raw is bool) return raw;
+    if (raw is String) return raw.toLowerCase() == 'true';
+    if (raw is num) return raw != 0;
+    return false;
+  }
+
+  double? get loyaltyPointsRequired {
+    final raw = variantAttributes?['loyalty_points_required'];
+    if (raw is num) return raw.toDouble();
+    if (raw is String) return double.tryParse(raw);
+    return null;
+  }
+
+  ProductBarcodeDto copyWithLoyaltyGift({
+    required bool enabled,
+    double? pointsRequired,
+  }) {
+    final attrs = Map<String, dynamic>.from(variantAttributes ?? const {});
+    attrs['loyalty_gift_enabled'] = enabled;
+    if (enabled && pointsRequired != null && pointsRequired > 0) {
+      attrs['loyalty_points_required'] = pointsRequired;
+    } else {
+      attrs.remove('loyalty_points_required');
+    }
+    return ProductBarcodeDto(
+      barcodeId: barcodeId,
+      barcode: barcode,
+      packSize: packSize,
+      costPrice: costPrice,
+      sellingPrice: sellingPrice,
+      isPrimary: isPrimary,
+      variantName: variantName,
+      variantAttributes: attrs,
+      isActive: isActive,
+    );
+  }
+
   factory ProductBarcodeDto.fromJson(Map<String, dynamic> json) =>
       ProductBarcodeDto(
         barcodeId: json['barcode_id'] as int?,

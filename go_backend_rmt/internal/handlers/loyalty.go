@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -87,8 +88,31 @@ func (h *LoyaltyHandler) RedeemPoints(c *gin.Context) {
 		return
 	}
 
-	redemption, err := h.loyaltyService.RedeemPoints(companyID, &req)
+	redemption, err := h.loyaltyService.RedeemPoints(companyID, c.GetInt("user_id"), &req)
 	if err != nil {
+		var approvalErr *services.NegativeStockApprovalRequiredError
+		if errors.As(err, &approvalErr) {
+			utils.JSONResponse(c, http.StatusForbidden, false, approvalErr.Error(), gin.H{
+				"code": "NEGATIVE_STOCK_APPROVAL_REQUIRED",
+			}, nil)
+			return
+		}
+		var profitApprovalErr *services.NegativeProfitApprovalRequiredError
+		if errors.As(err, &profitApprovalErr) {
+			utils.JSONResponse(c, http.StatusForbidden, false, profitApprovalErr.Error(), gin.H{
+				"code":    "NEGATIVE_PROFIT_APPROVAL_REQUIRED",
+				"details": profitApprovalErr.Details,
+			}, nil)
+			return
+		}
+		var profitBlockedErr *services.NegativeProfitNotAllowedError
+		if errors.As(err, &profitBlockedErr) {
+			utils.JSONResponse(c, http.StatusBadRequest, false, profitBlockedErr.Error(), gin.H{
+				"code":    "NEGATIVE_PROFIT_NOT_ALLOWED",
+				"details": profitBlockedErr.Details,
+			}, nil)
+			return
+		}
 		if err.Error() == "customer not found" {
 			utils.NotFoundResponse(c, "Customer not found")
 			return
@@ -99,6 +123,10 @@ func (h *LoyaltyHandler) RedeemPoints(c *gin.Context) {
 		}
 		if err.Error() == "insufficient points available" {
 			utils.ErrorResponse(c, http.StatusBadRequest, "Insufficient points available", err)
+			return
+		}
+		if err.Error() == "location not found" {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Location not found", err)
 			return
 		}
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to redeem points", err)

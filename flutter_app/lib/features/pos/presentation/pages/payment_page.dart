@@ -51,6 +51,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   double _minRedemption = 0.0;
   double _minReserve = 0.0;
   double _pointValue = 0.01;
+  String _redemptionType = 'DISCOUNT';
   final TextEditingController _redeemCtrl = TextEditingController(text: '0');
   final TextEditingController _couponCtrl = TextEditingController();
   PosCouponValidationDto? _validatedCoupon;
@@ -98,6 +99,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       _minRedemption = settings?.minRedemptionPoints.toDouble() ?? 0.0;
       _minReserve = settings?.minPointsReserve.toDouble() ?? 0.0;
       _pointValue = settings?.pointValue ?? 0.01;
+      _redemptionType = settings?.redemptionType ?? 'DISCOUNT';
 
       CustomerSummaryDto? summary;
       CustomerDto? customer;
@@ -226,9 +228,12 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(posNotifierProvider);
+    final theme = Theme.of(context);
     final total = state.total;
-    final redeemPts =
-        _useLoyalty ? (double.tryParse(_redeemCtrl.text.trim()) ?? 0.0) : 0.0;
+    final allowDiscountRedemption = _redemptionType == 'DISCOUNT';
+    final redeemPts = allowDiscountRedemption && _useLoyalty
+        ? (double.tryParse(_redeemCtrl.text.trim()) ?? 0.0)
+        : 0.0;
     final redeemClamped = redeemPts.clamp(0.0, _availablePoints);
     final redeemValue = redeemClamped * _pointValue;
     final couponDiscount = _validatedCoupon?.discountAmount ?? 0.0;
@@ -255,7 +260,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (_availablePoints > 0) ...[
+                        if (_availablePoints > 0 &&
+                            allowDiscountRedemption) ...[
                           Row(children: [
                             Checkbox(
                                 value: _useLoyalty,
@@ -390,6 +396,21 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                             ),
                           ],
                           const Divider(height: 24),
+                        ],
+                        if (_availablePoints > 0 &&
+                            !allowDiscountRedemption) ...[
+                          Card(
+                            elevation: 0,
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            child: const ListTile(
+                              leading: Icon(Icons.redeem_rounded),
+                              title: Text('Loyalty gift redemption enabled'),
+                              subtitle: Text(
+                                'Point discounts are disabled here. Use the loyalty gift redeem page instead.',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
                         ],
 
                         Card(
