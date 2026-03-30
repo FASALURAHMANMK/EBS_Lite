@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -231,31 +232,7 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 			return nil, err
 		}
 		if existing != nil {
-			// Best-effort: if caller included an immediate payment, ensure cash register reflects
-			// the cash portion (idempotent by request id).
-			if req != nil && req.PaidAmount != nil && *req.PaidAmount > 0 && req.PaymentMethodID != nil {
-				var t string
-				if err := s.db.QueryRow(
-					`SELECT type FROM payment_methods WHERE method_id = $1 AND is_active = TRUE AND (company_id = $2 OR company_id IS NULL)`,
-					*req.PaymentMethodID,
-					companyID,
-				).Scan(&t); err == nil && strings.EqualFold(strings.TrimSpace(t), "CASH") {
-					note := fmt.Sprintf("purchase_id=%d purchase_number=%s", existing.PurchaseID, existing.PurchaseNumber)
-					_ = (&CashRegisterService{db: s.db}).RecordCashTransactionTx(
-						nil,
-						companyID,
-						locationID,
-						userID,
-						"OUT",
-						*req.PaidAmount,
-						"PURCHASE",
-						fmt.Sprintf("purchase:%d", existing.PurchaseID),
-						&note,
-						"",
-						idemKey,
-					)
-				}
-			}
+			_ = NewFinanceIntegrityServiceWithDB(s.db).ProcessAggregate(companyID, "purchase", existing.PurchaseID)
 			return existing, nil
 		}
 	}
@@ -400,6 +377,7 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 				return nil, lookupErr
 			}
 			if existing != nil {
+				_ = NewFinanceIntegrityServiceWithDB(s.db).ProcessAggregate(companyID, "purchase", existing.PurchaseID)
 				return existing, nil
 			}
 		}
@@ -488,30 +466,46 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 		}
 	}
 
-	// Best-effort: update cash register for purchases when immediately paid by CASH.
+	finance := NewFinanceIntegrityServiceWithDB(s.db)
+	if err := finance.EnqueueTx(tx, &models.FinanceOutboxEntry{
+		CompanyID:     companyID,
+		LocationID:    &locationID,
+		EventType:     financeEventLedgerPurchase,
+		AggregateType: "purchase",
+		AggregateID:   purchase.PurchaseID,
+		Payload:       models.JSONB{},
+		CreatedBy:     &userID,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to enqueue purchase ledger posting: %w", err)
+	}
 	if paidAmount > 0 && strings.EqualFold(strings.TrimSpace(paymentMethodType), "CASH") {
 		note := fmt.Sprintf("purchase_id=%d purchase_number=%s", purchase.PurchaseID, purchaseNumber)
-		_ = (&CashRegisterService{db: s.db}).RecordCashTransactionTx(
-			tx,
-			companyID,
-			locationID,
-			userID,
-			"OUT",
-			paidAmount,
-			"PURCHASE",
-			fmt.Sprintf("purchase:%d", purchase.PurchaseID),
-			&note,
-			"",
-			idemKey,
-		)
+		if err := finance.EnqueueTx(tx, &models.FinanceOutboxEntry{
+			CompanyID:     companyID,
+			LocationID:    &locationID,
+			EventType:     financeEventCashPurchase,
+			AggregateType: "purchase",
+			AggregateID:   purchase.PurchaseID,
+			Payload: models.JSONB{
+				"amount":      paidAmount,
+				"direction":   "OUT",
+				"event_type":  "PURCHASE",
+				"reason_code": fmt.Sprintf("purchase:%d", purchase.PurchaseID),
+				"notes":       note,
+			},
+			CreatedBy: &userID,
+		}); err != nil {
+			return nil, fmt.Errorf("failed to enqueue purchase cash register event: %w", err)
+		}
 	}
 
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
-
-	_ = (&LedgerService{db: s.db}).RecordPurchase(companyID, purchase.PurchaseID, userID)
+	if err := finance.ProcessAggregate(companyID, "purchase", purchase.PurchaseID); err != nil {
+		log.Printf("purchase_service: failed to process finance outbox for purchase %d: %v", purchase.PurchaseID, err)
+	}
 
 	// Set response data
 	purchase.PurchaseNumber = purchaseNumber

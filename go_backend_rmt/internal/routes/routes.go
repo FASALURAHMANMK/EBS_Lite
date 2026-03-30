@@ -48,6 +48,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 	expenseHandler := handlers.NewExpenseHandler()
 	voucherHandler := handlers.NewVoucherHandler()
 	ledgerHandler := handlers.NewLedgerHandler()
+	financeIntegrityHandler := handlers.NewFinanceIntegrityHandler()
 	reportsHandler := handlers.NewReportsHandler()
 	employeeHandler := handlers.NewEmployeeHandler()
 	departmentHandler := handlers.NewDepartmentHandler()
@@ -623,6 +624,14 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			{
 				ledgers.GET("", middleware.RequirePermission("VIEW_LEDGER"), ledgerHandler.GetBalances)
 				ledgers.GET("/:account_id/entries", middleware.RequirePermission("VIEW_LEDGER_DETAILS"), ledgerHandler.GetEntries)
+			}
+
+			financeIntegrity := protected.Group("/finance-integrity")
+			financeIntegrity.Use(middleware.RequireCompanyAccess())
+			{
+				financeIntegrity.GET("/diagnostics", middleware.RequirePermission("VIEW_LEDGER"), financeIntegrityHandler.GetDiagnostics)
+				financeIntegrity.POST("/replay", middleware.RequirePermission("MANAGE_SETTINGS"), financeIntegrityHandler.Replay)
+				financeIntegrity.POST("/repair-ledger", middleware.RequirePermission("MANAGE_SETTINGS"), financeIntegrityHandler.RepairMissingLedger)
 			}
 
 			cashRegisters := protected.Group("/cash-registers")

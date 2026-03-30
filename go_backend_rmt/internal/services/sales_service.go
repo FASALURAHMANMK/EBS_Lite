@@ -707,7 +707,11 @@ func (s *SalesService) GetSaleByNumber(saleNumber string, companyID int) (*model
 // }
 
 type CreateSaleOptions struct {
-	IsTraining bool
+	IsTraining                 bool
+	CashInAmount               float64
+	LoyaltyRedeemPoints        float64
+	CouponCode                 string
+	AutoFillRaffleCustomerData *bool
 }
 
 func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models.CreateSaleRequest, idempotencyKey *string) (*models.Sale, error) {
@@ -827,6 +831,9 @@ func (s *SalesService) CreateSaleWithOptions(
 			return nil, err
 		}
 		if existing != nil {
+			if !opts.IsTraining {
+				_ = NewFinanceIntegrityServiceWithDB(s.db).ProcessAggregate(companyID, "sale", existing.SaleID)
+			}
 			return existing, nil
 		}
 	}
@@ -876,6 +883,9 @@ func (s *SalesService) CreateSaleWithOptions(
 				return nil, lookupErr
 			}
 			if existing != nil {
+				if !opts.IsTraining {
+					_ = NewFinanceIntegrityServiceWithDB(s.db).ProcessAggregate(companyID, "sale", existing.SaleID)
+				}
 				return existing, nil
 			}
 		}
@@ -965,27 +975,121 @@ func (s *SalesService) CreateSaleWithOptions(
 		}
 	}
 
+	if !opts.IsTraining {
+		finance := NewFinanceIntegrityServiceWithDB(s.db)
+		if err := finance.EnqueueTx(tx, &models.FinanceOutboxEntry{
+			CompanyID:     companyID,
+			LocationID:    &locationID,
+			EventType:     financeEventLedgerSale,
+			AggregateType: "sale",
+			AggregateID:   saleID,
+			Payload:       models.JSONB{},
+			CreatedBy:     &userID,
+		}); err != nil {
+			return nil, fmt.Errorf("failed to enqueue sale ledger posting: %w", err)
+		}
+
+		cashInAmount, err := s.resolveCashInAmountTx(tx, companyID, req, opts)
+		if err != nil {
+			return nil, err
+		}
+		if cashInAmount > 0 {
+			note := fmt.Sprintf("sale_id=%d sale_number=%s", saleID, saleNumber)
+			if err := finance.EnqueueTx(tx, &models.FinanceOutboxEntry{
+				CompanyID:     companyID,
+				LocationID:    &locationID,
+				EventType:     financeEventCashSale,
+				AggregateType: "sale",
+				AggregateID:   saleID,
+				Payload: models.JSONB{
+					"amount":      cashInAmount,
+					"direction":   "IN",
+					"event_type":  "SALE",
+					"reason_code": fmt.Sprintf("sale:%d", saleID),
+					"notes":       note,
+				},
+				CreatedBy: &userID,
+			}); err != nil {
+				return nil, fmt.Errorf("failed to enqueue sale cash register event: %w", err)
+			}
+		}
+
+		if req.CustomerID != nil {
+			if err := finance.EnqueueTx(tx, &models.FinanceOutboxEntry{
+				CompanyID:     companyID,
+				LocationID:    &locationID,
+				EventType:     financeEventLoyaltyAward,
+				AggregateType: "sale",
+				AggregateID:   saleID,
+				Payload: models.JSONB{
+					"customer_id": *req.CustomerID,
+					"sale_amount": totalAmount,
+				},
+				CreatedBy: &userID,
+			}); err != nil {
+				return nil, fmt.Errorf("failed to enqueue loyalty award: %w", err)
+			}
+		}
+
+		if req.CustomerID != nil && opts.LoyaltyRedeemPoints > 0 {
+			if err := finance.EnqueueTx(tx, &models.FinanceOutboxEntry{
+				CompanyID:     companyID,
+				LocationID:    &locationID,
+				EventType:     financeEventLoyaltyRedeem,
+				AggregateType: "sale",
+				AggregateID:   saleID,
+				Payload: models.JSONB{
+					"customer_id":      *req.CustomerID,
+					"requested_points": opts.LoyaltyRedeemPoints,
+				},
+				CreatedBy: &userID,
+			}); err != nil {
+				return nil, fmt.Errorf("failed to enqueue loyalty redemption: %w", err)
+			}
+		}
+
+		if req.CustomerID != nil && strings.TrimSpace(opts.CouponCode) != "" {
+			couponCode := strings.TrimSpace(opts.CouponCode)
+			if err := finance.EnqueueTx(tx, &models.FinanceOutboxEntry{
+				CompanyID:     companyID,
+				LocationID:    &locationID,
+				EventType:     financeEventCouponRedeem,
+				AggregateType: "sale",
+				AggregateID:   saleID,
+				Payload: models.JSONB{
+					"code":        couponCode,
+					"customer_id": *req.CustomerID,
+				},
+				CreatedBy: &userID,
+			}); err != nil {
+				return nil, fmt.Errorf("failed to enqueue coupon redemption: %w", err)
+			}
+		}
+
+		if err := finance.EnqueueTx(tx, &models.FinanceOutboxEntry{
+			CompanyID:     companyID,
+			LocationID:    &locationID,
+			EventType:     financeEventRaffleIssue,
+			AggregateType: "sale",
+			AggregateID:   saleID,
+			Payload: models.JSONB{
+				"customer_id":             req.CustomerID,
+				"auto_fill_customer_data": opts.AutoFillRaffleCustomerData,
+			},
+			CreatedBy: &userID,
+		}); err != nil {
+			return nil, fmt.Errorf("failed to enqueue raffle issuance: %w", err)
+		}
+	}
+
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	if !opts.IsTraining {
-		// Record ledger entry
-		if err := (&LedgerService{db: s.db}).RecordSale(companyID, saleID, userID); err != nil {
-			log.Printf("sales_service: failed to post sale %d to ledger: %v", saleID, err)
-		}
-
-		// Award loyalty points if customer is provided (async operation)
-		if req.CustomerID != nil {
-			go func() {
-				loyaltyService := NewLoyaltyService()
-				err := loyaltyService.AwardPoints(companyID, *req.CustomerID, totalAmount, saleID)
-				if err != nil {
-					// Log error but don't fail the sale
-					log.Printf("sales_service: failed to award loyalty points for sale %d: %v", saleID, err)
-				}
-			}()
+		if err := NewFinanceIntegrityServiceWithDB(s.db).ProcessAggregate(companyID, "sale", saleID); err != nil {
+			log.Printf("sales_service: failed to process finance outbox for sale %d: %v", saleID, err)
 		}
 	}
 
@@ -1041,6 +1145,32 @@ func (s *SalesService) getSaleByIdempotencyKey(key string, companyID, locationID
 		return nil, fmt.Errorf("failed to lookup idempotency key: %w", err)
 	}
 	return s.GetSaleByID(saleID, companyID)
+}
+
+func (s *SalesService) resolveCashInAmountTx(tx *sql.Tx, companyID int, req *models.CreateSaleRequest, opts CreateSaleOptions) (float64, error) {
+	if opts.CashInAmount > 0 {
+		return opts.CashInAmount, nil
+	}
+	if req == nil || req.PaymentMethodID == nil || req.PaidAmount <= 0 {
+		return 0, nil
+	}
+	var paymentType string
+	if err := tx.QueryRow(`
+		SELECT type
+		FROM payment_methods
+		WHERE method_id = $1
+		  AND is_active = TRUE
+		  AND (company_id = $2 OR company_id IS NULL)
+	`, *req.PaymentMethodID, companyID).Scan(&paymentType); err != nil {
+		if err == sql.ErrNoRows {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("failed to resolve payment method for sale cash posting: %w", err)
+	}
+	if strings.EqualFold(strings.TrimSpace(paymentType), "CASH") {
+		return req.PaidAmount, nil
+	}
+	return 0, nil
 }
 
 func nullIfEmpty(value string) *string {

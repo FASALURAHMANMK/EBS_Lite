@@ -3,6 +3,8 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"log"
+	"strings"
 	"time"
 
 	"erp-backend/internal/database"
@@ -74,11 +76,27 @@ func (s *PaymentService) GetPayments(companyID int, filters map[string]string) (
 
 // CreatePayment records a supplier payment and optionally applies it to a purchase
 func (s *PaymentService) CreatePayment(companyID, locationID, userID int, req *models.CreatePaymentRequest) (*models.Payment, error) {
+	idemKey := ""
+	if req != nil && req.IdempotencyKey != nil {
+		idemKey = strings.TrimSpace(*req.IdempotencyKey)
+	}
+
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback()
+
+	if idemKey != "" {
+		existing, err := s.getPaymentByIdempotencyKey(idemKey, companyID, locationID)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			_ = NewFinanceIntegrityServiceWithDB(s.db).ProcessAggregate(companyID, "payment", existing.PaymentID)
+			return existing, nil
+		}
+	}
 
 	var supplierID *int = req.SupplierID
 
@@ -143,13 +161,23 @@ func (s *PaymentService) CreatePayment(companyID, locationID, userID int, req *m
 	var p models.Payment
 	insert := `
         INSERT INTO payments (payment_number, supplier_id, purchase_id, location_id, payment_date,
-                              amount, payment_method_id, reference_number, notes, created_by, updated_by)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10)
+                              amount, payment_method_id, reference_number, notes, created_by, updated_by, idempotency_key)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10,NULLIF($11,''))
         RETURNING payment_id, payment_number, payment_date, created_at, updated_at`
 	if err := tx.QueryRow(insert,
 		paymentNumber, supplierID, req.PurchaseID, locationID, payDate,
-		req.Amount, req.PaymentMethodID, req.ReferenceNumber, req.Notes, userID,
+		req.Amount, req.PaymentMethodID, req.ReferenceNumber, req.Notes, userID, idemKey,
 	).Scan(&p.PaymentID, &p.PaymentNumber, &p.PaymentDate, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if idemKey != "" && isUniqueViolation(err) {
+			existing, lookupErr := s.getPaymentByIdempotencyKey(idemKey, companyID, locationID)
+			if lookupErr != nil {
+				return nil, lookupErr
+			}
+			if existing != nil {
+				_ = NewFinanceIntegrityServiceWithDB(s.db).ProcessAggregate(companyID, "payment", existing.PaymentID)
+				return existing, nil
+			}
+		}
 		return nil, fmt.Errorf("failed to insert payment: %w", err)
 	}
 
@@ -163,12 +191,53 @@ func (s *PaymentService) CreatePayment(companyID, locationID, userID int, req *m
 		}
 	}
 
+	finance := NewFinanceIntegrityServiceWithDB(s.db)
+	if err := finance.EnqueueTx(tx, &models.FinanceOutboxEntry{
+		CompanyID:     companyID,
+		LocationID:    &locationID,
+		EventType:     financeEventLedgerSupplierPay,
+		AggregateType: "payment",
+		AggregateID:   p.PaymentID,
+		Payload:       models.JSONB{},
+		CreatedBy:     &userID,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to enqueue supplier payment ledger posting: %w", err)
+	}
+
+	isCash := true
+	if req.PaymentMethodID != nil {
+		var paymentType string
+		if err := tx.QueryRow(`SELECT type FROM payment_methods WHERE method_id = $1`, *req.PaymentMethodID).Scan(&paymentType); err == nil {
+			isCash = strings.EqualFold(strings.TrimSpace(paymentType), "CASH")
+		}
+	}
+	if isCash && req.Amount > 0 {
+		note := fmt.Sprintf("payment_id=%d payment_number=%s", p.PaymentID, p.PaymentNumber)
+		if err := finance.EnqueueTx(tx, &models.FinanceOutboxEntry{
+			CompanyID:     companyID,
+			LocationID:    &locationID,
+			EventType:     financeEventCashSupplierPay,
+			AggregateType: "payment",
+			AggregateID:   p.PaymentID,
+			Payload: models.JSONB{
+				"amount":      req.Amount,
+				"direction":   "OUT",
+				"event_type":  "SUPPLIER_PAYMENT",
+				"reason_code": fmt.Sprintf("payment:%d", p.PaymentID),
+				"notes":       note,
+			},
+			CreatedBy: &userID,
+		}); err != nil {
+			return nil, fmt.Errorf("failed to enqueue supplier payment cash register event: %w", err)
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
-
-	// Best-effort: post to accounting ledger (idempotent by reference).
-	_ = (&LedgerService{db: s.db}).RecordSupplierPayment(companyID, p.PaymentID, userID)
+	if err := finance.ProcessAggregate(companyID, "payment", p.PaymentID); err != nil {
+		log.Printf("payment_service: failed to process finance outbox for payment %d: %v", p.PaymentID, err)
+	}
 
 	p.SupplierID = supplierID
 	p.PurchaseID = req.PurchaseID
@@ -177,7 +246,86 @@ func (s *PaymentService) CreatePayment(companyID, locationID, userID int, req *m
 	p.PaymentMethodID = req.PaymentMethodID
 	p.ReferenceNumber = req.ReferenceNumber
 	p.Notes = req.Notes
+	p.IdempotencyKey = nullIfEmpty(idemKey)
 	p.CreatedBy = userID
 	p.SyncStatus = "synced"
 	return &p, nil
+}
+
+func (s *PaymentService) getPaymentByIdempotencyKey(key string, companyID, locationID int) (*models.Payment, error) {
+	if strings.TrimSpace(key) == "" {
+		return nil, nil
+	}
+	var item models.Payment
+	var supplierID sql.NullInt64
+	var purchaseID sql.NullInt64
+	var locationValue sql.NullInt64
+	var paymentMethodID sql.NullInt64
+	var referenceNumber sql.NullString
+	var notes sql.NullString
+	var idempotencyKey sql.NullString
+	var updatedBy sql.NullInt64
+	err := s.db.QueryRow(`
+		SELECT pay.payment_id, pay.payment_number, pay.supplier_id, pay.purchase_id, pay.location_id,
+		       pay.amount, pay.payment_method_id, pay.reference_number, pay.notes, pay.idempotency_key,
+		       pay.payment_date, pay.created_by, pay.updated_by, pay.created_at, pay.updated_at
+		FROM payments pay
+		LEFT JOIN suppliers sup ON sup.supplier_id = pay.supplier_id
+		WHERE pay.location_id = $1
+		  AND pay.idempotency_key = $2
+		  AND (sup.company_id = $3 OR pay.supplier_id IS NULL)
+		  AND COALESCE(pay.is_deleted, FALSE) = FALSE
+	`, locationID, key, companyID).Scan(
+		&item.PaymentID,
+		&item.PaymentNumber,
+		&supplierID,
+		&purchaseID,
+		&locationValue,
+		&item.Amount,
+		&paymentMethodID,
+		&referenceNumber,
+		&notes,
+		&idempotencyKey,
+		&item.PaymentDate,
+		&item.CreatedBy,
+		&updatedBy,
+		&item.CreatedAt,
+		&item.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to lookup payment idempotency key: %w", err)
+	}
+	if supplierID.Valid {
+		v := int(supplierID.Int64)
+		item.SupplierID = &v
+	}
+	if purchaseID.Valid {
+		v := int(purchaseID.Int64)
+		item.PurchaseID = &v
+	}
+	if locationValue.Valid {
+		v := int(locationValue.Int64)
+		item.LocationID = &v
+	}
+	if paymentMethodID.Valid {
+		v := int(paymentMethodID.Int64)
+		item.PaymentMethodID = &v
+	}
+	if referenceNumber.Valid {
+		item.ReferenceNumber = &referenceNumber.String
+	}
+	if notes.Valid {
+		item.Notes = &notes.String
+	}
+	if idempotencyKey.Valid {
+		item.IdempotencyKey = &idempotencyKey.String
+	}
+	if updatedBy.Valid {
+		v := int(updatedBy.Int64)
+		item.UpdatedBy = &v
+	}
+	return &item, nil
 }

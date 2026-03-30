@@ -890,6 +890,18 @@ func (s *LoyaltyService) ValidateCouponCode(companyID int, req *models.ValidateC
 }
 
 func (s *LoyaltyService) RedeemCouponCode(companyID int, code string, saleID int, customerID *int) error {
+	var existingSaleID sql.NullInt64
+	if err := s.db.QueryRow(`
+		SELECT cc.redeemed_sale_id
+		FROM coupon_codes cc
+		JOIN coupon_series cs ON cs.coupon_series_id = cc.coupon_series_id
+		WHERE cc.code = $1 AND cs.company_id = $2
+	`, strings.ToUpper(strings.TrimSpace(code)), companyID).Scan(&existingSaleID); err == nil {
+		if existingSaleID.Valid && int(existingSaleID.Int64) == saleID {
+			return nil
+		}
+	}
+
 	var saleAmount float64
 	if err := s.db.QueryRow(`
 		SELECT total_amount::float8
@@ -1285,6 +1297,10 @@ func (s *LoyaltyService) MarkRaffleWinner(companyID, couponID int, req *models.M
 }
 
 func (s *LoyaltyService) IssueRaffleCouponsForSale(companyID, saleID int, customerID *int, autoFillOverride *bool) ([]models.RaffleCoupon, error) {
+	if existing, err := s.GetRaffleCoupons(companyID, nil, &saleID); err == nil && len(existing) > 0 {
+		return existing, nil
+	}
+
 	var (
 		totalAmount     float64
 		customerName    sql.NullString

@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -348,12 +349,26 @@ func (s *PurchaseReturnService) CreatePurchaseReturn(companyID, locationID, user
 		return nil, fmt.Errorf("failed to update purchase return total: %w", err)
 	}
 
+	if err := NewFinanceIntegrityServiceWithDB(s.db).EnqueueTx(tx, &models.FinanceOutboxEntry{
+		CompanyID:     companyID,
+		LocationID:    &locationID,
+		EventType:     financeEventLedgerPurchaseReturn,
+		AggregateType: "purchase_return",
+		AggregateID:   returnData.ReturnID,
+		Payload:       models.JSONB{},
+		CreatedBy:     &userID,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to enqueue purchase return ledger posting: %w", err)
+	}
+
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 
 	}
-	_ = (&LedgerService{db: s.db}).RecordPurchaseReturn(companyID, returnData.ReturnID, userID)
+	if err := NewFinanceIntegrityServiceWithDB(s.db).ProcessAggregate(companyID, "purchase_return", returnData.ReturnID); err != nil {
+		log.Printf("purchase_return_service: failed to process finance outbox for purchase_return %d: %v", returnData.ReturnID, err)
+	}
 
 	// Set response data
 	returnData.ReturnNumber = returnNumber

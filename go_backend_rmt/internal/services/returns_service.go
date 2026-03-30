@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 
 	"erp-backend/internal/database"
@@ -365,14 +366,28 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 		}
 	}
 
+	if !isTraining {
+		if err := NewFinanceIntegrityServiceWithDB(s.db).EnqueueTx(tx, &models.FinanceOutboxEntry{
+			CompanyID:     companyID,
+			LocationID:    &locationID,
+			EventType:     financeEventLedgerSaleReturn,
+			AggregateType: "sale_return",
+			AggregateID:   returnID,
+			Payload:       models.JSONB{},
+			CreatedBy:     &userID,
+		}); err != nil {
+			return nil, fmt.Errorf("failed to enqueue sale return ledger posting: %w", err)
+		}
+	}
+
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	if !isTraining {
-		if err := (&LedgerService{db: s.db}).RecordSaleReturn(companyID, returnID, userID); err != nil {
-			return nil, fmt.Errorf("failed to post sale return to ledger: %w", err)
+		if err := NewFinanceIntegrityServiceWithDB(s.db).ProcessAggregate(companyID, "sale_return", returnID); err != nil {
+			log.Printf("returns_service: failed to process finance outbox for sale_return %d: %v", returnID, err)
 		}
 	}
 

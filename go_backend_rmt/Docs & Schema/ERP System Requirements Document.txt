@@ -1,0 +1,38 @@
+EBS Lite Go Backend ERP System Requirements Document
+Version: 2026-03-30 SMB baseline
+
+Purpose
+- This file exists at the path required by AGENTS.md.
+- It is a controlled pointer document for the backend release surface.
+
+Authoritative source documents
+- RELEASE_READINESS_PLAN.md
+- docs/SMB_EDITION_SCOPE.md
+- docs/RELEASE_GATES_CHECKLIST.md
+- docs/MODULE_UAT_MATRIX.md
+- tools/api_parity_report.md
+- go_backend_rmt/openapi.yaml
+
+Backend release surface requirements
+- The Go backend is the system of record for business logic, data integrity, and OpenAPI coverage.
+- OpenAPI must remain accurate for all Flutter-called endpoints.
+- Any endpoint added or changed must update handler/service behavior, tests, OpenAPI, Flutter integration where shipped, and parity artifacts.
+- Stable response contracts and permission checks must remain enforced for launched modules.
+- Production deployments must use non-default secrets, real password reset URLs, and validated upload controls.
+- Offline/idempotent flows claimed in launch scope must remain supported for POS, purchases/GRN, collections, and expenses where documented.
+
+Primary backend domains supporting SMB launch
+- auth, companies, locations, users, roles, permissions
+- dashboard, settings, numbering, invoice templates, user preferences
+- inventory, products, categories, brands, attributes, combo products
+- sales, POS, returns, collections, customers, loyalty, promotions, warranty
+- purchases, goods receipts, purchase returns, suppliers, payments
+- accounting, cash registers, vouchers, ledgers, reports, audit logs
+- HR, attendance, payroll
+- workflow, notifications, supportability endpoints
+
+Out-of-scope launch claims
+- enterprise treasury and bank-reconciliation depth
+- intercompany and consolidation finance
+- enterprise IAM and governance posture
+- fully commercialized parity for every backend route exposed in OpenAPI

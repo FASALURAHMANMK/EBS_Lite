@@ -4,7 +4,15 @@ This document summarizes **module-by-module features** available in **EBS Lite**
 - Flutter client: `flutter_app/`
 - Go backend API: `go_backend_rmt/`
 
-Last reviewed: **2026-03-07**
+Last reviewed: **2026-03-30**
+
+Controlled scope note:
+
+- This file is the descriptive feature inventory.
+- Launch claims, acceptance criteria, and UAT obligations are governed by:
+  - `RELEASE_READINESS_PLAN.md`
+  - `docs/SMB_EDITION_SCOPE.md`
+  - `docs/MODULE_UAT_MATRIX.md`
 
 ## Status legend
 
@@ -196,6 +204,7 @@ Last reviewed: **2026-03-07**
 ### Vouchers & ledgers
 - **Available**: Voucher listing and creation (by voucher type).
 - **Available**: Ledger balances + ledger entries with date range paging.
+- **Available**: Finance Integrity diagnostics page for backend outbox backlog, missing-ledger detection, replay, and repair.
 
 ### Audit logs
 - **Available**: Audit log listing with filters (user/action/date range).

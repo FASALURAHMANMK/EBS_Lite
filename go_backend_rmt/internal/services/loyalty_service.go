@@ -681,6 +681,20 @@ func (s *LoyaltyService) AwardPoints(companyID, customerID int, saleAmount float
 	}
 	defer tx.Rollback()
 
+	var alreadyAwarded bool
+	if err := tx.QueryRow(`
+		SELECT EXISTS(
+			SELECT 1
+			FROM loyalty_transactions
+			WHERE customer_id = $1
+			  AND transaction_type = 'EARNED'
+			  AND reference_type = 'SALE'
+			  AND reference_id = $2
+		)
+	`, customerID, saleID).Scan(&alreadyAwarded); err == nil && alreadyAwarded {
+		return tx.Commit()
+	}
+
 	// Update or create loyalty program
 	_, err = tx.Exec(`
         INSERT INTO loyalty_programs (customer_id, points, total_earned, last_updated)
@@ -715,6 +729,22 @@ func (s *LoyaltyService) RedeemPointsForSale(companyID, customerID, saleID int, 
 	// Validate customer belongs to company
 	if err := s.validateCustomerInCompany(customerID, companyID); err != nil {
 		return 0, 0, err
+	}
+
+	var existingUsed float64
+	var existingValue float64
+	err = s.db.QueryRow(`
+		SELECT points_used::float8, value_redeemed::float8
+		FROM loyalty_redemptions
+		WHERE sale_id = $1 AND customer_id = $2 AND redemption_type = 'DISCOUNT'
+		ORDER BY redemption_id DESC
+		LIMIT 1
+	`, saleID, customerID).Scan(&existingUsed, &existingValue)
+	if err == nil {
+		return existingUsed, existingValue, nil
+	}
+	if err != nil && err != sql.ErrNoRows {
+		return 0, 0, fmt.Errorf("failed to check existing sale redemption: %w", err)
 	}
 
 	// Current balance

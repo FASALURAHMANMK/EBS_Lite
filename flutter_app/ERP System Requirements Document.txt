@@ -1,0 +1,40 @@
+EBS Lite Flutter ERP System Requirements Document
+Version: 2026-03-30 SMB baseline
+
+Purpose
+- This file exists at the path required by AGENTS.md.
+- It is a controlled pointer document for the Flutter release surface.
+
+Authoritative source documents
+- RELEASE_READINESS_PLAN.md
+- docs/SMB_EDITION_SCOPE.md
+- docs/MODULE_UAT_MATRIX.md
+- docs/module_wise_feature_list.md
+- docs/ACCOUNTING_MODULE_USER_MANUAL.md
+
+Flutter release surface requirements
+- Flutter is the primary SMB launch client.
+- No production navigation path may end in a placeholder or dead-end action.
+- Shipped claims are limited to the in-scope modules defined in docs/SMB_EDITION_SCOPE.md.
+- Flutter-called endpoints must remain present in go_backend_rmt/openapi.yaml and tools/api_parity_report.md must stay clean.
+- Offline/outbox claims are limited to flows already documented and UAT-covered.
+- Production builds must supply a real API_BASE_URL rather than relying on the localhost fallback.
+
+Primary functional modules for the Flutter surface
+- auth and bootstrap
+- dashboard and location-aware navigation
+- POS and sales
+- purchases and suppliers
+- inventory
+- customers and collections
+- accounting essentials
+- reports
+- HR core
+- workflow/notifications in limited scope
+- admin/settings and bulk import/export
+
+Out-of-scope launch claims
+- enterprise identity and governance
+- multi-entity finance
+- bank reconciliation completeness
+- browser-first office parity

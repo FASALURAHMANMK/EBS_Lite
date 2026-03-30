@@ -37,6 +37,7 @@ The table below tracks whether each backend route group in `routes.go` has a cor
 | `/expenses` | — | Intentionally unused |
 | `/vouchers` | `src/services/accounting.ts` | |
 | `/ledgers` | `src/services/accounting.ts` | |
+| `/finance-integrity` | — | Flutter accounting diagnostics only; web shell intentionally unused |
 | `/cash-registers` | `src/services/accounting.ts` | |
 | `/reports` | — | Intentionally unused |
 | `/suppliers` | `src/services/suppliers.ts` | |

@@ -226,6 +226,43 @@ class AccountsRepository {
     return list.map((e) => AuditLogDto.fromJson(e)).toList();
   }
 
+  Future<FinanceIntegrityDiagnosticsDto> getFinanceDiagnostics({
+    String? status,
+    int limit = 25,
+  }) async {
+    final qp = <String, dynamic>{
+      if (status != null && status.trim().isNotEmpty) 'status': status.trim(),
+      'limit': limit,
+    };
+    final res =
+        await _dio.get('/finance-integrity/diagnostics', queryParameters: qp);
+    return FinanceIntegrityDiagnosticsDto.fromJson(_extractMap(res));
+  }
+
+  Future<FinanceReplayResultDto> replayFinanceOutbox({
+    List<int> outboxIds = const [],
+    int limit = 50,
+  }) async {
+    final res = await _dio.post(
+      '/finance-integrity/replay',
+      data: {
+        if (outboxIds.isNotEmpty) 'outbox_ids': outboxIds,
+        'limit': limit,
+      },
+    );
+    return FinanceReplayResultDto.fromJson(_extractMap(res));
+  }
+
+  Future<FinanceRepairLedgerResultDto> repairMissingLedger({
+    int limit = 50,
+  }) async {
+    final res = await _dio.post(
+      '/finance-integrity/repair-ledger',
+      data: {'limit': limit},
+    );
+    return FinanceRepairLedgerResultDto.fromJson(_extractMap(res));
+  }
+
   List<Map<String, dynamic>> _extractList(Response res) {
     final body = res.data;
     if (body is List) return body.cast<Map<String, dynamic>>();

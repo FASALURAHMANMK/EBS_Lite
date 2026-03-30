@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -43,22 +44,7 @@ func (s *ExpenseService) CreateExpense(companyID, locationID, userID int, req *m
 		// If this item was already created (e.g., outbox retry), return the existing record id.
 		existingID, err := s.lookupExpenseIdempotencyKey(companyID, locationID, idemKey)
 		if err == nil {
-			_ = s.ensureLedgerExpense(companyID, existingID, req.Amount, userID)
-			// Best-effort: ensure cash register reflects the cash-out (idempotent by request id).
-			note := fmt.Sprintf("expense_id=%d", existingID)
-			_ = (&CashRegisterService{db: s.db}).RecordCashTransactionTx(
-				nil,
-				companyID,
-				locationID,
-				userID,
-				"OUT",
-				req.Amount,
-				"EXPENSE",
-				fmt.Sprintf("expense:%d", existingID),
-				&note,
-				"",
-				idemKey,
-			)
+			_ = NewFinanceIntegrityServiceWithDB(s.db).ProcessAggregate(companyID, "expense", existingID)
 			return existingID, nil
 		}
 		if err != sql.ErrNoRows {
@@ -101,22 +87,7 @@ func (s *ExpenseService) CreateExpense(companyID, locationID, userID int, req *m
 				rollback()
 				existingID, lerr := s.lookupExpenseIdempotencyKey(companyID, locationID, idemKey)
 				if lerr == nil {
-					_ = s.ensureLedgerExpense(companyID, existingID, req.Amount, userID)
-					// Best-effort: ensure cash register reflects the cash-out (idempotent by request id).
-					note := fmt.Sprintf("expense_id=%d", existingID)
-					_ = (&CashRegisterService{db: s.db}).RecordCashTransactionTx(
-						nil,
-						companyID,
-						locationID,
-						userID,
-						"OUT",
-						req.Amount,
-						"EXPENSE",
-						fmt.Sprintf("expense:%d", existingID),
-						&note,
-						"",
-						idemKey,
-					)
+					_ = NewFinanceIntegrityServiceWithDB(s.db).ProcessAggregate(companyID, "expense", existingID)
 					return existingID, nil
 				}
 			}
@@ -124,27 +95,44 @@ func (s *ExpenseService) CreateExpense(companyID, locationID, userID int, req *m
 		return 0, fmt.Errorf("failed to create expense: %w", err)
 	}
 
+	finance := NewFinanceIntegrityServiceWithDB(s.db)
+	note := fmt.Sprintf("expense_id=%d", id)
+	if err := finance.EnqueueTx(tx, &models.FinanceOutboxEntry{
+		CompanyID:     companyID,
+		LocationID:    &locationID,
+		EventType:     financeEventLedgerExpense,
+		AggregateType: "expense",
+		AggregateID:   id,
+		Payload:       models.JSONB{},
+		CreatedBy:     &userID,
+	}); err != nil {
+		return 0, fmt.Errorf("failed to enqueue expense ledger posting: %w", err)
+	}
+	if err := finance.EnqueueTx(tx, &models.FinanceOutboxEntry{
+		CompanyID:     companyID,
+		LocationID:    &locationID,
+		EventType:     financeEventCashExpense,
+		AggregateType: "expense",
+		AggregateID:   id,
+		Payload: models.JSONB{
+			"amount":      req.Amount,
+			"direction":   "OUT",
+			"event_type":  "EXPENSE",
+			"reason_code": fmt.Sprintf("expense:%d", id),
+			"notes":       note,
+		},
+		CreatedBy: &userID,
+	}); err != nil {
+		return 0, fmt.Errorf("failed to enqueue expense cash register event: %w", err)
+	}
+
 	if err := tx.Commit(); err != nil {
 		return 0, fmt.Errorf("failed to commit expense create: %w", err)
 	}
 	rolledBack = true
-
-	_ = s.ensureLedgerExpense(companyID, id, req.Amount, userID)
-	// Best-effort: update cash register for expenses (treated as cash-out).
-	note := fmt.Sprintf("expense_id=%d", id)
-	_ = (&CashRegisterService{db: s.db}).RecordCashTransactionTx(
-		nil,
-		companyID,
-		locationID,
-		userID,
-		"OUT",
-		req.Amount,
-		"EXPENSE",
-		fmt.Sprintf("expense:%d", id),
-		&note,
-		"",
-		idemKey,
-	)
+	if err := finance.ProcessAggregate(companyID, "expense", id); err != nil {
+		log.Printf("expense_service: failed to process finance outbox for expense %d: %v", id, err)
+	}
 	return id, nil
 }
 
@@ -158,11 +146,6 @@ func (s *ExpenseService) lookupExpenseIdempotencyKey(companyID, locationID int, 
 		LIMIT 1
 	`, idemKey, locationID, companyID).Scan(&id)
 	return id, err
-}
-
-func (s *ExpenseService) ensureLedgerExpense(companyID, expenseID int, amount float64, userID int) error {
-	_ = amount // ledger posting loads canonical amount/date from DB
-	return (&LedgerService{db: s.db}).RecordExpense(companyID, expenseID, userID)
 }
 
 func (s *ExpenseService) GetCategories(companyID int) ([]models.ExpenseCategory, error) {

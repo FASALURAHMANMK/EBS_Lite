@@ -271,6 +271,193 @@ class AuditLogDto {
       );
 }
 
+class FinanceIntegrityBucketDto {
+  final String eventType;
+  final String status;
+  final int count;
+
+  FinanceIntegrityBucketDto({
+    required this.eventType,
+    required this.status,
+    required this.count,
+  });
+
+  factory FinanceIntegrityBucketDto.fromJson(Map<String, dynamic> json) =>
+      FinanceIntegrityBucketDto(
+        eventType: (json['event_type'] ?? '').toString(),
+        status: (json['status'] ?? '').toString(),
+        count: _asInt(json['count']),
+      );
+}
+
+class FinanceIntegritySummaryDto {
+  final int pendingCount;
+  final int processingCount;
+  final int failedCount;
+  final int completedCount;
+  final List<FinanceIntegrityBucketDto> eventBuckets;
+
+  FinanceIntegritySummaryDto({
+    required this.pendingCount,
+    required this.processingCount,
+    required this.failedCount,
+    required this.completedCount,
+    required this.eventBuckets,
+  });
+
+  factory FinanceIntegritySummaryDto.fromJson(Map<String, dynamic> json) =>
+      FinanceIntegritySummaryDto(
+        pendingCount: _asInt(json['pending_count']),
+        processingCount: _asInt(json['processing_count']),
+        failedCount: _asInt(json['failed_count']),
+        completedCount: _asInt(json['completed_count']),
+        eventBuckets: (json['event_buckets'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(FinanceIntegrityBucketDto.fromJson)
+            .toList(),
+      );
+}
+
+class FinanceOutboxEntryDto {
+  final int outboxId;
+  final String eventType;
+  final String aggregateType;
+  final int aggregateId;
+  final String status;
+  final int attemptCount;
+  final String? lastError;
+  final DateTime? lastAttemptAt;
+  final DateTime nextAttemptAt;
+  final DateTime? processedAt;
+  final DateTime createdAt;
+
+  FinanceOutboxEntryDto({
+    required this.outboxId,
+    required this.eventType,
+    required this.aggregateType,
+    required this.aggregateId,
+    required this.status,
+    required this.attemptCount,
+    required this.lastError,
+    required this.lastAttemptAt,
+    required this.nextAttemptAt,
+    required this.processedAt,
+    required this.createdAt,
+  });
+
+  factory FinanceOutboxEntryDto.fromJson(Map<String, dynamic> json) =>
+      FinanceOutboxEntryDto(
+        outboxId: _asInt(json['outbox_id']),
+        eventType: (json['event_type'] ?? '').toString(),
+        aggregateType: (json['aggregate_type'] ?? '').toString(),
+        aggregateId: _asInt(json['aggregate_id']),
+        status: (json['status'] ?? '').toString(),
+        attemptCount: _asInt(json['attempt_count']),
+        lastError: json['last_error']?.toString(),
+        lastAttemptAt: _asNullableDate(json['last_attempt_at']),
+        nextAttemptAt: _asDate(json['next_attempt_at']),
+        processedAt: _asNullableDate(json['processed_at']),
+        createdAt: _asDate(json['created_at']),
+      );
+}
+
+class FinanceLedgerMismatchDto {
+  final String documentType;
+  final int documentId;
+  final String documentNumber;
+  final int? locationId;
+  final DateTime? documentDate;
+  final double totalAmount;
+  final String diagnostic;
+
+  FinanceLedgerMismatchDto({
+    required this.documentType,
+    required this.documentId,
+    required this.documentNumber,
+    required this.locationId,
+    required this.documentDate,
+    required this.totalAmount,
+    required this.diagnostic,
+  });
+
+  factory FinanceLedgerMismatchDto.fromJson(Map<String, dynamic> json) =>
+      FinanceLedgerMismatchDto(
+        documentType: (json['document_type'] ?? '').toString(),
+        documentId: _asInt(json['document_id']),
+        documentNumber: (json['document_number'] ?? '').toString(),
+        locationId: _asNullableInt(json['location_id']),
+        documentDate: _asNullableDate(json['document_date']),
+        totalAmount: _asDouble(json['total_amount']),
+        diagnostic: (json['diagnostic'] ?? '').toString(),
+      );
+}
+
+class FinanceIntegrityDiagnosticsDto {
+  final FinanceIntegritySummaryDto summary;
+  final List<FinanceOutboxEntryDto> outboxEntries;
+  final List<FinanceLedgerMismatchDto> missingLedgerEntries;
+
+  FinanceIntegrityDiagnosticsDto({
+    required this.summary,
+    required this.outboxEntries,
+    required this.missingLedgerEntries,
+  });
+
+  factory FinanceIntegrityDiagnosticsDto.fromJson(Map<String, dynamic> json) =>
+      FinanceIntegrityDiagnosticsDto(
+        summary: FinanceIntegritySummaryDto.fromJson(
+          (json['summary'] as Map<String, dynamic>? ?? const {}),
+        ),
+        outboxEntries: (json['outbox_entries'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(FinanceOutboxEntryDto.fromJson)
+            .toList(),
+        missingLedgerEntries:
+            (json['missing_ledger_entries'] as List<dynamic>? ?? const [])
+                .whereType<Map<String, dynamic>>()
+                .map(FinanceLedgerMismatchDto.fromJson)
+                .toList(),
+      );
+}
+
+class FinanceReplayResultDto {
+  final int processedCount;
+  final int succeededCount;
+  final int failedCount;
+
+  FinanceReplayResultDto({
+    required this.processedCount,
+    required this.succeededCount,
+    required this.failedCount,
+  });
+
+  factory FinanceReplayResultDto.fromJson(Map<String, dynamic> json) =>
+      FinanceReplayResultDto(
+        processedCount: _asInt(json['processed_count']),
+        succeededCount: _asInt(json['succeeded_count']),
+        failedCount: _asInt(json['failed_count']),
+      );
+}
+
+class FinanceRepairLedgerResultDto {
+  final int enqueuedCount;
+  final int processedCount;
+  final int failedCount;
+
+  FinanceRepairLedgerResultDto({
+    required this.enqueuedCount,
+    required this.processedCount,
+    required this.failedCount,
+  });
+
+  factory FinanceRepairLedgerResultDto.fromJson(Map<String, dynamic> json) =>
+      FinanceRepairLedgerResultDto(
+        enqueuedCount: _asInt(json['enqueued_count']),
+        processedCount: _asInt(json['processed_count']),
+        failedCount: _asInt(json['failed_count']),
+      );
+}
+
 class PaginatedResult<T> {
   final List<T> items;
   final MetaDto? meta;

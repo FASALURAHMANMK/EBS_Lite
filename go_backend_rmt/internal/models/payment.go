@@ -13,6 +13,7 @@ type Payment struct {
 	PaymentMethodID *int      `json:"payment_method_id,omitempty" db:"payment_method_id"`
 	ReferenceNumber *string   `json:"reference_number,omitempty" db:"reference_number"`
 	Notes           *string   `json:"notes,omitempty" db:"notes"`
+	IdempotencyKey  *string   `json:"idempotency_key,omitempty" db:"idempotency_key"`
 	PaymentDate     time.Time `json:"payment_date" db:"payment_date"`
 	CreatedBy       int       `json:"created_by" db:"created_by"`
 	UpdatedBy       *int      `json:"updated_by,omitempty" db:"updated_by"`
@@ -30,4 +31,5 @@ type CreatePaymentRequest struct {
 	PaymentDate     *string `json:"payment_date,omitempty"`
 	ReferenceNumber *string `json:"reference_number,omitempty"`
 	Notes           *string `json:"notes,omitempty"`
+	IdempotencyKey  *string `json:"idempotency_key,omitempty"`
 }

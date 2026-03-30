@@ -164,7 +164,25 @@ Use it for:
 - force-close review
 - override and exception follow-up
 
-### 9. Accounting Reports
+### 9. Finance Integrity
+
+File: `flutter_app/lib/features/accounts/presentation/pages/finance_integrity_page.dart`
+
+What it does:
+
+- shows guaranteed async finance side effects queued in the backend outbox
+- shows failed ledger/cash/loyalty/coupon/raffle side effects with error text
+- shows recent documents missing ledger postings
+- allows authorized admins to replay failed finance outbox items
+- allows authorized admins to enqueue and repair missing ledger postings
+
+Why it matters:
+
+- removes silent accounting drift
+- gives supportable diagnostics when async side effects fail
+- makes reconciliation issues visible to accounting/admin users without database access
+
+### 10. Accounting Reports
 
 Now reachable from Accounts Home and implemented through the reports module.
 
@@ -412,6 +430,7 @@ This structure is much closer to what VAT/GST filing and audit workpapers need.
 - `General Ledger` for transaction tracing
 - `Daily Cash` for cashier reconciliation
 - `Outstanding` for customer and supplier settlement follow-up
+- `Finance Integrity` for queued side effects and missing-ledger diagnostics
 
 ## Operational Guidance for Users
 

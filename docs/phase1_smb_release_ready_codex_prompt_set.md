@@ -6,9 +6,6 @@ Use these prompts in order. Do not skip a prompt. Each prompt assumes the prior 
 
 ## Global Rules For Every Phase 1 Prompt
 
-Paste this block at the top of every run:
-
-```text
 You are working in E:\PROJECTS\EBS_Lite.
 
 Mandatory read-first context:

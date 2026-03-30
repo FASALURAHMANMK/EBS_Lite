@@ -4,6 +4,16 @@ Date: 2026-03-30
 Scope: `flutter_app/` + `go_backend_rmt/` + `next_frontend_web/`  
 Prepared from: repo inspection, code-path review, documented module inventory, API parity snapshot, and market benchmark research
 
+Controlled follow-on documents produced from this report:
+
+- `RELEASE_READINESS_PLAN.md`
+- `docs/SMB_EDITION_SCOPE.md`
+- `docs/RELEASE_GATES_CHECKLIST.md`
+- `docs/MODULE_UAT_MATRIX.md`
+- `docs/REPO_GOVERNANCE_ARTIFACTS.md`
+
+This report remains the supporting market and architecture analysis. The controlled SMB launch baseline is now defined by the documents above.
+
 ## 1. Executive Summary
 
 EBS Lite is already beyond starter-ERP level. The current product surface covers retail/POS, inventory, purchases, sales, customers, suppliers, accounting, HR, workflow, reports, loyalty, promotions, warranty, notifications, cash registers, device sessions, offline outbox flows, and a meaningful set of control-sensitive backend protections.

@@ -6,6 +6,7 @@ import '../../../reports/presentation/report_categories.dart';
 import 'audit_logs_page.dart';
 import 'cash_register_page.dart';
 import 'day_end_flow_page.dart';
+import 'finance_integrity_page.dart';
 import 'ledgers_page.dart';
 import 'vouchers_page.dart';
 
@@ -48,6 +49,13 @@ class AccountingPage extends StatelessWidget {
         label: 'Ledgers',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const LedgersPage()),
+        ),
+      ),
+      FeatureItem(
+        icon: Icons.rule_folder_outlined,
+        label: 'Finance Integrity',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const FinanceIntegrityPage()),
         ),
       ),
       FeatureItem(

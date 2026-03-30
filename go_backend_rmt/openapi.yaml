@@ -4399,6 +4399,17 @@ paths:
                 $ref: '#/components/schemas/APIResponse'
     post:
       summary: POST /api/v1/payments
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
+      - name: X-Idempotency-Key
+        in: header
+        required: false
+        schema:
+          type: string
       responses:
         '200':
           description: Successful response
@@ -4600,6 +4611,57 @@ paths:
         required: true
         schema:
           type: string
+  /finance-integrity/diagnostics:
+    get:
+      summary: GET /api/v1/finance-integrity/diagnostics
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Finance diagnostics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /finance-integrity/replay:
+    post:
+      summary: POST /api/v1/finance-integrity/replay
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinanceReplayRequest'
+      responses:
+        '200':
+          description: Finance outbox replay result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /finance-integrity/repair-ledger:
+    post:
+      summary: POST /api/v1/finance-integrity/repair-ledger
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinanceRepairLedgerRequest'
+      responses:
+        '200':
+          description: Ledger repair result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
   /cash-registers:
     get:
       summary: GET /api/v1/cash-registers
@@ -6253,6 +6315,143 @@ components:
         refreshed_at:
           type: string
           format: date-time
+    FinanceIntegrityBucket:
+      type: object
+      properties:
+        event_type:
+          type: string
+        status:
+          type: string
+        count:
+          type: integer
+    FinanceIntegritySummary:
+      type: object
+      properties:
+        pending_count:
+          type: integer
+        processing_count:
+          type: integer
+        failed_count:
+          type: integer
+        completed_count:
+          type: integer
+        event_buckets:
+          type: array
+          items:
+            $ref: '#/components/schemas/FinanceIntegrityBucket'
+    FinanceOutboxEntry:
+      type: object
+      properties:
+        outbox_id:
+          type: integer
+        company_id:
+          type: integer
+        location_id:
+          type: integer
+          nullable: true
+        event_type:
+          type: string
+        aggregate_type:
+          type: string
+        aggregate_id:
+          type: integer
+        status:
+          type: string
+        attempt_count:
+          type: integer
+        last_error:
+          type: string
+          nullable: true
+        last_attempt_at:
+          type: string
+          format: date-time
+          nullable: true
+        next_attempt_at:
+          type: string
+          format: date-time
+        processed_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    FinanceLedgerMismatch:
+      type: object
+      properties:
+        document_type:
+          type: string
+        document_id:
+          type: integer
+        document_number:
+          type: string
+        location_id:
+          type: integer
+          nullable: true
+        document_date:
+          type: string
+          format: date-time
+          nullable: true
+        total_amount:
+          type: number
+          format: float
+        diagnostic:
+          type: string
+    FinanceIntegrityDiagnostics:
+      type: object
+      properties:
+        summary:
+          $ref: '#/components/schemas/FinanceIntegritySummary'
+        outbox_entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/FinanceOutboxEntry'
+        missing_ledger_entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/FinanceLedgerMismatch'
+    FinanceReplayRequest:
+      type: object
+      properties:
+        outbox_ids:
+          type: array
+          items:
+            type: integer
+        limit:
+          type: integer
+          nullable: true
+    FinanceReplayResult:
+      type: object
+      properties:
+        processed_count:
+          type: integer
+        succeeded_count:
+          type: integer
+        failed_count:
+          type: integer
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/FinanceOutboxEntry'
+    FinanceRepairLedgerRequest:
+      type: object
+      properties:
+        limit:
+          type: integer
+          nullable: true
+    FinanceRepairLedgerResult:
+      type: object
+      properties:
+        enqueued_count:
+          type: integer
+        processed_count:
+          type: integer
+        failed_count:
+          type: integer
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/FinanceOutboxEntry'
     GenericObject:
       type: object
       additionalProperties: true

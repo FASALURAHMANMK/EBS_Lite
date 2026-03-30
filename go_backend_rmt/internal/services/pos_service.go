@@ -186,10 +186,6 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 			return nil, err
 		}
 		if existing != nil {
-			// Best-effort: ensure cash register reflects the cash portion (idempotent by request id).
-			if !trainingEnabled {
-				s.recordCashRegisterForSale(companyID, locationID, userID, existing.SaleID, existing.SaleNumber, req, idemKey)
-			}
 			return existing, nil
 		}
 	}
@@ -293,13 +289,27 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 		}
 	}
 
+	cashInForSale := 0.0
+	if !trainingEnabled {
+		cashInForSale, err = s.cashInBaseFromPOSRequest(req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to calculate sale cash posting: %w", err)
+		}
+	}
+
 	sale, err := s.salesService.CreateSaleWithOptions(
 		companyID,
 		locationID,
 		userID,
 		saleReq,
 		&idempotencyKey,
-		CreateSaleOptions{IsTraining: trainingEnabled},
+		CreateSaleOptions{
+			IsTraining:                 trainingEnabled,
+			CashInAmount:               cashInForSale,
+			LoyaltyRedeemPoints:        plannedRedeemPoints,
+			CouponCode:                 strings.TrimSpace(ptrString(req.CouponCode)),
+			AutoFillRaffleCustomerData: req.AutoFillRaffleCustomerData,
+		},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process checkout: %w", err)
@@ -311,37 +321,11 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 		s.applyBusinessDateToSale(companyID, locationID, sale.SaleID)
 	}
 
-	// After sale is created, persist redemption and reduce points
-	if !trainingEnabled && sale != nil && req.CustomerID != nil && plannedRedeemPoints > 0 {
-		loyalty := NewLoyaltyService()
-		if _, _, err := loyalty.RedeemPointsForSale(companyID, *req.CustomerID, sale.SaleID, plannedRedeemPoints); err != nil {
-			// Log but do not fail sale; mismatch could happen if race condition
-			log.Printf("Warning: failed to persist loyalty redemption for sale %d: %v", sale.SaleID, err)
-		}
-	}
-
-	if !trainingEnabled && sale != nil && req.CouponCode != nil && strings.TrimSpace(*req.CouponCode) != "" {
-		if err := NewLoyaltyService().RedeemCouponCode(companyID, strings.TrimSpace(*req.CouponCode), sale.SaleID, req.CustomerID); err != nil {
-			log.Printf("warning: failed to redeem coupon %q for sale %d: %v", strings.TrimSpace(*req.CouponCode), sale.SaleID, err)
-		}
-	}
-
-	if !trainingEnabled && sale != nil {
-		if _, err := NewLoyaltyService().IssueRaffleCouponsForSale(companyID, sale.SaleID, req.CustomerID, req.AutoFillRaffleCustomerData); err != nil {
-			log.Printf("warning: failed to issue raffle coupons for sale %d: %v", sale.SaleID, err)
-		}
-	}
-
 	// Record payment breakdown if provided
 	if len(req.Payments) > 0 {
 		if err := s.recordSalePayments(nil, sale.SaleID, req.Payments); err != nil {
 			log.Printf("warning: failed to record sale payments for sale %d: %v", sale.SaleID, err)
 		}
-	}
-
-	// Best-effort: update cash register totals for cash payments (do not block checkout).
-	if !trainingEnabled {
-		s.recordCashRegisterForSale(companyID, locationID, userID, sale.SaleID, sale.SaleNumber, req, idemKey)
 	}
 
 	// Best-effort audit log when a manager override was used (do not fail the sale).

@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"erp-backend/internal/models"
 	"erp-backend/internal/services"
@@ -79,6 +80,11 @@ func (h *PaymentHandler) CreatePayment(c *gin.Context) {
 	if err := utils.ValidateStruct(&req); err != nil {
 		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
 		return
+	}
+	if idemKey := strings.TrimSpace(c.GetHeader("Idempotency-Key")); idemKey != "" {
+		req.IdempotencyKey = &idemKey
+	} else if idemKey := strings.TrimSpace(c.GetHeader("X-Idempotency-Key")); idemKey != "" {
+		req.IdempotencyKey = &idemKey
 	}
 
 	p, err := h.service.CreatePayment(companyID, locationID, userID, &req)

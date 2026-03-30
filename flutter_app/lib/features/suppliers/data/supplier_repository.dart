@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/api_client.dart';
 import '../../../core/offline_cache/offline_cache_providers.dart';
@@ -159,6 +160,7 @@ class SupplierRepository {
     if (loc == null) {
       throw StateError('Location not selected');
     }
+    final idemKey = const Uuid().v4();
     final payload = <String, dynamic>{
       'amount': amount,
       if (supplierId != null) 'supplier_id': supplierId,
@@ -170,8 +172,15 @@ class SupplierRepository {
         'reference_number': reference,
       if (notes != null && notes.isNotEmpty) 'notes': notes,
     };
-    final res = await _dio.post('/payments',
-        data: payload, queryParameters: {'location_id': loc});
+    final res = await _dio.post(
+      '/payments',
+      data: payload,
+      queryParameters: {'location_id': loc},
+      options: Options(headers: {
+        'Idempotency-Key': idemKey,
+        'X-Idempotency-Key': idemKey,
+      }),
+    );
     final body = res.data is Map && (res.data['data'] != null)
         ? res.data['data'] as Map<String, dynamic>
         : res.data as Map<String, dynamic>;

@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -113,34 +114,7 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 			return nil, err
 		}
 		if existing != nil {
-			// Best-effort: ensure cash register reflects the cash portion (idempotent by request id).
-			{
-				isCash := true
-				if existing.PaymentMethodID != nil {
-					var t string
-					if err := s.db.QueryRow(`SELECT type FROM payment_methods WHERE method_id = $1`, *existing.PaymentMethodID).Scan(&t); err == nil {
-						isCash = strings.EqualFold(strings.TrimSpace(t), "CASH")
-					}
-				}
-				if isCash && existing.Amount > 0 {
-					note := fmt.Sprintf("collection_id=%d collection_number=%s", existing.CollectionID, existing.CollectionNumber)
-					_ = (&CashRegisterService{db: s.db}).RecordCashTransactionTx(
-						nil,
-						companyID,
-						locationID,
-						userID,
-						"IN",
-						existing.Amount,
-						"COLLECTION",
-						fmt.Sprintf("collection:%d", existing.CollectionID),
-						&note,
-						"",
-						idemKey,
-					)
-				}
-			}
-			// Best-effort: ensure accounting ledger entries exist (idempotent by reference).
-			_ = (&LedgerService{db: s.db}).RecordCollection(companyID, existing.CollectionID, userID)
+			_ = NewFinanceIntegrityServiceWithDB(s.db).ProcessAggregate(companyID, "collection", existing.CollectionID)
 			return existing, nil
 		}
 	}
@@ -204,6 +178,7 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 				return nil, lookupErr
 			}
 			if existing != nil {
+				_ = NewFinanceIntegrityServiceWithDB(s.db).ProcessAggregate(companyID, "collection", existing.CollectionID)
 				return existing, nil
 			}
 		}
@@ -315,7 +290,19 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 		}
 	}
 
-	// Best-effort: update cash register for cash collections.
+	finance := NewFinanceIntegrityServiceWithDB(s.db)
+	if err := finance.EnqueueTx(tx, &models.FinanceOutboxEntry{
+		CompanyID:     companyID,
+		LocationID:    &locationID,
+		EventType:     financeEventLedgerCollection,
+		AggregateType: "collection",
+		AggregateID:   col.CollectionID,
+		Payload:       models.JSONB{},
+		CreatedBy:     &userID,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to enqueue collection ledger posting: %w", err)
+	}
+
 	{
 		isCash := true
 		if req.PaymentMethodID != nil {
@@ -326,19 +313,23 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 		}
 		if isCash && req.Amount > 0 {
 			note := fmt.Sprintf("collection_id=%d collection_number=%s", col.CollectionID, col.CollectionNumber)
-			_ = (&CashRegisterService{db: s.db}).RecordCashTransactionTx(
-				tx,
-				companyID,
-				locationID,
-				userID,
-				"IN",
-				req.Amount,
-				"COLLECTION",
-				fmt.Sprintf("collection:%d", col.CollectionID),
-				&note,
-				"",
-				idemKey,
-			)
+			if err := finance.EnqueueTx(tx, &models.FinanceOutboxEntry{
+				CompanyID:     companyID,
+				LocationID:    &locationID,
+				EventType:     financeEventCashCollection,
+				AggregateType: "collection",
+				AggregateID:   col.CollectionID,
+				Payload: models.JSONB{
+					"amount":      req.Amount,
+					"direction":   "IN",
+					"event_type":  "COLLECTION",
+					"reason_code": fmt.Sprintf("collection:%d", col.CollectionID),
+					"notes":       note,
+				},
+				CreatedBy: &userID,
+			}); err != nil {
+				return nil, fmt.Errorf("failed to enqueue collection cash register event: %w", err)
+			}
 		}
 	}
 
@@ -346,8 +337,9 @@ func (s *CollectionService) CreateCollection(companyID, locationID, userID int, 
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	// Best-effort: post to accounting ledger (idempotent by reference).
-	_ = (&LedgerService{db: s.db}).RecordCollection(companyID, col.CollectionID, userID)
+	if err := finance.ProcessAggregate(companyID, "collection", col.CollectionID); err != nil {
+		log.Printf("collection_service: failed to process finance outbox for collection %d: %v", col.CollectionID, err)
+	}
 
 	col.CustomerID = req.CustomerID
 	col.LocationID = locationID

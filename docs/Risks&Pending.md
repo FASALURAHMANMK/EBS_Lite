@@ -1,0 +1,17 @@
+Prompt 1
+Exact Remaining Gaps
+Flutter still has a reachable placeholder-quality Help & support action in dashboard_sidebar.dart.
+Flutter still has a localhost fallback in app_config.dart; production builds must override API_BASE_URL.
+Launch-critical operator assets are still missing and now listed in REPO_GOVERNANCE_ARTIFACTS.md: cashier SOP, day-close SOP, purchase/inventory SOPs, backup/restore runbook, demo dataset manifest/reset guide, support triage guide, and related launch docs.
+The web shell remains a limited secondary surface with no automated test baseline; it should not be sold as full parity with Flutter.
+
+Prompt 2
+Risk List
+Historical cash-register mismatches are not yet surfaced by a dedicated reconciliation query; the new diagnostics currently focus on outbox backlog and missing ledger postings.
+Goods receipt, held sale, and void sale are classified/documented in this slice, but they do not yet have dedicated mismatch rows in the new diagnostics endpoint.
+Operator-visible async state is currently centralized in Accounts > Finance Integrity; cashier/POS screens themselves were not expanded with new per-document async badges in this slice.
+No seeded finance/UAT demo dataset was added here.
+Exact Remaining Gaps
+Missing: dedicated cash-register reconciliation diagnostics for legacy/historical documents.
+Missing: dedicated diagnostics rows for held-sale/void-sale/goods-receipt support trails.
+Missing: seeded reproducible finance demo/UAT dataset for this new diagnostics flow.
