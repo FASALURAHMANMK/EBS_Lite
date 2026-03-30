@@ -286,12 +286,15 @@ Controlled scope note:
 
 ### Security controls
 - **Available**: Session-limit controls (set/update/delete).
+- **Available**: Company-level password policy controls (minimum length, character classes).
+- **Available**: Company-level session idle timeout and elevated-access window controls.
+- **Available**: Elevated step-up verification required for security-sensitive settings changes.
 - **Available**: Device-control settings endpoint support (UI depends on permissions).
 - **Available**: User preferences endpoints for per-user configuration.
 
 ### Supportability
-- **Available**: Support bundle generation in-app (includes outbox health snapshot) for sharing with support.
-- **Backend-ready**: `/support/bundle` endpoint exists (not currently used by Flutter UI).
+- **Available**: Support bundle generation in-app (includes outbox health snapshot and backend diagnostics when reachable) for sharing with support.
+- **Available**: `/support/bundle` backend endpoint is now consumed by Flutter support-bundle generation when available.
 
 ---
 

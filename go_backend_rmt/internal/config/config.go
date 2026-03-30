@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -197,4 +199,85 @@ func parseCSV(key, defaultValue string) []string {
 		}
 	}
 	return result
+}
+
+func (c *Config) ProductionReadinessIssues() []string {
+	if c == nil {
+		return []string{"config is nil"}
+	}
+	var issues []string
+	if strings.TrimSpace(c.Environment) != "production" {
+		return issues
+	}
+	if isWeakProductionJWTSecret(c.JWTSecret) {
+		issues = append(issues, "JWT_SECRET is weak or default")
+	}
+	if len(c.AllowedOrigins) == 0 {
+		issues = append(issues, "ALLOWED_ORIGINS must list deployed origins")
+	}
+	for _, origin := range c.AllowedOrigins {
+		o := strings.TrimSpace(strings.ToLower(origin))
+		if o == "" {
+			continue
+		}
+		if o == "*" {
+			issues = append(issues, "ALLOWED_ORIGINS must not contain wildcard '*' in production")
+			continue
+		}
+		if isLocalHostString(o) {
+			issues = append(issues, fmt.Sprintf("ALLOWED_ORIGINS contains local origin %s", origin))
+		}
+	}
+	if err := validateFrontendBaseURL(c.FrontendBaseURL); err != nil {
+		issues = append(issues, err.Error())
+	}
+	if !c.RateLimitEnabled {
+		issues = append(issues, "RATE_LIMIT_ENABLED must remain true in production")
+	}
+	if c.RateLimitFailOpen {
+		issues = append(issues, "RATE_LIMIT_FAIL_OPEN should be false in production")
+	}
+	if (c.RateLimitEnabled || c.SessionLastSeenUseRedis || c.ReadyCheckRedis) && strings.TrimSpace(c.RedisURL) == "" {
+		issues = append(issues, "REDIS_URL is required for the configured production posture")
+	}
+	return issues
+}
+
+func (c *Config) ValidateProductionReadiness() error {
+	issues := c.ProductionReadinessIssues()
+	if len(issues) == 0 {
+		return nil
+	}
+	return fmt.Errorf(strings.Join(issues, "; "))
+}
+
+func isWeakProductionJWTSecret(secret string) bool {
+	trimmed := strings.TrimSpace(secret)
+	if trimmed == "" {
+		return true
+	}
+	if trimmed == "your-super-secret-jwt-key-change-this-in-production" || trimmed == "change_me_in_production" {
+		return true
+	}
+	return len(trimmed) < 32
+}
+
+func validateFrontendBaseURL(raw string) error {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return fmt.Errorf("FRONTEND_BASE_URL must be set in production")
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return fmt.Errorf("FRONTEND_BASE_URL must be a full URL in production")
+	}
+	if isLocalHostString(strings.ToLower(parsed.Hostname())) {
+		return fmt.Errorf("FRONTEND_BASE_URL must not point to localhost in production")
+	}
+	return nil
+}
+
+func isLocalHostString(value string) bool {
+	value = strings.TrimSpace(strings.ToLower(value))
+	return strings.Contains(value, "localhost") || strings.Contains(value, "127.0.0.1") || strings.Contains(value, "0.0.0.0")
 }

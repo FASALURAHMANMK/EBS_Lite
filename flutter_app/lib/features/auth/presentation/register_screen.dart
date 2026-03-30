@@ -66,7 +66,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String? _validatePassword(String? v) {
     final value = (v ?? '');
     if (value.isEmpty) return 'Password is required';
-    if (value.length < 6) return 'Use at least 6 characters';
+    if (value.length < 10) return 'Use at least 10 characters';
+    if (!RegExp(r'[A-Z]').hasMatch(value)) {
+      return 'Include at least one uppercase letter';
+    }
+    if (!RegExp(r'[a-z]').hasMatch(value)) {
+      return 'Include at least one lowercase letter';
+    }
+    if (!RegExp(r'[0-9]').hasMatch(value)) {
+      return 'Include at least one number';
+    }
+    if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-\[\]\\/=+~`]').hasMatch(value)) {
+      return 'Include at least one special character';
+    }
     return null;
   }
 
@@ -307,6 +319,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                               ?.copyWith(color: strengthColor),
                                         ),
                                       ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Use 10+ characters with uppercase, lowercase, number, and symbol.',
+                                      style:
+                                          theme.textTheme.bodySmall?.copyWith(
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                      ),
                                     ),
                                   ],
                                 );

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -59,8 +58,10 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	if cfg.Environment == "production" && isWeakJWTSecret(cfg.JWTSecret) {
-		log.Fatal("Refusing to start: JWT_SECRET is weak or default in production")
+	if cfg.Environment == "production" {
+		if err := cfg.ValidateProductionReadiness(); err != nil {
+			log.Fatalf("Refusing to start: %v", err)
+		}
 	}
 
 	// Initialize Gin router
@@ -104,15 +105,4 @@ func main() {
 		log.Printf("Graceful shutdown failed: %v", err)
 	}
 	log.Println("Server stopped")
-}
-
-func isWeakJWTSecret(secret string) bool {
-	trimmed := strings.TrimSpace(secret)
-	if trimmed == "" {
-		return true
-	}
-	if trimmed == "your-super-secret-jwt-key-change-this-in-production" {
-		return true
-	}
-	return len(trimmed) < 32
 }

@@ -50,12 +50,12 @@ type ForgotPasswordRequest struct {
 
 type ResetPasswordRequest struct {
 	Token       string `json:"token" validate:"required"`
-	NewPassword string `json:"new_password" validate:"required,min=6"`
+	NewPassword string `json:"new_password" validate:"required,min=8"`
 }
 
 type ChangePasswordRequest struct {
 	CurrentPassword string `json:"current_password" validate:"required"`
-	NewPassword     string `json:"new_password" validate:"required,min=6"`
+	NewPassword     string `json:"new_password" validate:"required,min=8"`
 }
 
 type JWTClaims struct {
@@ -80,7 +80,7 @@ type Language struct {
 type RegisterRequest struct {
 	Username          string  `json:"username" validate:"required,min=3,max=50"`
 	Email             string  `json:"email" validate:"required,email"`
-	Password          string  `json:"password" validate:"required,min=6"`
+	Password          string  `json:"password" validate:"required,min=8"`
 	FirstName         *string `json:"first_name,omitempty"`
 	LastName          *string `json:"last_name,omitempty"`
 	Phone             *string `json:"phone,omitempty"`

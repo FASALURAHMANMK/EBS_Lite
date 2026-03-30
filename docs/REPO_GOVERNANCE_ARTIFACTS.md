@@ -15,10 +15,21 @@ Purpose: inventory release-governance documents, identify missing or stale artif
 | Market readiness analysis | `docs/release_market_readiness_report.md` | Current but analytical | Input to baseline, not the release checklist itself |
 | Module feature inventory | `docs/module_wise_feature_list.md` | Updated to reference baseline | Descriptive feature inventory |
 | Accounting manual | `docs/ACCOUNTING_MODULE_USER_MANUAL.md` | Current | Governs current accounting behavior claims |
+| Operator SOP pack | `docs/OPERATOR_SOPS.md` | Created in release hardening slice | Cashier, day close, purchase, and inventory SOPs |
+| Release operations runbook | `docs/RELEASE_OPERATIONS_RUNBOOK.md` | Created in release hardening slice | Backup, restore, monitoring, incident, deployment, rollback, checklist |
+| Security operations guide | `docs/SECURITY_OPERATIONS_GUIDE.md` | Created in release hardening slice | Secrets, origins, step-up controls, rate-limit posture |
+| Demo dataset and onboarding pack | `docs/DEMO_DATASET_AND_ONBOARDING.md` | Created in release hardening slice | Dataset manifest, reset notes, onboarding checklist, support bundle guidance |
+| SMB feature matrix | `docs/SMB_FEATURE_MATRIX.md` | Created in release hardening slice | Edition-ready packaging view |
+| UAT evidence pack | `docs/UAT_EVIDENCE_PACK.md` | Created in release hardening slice | Records automated evidence and remaining manual UAT gap |
+| Go / no-go summary | `docs/GO_NO_GO_SUMMARY.md` | Created in release hardening slice | Controlled launch decision summary |
+| Known limitations register | `docs/KNOWN_LIMITATIONS_AND_ISSUES.md` | Created in release hardening slice | Accepted claim limits and launch caveats |
+| Release notes template | `docs/RELEASE_NOTES_TEMPLATE.md` | Created in release hardening slice | Standardized release communication template |
 | API parity report | `tools/api_parity_report.md` | Generated artifact | Must be regenerated when API claims change |
 | Web route parity note | `go_backend_rmt/internal/routes/FRONTEND_PARITY.md` | Current | Describes web route coverage, not launch scope |
 | Flutter requirements pointer | `flutter_app/ERP System Requirements Document.txt` | Created in this baseline | Fulfills `AGENTS.md` read-first path |
 | Backend requirements pointer | `go_backend_rmt/Docs & Schema/ERP System Requirements Document.txt` | Created in this baseline | Fulfills `AGENTS.md` read-first path |
+| Backend production env template | `go_backend_rmt/.env.production.template` | Created in release hardening slice | Deployment-safe backend template |
+| Flutter production defines template | `flutter_app/dart_defines.production.example.json` | Created in release hardening slice | Packaged build template |
 
 ## 2. Missing launch-critical artifacts still required
 
@@ -26,18 +37,7 @@ These are still missing after this documentation slice and remain launch blocker
 
 | Priority | Required artifact | Expected purpose |
 |---|---|---|
-| P0 | POS cashier SOP | Open sale, hold/resume, split payment, offline behavior, receipt reprint, void/override handling |
-| P0 | Day open/close SOP | Register open, tally, movement, variance review, day close |
-| P0 | Purchase receiving and return SOP | PO, GRN, quick purchase, attachments, return handling |
-| P0 | Inventory control SOP | Product setup, stock adjustment, transfer, serial/batch handling |
-| P0 | Backup/restore runbook | Operator-safe backup, restore, retention, and recovery validation |
-| P0 | Demo dataset manifest and reset guide | Reproducible launch demo/UAT data with reset instructions |
-| P0 | Support triage and escalation guide | Support bundle usage, first response, escalation path, issue classification |
-| P1 | Release install/upgrade runbook | Deployment, upgrade order, smoke checks, rollback notes |
-| P1 | Known issues register | Controlled record of accepted non-blockers at launch |
-| P1 | Release notes template | Standardized release communication artifact |
-| P1 | Sales/operator onboarding pack | Role-based onboarding for cashiers, managers, accountant, purchaser |
-| P1 | Security operations checklist | Secret rotation, password reset URL validation, support bundle posture, upload policy verification |
+| P0 | Manual release-candidate UAT sign-off | Signed operator evidence against blocker scenarios in `docs/MODULE_UAT_MATRIX.md` |
 
 ## 3. Stale or insufficient artifacts
 

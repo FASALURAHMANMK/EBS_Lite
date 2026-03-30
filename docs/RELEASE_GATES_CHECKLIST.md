@@ -52,6 +52,7 @@ Applies to: SMB Edition launch candidate
 
 - [ ] Permission-gated actions have positive and negative test coverage.
 - [ ] Session revocation, request IDs, and rate limiting remain enabled.
+- [ ] Security-sensitive settings changes require elevated verification in the shipped build.
 - [ ] Password reset URL is configured to a real deployed frontend.
 - [ ] Support bundle exposure is explicitly approved for the deployment environment.
 

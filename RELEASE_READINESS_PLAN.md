@@ -34,12 +34,8 @@ The following assumptions were confirmed by repo inspection on 2026-03-30:
 - The Go backend supports a wider capability set than the currently commercialized Flutter and web UI surface.
 - The Next.js web application exists and is useful as an office/admin shell, but `go_backend_rmt/internal/routes/FRONTEND_PARITY.md` still marks many backend route groups as reserved or intentionally unused there.
 - `tools/api_parity_report.md` currently shows no Flutter-called endpoints missing from OpenAPI and no method mismatches.
-- The repo still lacked the read-first documents required by `AGENTS.md` before this update:
-  - `RELEASE_READINESS_PLAN.md`
-  - `flutter_app/ERP System Requirements Document.txt`
-  - `go_backend_rmt/Docs & Schema/ERP System Requirements Document.txt`
-- There is still at least one reachable placeholder-quality experience in production navigation:
-  - Flutter `Help & support` drawer action only shows a snackbar and is not a real help workflow.
+- The read-first documents required by `AGENTS.md` now exist at the expected paths.
+- The shipped Flutter help and support entry now resolves to live operational help content rather than a placeholder action.
 - The Flutter app uses `String.fromEnvironment('API_BASE_URL')` correctly, but still falls back to `http://127.0.0.1:8080/api/v1`; this is acceptable for local development and a release risk for packaged builds if not overridden.
 
 ## 3. Commercial release position
@@ -86,7 +82,7 @@ Current baseline:
 
 - Go service and migration structure is present
 - no new migration work is required for this documentation slice
-- demo dataset and seeded reference data are still missing as governed artifacts
+- demo dataset and onboarding assets are now governed by `docs/DEMO_DATASET_AND_ONBOARDING.md`
 
 ### 4.3 API and OpenAPI
 
@@ -113,7 +109,7 @@ Current baseline:
 
 - feature boundaries are largely preserved
 - offline foundations are present
-- at least one reachable support/help action is still placeholder-quality
+- the support/help flow is now a live workflow and no longer a placeholder-quality action
 
 ### 4.5 Permissions and security
 
@@ -127,7 +123,7 @@ Required release outcome:
 Current baseline:
 
 - auth, sessions, request IDs, rate limiting, upload validation, and audit logs are present
-- production secret/config hardening still needs release sign-off outside the repo docs
+- production secret/config guidance now exists in repo docs and templates, but release sign-off still requires environment-specific verification
 
 ### 4.6 Offline, outbox, and idempotency
 
@@ -155,7 +151,7 @@ Required release outcome:
 Current baseline:
 
 - accounting documentation is materially ahead of the rest of the operator doc set
-- launch runbooks, demo dataset pack, release notes template, and support SOPs are still missing and remain blockers
+- launch runbooks, demo dataset pack, operator SOPs, and release templates now exist in repo and must be kept current with the release candidate
 
 ## 5. Frozen SMB scope summary
 
@@ -192,13 +188,13 @@ Severity definitions:
 | GAP-01 | P0 | Finance integrity and reconciliation confidence must be proven end to end | Release report identifies financial integrity and banking/close operations as largest SMB gaps | UAT evidence covers sale, return, purchase, collection, expense, cash close, and accounting reports without drift |
 | GAP-02 | P0 | Banking and reconciliation are not first-class launch workflows | `docs/release_market_readiness_report.md` identifies bank reconciliation and close controls as missing depth | SMB claim text excludes bank reconciliation; release notes and sales collateral do not imply treasury depth |
 | GAP-03 | P0 | Governance baseline was incomplete and required read-first docs were missing | `AGENTS.md` referenced three missing documents before this change | Required baseline docs exist, cross-reference each other, and are kept current in repo |
-| GAP-04 | P0 | Operator launch package is incomplete | Only accounting has a substantive user manual today; no demo dataset manifest or launch SOP set exists | Launch pack includes UAT matrix, demo dataset manifest, operator guides, backup/restore SOP, release checklist, and support triage guide |
-| GAP-05 | P1 | Reachable placeholder support action remains in Flutter navigation | `dashboard_sidebar.dart` help action shows snackbar text: "wire up your help center" | Replace with real support flow or remove from production builds |
+| GAP-04 | P0 | Operator launch package must stay complete and current | Launch docs now exist, but UAT evidence and final sign-off still determine release readiness | Launch pack includes UAT matrix, demo dataset manifest, operator guides, backup/restore SOP, release checklist, and support triage guide |
+| GAP-05 | P1 | Security hardening must be verified in the packaged deployment | Security policy, session timeout, and step-up controls now exist but must be validated in the actual release environment | Production verification evidence is attached to the release candidate |
 | GAP-06 | P1 | Web app is not a parity-safe launch surface | `go_backend_rmt/internal/routes/FRONTEND_PARITY.md` marks many web route groups as reserved/intentionally unused; `next_frontend_web/README.md` says tests are not configured | Market web app as limited office shell only until its own gates exist |
 | GAP-07 | P1 | Backend-ready endpoints exceed commercialized UI scope | `tools/api_parity_report.md` lists multiple OpenAPI paths unused by Flutter | Each unused endpoint is classified as internal, future, or intentionally uncommercialized |
 | GAP-08 | P1 | Production config still depends on external discipline | `go_backend_rmt/.env.example` includes `JWT_SECRET=change_me_in_production`; Flutter fallback base URL is localhost | Release gate requires production env verification and packaged build review |
 | GAP-09 | P1 | Workflow and notifications are present but lightly wired into high-risk flows | Current reports call out workflow depth as a gap | Limit claims to current approval list/review behavior until more flows are wired |
-| GAP-10 | P1 | Demo dataset and onboarding assets are missing | No governed demo dataset manifest or onboarding pack found in repo | Add seeded demo data spec and operator onboarding materials |
+| GAP-10 | P1 | Demo dataset repeatability is documented but not yet one-command automated | Repo now contains the governed manifest and onboarding pack, but full reseed automation is still absent | Add or accept the manual controlled reset process explicitly |
 | GAP-11 | P2 | Flutter domain isolation is incomplete | Current market readiness report notes limited domain isolation | Track as architecture debt, not a launch blocker |
 | GAP-12 | P2 | Asset/consumable and similar newer backend/UI slices are not yet commercialized | Inventory surface includes assets/consumables, but they are not part of current market narrative or module feature list | Decide ship, pilot, or hide before any public claim |
 

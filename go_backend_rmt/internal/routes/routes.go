@@ -788,6 +788,8 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 
 				settings.GET("/device-control", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetDeviceControlSettings)
 				settings.PUT("/device-control", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.UpdateDeviceControlSettings)
+				settings.GET("/security-policy", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetSecurityPolicy)
+				settings.PUT("/security-policy", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.UpdateSecurityPolicy)
 
 				settings.GET("/session-limit", middleware.RequirePermission("VIEW_SETTINGS"), settingsHandler.GetSessionLimit)
 				settings.POST("/session-limit", middleware.RequirePermission("MANAGE_SETTINGS"), settingsHandler.SetSessionLimit)

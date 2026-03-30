@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"erp-backend/internal/models"
 	"erp-backend/internal/services"
@@ -217,6 +218,9 @@ func (h *SettingsHandler) UpdateDeviceControlSettings(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
+	if !requireSecurityStepUp(c, companyID) {
+		return
+	}
 	var req models.DeviceControlSettings
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
@@ -227,6 +231,41 @@ func (h *SettingsHandler) UpdateDeviceControlSettings(c *gin.Context) {
 		return
 	}
 	utils.SuccessResponse(c, "Device control settings updated successfully", nil)
+}
+
+func (h *SettingsHandler) GetSecurityPolicy(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	settings, err := h.service.GetSecurityPolicy(companyID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get security policy", err)
+		return
+	}
+	utils.SuccessResponse(c, "Security policy retrieved successfully", settings)
+}
+
+func (h *SettingsHandler) UpdateSecurityPolicy(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	if !requireSecurityStepUp(c, companyID) {
+		return
+	}
+	var req models.SecurityPolicySettings
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := h.service.UpdateSecurityPolicy(companyID, req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update security policy", err)
+		return
+	}
+	utils.SuccessResponse(c, "Security policy updated successfully", nil)
 }
 
 // Session limit settings
@@ -248,6 +287,9 @@ func (h *SettingsHandler) SetSessionLimit(c *gin.Context) {
 	companyID := c.GetInt("company_id")
 	if companyID == 0 {
 		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	if !requireSecurityStepUp(c, companyID) {
 		return
 	}
 	var req models.SessionLimitRequest
@@ -272,11 +314,27 @@ func (h *SettingsHandler) DeleteSessionLimit(c *gin.Context) {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
 	}
+	if !requireSecurityStepUp(c, companyID) {
+		return
+	}
 	if err := h.service.DeleteMaxSessions(companyID); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to delete session limit", err)
 		return
 	}
 	utils.SuccessResponse(c, "Session limit deleted successfully", nil)
+}
+
+func requireSecurityStepUp(c *gin.Context, companyID int) bool {
+	token := strings.TrimSpace(c.GetHeader("X-Step-Up-Token"))
+	if token == "" {
+		utils.ForbiddenResponse(c, "Elevated verification required for security changes")
+		return false
+	}
+	if _, err := services.ValidateOverrideToken(token, companyID, []string{"MANAGE_SETTINGS"}); err != nil {
+		utils.ErrorResponse(c, http.StatusUnauthorized, "Invalid elevated verification", err)
+		return false
+	}
+	return true
 }
 
 // Payment methods CRUD

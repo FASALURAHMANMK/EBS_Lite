@@ -136,3 +136,46 @@ class SessionLimitDto {
         maxSessions: (json['max_sessions'] as num?)?.toInt() ?? 0,
       );
 }
+
+class SecurityPolicyDto {
+  final int minPasswordLength;
+  final bool requireUppercase;
+  final bool requireLowercase;
+  final bool requireNumber;
+  final bool requireSpecial;
+  final int sessionIdleTimeoutMins;
+  final int elevatedAccessWindowMins;
+
+  const SecurityPolicyDto({
+    this.minPasswordLength = 10,
+    this.requireUppercase = true,
+    this.requireLowercase = true,
+    this.requireNumber = true,
+    this.requireSpecial = true,
+    this.sessionIdleTimeoutMins = 480,
+    this.elevatedAccessWindowMins = 5,
+  });
+
+  factory SecurityPolicyDto.fromJson(Map<String, dynamic> json) =>
+      SecurityPolicyDto(
+        minPasswordLength: (json['min_password_length'] as num?)?.toInt() ?? 10,
+        requireUppercase: json['require_uppercase'] as bool? ?? true,
+        requireLowercase: json['require_lowercase'] as bool? ?? true,
+        requireNumber: json['require_number'] as bool? ?? true,
+        requireSpecial: json['require_special'] as bool? ?? true,
+        sessionIdleTimeoutMins:
+            (json['session_idle_timeout_mins'] as num?)?.toInt() ?? 480,
+        elevatedAccessWindowMins:
+            (json['elevated_access_window_mins'] as num?)?.toInt() ?? 5,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'min_password_length': minPasswordLength,
+        'require_uppercase': requireUppercase,
+        'require_lowercase': requireLowercase,
+        'require_number': requireNumber,
+        'require_special': requireSpecial,
+        'session_idle_timeout_mins': sessionIdleTimeoutMins,
+        'elevated_access_window_mins': elevatedAccessWindowMins,
+      };
+}

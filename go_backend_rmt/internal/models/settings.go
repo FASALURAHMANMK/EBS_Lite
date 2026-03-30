@@ -63,6 +63,17 @@ type DeviceControlSettings struct {
 	AllowRemote bool `json:"allow_remote"`
 }
 
+// SecurityPolicySettings holds password and session hardening policy for a company.
+type SecurityPolicySettings struct {
+	MinPasswordLength        int  `json:"min_password_length"`
+	RequireUppercase         bool `json:"require_uppercase"`
+	RequireLowercase         bool `json:"require_lowercase"`
+	RequireNumber            bool `json:"require_number"`
+	RequireSpecial           bool `json:"require_special"`
+	SessionIdleTimeoutMins   int  `json:"session_idle_timeout_mins"`
+	ElevatedAccessWindowMins int  `json:"elevated_access_window_mins"`
+}
+
 // PrinterProfile represents a printer configuration profile
 type PrinterProfile struct {
 	PrinterID    int     `json:"printer_id" db:"printer_id"`

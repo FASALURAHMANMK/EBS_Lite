@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE IF NOT EXISTS workflow_requests (
     approval_id SERIAL PRIMARY KEY,
     company_id INT NOT NULL REFERENCES companies(company_id),
@@ -52,3 +53,7 @@ CREATE TABLE IF NOT EXISTS workflow_request_events (
 
 CREATE INDEX IF NOT EXISTS idx_workflow_request_events_request
     ON workflow_request_events(approval_id, created_at DESC);
+
+-- +goose Down
+DROP TABLE IF EXISTS workflow_request_events;
+DROP TABLE IF EXISTS workflow_requests;

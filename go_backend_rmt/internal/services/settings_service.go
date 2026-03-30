@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"erp-backend/internal/utils"
 	"github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 
@@ -319,6 +320,56 @@ func (s *SettingsService) GetDeviceControlSettings(companyID int) (*models.Devic
 
 func (s *SettingsService) UpdateDeviceControlSettings(companyID int, cfg models.DeviceControlSettings) error {
 	return s.updateJSONSetting(companyID, "device_control", cfg)
+}
+
+// Security policy settings
+func (s *SettingsService) GetSecurityPolicy(companyID int) (*models.SecurityPolicySettings, error) {
+	defaults := utils.DefaultPasswordPolicy()
+	cfg := &models.SecurityPolicySettings{
+		MinPasswordLength:        defaults.MinPasswordLength,
+		RequireUppercase:         defaults.RequireUppercase,
+		RequireLowercase:         defaults.RequireLowercase,
+		RequireNumber:            defaults.RequireNumber,
+		RequireSpecial:           defaults.RequireSpecial,
+		SessionIdleTimeoutMins:   defaults.SessionIdleTimeoutMins,
+		ElevatedAccessWindowMins: defaults.ElevatedAccessWindowMins,
+	}
+	if err := s.getJSONSetting(companyID, "security_policy", cfg); err != nil {
+		return nil, err
+	}
+	policy := utils.NormalizePasswordPolicy(utils.PasswordPolicy{
+		MinPasswordLength:        cfg.MinPasswordLength,
+		RequireUppercase:         cfg.RequireUppercase,
+		RequireLowercase:         cfg.RequireLowercase,
+		RequireNumber:            cfg.RequireNumber,
+		RequireSpecial:           cfg.RequireSpecial,
+		SessionIdleTimeoutMins:   cfg.SessionIdleTimeoutMins,
+		ElevatedAccessWindowMins: cfg.ElevatedAccessWindowMins,
+	})
+	cfg.MinPasswordLength = policy.MinPasswordLength
+	cfg.SessionIdleTimeoutMins = policy.SessionIdleTimeoutMins
+	cfg.ElevatedAccessWindowMins = policy.ElevatedAccessWindowMins
+	return cfg, nil
+}
+
+func (s *SettingsService) UpdateSecurityPolicy(companyID int, cfg models.SecurityPolicySettings) error {
+	policy := utils.PasswordPolicy{
+		MinPasswordLength:        cfg.MinPasswordLength,
+		RequireUppercase:         cfg.RequireUppercase,
+		RequireLowercase:         cfg.RequireLowercase,
+		RequireNumber:            cfg.RequireNumber,
+		RequireSpecial:           cfg.RequireSpecial,
+		SessionIdleTimeoutMins:   cfg.SessionIdleTimeoutMins,
+		ElevatedAccessWindowMins: cfg.ElevatedAccessWindowMins,
+	}
+	if err := utils.ValidatePasswordPolicyConfig(policy); err != nil {
+		return err
+	}
+	policy = utils.NormalizePasswordPolicy(policy)
+	cfg.MinPasswordLength = policy.MinPasswordLength
+	cfg.SessionIdleTimeoutMins = policy.SessionIdleTimeoutMins
+	cfg.ElevatedAccessWindowMins = policy.ElevatedAccessWindowMins
+	return s.updateJSONSetting(companyID, "security_policy", cfg)
 }
 
 // ensureSettingsPermissions inserts required settings permissions and assigns

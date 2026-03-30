@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../../core/error_handler.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import '../../../../shared/widgets/app_confirm_dialog.dart';
+import '../../data/settings_repository.dart';
 import 'company_settings_page.dart';
 import 'dashboard_customization_page.dart';
 import 'inventory_settings_page.dart';
@@ -57,6 +58,14 @@ class SettingsPage extends ConsumerWidget {
     try {
       final failed =
           await ref.read(outboxNotifierProvider.notifier).listFailed(limit: 50);
+      Map<String, dynamic>? backendBundle;
+      String? backendBundleError;
+      try {
+        backendBundle =
+            await ref.read(settingsRepositoryProvider).getSupportBundle();
+      } catch (e) {
+        backendBundleError = ErrorHandler.message(e);
+      }
 
       final payload = <String, dynamic>{
         'generated_at': DateTime.now().toUtc().toIso8601String(),
@@ -85,6 +94,8 @@ class SettingsPage extends ConsumerWidget {
                   })
               .toList(),
         },
+        'backend': backendBundle,
+        if (backendBundleError != null) 'backend_error': backendBundleError,
       };
 
       final dir = await getTemporaryDirectory();
@@ -254,7 +265,7 @@ class SettingsPage extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.security_rounded),
             title: const Text('Security'),
-            subtitle: const Text('Two-factor, sessions'),
+            subtitle: const Text('Step-up approval, password, sessions'),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: theme.colorScheme.surface,

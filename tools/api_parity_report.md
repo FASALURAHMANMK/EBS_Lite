@@ -1,7 +1,7 @@
 # API Parity Report (Flutter <-> OpenAPI)
 
-- Flutter unique paths: **244**
-- OpenAPI unique paths: **279**
+- Flutter unique paths: **246**
+- OpenAPI unique paths: **280**
 
 ## Flutter paths missing from OpenAPI
 - None
@@ -44,5 +44,4 @@
 - `/sales/quotes/export`
 - `/sales/{}/hold`
 - `/settings`
-- `/support/bundle`
 - `/translations`

@@ -38,3 +38,11 @@ No dedicated persisted cycle-count backend/data model or approval flow was added
 No full bin-execution or directed warehouse task flow was added.
 No backend implementation was added for printable barcode generation; /inventory/barcode is still effectively placeholder.
 Workflow submission is not yet wired into pricing overrides, customer master-data changes, or other sensitive settings beyond inventory configuration.
+
+Prompt 5
+Risk list and remaining gaps:
+Manual blocker-scenario UAT from MODULE_UAT_MATRIX.md is not yet completed and signed off.
+The demo/UAT dataset is now governed and documented, but there is still no one-command reproducible full seed/reset implementation.
+Release-ready statement:
+Not fully release-ready yet.
+Current decision: NO-GO until those two residual blockers are closed.

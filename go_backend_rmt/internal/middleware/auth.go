@@ -2,9 +2,12 @@ package middleware
 
 import (
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
@@ -53,6 +56,14 @@ func RequireAuth() gin.HandlerFunc {
 			utils.UnauthorizedResponse(c, "User account is inactive or locked")
 			c.Abort()
 			return
+		}
+
+		if claims.SessionID != "" {
+			if err := validateSessionState(claims.SessionID, user.UserID, user.CompanyID); err != nil {
+				utils.UnauthorizedResponse(c, err.Error())
+				c.Abort()
+				return
+			}
 		}
 
 		// Set user context from DB (authoritative; avoids stale JWT role/company/location IDs)
@@ -323,4 +334,62 @@ func getRoleNameByID(roleID int) (string, error) {
 	var name string
 	err := db.QueryRow(`SELECT name FROM roles WHERE role_id = $1`, roleID).Scan(&name)
 	return name, err
+}
+
+func validateSessionState(sessionID string, userID int, companyID *int) error {
+	db := database.GetDB()
+
+	var isActive bool
+	var lastSeen time.Time
+	err := db.QueryRow(`
+		SELECT is_active, COALESCE(last_seen, created_at)
+		FROM device_sessions
+		WHERE session_id = $1 AND user_id = $2
+	`, sessionID, userID).Scan(&isActive, &lastSeen)
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("session not found")
+	}
+	if err != nil {
+		return fmt.Errorf("failed to validate session")
+	}
+	if !isActive {
+		return fmt.Errorf("session is inactive")
+	}
+
+	idleTimeout := time.Duration(utils.DefaultPasswordPolicy().SessionIdleTimeoutMins) * time.Minute
+	if companyID != nil && *companyID > 0 {
+		idleTimeout = resolveCompanySessionIdleTimeout(db, *companyID)
+	}
+	if idleTimeout > 0 && time.Since(lastSeen.UTC()) > idleTimeout {
+		_, _ = db.Exec(`UPDATE device_sessions SET is_active = FALSE WHERE session_id = $1`, sessionID)
+		return fmt.Errorf("session expired due to inactivity")
+	}
+	return nil
+}
+
+func resolveCompanySessionIdleTimeout(db *sql.DB, companyID int) time.Duration {
+	defaultTimeout := time.Duration(utils.DefaultPasswordPolicy().SessionIdleTimeoutMins) * time.Minute
+	if db == nil || companyID == 0 {
+		return defaultTimeout
+	}
+
+	var value models.JSONB
+	err := db.QueryRow(`SELECT value FROM settings WHERE company_id = $1 AND key = 'security_policy'`, companyID).Scan(&value)
+	if err != nil {
+		return defaultTimeout
+	}
+
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return defaultTimeout
+	}
+
+	var policy models.SecurityPolicySettings
+	if err := json.Unmarshal(raw, &policy); err != nil {
+		return defaultTimeout
+	}
+	normalized := utils.NormalizePasswordPolicy(utils.PasswordPolicy{
+		SessionIdleTimeoutMins: policy.SessionIdleTimeoutMins,
+	})
+	return time.Duration(normalized.SessionIdleTimeoutMins) * time.Minute
 }

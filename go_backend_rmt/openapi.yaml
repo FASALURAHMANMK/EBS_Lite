@@ -5931,6 +5931,13 @@ paths:
                 $ref: '#/components/schemas/APIResponse'
     put:
       summary: PUT /api/v1/settings/device-control
+      parameters:
+      - name: X-Step-Up-Token
+        in: header
+        required: true
+        schema:
+          type: string
+        description: Short-lived elevated verification token issued by /auth/verify.
       responses:
         '200':
           description: Successful response
@@ -5942,7 +5949,38 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/DeviceControlSettings'
+  /settings/security-policy:
+    get:
+      summary: GET /api/v1/settings/security-policy
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+    put:
+      summary: PUT /api/v1/settings/security-policy
+      parameters:
+      - name: X-Step-Up-Token
+        in: header
+        required: true
+        schema:
+          type: string
+        description: Short-lived elevated verification token issued by /auth/verify.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SecurityPolicySettings'
   /settings/session-limit:
     get:
       summary: GET /api/v1/settings/session-limit
@@ -5955,6 +5993,13 @@ paths:
                 $ref: '#/components/schemas/APIResponse'
     post:
       summary: POST /api/v1/settings/session-limit
+      parameters:
+      - name: X-Step-Up-Token
+        in: header
+        required: true
+        schema:
+          type: string
+        description: Short-lived elevated verification token issued by /auth/verify.
       responses:
         '200':
           description: Successful response
@@ -5966,9 +6011,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/SessionLimitRequest'
     put:
       summary: PUT /api/v1/settings/session-limit
+      parameters:
+      - name: X-Step-Up-Token
+        in: header
+        required: true
+        schema:
+          type: string
+        description: Short-lived elevated verification token issued by /auth/verify.
       responses:
         '200':
           description: Successful response
@@ -5980,9 +6032,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/SessionLimitRequest'
     delete:
       summary: DELETE /api/v1/settings/session-limit
+      parameters:
+      - name: X-Step-Up-Token
+        in: header
+        required: true
+        schema:
+          type: string
+        description: Short-lived elevated verification token issued by /auth/verify.
       responses:
         '200':
           description: Successful response
@@ -5990,11 +6049,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenericObject'
   /settings/payment-methods:
     get:
       summary: GET /api/v1/settings/payment-methods
@@ -8297,6 +8351,35 @@ components:
         override_token:
           type: string
         expires_at_unix:
+          type: integer
+    DeviceControlSettings:
+      type: object
+      properties:
+        allow_remote:
+          type: boolean
+    SessionLimitRequest:
+      type: object
+      properties:
+        max_sessions:
+          type: integer
+      required:
+        - max_sessions
+    SecurityPolicySettings:
+      type: object
+      properties:
+        min_password_length:
+          type: integer
+        require_uppercase:
+          type: boolean
+        require_lowercase:
+          type: boolean
+        require_number:
+          type: boolean
+        require_special:
+          type: boolean
+        session_idle_timeout_mins:
+          type: integer
+        elevated_access_window_mins:
           type: integer
     POSPaymentLine:
       type: object

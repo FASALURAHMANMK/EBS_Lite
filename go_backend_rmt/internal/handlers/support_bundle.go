@@ -44,7 +44,10 @@ func (h *SupportHandler) GetSupportBundle(c *gin.Context) {
 		"config": gin.H{
 			"environment":                h.cfg.Environment,
 			"port":                       h.cfg.Port,
+			"allowed_origins":            h.cfg.AllowedOrigins,
+			"frontend_base_url":          h.cfg.FrontendBaseURL,
 			"rate_limit_enabled":         h.cfg.RateLimitEnabled,
+			"rate_limit_fail_open":       h.cfg.RateLimitFailOpen,
 			"rate_limit_requests":        h.cfg.RateLimitRequests,
 			"rate_limit_window":          h.cfg.RateLimitWindow.String(),
 			"session_last_seen_redis":    h.cfg.SessionLastSeenUseRedis,
@@ -56,7 +59,8 @@ func (h *SupportHandler) GetSupportBundle(c *gin.Context) {
 			"ready_check_redis":          h.cfg.ReadyCheckRedis,
 			"ready_check_timeout":        h.cfg.ReadyCheckTimeout.String(),
 		},
-		"logs": redactLogLines(utils.DefaultLogLines(h.cfg.SupportBundleLogLines)),
+		"production_readiness_issues": h.cfg.ProductionReadinessIssues(),
+		"logs":                        redactLogLines(utils.DefaultLogLines(h.cfg.SupportBundleLogLines)),
 	}
 
 	if dbErr != nil {

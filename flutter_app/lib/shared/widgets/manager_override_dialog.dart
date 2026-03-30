@@ -27,6 +27,8 @@ Future<ManagerOverrideResult?> showManagerOverrideDialog(
   required List<String> requiredPermissions,
   bool requireReason = false,
   String reasonLabel = 'Reason',
+  String identityLabel = 'Manager username or email',
+  String actionLabel = 'Approve',
 }) async {
   final usernameController = TextEditingController();
   final passwordController = TextEditingController();
@@ -55,9 +57,9 @@ Future<ManagerOverrideResult?> showManagerOverrideDialog(
               ],
               TextField(
                 controller: usernameController,
-                decoration: const InputDecoration(
-                  labelText: 'Manager username or email',
-                  prefixIcon: Icon(Icons.person_rounded),
+                decoration: InputDecoration(
+                  labelText: identityLabel,
+                  prefixIcon: const Icon(Icons.person_rounded),
                 ),
               ),
               const SizedBox(height: 12),
@@ -122,7 +124,7 @@ Future<ManagerOverrideResult?> showManagerOverrideDialog(
                         );
                       }
                     },
-              child: Text(busy ? 'Verifying...' : 'Approve'),
+              child: Text(busy ? 'Verifying...' : actionLabel),
             ),
           ],
         ),

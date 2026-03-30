@@ -116,12 +116,12 @@ func (s *AuthService) Login(req *models.LoginRequest, ipAddress, userAgent strin
 	}
 
 	// Generate tokens
-	accessToken, err := utils.GenerateAccessToken(user, sessionID, 24*time.Hour)
+	accessToken, err := utils.GenerateAccessToken(user, sessionID, s.cfg.JWTExpiry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	refreshToken, err := utils.GenerateRefreshToken(user, sessionID, 7*24*time.Hour)
+	refreshToken, err := utils.GenerateRefreshToken(user, sessionID, s.cfg.JWTRefreshExpiry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
 	}
@@ -217,7 +217,7 @@ func (s *AuthService) RefreshToken(req *models.RefreshTokenRequest) (*models.Ref
 	}
 
 	// Generate new access token
-	accessToken, err := utils.GenerateAccessToken(user, claims.SessionID, 24*time.Hour)
+	accessToken, err := utils.GenerateAccessToken(user, claims.SessionID, s.cfg.JWTExpiry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
@@ -310,6 +310,14 @@ func (s *AuthService) ResetPassword(req *models.ResetPasswordRequest) error {
 
 	if time.Now().After(expiresAt) {
 		return fmt.Errorf("invalid or expired token")
+	}
+
+	policy, err := s.getPasswordPolicyForUser(userID)
+	if err != nil {
+		return fmt.Errorf("failed to load password policy: %w", err)
+	}
+	if err := utils.ValidatePasswordAgainstPolicy(req.NewPassword, policy); err != nil {
+		return err
 	}
 
 	// Hash new password
@@ -459,12 +467,13 @@ func (s *AuthService) VerifyCredentials(companyID int, req *models.VerifyCredent
 		for p := range required {
 			requiredList = append(requiredList, p)
 		}
-		token, err := utils.GenerateManagerOverrideToken(user.UserID, companyID, requiredList, 5*time.Minute)
+		expiry := s.overrideExpiryForCompany(companyID)
+		token, err := utils.GenerateManagerOverrideToken(user.UserID, companyID, requiredList, expiry)
 		if err != nil {
 			return nil, err
 		}
 		resp.OverrideToken = token
-		resp.ExpiresAtUnix = time.Now().Add(5 * time.Minute).Unix()
+		resp.ExpiresAtUnix = time.Now().Add(expiry).Unix()
 	}
 
 	return resp, nil
@@ -626,6 +635,10 @@ func (s *AuthService) Register(req *models.RegisterRequest) (*models.RegisterRes
 		return nil, fmt.Errorf("username or email already exists")
 	}
 
+	if err := utils.ValidatePasswordAgainstPolicy(req.Password, utils.DefaultPasswordPolicy()); err != nil {
+		return nil, err
+	}
+
 	// Hash password
 	hashedPassword, err := utils.HashPassword(req.Password)
 	if err != nil {
@@ -670,4 +683,48 @@ func (s *AuthService) checkUserExists(username, email string) (bool, error) {
 	}
 
 	return count > 0, nil
+}
+
+func (s *AuthService) getPasswordPolicyForUser(userID int) (utils.PasswordPolicy, error) {
+	policy := utils.DefaultPasswordPolicy()
+	var companyID sql.NullInt64
+	if err := s.db.QueryRow(`SELECT company_id FROM users WHERE user_id = $1 AND is_deleted = FALSE`, userID).Scan(&companyID); err != nil {
+		if err == sql.ErrNoRows {
+			return policy, nil
+		}
+		return policy, err
+	}
+	if !companyID.Valid {
+		return policy, nil
+	}
+	return s.getPasswordPolicyForCompany(int(companyID.Int64))
+}
+
+func (s *AuthService) getPasswordPolicyForCompany(companyID int) (utils.PasswordPolicy, error) {
+	policy := utils.DefaultPasswordPolicy()
+	if companyID == 0 {
+		return policy, nil
+	}
+	settingsSvc := NewSettingsService()
+	cfg, err := settingsSvc.GetSecurityPolicy(companyID)
+	if err != nil {
+		return policy, err
+	}
+	return utils.NormalizePasswordPolicy(utils.PasswordPolicy{
+		MinPasswordLength:        cfg.MinPasswordLength,
+		RequireUppercase:         cfg.RequireUppercase,
+		RequireLowercase:         cfg.RequireLowercase,
+		RequireNumber:            cfg.RequireNumber,
+		RequireSpecial:           cfg.RequireSpecial,
+		SessionIdleTimeoutMins:   cfg.SessionIdleTimeoutMins,
+		ElevatedAccessWindowMins: cfg.ElevatedAccessWindowMins,
+	}), nil
+}
+
+func (s *AuthService) overrideExpiryForCompany(companyID int) time.Duration {
+	policy, err := s.getPasswordPolicyForCompany(companyID)
+	if err != nil {
+		return 5 * time.Minute
+	}
+	return time.Duration(policy.ElevatedAccessWindowMins) * time.Minute
 }
