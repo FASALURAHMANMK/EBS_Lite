@@ -93,6 +93,14 @@ class CustomerRepository {
         .toList();
   }
 
+  Future<List<OutstandingCustomerDto>> getOutstandingCustomers() async {
+    final res = await _dio.get('/collections/outstanding');
+    final data = _extractList(res);
+    return data
+        .map((e) => OutstandingCustomerDto.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<Map<String, dynamic>>> getOutstandingInvoices(
       {required int customerId}) async {
     // Use history endpoint (no location requirement) and compute outstanding client-side

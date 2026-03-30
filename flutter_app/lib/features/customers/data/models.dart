@@ -98,3 +98,47 @@ class CustomerCollectionDto {
         referenceNumber: json['reference_number'] as String?,
       );
 }
+
+class CustomerInvoiceReferenceDto {
+  final int saleId;
+  final String saleNumber;
+  final double amountDue;
+
+  const CustomerInvoiceReferenceDto({
+    required this.saleId,
+    required this.saleNumber,
+    required this.amountDue,
+  });
+
+  factory CustomerInvoiceReferenceDto.fromJson(Map<String, dynamic> json) =>
+      CustomerInvoiceReferenceDto(
+        saleId: json['sale_id'] as int? ?? 0,
+        saleNumber: (json['sale_number'] ?? '').toString(),
+        amountDue: (json['amount_due'] as num?)?.toDouble() ?? 0,
+      );
+}
+
+class OutstandingCustomerDto {
+  final int customerId;
+  final String name;
+  final double outstandingAmount;
+  final List<CustomerInvoiceReferenceDto> invoices;
+
+  const OutstandingCustomerDto({
+    required this.customerId,
+    required this.name,
+    required this.outstandingAmount,
+    required this.invoices,
+  });
+
+  factory OutstandingCustomerDto.fromJson(Map<String, dynamic> json) =>
+      OutstandingCustomerDto(
+        customerId: json['customer_id'] as int? ?? 0,
+        name: (json['name'] ?? '').toString(),
+        outstandingAmount: (json['credit_balance'] as num?)?.toDouble() ?? 0,
+        invoices: (json['invoices'] as List? ?? const [])
+            .map((e) =>
+                CustomerInvoiceReferenceDto.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}

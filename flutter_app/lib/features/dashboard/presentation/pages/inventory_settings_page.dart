@@ -110,11 +110,14 @@ class _InventorySettingsPageState extends ConsumerState<InventorySettingsPage> {
       if (!mounted) return;
       _password.clear();
       _confirmPassword.clear();
-      setState(() => _hasApprovalPassword = requiresApprovalPassword);
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(content: Text('Inventory configuration saved')),
+          const SnackBar(
+            content: Text(
+              'Inventory configuration submitted for approval. Live settings remain unchanged until approved.',
+            ),
+          ),
         );
     } catch (e) {
       if (!mounted) return;

@@ -207,8 +207,9 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 
 	// Verify supplier belongs to company
 	var supplierCompanyID int
-	err = tx.QueryRow("SELECT company_id FROM suppliers WHERE supplier_id = $1 AND is_active = TRUE",
-		req.SupplierID).Scan(&supplierCompanyID)
+	var supplierName string
+	err = tx.QueryRow("SELECT company_id, name FROM suppliers WHERE supplier_id = $1 AND is_active = TRUE",
+		req.SupplierID).Scan(&supplierCompanyID, &supplierName)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("supplier not found")
@@ -497,6 +498,10 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 		}); err != nil {
 			return nil, fmt.Errorf("failed to enqueue purchase cash register event: %w", err)
 		}
+	}
+
+	if _, err := NewWorkflowService().CreatePurchaseApprovalRequestTx(tx, companyID, locationID, userID, purchase.PurchaseID, purchaseNumber, supplierName, totalAmount); err != nil {
+		return nil, fmt.Errorf("failed to create purchase approval workflow: %w", err)
 	}
 
 	// Commit transaction
@@ -1250,12 +1255,18 @@ func (s *PurchaseService) DeletePurchase(purchaseID, companyID int) error {
 
 // ApprovePurchaseOrder sets a purchase order's status to APPROVED
 func (s *PurchaseService) ApprovePurchaseOrder(purchaseID, companyID, userID int) error {
+	if err := NewWorkflowService().ApproveByEntity(companyID, userID, workflowEntityPurchaseOrder, purchaseID, nil); err == nil {
+		return nil
+	} else if err.Error() != "workflow request not found" {
+		return err
+	}
+
 	_, err := s.db.Exec(`
-                UPDATE purchases p
-                SET status = 'APPROVED', updated_by = $1, updated_at = CURRENT_TIMESTAMP
-                FROM suppliers s
-                WHERE p.purchase_id = $2 AND p.supplier_id = s.supplier_id AND s.company_id = $3 AND p.is_deleted = FALSE
-        `, userID, purchaseID, companyID)
+		UPDATE purchases p
+		SET status = 'APPROVED', updated_by = $1, updated_at = CURRENT_TIMESTAMP
+		FROM suppliers s
+		WHERE p.purchase_id = $2 AND p.supplier_id = s.supplier_id AND s.company_id = $3 AND p.is_deleted = FALSE
+	`, userID, purchaseID, companyID)
 	if err != nil {
 		return fmt.Errorf("failed to approve purchase: %w", err)
 	}

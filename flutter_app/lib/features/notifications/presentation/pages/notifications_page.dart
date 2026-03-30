@@ -7,6 +7,8 @@ import '../../../../core/error_handler.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import '../../../dashboard/presentation/pages/sync_health_page.dart';
+import '../../../inventory/presentation/pages/product_transactions_page.dart';
+import '../../../workflow/presentation/pages/workflow_requests_page.dart';
 import '../../controllers/notifications_providers.dart';
 import '../../data/models.dart';
 import '../../data/notifications_repository.dart';
@@ -71,6 +73,17 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     }
   }
 
+  Color _severityColor(BuildContext context, NotificationDto item) {
+    switch (item.severity.toUpperCase()) {
+      case 'CRITICAL':
+        return Theme.of(context).colorScheme.error;
+      case 'WARNING':
+        return Colors.orange;
+      default:
+        return Theme.of(context).colorScheme.primary;
+    }
+  }
+
   String _fmtTime(DateTime? dt) {
     if (dt == null) return '';
     final local = dt.toLocal();
@@ -80,6 +93,51 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     final hh = local.hour.toString().padLeft(2, '0');
     final mm = local.minute.toString().padLeft(2, '0');
     return '$y-$m-$d $hh:$mm';
+  }
+
+  Future<void> _openNotification(NotificationDto item) async {
+    if (!item.isRead) {
+      await _markRead([item.key]);
+    }
+    if (!mounted) return;
+
+    if (item.approvalId != null) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              WorkflowRequestDetailPage(approvalId: item.approvalId!),
+        ),
+      );
+      return;
+    }
+
+    if (item.productId != null && item.type.toUpperCase() == 'LOW_STOCK') {
+      final productName =
+          item.title.replaceFirst(RegExp(r'^Low stock:\s*'), '');
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ProductTransactionsPage(
+            productId: item.productId!,
+            productName: productName.isEmpty ? 'Product' : productName,
+          ),
+        ),
+      );
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(item.title),
+        content: Text(item.body),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -163,6 +221,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
               )
             else
               ..._items.map((n) {
+                final severityColor = _severityColor(context, n);
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Material(
@@ -172,10 +231,8 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                     ),
                     child: ListTile(
                       leading: CircleAvatar(
-                        backgroundColor:
-                            theme.colorScheme.primary.withValues(alpha: .12),
-                        child: Icon(_iconForType(n.type),
-                            color: theme.colorScheme.primary),
+                        backgroundColor: severityColor.withValues(alpha: .12),
+                        child: Icon(_iconForType(n.type), color: severityColor),
                       ),
                       title: Row(
                         children: [
@@ -200,6 +257,10 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                       subtitle: Text(
                         [
                           n.body,
+                          if ((n.badgeLabel ?? '').trim().isNotEmpty)
+                            'State: ${n.badgeLabel!.trim()}',
+                          if (_fmtTime(n.dueAt).isNotEmpty)
+                            'Due: ${_fmtTime(n.dueAt)}',
                           if (_fmtTime(n.createdAt).isNotEmpty)
                             _fmtTime(n.createdAt),
                         ].join('\n'),
@@ -209,24 +270,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                       ),
                       isThreeLine: true,
                       trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () async {
-                        if (!n.isRead) await _markRead([n.key]);
-                        if (!context.mounted) return;
-                        await showDialog<void>(
-                          context: context,
-                          builder: (dialogContext) => AlertDialog(
-                            title: Text(n.title),
-                            content: Text(n.body),
-                            actions: [
-                              TextButton(
-                                onPressed: () =>
-                                    Navigator.of(dialogContext).pop(),
-                                child: const Text('Close'),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
+                      onTap: () => _openNotification(n),
                     ),
                   ),
                 );

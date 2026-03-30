@@ -22,12 +22,43 @@ func NewWorkflowHandler() *WorkflowHandler {
 
 // GET /workflow-requests
 func (h *WorkflowHandler) GetWorkflowRequests(c *gin.Context) {
-	requests, err := h.service.GetPendingRequests()
+	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
+	if companyID == 0 || userID == 0 {
+		utils.ForbiddenResponse(c, "Company and user access required")
+		return
+	}
+	requests, err := h.service.ListRequests(companyID, userID, c.Query("status"))
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get workflow requests", err)
 		return
 	}
 	utils.SuccessResponse(c, "Workflow requests retrieved successfully", requests)
+}
+
+// GET /workflow-requests/:id
+func (h *WorkflowHandler) GetWorkflowRequest(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
+	if companyID == 0 || userID == 0 {
+		utils.ForbiddenResponse(c, "Company and user access required")
+		return
+	}
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request id", err)
+		return
+	}
+	request, err := h.service.GetRequestByID(companyID, userID, id)
+	if err != nil {
+		if err.Error() == "workflow request not found" {
+			utils.NotFoundResponse(c, "Workflow request not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get workflow request", err)
+		return
+	}
+	utils.SuccessResponse(c, "Workflow request retrieved successfully", request)
 }
 
 // POST /workflow-requests
@@ -44,7 +75,8 @@ func (h *WorkflowHandler) CreateWorkflowRequest(c *gin.Context) {
 	}
 
 	userID := c.GetInt("user_id")
-	request, err := h.service.CreateRequest(userID, &req)
+	companyID := c.GetInt("company_id")
+	request, err := h.service.CreateRequest(companyID, userID, &req)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create workflow request", err)
 		return
@@ -67,7 +99,8 @@ func (h *WorkflowHandler) ApproveWorkflowRequest(c *gin.Context) {
 	}
 
 	userID := c.GetInt("user_id")
-	if err := h.service.ApproveRequest(id, userID, req.Remarks); err != nil {
+	companyID := c.GetInt("company_id")
+	if err := h.service.ApproveRequest(companyID, id, userID, req.Remarks); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to approve workflow request", err)
 		return
 	}
@@ -89,7 +122,8 @@ func (h *WorkflowHandler) RejectWorkflowRequest(c *gin.Context) {
 	}
 
 	userID := c.GetInt("user_id")
-	if err := h.service.RejectRequest(id, userID, req.Remarks); err != nil {
+	companyID := c.GetInt("company_id")
+	if err := h.service.RejectRequest(companyID, id, userID, req.Remarks); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to reject workflow request", err)
 		return
 	}

@@ -204,6 +204,22 @@ func (s *SettingsService) GetInventorySettings(companyID int) (*models.Inventory
 }
 
 func (s *SettingsService) UpdateInventorySettings(companyID int, req models.UpdateInventorySettingsRequest) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin settings transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	if err := s.applyInventorySettingsTx(tx, companyID, req); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit inventory settings: %w", err)
+	}
+	return nil
+}
+
+func (s *SettingsService) applyInventorySettingsTx(tx *sql.Tx, companyID int, req models.UpdateInventorySettingsRequest) error {
 	existing := inventorySettingsRecord{}
 	if err := s.getJSONSetting(companyID, "inventory", &existing); err != nil {
 		return err
@@ -247,7 +263,23 @@ func (s *SettingsService) UpdateInventorySettings(companyID int, req models.Upda
 		existing.NegativeStockApprovalPasswordHash = ""
 	}
 
-	return s.updateJSONSetting(companyID, "inventory", existing)
+	b, err := json.Marshal(existing)
+	if err != nil {
+		return fmt.Errorf("failed to marshal inventory settings: %w", err)
+	}
+	var value models.JSONB
+	if err := json.Unmarshal(b, &value); err != nil {
+		return fmt.Errorf("failed to unmarshal inventory settings: %w", err)
+	}
+	if _, err := tx.Exec(`
+		INSERT INTO settings (company_id, key, value)
+		VALUES ($1, 'inventory', $2)
+		ON CONFLICT (company_id, key)
+		DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
+	`, companyID, value); err != nil {
+		return fmt.Errorf("failed to persist inventory settings: %w", err)
+	}
+	return nil
 }
 
 // Invoice settings

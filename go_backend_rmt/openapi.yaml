@@ -3982,13 +3982,14 @@ paths:
     put:
       summary: PUT /api/v1/settings/inventory
       responses:
-        '200':
-          description: Successful response
+        '202':
+          description: Inventory settings change submitted for approval
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -5084,7 +5085,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/NotificationItem'
   /notifications/unread-count:
     get:
       summary: GET /api/v1/notifications/unread-count
@@ -5106,10 +5114,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/APIResponse'
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/MarkNotificationsReadRequest'
   /reports/sales-summary:
     get:
       summary: GET /api/v1/reports/sales-summary
@@ -6446,21 +6455,55 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/WorkflowRequest'
     post:
       summary: POST /api/v1/workflow-requests
       responses:
-        '200':
-          description: Successful response
+        '201':
+          description: Workflow request created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APIResponse'
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/WorkflowRequest'
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreateWorkflowRequest'
+  /workflow-requests/{id}:
+    get:
+      summary: GET /api/v1/workflow-requests/{id}
+      responses:
+        '200':
+          description: Workflow request detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/WorkflowRequest'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
   /workflow-requests/{id}/approve:
     put:
       summary: PUT /api/v1/workflow-requests/{id}/approve
@@ -6476,12 +6519,12 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          type: integer
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/DecisionRequest'
   /workflow-requests/{id}/reject:
     put:
       summary: PUT /api/v1/workflow-requests/{id}/reject
@@ -6497,12 +6540,12 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          type: integer
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/DecisionRequest'
 components:
   schemas:
     APIResponse:
@@ -6558,6 +6601,224 @@ components:
         negative_profit_policy:
           type: string
         negative_stock_approval_password:
+          type: string
+          nullable: true
+    NotificationItem:
+      type: object
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        status:
+          type: string
+        severity:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        is_read:
+          type: boolean
+        is_overdue:
+          type: boolean
+        approval_id:
+          type: integer
+          nullable: true
+        entity_type:
+          type: string
+          nullable: true
+        entity_id:
+          type: integer
+          nullable: true
+        location_id:
+          type: integer
+          nullable: true
+        product_id:
+          type: integer
+          nullable: true
+        action_label:
+          type: string
+          nullable: true
+        badge_label:
+          type: string
+          nullable: true
+        due_at:
+          type: string
+          format: date-time
+          nullable: true
+    MarkNotificationsReadRequest:
+      type: object
+      required:
+        - keys
+      properties:
+        keys:
+          type: array
+          items:
+            type: string
+    WorkflowRequestEvent:
+      type: object
+      properties:
+        event_id:
+          type: integer
+        approval_id:
+          type: integer
+        event_type:
+          type: string
+        actor_id:
+          type: integer
+          nullable: true
+        actor_name:
+          type: string
+          nullable: true
+        from_status:
+          type: string
+          nullable: true
+        to_status:
+          type: string
+          nullable: true
+        remarks:
+          type: string
+          nullable: true
+        payload:
+          type: object
+          additionalProperties: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    WorkflowRequest:
+      type: object
+      properties:
+        approval_id:
+          type: integer
+        company_id:
+          type: integer
+        location_id:
+          type: integer
+          nullable: true
+        module:
+          type: string
+        entity_type:
+          type: string
+        entity_id:
+          type: integer
+          nullable: true
+        action_type:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+          nullable: true
+        request_reason:
+          type: string
+          nullable: true
+        status:
+          type: string
+        priority:
+          type: string
+        approver_role_id:
+          type: integer
+        approver_role_name:
+          type: string
+          nullable: true
+        payload:
+          type: object
+          additionalProperties: true
+        result_snapshot:
+          type: object
+          additionalProperties: true
+        due_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_overdue:
+          type: boolean
+        escalation_level:
+          type: integer
+        created_by:
+          type: integer
+        created_by_name:
+          type: string
+          nullable: true
+        updated_by:
+          type: integer
+          nullable: true
+        approved_by:
+          type: integer
+          nullable: true
+        approved_by_name:
+          type: string
+          nullable: true
+        approved_at:
+          type: string
+          format: date-time
+          nullable: true
+        decision_reason:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowRequestEvent'
+    CreateWorkflowRequest:
+      type: object
+      required:
+        - module
+        - entity_type
+        - action_type
+        - title
+        - approver_role_id
+      properties:
+        location_id:
+          type: integer
+          nullable: true
+        module:
+          type: string
+        entity_type:
+          type: string
+        entity_id:
+          type: integer
+          nullable: true
+        action_type:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+          nullable: true
+        request_reason:
+          type: string
+          nullable: true
+        priority:
+          type: string
+          nullable: true
+        approver_role_id:
+          type: integer
+        due_at:
+          type: string
+          format: date-time
+          nullable: true
+        payload:
+          type: object
+          additionalProperties: true
+        result_snapshot:
+          type: object
+          additionalProperties: true
+    DecisionRequest:
+      type: object
+      properties:
+        remarks:
           type: string
           nullable: true
     ApproveStockTransferRequest:

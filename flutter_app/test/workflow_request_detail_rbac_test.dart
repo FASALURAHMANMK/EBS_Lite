@@ -19,19 +19,42 @@ void main() {
       (tester) async {
     const req = WorkflowRequestDto(
       approvalId: 1,
-      stateId: 10,
-      approverRoleId: 2,
+      locationId: null,
+      module: 'PURCHASES',
+      entityType: 'PURCHASE_ORDER',
+      entityId: 99,
+      actionType: 'APPROVE_PURCHASE_ORDER',
+      title: 'Approve purchase order PO-0001',
+      summary: 'Supplier ACME • total 100.00',
+      requestReason: null,
       status: 'PENDING',
-      remarks: null,
-      approvedAt: null,
+      priority: 'HIGH',
+      approverRoleId: 2,
+      approverRoleName: 'Manager',
+      payload: {},
+      resultSnapshot: {},
+      dueAt: null,
+      isOverdue: false,
+      escalationLevel: 0,
       createdBy: 5,
+      createdByName: 'Requester',
       updatedBy: null,
+      approvedBy: null,
+      approvedByName: null,
+      approvedAt: null,
+      decisionReason: null,
+      createdAt: null,
+      updatedAt: null,
+      events: [],
     );
 
     await tester.pumpWidget(
       _wrap(
-        const WorkflowRequestDetailPage(request: req),
-        permissions: const ['VIEW_WORKFLOWS'],
+        WorkflowRequestDetailPage(
+          approvalId: 1,
+          initialRequest: req,
+        ),
+        permissions: ['VIEW_WORKFLOWS'],
       ),
     );
 

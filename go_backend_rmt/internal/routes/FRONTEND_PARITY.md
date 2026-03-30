@@ -33,7 +33,7 @@ The table below tracks whether each backend route group in `routes.go` has a cor
 | `/employees` | `src/services/employees.ts` | Added for parity |
 | `/attendance` | `src/services/attendance.ts` | Added for parity |
 | `/payrolls` | — | Intentionally unused |
-| `/collections` | — | Intentionally unused |
+| `/collections` | — | Web shell intentionally unused; Flutter ships collections workbench and customer collections flows |
 | `/expenses` | — | Intentionally unused |
 | `/vouchers` | `src/services/accounting.ts` | |
 | `/ledgers` | `src/services/accounting.ts` | |
@@ -46,7 +46,7 @@ The table below tracks whether each backend route group in `routes.go` has a cor
 | `/suppliers` | `src/services/suppliers.ts` | |
 | `/currencies` | — | Intentionally unused |
 | `/taxes` | — | Intentionally unused |
-| `/settings` | — | Intentionally unused |
+| `/settings` | — | Web shell intentionally unused; Flutter uses inventory settings and other admin settings surfaces |
 | `/audit-logs` | — | Intentionally unused |
 | `/languages` | — | Intentionally unused |
 | `/translations` | — | Intentionally unused |
@@ -54,6 +54,6 @@ The table below tracks whether each backend route group in `routes.go` has a cor
 | `/numbering-sequences` | — | Intentionally unused |
 | `/invoice-templates` | — | Intentionally unused |
 | `/print` | — | Intentionally unused |
-| `/workflow-requests` | — | Intentionally unused |
+| `/workflow-requests` | — | Web shell intentionally unused; Flutter ships approvals list/detail and approval actions |
 
 This document should be updated whenever new service modules are created or an unused endpoint becomes active.

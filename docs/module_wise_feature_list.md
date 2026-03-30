@@ -297,17 +297,20 @@ Controlled scope note:
 
 ## 14) Workflow & approvals module
 
-- **Available**: Workflow request list and detail views.
-- **Available**: Approve/reject requests (permission gated).
-- **Backend-ready**: Create workflow request endpoint exists (UI coverage depends on flows that submit approvals).
+- **Available**: Workflow request list, detail, audit trail, overdue visibility, and approve/reject actions.
+- **Available**: Purchase order approvals are now created automatically from procurement flow.
+- **Available**: Purchase return review, supplier master-data review, and inventory configuration changes now submit workflow requests.
+- **Available**: Approve/reject remains permission gated.
+- **Backend-ready**: Create workflow request endpoint remains available for additional supervised flows.
 
 ---
 
 ## 15) Notifications module
 
-- **Available**: Notifications list + unread count badge.
+- **Available**: Notifications list + unread count badge with unread, pending, overdue, and severity states.
 - **Available**: Mark read (single/all).
-- **Available**: Notification types include (at least) low stock and approval pending.
+- **Available**: Notifications now deep-link into approval detail and stock investigation flows.
+- **Available**: Notification types include low stock and role-aware approval requests.
 - **Available**: Sync/outbox health entry from notifications screen.
 
 ---

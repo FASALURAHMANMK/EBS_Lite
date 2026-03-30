@@ -2,6 +2,8 @@ import 'package:ebs_lite/features/auth/controllers/auth_notifier.dart';
 import 'package:ebs_lite/features/auth/controllers/auth_permissions_provider.dart';
 import 'package:ebs_lite/features/customers/presentation/pages/customer_management_page.dart';
 import 'package:ebs_lite/features/customers/presentation/pages/customer_warranty_page.dart';
+import 'package:ebs_lite/features/customers/presentation/pages/customer_care_hub_page.dart';
+import 'package:ebs_lite/features/customers/presentation/pages/collections_workbench_page.dart';
 import 'package:ebs_lite/features/customers/presentation/pages/loyalty_management_page.dart';
 import 'package:ebs_lite/features/customers/presentation/pages/loyalty_gift_redeem_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/attribute_management_page.dart';
@@ -11,6 +13,7 @@ import 'package:ebs_lite/features/inventory/presentation/pages/category_manageme
 import 'package:ebs_lite/features/inventory/presentation/pages/combo_definitions_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/consumable_management_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/inventory_management_page.dart';
+import 'package:ebs_lite/features/inventory/presentation/pages/inventory_operations_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/inventory_view_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/stock_adjustments_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/stock_transfers_page.dart';
@@ -27,12 +30,14 @@ import 'package:ebs_lite/features/sales/presentation/pages/quotes_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/sales_history_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/sales_returns_page.dart';
 import 'package:ebs_lite/features/suppliers/presentation/pages/suppliers_page.dart';
+import 'package:ebs_lite/features/suppliers/presentation/pages/supplier_balance_workbench_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/widgets/app_confirm_dialog.dart';
 import '../../controllers/location_notifier.dart';
 import '../dashboard_navigation.dart';
+import '../pages/help_support_page.dart';
 import 'company_logo.dart';
 
 class DashboardDesktopSidebar extends ConsumerWidget {
@@ -213,6 +218,12 @@ class DashboardDesktopSidebar extends ConsumerWidget {
                   label: 'Supplier Management',
                   onTap: () => onOpen(const SuppliersPage()),
                 ),
+                _child(
+                  context,
+                  icon: Icons.account_balance_wallet_rounded,
+                  label: 'Supplier Balances',
+                  onTap: () => onOpen(const SupplierBalanceWorkbenchPage()),
+                ),
               ],
             ),
             _section(
@@ -220,6 +231,12 @@ class DashboardDesktopSidebar extends ConsumerWidget {
               icon: Icons.inventory_2_rounded,
               title: 'Inventory',
               children: [
+                _child(
+                  context,
+                  icon: Icons.qr_code_scanner_rounded,
+                  label: 'Inventory Operations',
+                  onTap: () => onOpen(const InventoryOperationsPage()),
+                ),
                 _child(
                   context,
                   icon: Icons.inventory_2_rounded,
@@ -287,6 +304,18 @@ class DashboardDesktopSidebar extends ConsumerWidget {
               icon: Icons.people_alt_rounded,
               title: 'Customers',
               children: [
+                _child(
+                  context,
+                  icon: Icons.support_agent_rounded,
+                  label: 'Customer Care Hub',
+                  onTap: () => onOpen(const CustomerCareHubPage()),
+                ),
+                _child(
+                  context,
+                  icon: Icons.payments_rounded,
+                  label: 'Collections Workbench',
+                  onTap: () => onOpen(const CollectionsWorkbenchPage()),
+                ),
                 _child(
                   context,
                   icon: Icons.manage_accounts_rounded,
@@ -474,17 +503,9 @@ class DashboardDesktopSidebar extends ConsumerWidget {
               context,
               icon: Icons.help_outline_rounded,
               label: 'Help & support',
-              onTap: () {
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                          'Help is on the way! (wire up your help center)'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-              },
+              onTap: () => onOpen(
+                const HelpSupportPage(),
+              ),
             ),
             _tile(
               context,

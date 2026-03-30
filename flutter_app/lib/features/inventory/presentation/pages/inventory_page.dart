@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ebs_lite/shared/widgets/feature_menu.dart';
+import 'inventory_operations_page.dart';
 import 'stock_adjustments_page.dart';
 import 'inventory_management_page.dart';
 import 'inventory_view_page.dart';
@@ -17,6 +18,13 @@ class InventoryPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
+      FeatureItem(
+        icon: Icons.qr_code_scanner_rounded,
+        label: 'Operations',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const InventoryOperationsPage()),
+        ),
+      ),
       FeatureItem(
         icon: Icons.inventory_2_rounded,
         label: 'Inventory',

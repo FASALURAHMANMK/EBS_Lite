@@ -270,6 +270,10 @@ func (s *SupplierService) CreateSupplier(companyID, userID int, req *models.Crea
 	supplier.CreatedBy = userID
 	supplier.UpdatedBy = &userID
 
+	if _, err := NewWorkflowService().CreateSupplierReviewRequest(companyID, userID, supplier.SupplierID, supplier.Name, strPtr("Review supplier master-data creation")); err != nil {
+		return nil, err
+	}
+
 	return &supplier, nil
 }
 
@@ -398,8 +402,14 @@ func (s *SupplierService) UpdateSupplier(supplierID, companyID, userID int, req 
 	if err != nil {
 		return nil, fmt.Errorf("failed to update supplier: %w", err)
 	}
-
-	return s.GetSupplierByID(supplierID, companyID)
+	updated, err := s.GetSupplierByID(supplierID, companyID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := NewWorkflowService().CreateSupplierReviewRequest(companyID, userID, supplierID, updated.Name, strPtr("Review supplier master-data update")); err != nil {
+		return nil, err
+	}
+	return updated, nil
 }
 
 func (s *SupplierService) DeleteSupplier(supplierID, companyID, userID int) error {

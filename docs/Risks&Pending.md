@@ -26,3 +26,15 @@ Exact Remaining Gaps
 No CSV/bank-feed import presets or auto-match suggestions were completed.
 No automated fixed-asset depreciation posting was completed.
 No full ERP-wide closed-period posting lock was completed outside the accounting/banking slice.
+
+Prompt 4
+Risk List
+Cycle count remains a lightweight operational workbench pattern; there is still no persisted cycle-count program with its own backend entities/workflow.
+Bin/location control is still partial through existing storage/location surfaces; this is not a full warehouse task/bin execution model.
+/inventory/barcode is still backend-placeholder and remains intentionally unexposed in Flutter.
+Workflow coverage is broader but still not complete for all overrides and master-data domains; pricing overrides and additional sensitive settings are still gaps.
+Exact Remaining Gaps
+No dedicated persisted cycle-count backend/data model or approval flow was added.
+No full bin-execution or directed warehouse task flow was added.
+No backend implementation was added for printable barcode generation; /inventory/barcode is still effectively placeholder.
+Workflow submission is not yet wired into pricing overrides, customer master-data changes, or other sensitive settings beyond inventory configuration.

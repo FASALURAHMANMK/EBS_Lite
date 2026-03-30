@@ -112,6 +112,7 @@ func (h *SettingsHandler) GetInventorySettings(c *gin.Context) {
 
 func (h *SettingsHandler) UpdateInventorySettings(c *gin.Context) {
 	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
 	if companyID == 0 {
 		utils.ForbiddenResponse(c, "Company access required")
 		return
@@ -121,11 +122,12 @@ func (h *SettingsHandler) UpdateInventorySettings(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
 		return
 	}
-	if err := h.service.UpdateInventorySettings(companyID, req); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update inventory settings", err)
+	request, err := services.NewWorkflowService().CreateInventorySettingsApproval(companyID, userID, req)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to submit inventory settings approval", err)
 		return
 	}
-	utils.SuccessResponse(c, "Inventory settings updated successfully", nil)
+	utils.JSONResponse(c, http.StatusAccepted, true, "Inventory settings change submitted for approval", request, nil)
 }
 
 // Invoice settings

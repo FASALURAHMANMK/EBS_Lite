@@ -38,9 +38,9 @@ func TestPurchaseService_CreatePurchase_IdempotencyUniqueViolationReturnsExistin
 
 	mock.ExpectBegin()
 
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT company_id FROM suppliers WHERE supplier_id = $1 AND is_active = TRUE")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT company_id, name FROM suppliers WHERE supplier_id = $1 AND is_active = TRUE")).
 		WithArgs(supplierID).
-		WillReturnRows(sqlmock.NewRows([]string{"company_id"}).AddRow(companyID))
+		WillReturnRows(sqlmock.NewRows([]string{"company_id", "name"}).AddRow(companyID, "ACME Supplies"))
 
 	mock.ExpectQuery("(?s)SELECT p.purchase_id, p.purchase_number.*FROM purchases p.*WHERE p.idempotency_key = \\$1.*").
 		WithArgs(idemKey, locationID, companyID).

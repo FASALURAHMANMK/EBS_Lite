@@ -6,6 +6,8 @@ import '../../accounts/presentation/pages/cash_register_page.dart';
 import '../../accounts/presentation/pages/day_end_flow_page.dart';
 import '../../accounts/presentation/pages/ledgers_page.dart';
 import '../../accounts/presentation/pages/vouchers_page.dart';
+import '../../customers/presentation/pages/customer_care_hub_page.dart';
+import '../../customers/presentation/pages/collections_workbench_page.dart';
 import '../../expenses/presentation/pages/expense_categories_page.dart';
 import '../../expenses/presentation/pages/expenses_page.dart';
 import '../../hr/presentation/pages/attendance_page.dart';
@@ -14,11 +16,14 @@ import '../../hr/presentation/pages/employees_page.dart';
 import '../../hr/presentation/pages/hr_page.dart';
 import '../../hr/presentation/pages/payroll_page.dart';
 import '../../inventory/presentation/pages/combo_definitions_page.dart';
+import '../../inventory/presentation/pages/inventory_operations_page.dart';
 import '../../reports/presentation/pages/report_category_page.dart';
 import '../../reports/presentation/pages/reports_page.dart';
 import '../../reports/presentation/report_categories.dart';
+import '../../suppliers/presentation/pages/supplier_balance_workbench_page.dart';
 import '../../workflow/presentation/pages/workflow_requests_page.dart';
 import '../../workflow/presentation/pages/approvals_hub_page.dart';
+import 'pages/help_support_page.dart';
 import 'pages/settings_page.dart';
 
 typedef DashboardMenuSelectHandler = void Function(
@@ -121,6 +126,16 @@ class DashboardNavigation {
         );
       case 'Settings':
         return SettingsPage(fromMenu: fromMenu, onMenuSelect: onMenuSelect);
+      case 'Help & support':
+        return HelpSupportPage(fromMenu: fromMenu, onMenuSelect: onMenuSelect);
+      case 'Customer Care Hub':
+        return const CustomerCareHubPage();
+      case 'Collections Workbench':
+        return const CollectionsWorkbenchPage();
+      case 'Inventory Operations':
+        return const InventoryOperationsPage();
+      case 'Supplier Balances':
+        return const SupplierBalanceWorkbenchPage();
       case 'Combo Definitions':
         return const ComboDefinitionsPage();
       default:

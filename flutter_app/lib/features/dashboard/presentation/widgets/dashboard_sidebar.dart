@@ -141,13 +141,10 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                     horizontalTitleGap: 12,
                     onTap: () {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(const SnackBar(
-                          content: Text(
-                              'Help is on the way! (wire up your help center)'),
-                          behavior: SnackBarBehavior.floating,
-                        ));
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
+                        widget.onSelect?.call('Help & support');
+                      });
                     },
                   ),
                   ListTile(

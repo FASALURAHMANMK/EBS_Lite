@@ -361,6 +361,35 @@ func (s *PurchaseReturnService) CreatePurchaseReturn(companyID, locationID, user
 		return nil, fmt.Errorf("failed to enqueue purchase return ledger posting: %w", err)
 	}
 
+	approverRoleID, err := NewWorkflowService().findApproverRoleTx(tx, "Admin", "Manager", "Purchase Manager", "Super Admin")
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve purchase return approver role: %w", err)
+	}
+	dueAt := now.Add(12 * time.Hour)
+	title := fmt.Sprintf("Review purchase return %s", returnNumber)
+	summary := fmt.Sprintf("Supplier return completed for purchase %d • total %.2f", req.PurchaseID, totalAmount)
+	if _, err := NewWorkflowService().CreateReviewRequestTx(tx, companyID, userID, workflowCreateInput{
+		LocationID:     &locationID,
+		Module:         workflowModuleReturns,
+		EntityType:     workflowEntityPurchaseReturn,
+		EntityID:       &returnData.ReturnID,
+		ActionType:     workflowActionReviewPurchaseReturn,
+		Title:          title,
+		Summary:        &summary,
+		RequestReason:  req.Reason,
+		Priority:       workflowPriorityNormal,
+		ApproverRoleID: approverRoleID,
+		Payload: models.JSONB{
+			"purchase_return_id": returnData.ReturnID,
+			"purchase_id":        req.PurchaseID,
+			"return_number":      returnNumber,
+			"total_amount":       totalAmount,
+		},
+		DueAt: &dueAt,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to create purchase return review workflow: %w", err)
+	}
+
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)

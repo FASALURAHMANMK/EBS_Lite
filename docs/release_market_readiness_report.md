@@ -303,15 +303,15 @@ EBS Lite only partially meets this higher tier today.
 
 #### P1: Workflow depth
 
-- approvals are not deeply connected to procurement, returns, pricing overrides, settings changes, or master-data governance
-- notifications need escalation and ownership
+- procurement approvals, purchase-return review, supplier master-data review, and inventory settings changes are now wired into workflow requests
+- notifications now carry overdue state, ownership by approver role, and direct links into approval or stock investigation screens
+- remaining workflow gaps are pricing overrides, additional master-data domains, and broader escalation policies
 
 #### P1: Inventory execution depth
 
-- bin-level control
-- cycle counting programs
-- replenishment rules
-- directed warehouse behaviors
+- replenishment visibility is improved through low-stock workbench and stock utility lookup
+- cycle-count persistence and directed warehouse behaviors are still incomplete
+- bin-level control remains partial through location/storage assignment features rather than a full warehouse task model
 
 #### P1: Reporting and data operations
 

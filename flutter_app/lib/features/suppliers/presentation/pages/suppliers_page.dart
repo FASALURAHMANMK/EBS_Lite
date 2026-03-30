@@ -8,6 +8,7 @@ import '../../data/supplier_repository.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import '../../../../shared/widgets/app_empty_view.dart';
 import '../../../../shared/widgets/app_loading_view.dart';
+import 'supplier_balance_workbench_page.dart';
 import 'supplier_detail_page.dart';
 import 'supplier_create_page.dart';
 
@@ -50,6 +51,15 @@ class _SuppliersPageState extends ConsumerState<SuppliersPage> {
         leading: isWide ? const DesktopSidebarToggleLeading() : null,
         title: const Text('Suppliers'),
         actions: [
+          IconButton(
+            tooltip: 'Supplier balances',
+            icon: const Icon(Icons.account_balance_wallet_rounded),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const SupplierBalanceWorkbenchPage(),
+              ),
+            ),
+          ),
           IconButton(
             tooltip: 'New Supplier',
             icon: const Icon(Icons.add_rounded),

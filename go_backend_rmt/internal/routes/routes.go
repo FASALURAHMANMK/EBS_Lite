@@ -868,6 +868,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			workflow.Use(middleware.RequireCompanyAccess())
 			{
 				workflow.GET("", middleware.RequirePermission("VIEW_WORKFLOWS"), workflowHandler.GetWorkflowRequests)
+				workflow.GET("/:id", middleware.RequirePermission("VIEW_WORKFLOWS"), workflowHandler.GetWorkflowRequest)
 				workflow.POST("", middleware.RequirePermission("CREATE_WORKFLOWS"), workflowHandler.CreateWorkflowRequest)
 				workflow.PUT("/:id/approve", middleware.RequirePermission("APPROVE_WORKFLOWS"), workflowHandler.ApproveWorkflowRequest)
 				workflow.PUT("/:id/reject", middleware.RequirePermission("APPROVE_WORKFLOWS"), workflowHandler.RejectWorkflowRequest)
