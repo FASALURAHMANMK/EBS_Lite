@@ -48,6 +48,9 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 	expenseHandler := handlers.NewExpenseHandler()
 	voucherHandler := handlers.NewVoucherHandler()
 	ledgerHandler := handlers.NewLedgerHandler()
+	chartOfAccountsHandler := handlers.NewChartOfAccountsHandler()
+	accountingPeriodHandler := handlers.NewAccountingPeriodHandler()
+	bankingHandler := handlers.NewBankingHandler()
 	financeIntegrityHandler := handlers.NewFinanceIntegrityHandler()
 	reportsHandler := handlers.NewReportsHandler()
 	employeeHandler := handlers.NewEmployeeHandler()
@@ -626,6 +629,37 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				ledgers.GET("/:account_id/entries", middleware.RequirePermission("VIEW_LEDGER_DETAILS"), ledgerHandler.GetEntries)
 			}
 
+			chartOfAccounts := protected.Group("/chart-of-accounts")
+			chartOfAccounts.Use(middleware.RequireCompanyAccess())
+			{
+				chartOfAccounts.GET("", middleware.RequirePermission("VIEW_CHART_OF_ACCOUNTS"), chartOfAccountsHandler.List)
+				chartOfAccounts.POST("", middleware.RequirePermission("MANAGE_CHART_OF_ACCOUNTS"), chartOfAccountsHandler.Create)
+				chartOfAccounts.PUT("/:id", middleware.RequirePermission("MANAGE_CHART_OF_ACCOUNTS"), chartOfAccountsHandler.Update)
+			}
+
+			accountingPeriods := protected.Group("/accounting-periods")
+			accountingPeriods.Use(middleware.RequireCompanyAccess())
+			{
+				accountingPeriods.GET("", middleware.RequirePermission("VIEW_ACCOUNTING_PERIODS"), accountingPeriodHandler.List)
+				accountingPeriods.POST("", middleware.RequirePermission("MANAGE_ACCOUNTING_PERIODS"), accountingPeriodHandler.Create)
+				accountingPeriods.POST("/:id/close", middleware.RequirePermission("MANAGE_ACCOUNTING_PERIODS"), accountingPeriodHandler.Close)
+				accountingPeriods.POST("/:id/reopen", middleware.RequirePermission("MANAGE_ACCOUNTING_PERIODS"), accountingPeriodHandler.Reopen)
+			}
+
+			bankAccounts := protected.Group("/bank-accounts")
+			bankAccounts.Use(middleware.RequireCompanyAccess())
+			{
+				bankAccounts.GET("", middleware.RequirePermission("VIEW_BANK_ACCOUNTS"), bankingHandler.ListBankAccounts)
+				bankAccounts.POST("", middleware.RequirePermission("MANAGE_BANK_ACCOUNTS"), bankingHandler.CreateBankAccount)
+				bankAccounts.PUT("/:id", middleware.RequirePermission("MANAGE_BANK_ACCOUNTS"), bankingHandler.UpdateBankAccount)
+				bankAccounts.GET("/:id/statements", middleware.RequirePermission("VIEW_BANK_ACCOUNTS"), bankingHandler.ListStatementEntries)
+				bankAccounts.POST("/:id/statements", middleware.RequirePermission("MANAGE_BANK_ACCOUNTS"), bankingHandler.CreateStatementEntry)
+				bankAccounts.POST("/:id/reconcile", middleware.RequirePermission("RECONCILE_BANK_STATEMENTS"), bankingHandler.MatchStatement)
+				bankAccounts.POST("/:id/unmatch", middleware.RequirePermission("RECONCILE_BANK_STATEMENTS"), bankingHandler.UnmatchStatement)
+				bankAccounts.POST("/:id/review", middleware.RequirePermission("RECONCILE_BANK_STATEMENTS"), bankingHandler.ReviewStatement)
+				bankAccounts.POST("/:id/adjustment", middleware.RequirePermission("RECONCILE_BANK_STATEMENTS"), bankingHandler.CreateAdjustment)
+			}
+
 			financeIntegrity := protected.Group("/finance-integrity")
 			financeIntegrity.Use(middleware.RequireCompanyAccess())
 			{
@@ -669,6 +703,9 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				reports.GET("/purchase-vs-returns", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetPurchaseVsReturns)
 				reports.GET("/supplier", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetSupplierReport)
 				reports.GET("/daily-cash", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetDailyCashReport)
+				reports.GET("/cash-book", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetCashBookReport)
+				reports.GET("/bank-book", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetBankBookReport)
+				reports.GET("/reconciliation-summary", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetReconciliationSummaryReport)
 				reports.GET("/income-expense", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetIncomeExpenseReport)
 				reports.GET("/general-ledger", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetGeneralLedger)
 				reports.GET("/trial-balance", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetTrialBalance)
@@ -676,6 +713,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				reports.GET("/balance-sheet", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetBalanceSheet)
 				reports.GET("/outstanding", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetOutstandingReport)
 				reports.GET("/tax", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetTaxReport)
+				reports.GET("/tax-review", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetTaxReviewReport)
 				reports.GET("/top-performers", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetTopPerformers)
 				reports.GET("/asset-register", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetAssetRegisterReport)
 				reports.GET("/asset-value-summary", middleware.RequirePermission("VIEW_REPORTS"), reportsHandler.GetAssetValueSummaryReport)

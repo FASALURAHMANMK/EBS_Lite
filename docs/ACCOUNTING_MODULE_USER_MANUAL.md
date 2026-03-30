@@ -27,7 +27,10 @@ This is the entry point for the accounting area. It now exposes:
 - `Day Open/Close`
 - `Expenses`
 - `Vouchers`
+- `Banking`
 - `Ledgers`
+- `Chart of Accounts`
+- `Period Close`
 - `Accounting Reports`
 - `Audit Logs`
 
@@ -95,26 +98,49 @@ Typical use cases:
 
 File: `flutter_app/lib/features/accounts/presentation/pages/vouchers_page.dart`
 
-This page is for manual single-counterpart vouchers.
+This page is for manual vouchers and balanced journals.
 
 What it does:
 
 - creates `payment` vouchers
 - creates `receipt` vouchers
+- creates balanced multi-line `journal` vouchers
+- supports bank-account settlement for receipt/payment vouchers
 - lists existing vouchers
 - filters by date and type
-
-Important rule:
-
-- `journal` vouchers are intentionally blocked now because the current API only stores one account plus one amount. A true journal requires balanced multi-line debit/credit rows. Allowing a fake one-line journal would be misleading for audit and financial reporting.
 
 Use vouchers for:
 
 - manual cash receipt against an account
 - manual cash payment against an account
-- controlled one-off adjustments with a cash counterpart
+- controlled one-off adjustments with a cash or bank counterpart
+- balanced journals such as accruals, corrections, bank charges, and reclasses
 
-### 6. Ledgers
+### 6. Banking
+
+File: `flutter_app/lib/features/accounts/presentation/pages/banking_page.dart`
+
+This is the bank-account and reconciliation workspace.
+
+What it does:
+
+- maintains bank-account masters linked to specific ledger accounts
+- captures structured bank statement lines
+- tracks `UNMATCHED`, `MATCHED`, and `REVIEW` statuses
+- matches statement lines to posted bank-ledger entries
+- allows unmatch and review handling
+- posts bank charges or adjustments directly from reconciliation
+
+Operator routine:
+
+1. Select the bank account.
+2. Enter or import statement lines for the period.
+3. Match clean items first.
+4. Mark unclear items as `REVIEW`.
+5. Post bank charges or adjustments when the statement is valid but the ledger entry is missing.
+6. Confirm the open-item count is zero before period close.
+
+### 7. Ledgers
 
 File: `flutter_app/lib/features/accounts/presentation/pages/ledgers_page.dart`
 
@@ -126,7 +152,7 @@ What it does:
 - lets the user search by code, name, type, or account id
 - opens ledger entry drill-down
 
-### 7. Ledger Entries
+### 8. Ledger Entries
 
 File: `flutter_app/lib/features/accounts/presentation/pages/ledger_entries_page.dart`
 
@@ -145,7 +171,48 @@ Use it for:
 - investigating balance movements
 - audit support and period-end review
 
-### 8. Audit Logs
+### 9. Chart of Accounts
+
+File: `flutter_app/lib/features/accounts/presentation/pages/chart_of_accounts_page.dart`
+
+This page is for maintaining the accounting structure itself.
+
+What it does:
+
+- lists the chart of accounts with code, type, subtype, parent, and current balance
+- lets finance admins create or update active/inactive ledgers
+- supports parent-child grouping for clearer report structure
+
+Use it for:
+
+- adding bank ledgers for separate bank accounts
+- adding expense, tax, and control subaccounts
+- improving reporting readability without changing source documents
+
+### 10. Period Close
+
+File: `flutter_app/lib/features/accounts/presentation/pages/period_close_page.dart`
+
+This page provides close-status visibility and the close checklist.
+
+What it does:
+
+- creates named accounting periods
+- shows current period status
+- shows close blockers for:
+  - trial-balance imbalance
+  - finance integrity backlog
+  - unreconciled bank statement lines
+- allows authorized users to close or reopen a period
+
+Close routine:
+
+1. Run reconciliation and clear open bank items.
+2. Review finance integrity diagnostics and clear failed/pending items.
+3. Review GL, trial balance, P&L, balance sheet, and tax review.
+4. Close the accounting period only after the checklist shows no blockers.
+
+### 11. Audit Logs
 
 File: `flutter_app/lib/features/accounts/presentation/pages/audit_logs_page.dart`
 
@@ -164,7 +231,7 @@ Use it for:
 - force-close review
 - override and exception follow-up
 
-### 9. Finance Integrity
+### 12. Finance Integrity
 
 File: `flutter_app/lib/features/accounts/presentation/pages/finance_integrity_page.dart`
 
@@ -182,7 +249,7 @@ Why it matters:
 - gives supportable diagnostics when async side effects fail
 - makes reconciliation issues visible to accounting/admin users without database access
 
-### 10. Accounting Reports
+### 13. Accounting Reports
 
 Now reachable from Accounts Home and implemented through the reports module.
 
@@ -195,16 +262,34 @@ Relevant files:
 Reports available:
 
 - Daily Cash
+- Cash Book
+- Bank Book
+- Reconciliation Summary
 - Expenses Summary
 - Income vs Expense
 - General Ledger
 - Trial Balance
+- Tax Review
 - Profit & Loss
 - Balance Sheet
 - Outstanding
 - Top Performers
 
 These are the period-end review screens for finance users.
+
+## Reconciliation And Close Operator Guidance
+
+Bank reconciliation expectations:
+
+- every statement line should end in `MATCHED` or a documented `REVIEW` state during investigation
+- `REVIEW` is not a silent parking lot; it needs a reason
+- bank charges should normally be posted through the reconciliation action so the statement and ledger close together
+
+Period close expectations:
+
+- close only after bank reconciliation is complete for the period
+- close only after finance integrity diagnostics show no unresolved accounting backlog
+- if a period must be reopened, document the reason and re-run the close checklist after corrections
 
 ## Ledgers Present and Why They Exist
 
@@ -391,16 +476,17 @@ Why:
 
 Source flow:
 
-- manual payment/receipt voucher
+- manual payment, receipt, or journal voucher
 
 Ledger result:
 
-- `payment`: Debit selected account, Credit `Cash`
-- `receipt`: Debit `Cash`, Credit selected account
+- `payment`: Debit selected account, Credit `Cash` or the selected bank ledger
+- `receipt`: Debit `Cash` or the selected bank ledger, Credit selected account
+- `journal`: one or more debit lines balanced against one or more credit lines in the same voucher
 
 Why:
 
-- this is a controlled manual correction / settlement tool with a cash counterpart
+- this is a controlled manual correction / settlement tool for cash, bank, accrual, reclass, and adjustment entries
 
 ## Tax and Audit Readiness Notes
 
@@ -444,17 +530,21 @@ This structure is much closer to what VAT/GST filing and audit workpapers need.
 
 ### Period-end routine
 
-1. Check `Outstanding`.
-2. Review `Trial Balance`.
-3. Investigate unusual ledger balances.
-4. Review `Profit & Loss` and `Balance Sheet`.
-5. Export tax and ledger reports for accountant review.
+1. Complete bank reconciliation and clear or document all open statement lines.
+2. Check `Outstanding`.
+3. Review `Trial Balance`.
+4. Investigate unusual ledger balances through `General Ledger` drill-down.
+5. Review `Profit & Loss`, `Balance Sheet`, and `Tax Review`.
+6. Review `Finance Integrity` and confirm there is no unresolved accounting backlog.
+7. Close the period from `Period Close` once the checklist is clear.
 
 ## Current Boundaries / Important Caveats
 
-- Multi-line manual journal vouchers are not implemented yet, so one-line “journal” creation is blocked on purpose.
 - Sale returns currently behave as credit notes unless a separate refund/payment process is used.
 - The seeded chart of accounts is intentionally minimal; many businesses will still want extra ledgers such as discounts, freight, payroll expense, bank charges, retained earnings, and tax control subaccounts.
+- Fixed-assets-lite exists through asset classes, asset register entries, and asset reports, but depreciation schedules and depreciation journal automation are not part of this Phase 1 slice.
+- Bank reconciliation is operationally complete for structured statement entry, matching, review, unmatch, and bank adjustments, but it does not yet include CSV parser presets or automatic match suggestions.
+- Accounting period close now blocks voucher and bank-statement activity in closed dates, but some source modules outside accounting still need tighter global close enforcement.
 - Jurisdiction-specific return boxes, filing labels, and statutory mappings are not hard-coded in this module; they should be validated locally before final filing.
 
 ## Summary
@@ -469,7 +559,8 @@ The accounting module is now suitable for a practical SME workflow:
 
 For a full production rollout, the next finance-focused enhancement should be:
 
-1. true multi-line journal vouchers
-2. richer chart-of-accounts management
-3. jurisdiction-specific tax return mapping
-4. a dedicated refund/payout workflow for sale returns
+1. depreciation schedules and posting for fixed assets
+2. tighter all-module posting locks for closed periods
+3. automatic bank statement import/match assistance
+4. jurisdiction-specific tax return mapping
+5. a dedicated refund/payout workflow for sale returns

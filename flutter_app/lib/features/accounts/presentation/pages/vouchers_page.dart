@@ -107,9 +107,14 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
   Future<void> _openCreateDialog() async {
     String type = 'payment';
     List<LedgerBalanceDto> accounts = const [];
+    List<BankAccountDto> bankAccounts = const [];
     int? selectedAccountId;
+    int? selectedSettlementAccountId;
+    int? selectedBankAccountId;
     try {
       accounts = await ref.read(accountsRepositoryProvider).getLedgerBalances();
+      bankAccounts =
+          await ref.read(accountsRepositoryProvider).getBankAccounts();
       if (accounts.isNotEmpty) selectedAccountId = accounts.first.accountId;
     } catch (e) {
       if (!mounted) return;
@@ -129,6 +134,13 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
     final amount = TextEditingController();
     final reference = TextEditingController();
     final description = TextEditingController();
+    final journalLines = <_DraftVoucherLine>[
+      _DraftVoucherLine(accountId: selectedAccountId),
+      _DraftVoucherLine(
+        accountId:
+            accounts.length > 1 ? accounts[1].accountId : selectedAccountId,
+      ),
+    ];
     final saved = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -146,11 +158,12 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
                   items: const [
                     DropdownMenuItem(value: 'payment', child: Text('Payment')),
                     DropdownMenuItem(value: 'receipt', child: Text('Receipt')),
+                    DropdownMenuItem(value: 'journal', child: Text('Journal')),
                   ],
                   onChanged: (v) => setInner(() => type = v ?? type),
                 ),
                 const SizedBox(height: 8),
-                if (accounts.isNotEmpty)
+                if (type != 'journal' && accounts.isNotEmpty)
                   DropdownButtonFormField<int>(
                     isExpanded: true,
                     key: ValueKey(selectedAccountId),
@@ -182,7 +195,7 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
                       accountId.text = (v ?? '').toString();
                     },
                   )
-                else
+                else if (type != 'journal')
                   TextField(
                     controller: accountId,
                     keyboardType: TextInputType.number,
@@ -191,16 +204,155 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
                       prefixIcon: Icon(Icons.account_tree_rounded),
                     ),
                   ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: amount,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Amount',
-                    prefixIcon: Icon(Icons.payments_rounded),
+                if (type != 'journal') ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: amount,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Amount',
+                      prefixIcon: Icon(Icons.payments_rounded),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<int?>(
+                    initialValue: selectedSettlementAccountId,
+                    decoration: const InputDecoration(
+                      labelText: 'Settlement Ledger',
+                      prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+                    ),
+                    items: [
+                      const DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('Default Cash Ledger'),
+                      ),
+                      ...accounts.map(
+                        (a) => DropdownMenuItem<int?>(
+                          value: a.accountId,
+                          child: Text(
+                            '${a.accountCode ?? ''} ${a.accountName ?? 'Account'}'
+                                .trim(),
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: (v) =>
+                        setInner(() => selectedSettlementAccountId = v),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<int?>(
+                    initialValue: selectedBankAccountId,
+                    decoration: const InputDecoration(
+                      labelText: 'Bank Account',
+                      prefixIcon: Icon(Icons.account_balance_rounded),
+                    ),
+                    items: [
+                      const DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('No bank settlement'),
+                      ),
+                      ...bankAccounts.map(
+                        (a) => DropdownMenuItem<int?>(
+                          value: a.bankAccountId,
+                          child: Text('${a.bankName} • ${a.accountName}'),
+                        ),
+                      ),
+                    ],
+                    onChanged: (v) => setInner(() => selectedBankAccountId = v),
+                  ),
+                ],
+                if (type == 'journal') ...[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Balanced Journal Lines',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...List.generate(journalLines.length, (index) {
+                    final line = journalLines[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Card(
+                        elevation: 0,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Column(
+                            children: [
+                              DropdownButtonFormField<int>(
+                                initialValue: line.accountId,
+                                decoration: InputDecoration(
+                                  labelText: 'Line ${index + 1} Account',
+                                ),
+                                items: accounts
+                                    .map(
+                                      (a) => DropdownMenuItem<int>(
+                                        value: a.accountId,
+                                        child: Text(
+                                          '${a.accountCode ?? ''} ${a.accountName ?? 'Account'}'
+                                              .trim(),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (v) =>
+                                    setInner(() => line.accountId = v),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: line.debitCtrl,
+                                      keyboardType:
+                                          const TextInputType.numberWithOptions(
+                                              decimal: true),
+                                      decoration: const InputDecoration(
+                                        labelText: 'Debit',
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: line.creditCtrl,
+                                      keyboardType:
+                                          const TextInputType.numberWithOptions(
+                                              decimal: true),
+                                      decoration: const InputDecoration(
+                                        labelText: 'Credit',
+                                      ),
+                                    ),
+                                  ),
+                                  if (journalLines.length > 2)
+                                    IconButton(
+                                      onPressed: () => setInner(
+                                          () => journalLines.removeAt(index)),
+                                      icon: const Icon(Icons.delete_outline),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: () => setInner(
+                        () => journalLines.add(
+                          _DraftVoucherLine(accountId: selectedAccountId),
+                        ),
+                      ),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Add Line'),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 TextField(
                   controller: reference,
@@ -233,15 +385,6 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
     );
     if (!mounted) return;
     if (saved != true) return;
-    final id = int.tryParse(accountId.text.trim());
-    final amt = double.tryParse(amount.text.trim());
-    if (id == null || id <= 0 || amt == null || amt <= 0) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter valid account and amount')),
-      );
-      return;
-    }
     if (reference.text.trim().isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -250,13 +393,37 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
       return;
     }
     try {
-      await ref.read(accountsRepositoryProvider).createVoucher(
-            type: type,
-            accountId: id,
-            amount: amt,
-            reference: reference.text,
-            description: description.text,
-          );
+      if (type == 'journal') {
+        await ref.read(accountsRepositoryProvider).createVoucher(
+              type: type,
+              reference: reference.text,
+              description: description.text,
+              lines: journalLines
+                  .map(
+                    (line) => VoucherLineInput(
+                      accountId: line.accountId ?? 0,
+                      debit: double.tryParse(line.debitCtrl.text.trim()) ?? 0,
+                      credit: double.tryParse(line.creditCtrl.text.trim()) ?? 0,
+                    ),
+                  )
+                  .toList(),
+            );
+      } else {
+        final id = int.tryParse(accountId.text.trim());
+        final amt = double.tryParse(amount.text.trim());
+        if (id == null || id <= 0 || amt == null || amt <= 0) {
+          throw Exception('Enter valid account and amount');
+        }
+        await ref.read(accountsRepositoryProvider).createVoucher(
+              type: type,
+              accountId: id,
+              amount: amt,
+              reference: reference.text,
+              description: description.text,
+              settlementAccountId: selectedSettlementAccountId,
+              bankAccountId: selectedBankAccountId,
+            );
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Voucher created')),
@@ -410,4 +577,12 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
     if (!widget.fromMenu) return scaffold;
     return PopScope(canPop: false, child: scaffold);
   }
+}
+
+class _DraftVoucherLine {
+  _DraftVoucherLine({this.accountId});
+
+  int? accountId;
+  final TextEditingController debitCtrl = TextEditingController();
+  final TextEditingController creditCtrl = TextEditingController();
 }

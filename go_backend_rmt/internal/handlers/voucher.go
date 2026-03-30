@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"erp-backend/internal/models"
 	"erp-backend/internal/services"
@@ -85,10 +86,15 @@ func (h *VoucherHandler) CreateVoucher(c *gin.Context) {
 		utils.ValidationErrorResponse(c, validationErrors)
 		return
 	}
+	if idemKey := strings.TrimSpace(c.GetHeader("Idempotency-Key")); idemKey != "" {
+		req.IdempotencyKey = &idemKey
+	} else if idemKey := strings.TrimSpace(c.GetHeader("X-Idempotency-Key")); idemKey != "" {
+		req.IdempotencyKey = &idemKey
+	}
 
 	id, err := h.service.CreateVoucher(companyID, userID, vType, &req)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to create voucher", err)
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create voucher", err)
 		return
 	}
 	utils.CreatedResponse(c, "Voucher created", gin.H{"voucher_id": id})

@@ -45,13 +45,25 @@ var reportExportSchemas = map[string]reportExportSchema{
 		Title:         "Cash Register Summary",
 		PreferredCols: []string{"date", "location_id", "status", "opening_balance", "cash_in", "cash_out", "expected_balance", "closing_balance", "variance"},
 	},
+	"/reports/cash-book": {
+		Title:         "Cash Book",
+		PreferredCols: []string{"date", "account_code", "account_name", "debit", "credit", "running_balance", "transaction_type", "transaction_id", "reference", "description"},
+	},
+	"/reports/bank-book": {
+		Title:         "Bank Book",
+		PreferredCols: []string{"bank_account_name", "bank_name", "date", "account_code", "account_name", "debit", "credit", "running_balance", "transaction_type", "transaction_id", "reference", "description"},
+	},
+	"/reports/reconciliation-summary": {
+		Title:         "Reconciliation Summary",
+		PreferredCols: []string{"bank_account_name", "bank_name", "statement_entries", "matched_entries", "unmatched_entries", "review_entries", "net_statement_amount", "open_amount"},
+	},
 	"/reports/income-expense": {
 		Title:         "Income and Expense Summary",
 		PreferredCols: []string{"day", "sales_total", "expenses_total", "net_income"},
 	},
 	"/reports/general-ledger": {
 		Title:         "General Ledger",
-		PreferredCols: []string{"date", "account_code", "account_name", "debit", "credit", "transaction_type", "transaction_id", "reference", "description", "voucher_id", "entry_id", "account_id"},
+		PreferredCols: []string{"date", "account_code", "account_name", "debit", "credit", "transaction_type", "transaction_id", "source_number", "reference", "description", "voucher_id", "entry_id", "account_id"},
 	},
 	"/reports/trial-balance": {
 		Title:         "Trial Balance",
@@ -68,6 +80,10 @@ var reportExportSchemas = map[string]reportExportSchema{
 	"/reports/outstanding": {
 		Title:         "Receivables and Payables Summary",
 		PreferredCols: []string{"type", "amount"},
+	},
+	"/reports/tax-review": {
+		Title:         "Tax Review",
+		PreferredCols: []string{"tax_side", "tax_name", "tax_rate", "taxable_amount", "tax_amount"},
 	},
 	"/reports/top-performers": {
 		Title:         "Top Performers",
@@ -110,6 +126,8 @@ var reportExportLabels = map[string]string{
 	"account_type":          "Account Type",
 	"amount":                "Amount",
 	"asset_tag":             "Asset Tag",
+	"bank_account_name":     "Bank Account",
+	"bank_name":             "Bank",
 	"balance":               "Balance",
 	"cash_in":               "Cash In",
 	"cash_out":              "Cash Out",
@@ -136,6 +154,8 @@ var reportExportLabels = map[string]string{
 	"net_income":            "Net Income",
 	"net_movement":          "Net Movement",
 	"net_purchases":         "Net Purchases",
+	"net_statement_amount":  "Net Statement Amount",
+	"open_amount":           "Open Amount",
 	"opening_balance":       "Opening Balance",
 	"outstanding":           "Outstanding Balance",
 	"period":                "Period",
@@ -156,9 +176,12 @@ var reportExportLabels = map[string]string{
 	"section":               "Section",
 	"source_mode":           "Source Mode",
 	"status":                "Status",
+	"statement_entries":     "Statement Entries",
 	"stock_value":           "Stock Value",
+	"source_number":         "Source Number",
 	"supplier_id":           "Supplier ID",
 	"supplier_name":         "Supplier Name",
+	"tax_side":              "Tax Side",
 	"tax_amount":            "Tax Amount",
 	"tax_name":              "Tax Code",
 	"tax_rate":              "Tax Rate",
@@ -172,6 +195,9 @@ var reportExportLabels = map[string]string{
 	"transaction_id":        "Transaction ID",
 	"transaction_type":      "Source Type",
 	"type":                  "Type",
+	"matched_entries":       "Matched Entries",
+	"unmatched_entries":     "Unmatched Entries",
+	"review_entries":        "Review Entries",
 	"value":                 "Value",
 	"variance":              "Variance",
 	"voucher_id":            "Voucher ID",
@@ -195,6 +221,11 @@ var reportExportValueLabels = map[string]map[string]string{
 	"type": {
 		"sales":     "Accounts Receivable",
 		"purchases": "Accounts Payable",
+	},
+	"tax_side": {
+		"OUTPUT": "Output Tax",
+		"INPUT":  "Input Tax",
+		"NET":    "Net Tax",
 	},
 }
 

@@ -4,10 +4,13 @@ import 'package:ebs_lite/features/expenses/presentation/pages/expenses_page.dart
 import '../../../reports/presentation/pages/report_category_page.dart';
 import '../../../reports/presentation/report_categories.dart';
 import 'audit_logs_page.dart';
+import 'banking_page.dart';
 import 'cash_register_page.dart';
+import 'chart_of_accounts_page.dart';
 import 'day_end_flow_page.dart';
 import 'finance_integrity_page.dart';
 import 'ledgers_page.dart';
+import 'period_close_page.dart';
 import 'vouchers_page.dart';
 
 class AccountingPage extends StatelessWidget {
@@ -45,10 +48,31 @@ class AccountingPage extends StatelessWidget {
         ),
       ),
       FeatureItem(
+        icon: Icons.account_balance_rounded,
+        label: 'Banking',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const BankingPage()),
+        ),
+      ),
+      FeatureItem(
         icon: Icons.menu_book_rounded,
         label: 'Ledgers',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const LedgersPage()),
+        ),
+      ),
+      FeatureItem(
+        icon: Icons.account_tree_rounded,
+        label: 'Chart of Accounts',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ChartOfAccountsPage()),
+        ),
+      ),
+      FeatureItem(
+        icon: Icons.event_note_rounded,
+        label: 'Period Close',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const PeriodClosePage()),
         ),
       ),
       FeatureItem(

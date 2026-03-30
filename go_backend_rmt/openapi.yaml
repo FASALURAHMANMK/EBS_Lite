@@ -4611,6 +4611,304 @@ paths:
         required: true
         schema:
           type: string
+  /chart-of-accounts:
+    get:
+      summary: GET /api/v1/chart-of-accounts
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+    post:
+      summary: POST /api/v1/chart-of-accounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChartOfAccountRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /chart-of-accounts/{id}:
+    put:
+      summary: PUT /api/v1/chart-of-accounts/{id}
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateChartOfAccountRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /accounting-periods:
+    get:
+      summary: GET /api/v1/accounting-periods
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+    post:
+      summary: POST /api/v1/accounting-periods
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountingPeriodRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /accounting-periods/{id}/close:
+    post:
+      summary: POST /api/v1/accounting-periods/{id}/close
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAccountingPeriodStatusRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /accounting-periods/{id}/reopen:
+    post:
+      summary: POST /api/v1/accounting-periods/{id}/reopen
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAccountingPeriodStatusRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /bank-accounts:
+    get:
+      summary: GET /api/v1/bank-accounts
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+    post:
+      summary: POST /api/v1/bank-accounts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBankAccountRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /bank-accounts/{id}:
+    put:
+      summary: PUT /api/v1/bank-accounts/{id}
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBankAccountRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /bank-accounts/{id}/statements:
+    get:
+      summary: GET /api/v1/bank-accounts/{id}/statements
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: date_from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: date_to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+    post:
+      summary: POST /api/v1/bank-accounts/{id}/statements
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBankStatementEntryRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /bank-accounts/{id}/reconcile:
+    post:
+      summary: POST /api/v1/bank-accounts/{id}/reconcile
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MatchBankStatementRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /bank-accounts/{id}/unmatch:
+    post:
+      summary: POST /api/v1/bank-accounts/{id}/unmatch
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnmatchBankStatementRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /bank-accounts/{id}/review:
+    post:
+      summary: POST /api/v1/bank-accounts/{id}/review
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewBankStatementRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /bank-accounts/{id}/adjustment:
+    post:
+      summary: POST /api/v1/bank-accounts/{id}/adjustment
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBankAdjustmentRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
   /finance-integrity/diagnostics:
     get:
       summary: GET /api/v1/finance-integrity/diagnostics
@@ -4701,7 +4999,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreateVoucherRequest'
   /cash-registers/training/enable:
     post:
       summary: POST /api/v1/cash-registers/training/enable
@@ -4912,6 +5210,60 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
+  /reports/cash-book:
+    get:
+      summary: GET /api/v1/reports/cash-book
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /reports/bank-book:
+    get:
+      summary: GET /api/v1/reports/bank-book
+      parameters:
+      - name: bank_account_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /reports/reconciliation-summary:
+    get:
+      summary: GET /api/v1/reports/reconciliation-summary
+      parameters:
+      - name: bank_account_id
+        in: query
+        required: false
+        schema:
+          type: integer
+      - name: from_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: to_date
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
   /reports/income-expense:
     get:
       summary: GET /api/v1/reports/income-expense
@@ -4975,6 +5327,16 @@ paths:
   /reports/tax:
     get:
       summary: GET /api/v1/reports/tax
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /reports/tax-review:
+    get:
+      summary: GET /api/v1/reports/tax-review
       responses:
         '200':
           description: Successful response
@@ -6455,6 +6817,527 @@ components:
     GenericObject:
       type: object
       additionalProperties: true
+    VoucherLine:
+      type: object
+      properties:
+        line_id:
+          type: integer
+        voucher_id:
+          type: integer
+        company_id:
+          type: integer
+        account_id:
+          type: integer
+        account_code:
+          type: string
+          nullable: true
+        account_name:
+          type: string
+          nullable: true
+        line_no:
+          type: integer
+        debit:
+          type: number
+          format: float
+        credit:
+          type: number
+          format: float
+        description:
+          type: string
+          nullable: true
+    VoucherLineRequest:
+      type: object
+      required:
+        - account_id
+      properties:
+        account_id:
+          type: integer
+        debit:
+          type: number
+          format: float
+        credit:
+          type: number
+          format: float
+        description:
+          type: string
+          nullable: true
+    CreateVoucherRequest:
+      type: object
+      required:
+        - reference
+      properties:
+        account_id:
+          type: integer
+        amount:
+          type: number
+          format: float
+        settlement_account_id:
+          type: integer
+          nullable: true
+        bank_account_id:
+          type: integer
+          nullable: true
+        reference:
+          type: string
+        date:
+          type: string
+          format: date-time
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/VoucherLineRequest'
+        idempotency_key:
+          type: string
+          nullable: true
+    ChartOfAccount:
+      type: object
+      properties:
+        account_id:
+          type: integer
+        company_id:
+          type: integer
+        account_code:
+          type: string
+          nullable: true
+        name:
+          type: string
+        type:
+          type: string
+        subtype:
+          type: string
+          nullable: true
+        parent_id:
+          type: integer
+          nullable: true
+        parent_code:
+          type: string
+          nullable: true
+        parent_name:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+        current_balance:
+          type: number
+          format: float
+          nullable: true
+    CreateChartOfAccountRequest:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        account_code:
+          type: string
+          nullable: true
+        name:
+          type: string
+        type:
+          type: string
+        subtype:
+          type: string
+          nullable: true
+        parent_id:
+          type: integer
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
+    UpdateChartOfAccountRequest:
+      type: object
+      properties:
+        account_code:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        type:
+          type: string
+          nullable: true
+        subtype:
+          type: string
+          nullable: true
+        parent_id:
+          type: integer
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
+    BankAccount:
+      type: object
+      properties:
+        bank_account_id:
+          type: integer
+        company_id:
+          type: integer
+        ledger_account_id:
+          type: integer
+        ledger_account_code:
+          type: string
+          nullable: true
+        ledger_account_name:
+          type: string
+          nullable: true
+        default_location_id:
+          type: integer
+          nullable: true
+        account_name:
+          type: string
+        bank_name:
+          type: string
+        account_number_masked:
+          type: string
+          nullable: true
+        branch_name:
+          type: string
+          nullable: true
+        currency_code:
+          type: string
+          nullable: true
+        statement_import_hint:
+          type: string
+          nullable: true
+        opening_balance:
+          type: number
+          format: float
+        is_active:
+          type: boolean
+        unmatched_entries:
+          type: integer
+        review_entries:
+          type: integer
+        last_statement_date:
+          type: string
+          format: date-time
+          nullable: true
+    CreateBankAccountRequest:
+      type: object
+      required:
+        - ledger_account_id
+        - account_name
+        - bank_name
+      properties:
+        ledger_account_id:
+          type: integer
+        default_location_id:
+          type: integer
+          nullable: true
+        account_name:
+          type: string
+        bank_name:
+          type: string
+        account_number_masked:
+          type: string
+          nullable: true
+        branch_name:
+          type: string
+          nullable: true
+        currency_code:
+          type: string
+          nullable: true
+        statement_import_hint:
+          type: string
+          nullable: true
+        opening_balance:
+          type: number
+          format: float
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
+    UpdateBankAccountRequest:
+      type: object
+      properties:
+        ledger_account_id:
+          type: integer
+          nullable: true
+        default_location_id:
+          type: integer
+          nullable: true
+        account_name:
+          type: string
+          nullable: true
+        bank_name:
+          type: string
+          nullable: true
+        account_number_masked:
+          type: string
+          nullable: true
+        branch_name:
+          type: string
+          nullable: true
+        currency_code:
+          type: string
+          nullable: true
+        statement_import_hint:
+          type: string
+          nullable: true
+        opening_balance:
+          type: number
+          format: float
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
+    BankReconciliationMatch:
+      type: object
+      properties:
+        match_id:
+          type: integer
+        company_id:
+          type: integer
+        bank_account_id:
+          type: integer
+        statement_entry_id:
+          type: integer
+        ledger_entry_id:
+          type: integer
+        matched_amount:
+          type: number
+          format: float
+        match_kind:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        created_by:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        ledger_date:
+          type: string
+          format: date-time
+          nullable: true
+        ledger_reference:
+          type: string
+          nullable: true
+        ledger_description:
+          type: string
+          nullable: true
+    BankStatementEntry:
+      type: object
+      properties:
+        statement_entry_id:
+          type: integer
+        company_id:
+          type: integer
+        bank_account_id:
+          type: integer
+        entry_date:
+          type: string
+          format: date-time
+        value_date:
+          type: string
+          format: date-time
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        reference:
+          type: string
+          nullable: true
+        external_ref:
+          type: string
+          nullable: true
+        source_type:
+          type: string
+        deposit_amount:
+          type: number
+          format: float
+        withdrawal_amount:
+          type: number
+          format: float
+        running_balance:
+          type: number
+          format: float
+          nullable: true
+        status:
+          type: string
+        review_reason:
+          type: string
+          nullable: true
+        matched_amount:
+          type: number
+          format: float
+        available_amount:
+          type: number
+          format: float
+        created_at:
+          type: string
+          format: date-time
+        matches:
+          type: array
+          items:
+            $ref: '#/components/schemas/BankReconciliationMatch'
+    CreateBankStatementEntryRequest:
+      type: object
+      required:
+        - entry_date
+      properties:
+        entry_date:
+          type: string
+        value_date:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        reference:
+          type: string
+          nullable: true
+        external_ref:
+          type: string
+          nullable: true
+        source_type:
+          type: string
+          nullable: true
+        deposit_amount:
+          type: number
+          format: float
+        withdrawal_amount:
+          type: number
+          format: float
+        running_balance:
+          type: number
+          format: float
+          nullable: true
+        review_reason:
+          type: string
+          nullable: true
+        idempotency_key:
+          type: string
+          nullable: true
+    MatchBankStatementRequest:
+      type: object
+      required:
+        - statement_entry_id
+        - ledger_entry_id
+        - matched_amount
+      properties:
+        statement_entry_id:
+          type: integer
+        ledger_entry_id:
+          type: integer
+        matched_amount:
+          type: number
+          format: float
+        notes:
+          type: string
+          nullable: true
+    UnmatchBankStatementRequest:
+      type: object
+      required:
+        - statement_entry_id
+        - match_id
+      properties:
+        statement_entry_id:
+          type: integer
+        match_id:
+          type: integer
+    ReviewBankStatementRequest:
+      type: object
+      required:
+        - statement_entry_id
+      properties:
+        statement_entry_id:
+          type: integer
+        review_reason:
+          type: string
+          nullable: true
+    CreateBankAdjustmentRequest:
+      type: object
+      required:
+        - statement_entry_id
+        - adjustment_type
+        - offset_account_id
+      properties:
+        statement_entry_id:
+          type: integer
+        adjustment_type:
+          type: string
+        offset_account_id:
+          type: integer
+        reference:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        date:
+          type: string
+          format: date-time
+          nullable: true
+        idempotency_key:
+          type: string
+          nullable: true
+    AccountingPeriod:
+      type: object
+      properties:
+        period_id:
+          type: integer
+        company_id:
+          type: integer
+        period_name:
+          type: string
+        start_date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+        status:
+          type: string
+        checklist:
+          type: object
+          additionalProperties: true
+        notes:
+          type: string
+          nullable: true
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
+        closed_by:
+          type: integer
+          nullable: true
+        reopened_at:
+          type: string
+          format: date-time
+          nullable: true
+        reopened_by:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    CreateAccountingPeriodRequest:
+      type: object
+      required:
+        - period_name
+        - start_date
+        - end_date
+      properties:
+        period_name:
+          type: string
+        start_date:
+          type: string
+        end_date:
+          type: string
+        notes:
+          type: string
+          nullable: true
+    UpdateAccountingPeriodStatusRequest:
+      type: object
+      properties:
+        notes:
+          type: string
+          nullable: true
     Supplier:
       type: object
       properties:

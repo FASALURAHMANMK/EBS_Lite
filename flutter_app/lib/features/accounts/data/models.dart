@@ -57,8 +57,11 @@ class VoucherDto {
   final double amount;
   final DateTime date;
   final int accountId;
+  final int? settlementAccountId;
+  final int? bankAccountId;
   final String reference;
   final String? description;
+  final List<VoucherLineDto> lines;
 
   VoucherDto({
     required this.voucherId,
@@ -67,8 +70,11 @@ class VoucherDto {
     required this.amount,
     required this.date,
     required this.accountId,
+    required this.settlementAccountId,
+    required this.bankAccountId,
     required this.reference,
     required this.description,
+    required this.lines,
   });
 
   factory VoucherDto.fromJson(Map<String, dynamic> json) => VoucherDto(
@@ -78,8 +84,344 @@ class VoucherDto {
         amount: _asDouble(json['amount']),
         date: _asDate(json['date']),
         accountId: _asInt(json['account_id']),
+        settlementAccountId: _asNullableInt(json['settlement_account_id']),
+        bankAccountId: _asNullableInt(json['bank_account_id']),
         reference: (json['reference'] ?? '').toString(),
         description: json['description']?.toString(),
+        lines: (json['lines'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(VoucherLineDto.fromJson)
+            .toList(),
+      );
+}
+
+class VoucherLineDto {
+  final int lineId;
+  final int voucherId;
+  final int companyId;
+  final int accountId;
+  final String? accountCode;
+  final String? accountName;
+  final int lineNo;
+  final double debit;
+  final double credit;
+  final String? description;
+
+  VoucherLineDto({
+    required this.lineId,
+    required this.voucherId,
+    required this.companyId,
+    required this.accountId,
+    required this.accountCode,
+    required this.accountName,
+    required this.lineNo,
+    required this.debit,
+    required this.credit,
+    required this.description,
+  });
+
+  factory VoucherLineDto.fromJson(Map<String, dynamic> json) => VoucherLineDto(
+        lineId: _asInt(json['line_id']),
+        voucherId: _asInt(json['voucher_id']),
+        companyId: _asInt(json['company_id']),
+        accountId: _asInt(json['account_id']),
+        accountCode: json['account_code']?.toString(),
+        accountName: json['account_name']?.toString(),
+        lineNo: _asInt(json['line_no']),
+        debit: _asDouble(json['debit']),
+        credit: _asDouble(json['credit']),
+        description: json['description']?.toString(),
+      );
+}
+
+class VoucherLineInput {
+  final int accountId;
+  final double debit;
+  final double credit;
+  final String? description;
+
+  const VoucherLineInput({
+    required this.accountId,
+    required this.debit,
+    required this.credit,
+    this.description,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'account_id': accountId,
+        'debit': debit,
+        'credit': credit,
+        if ((description ?? '').trim().isNotEmpty)
+          'description': description!.trim(),
+      };
+}
+
+class ChartOfAccountDto {
+  final int accountId;
+  final int companyId;
+  final String? accountCode;
+  final String name;
+  final String type;
+  final String? subtype;
+  final int? parentId;
+  final String? parentCode;
+  final String? parentName;
+  final bool isActive;
+  final double? currentBalance;
+
+  ChartOfAccountDto({
+    required this.accountId,
+    required this.companyId,
+    required this.accountCode,
+    required this.name,
+    required this.type,
+    required this.subtype,
+    required this.parentId,
+    required this.parentCode,
+    required this.parentName,
+    required this.isActive,
+    required this.currentBalance,
+  });
+
+  factory ChartOfAccountDto.fromJson(Map<String, dynamic> json) =>
+      ChartOfAccountDto(
+        accountId: _asInt(json['account_id']),
+        companyId: _asInt(json['company_id']),
+        accountCode: json['account_code']?.toString(),
+        name: (json['name'] ?? '').toString(),
+        type: (json['type'] ?? '').toString(),
+        subtype: json['subtype']?.toString(),
+        parentId: _asNullableInt(json['parent_id']),
+        parentCode: json['parent_code']?.toString(),
+        parentName: json['parent_name']?.toString(),
+        isActive: (json['is_active'] as bool?) ?? true,
+        currentBalance: _asNullableDouble(json['current_balance']),
+      );
+}
+
+class BankAccountDto {
+  final int bankAccountId;
+  final int companyId;
+  final int ledgerAccountId;
+  final String? ledgerAccountCode;
+  final String? ledgerAccountName;
+  final int? defaultLocationId;
+  final String accountName;
+  final String bankName;
+  final String? accountNumberMasked;
+  final String? branchName;
+  final String? currencyCode;
+  final String? statementImportHint;
+  final double openingBalance;
+  final bool isActive;
+  final int unmatchedEntries;
+  final int reviewEntries;
+  final DateTime? lastStatementDate;
+
+  BankAccountDto({
+    required this.bankAccountId,
+    required this.companyId,
+    required this.ledgerAccountId,
+    required this.ledgerAccountCode,
+    required this.ledgerAccountName,
+    required this.defaultLocationId,
+    required this.accountName,
+    required this.bankName,
+    required this.accountNumberMasked,
+    required this.branchName,
+    required this.currencyCode,
+    required this.statementImportHint,
+    required this.openingBalance,
+    required this.isActive,
+    required this.unmatchedEntries,
+    required this.reviewEntries,
+    required this.lastStatementDate,
+  });
+
+  factory BankAccountDto.fromJson(Map<String, dynamic> json) => BankAccountDto(
+        bankAccountId: _asInt(json['bank_account_id']),
+        companyId: _asInt(json['company_id']),
+        ledgerAccountId: _asInt(json['ledger_account_id']),
+        ledgerAccountCode: json['ledger_account_code']?.toString(),
+        ledgerAccountName: json['ledger_account_name']?.toString(),
+        defaultLocationId: _asNullableInt(json['default_location_id']),
+        accountName: (json['account_name'] ?? '').toString(),
+        bankName: (json['bank_name'] ?? '').toString(),
+        accountNumberMasked: json['account_number_masked']?.toString(),
+        branchName: json['branch_name']?.toString(),
+        currencyCode: json['currency_code']?.toString(),
+        statementImportHint: json['statement_import_hint']?.toString(),
+        openingBalance: _asDouble(json['opening_balance']),
+        isActive: (json['is_active'] as bool?) ?? true,
+        unmatchedEntries: _asInt(json['unmatched_entries']),
+        reviewEntries: _asInt(json['review_entries']),
+        lastStatementDate: _asNullableDate(json['last_statement_date']),
+      );
+}
+
+class BankStatementMatchDto {
+  final int matchId;
+  final int companyId;
+  final int bankAccountId;
+  final int statementEntryId;
+  final int ledgerEntryId;
+  final double matchedAmount;
+  final String matchKind;
+  final String? notes;
+  final int createdBy;
+  final DateTime createdAt;
+  final DateTime? ledgerDate;
+  final String? ledgerReference;
+  final String? ledgerDescription;
+
+  BankStatementMatchDto({
+    required this.matchId,
+    required this.companyId,
+    required this.bankAccountId,
+    required this.statementEntryId,
+    required this.ledgerEntryId,
+    required this.matchedAmount,
+    required this.matchKind,
+    required this.notes,
+    required this.createdBy,
+    required this.createdAt,
+    required this.ledgerDate,
+    required this.ledgerReference,
+    required this.ledgerDescription,
+  });
+
+  factory BankStatementMatchDto.fromJson(Map<String, dynamic> json) =>
+      BankStatementMatchDto(
+        matchId: _asInt(json['match_id']),
+        companyId: _asInt(json['company_id']),
+        bankAccountId: _asInt(json['bank_account_id']),
+        statementEntryId: _asInt(json['statement_entry_id']),
+        ledgerEntryId: _asInt(json['ledger_entry_id']),
+        matchedAmount: _asDouble(json['matched_amount']),
+        matchKind: (json['match_kind'] ?? '').toString(),
+        notes: json['notes']?.toString(),
+        createdBy: _asInt(json['created_by']),
+        createdAt: _asDate(json['created_at']),
+        ledgerDate: _asNullableDate(json['ledger_date']),
+        ledgerReference: json['ledger_reference']?.toString(),
+        ledgerDescription: json['ledger_description']?.toString(),
+      );
+}
+
+class BankStatementEntryDto {
+  final int statementEntryId;
+  final int companyId;
+  final int bankAccountId;
+  final DateTime entryDate;
+  final DateTime? valueDate;
+  final String? description;
+  final String? reference;
+  final String? externalRef;
+  final String sourceType;
+  final double depositAmount;
+  final double withdrawalAmount;
+  final double? runningBalance;
+  final String status;
+  final String? reviewReason;
+  final double matchedAmount;
+  final double availableAmount;
+  final DateTime createdAt;
+  final List<BankStatementMatchDto> matches;
+
+  BankStatementEntryDto({
+    required this.statementEntryId,
+    required this.companyId,
+    required this.bankAccountId,
+    required this.entryDate,
+    required this.valueDate,
+    required this.description,
+    required this.reference,
+    required this.externalRef,
+    required this.sourceType,
+    required this.depositAmount,
+    required this.withdrawalAmount,
+    required this.runningBalance,
+    required this.status,
+    required this.reviewReason,
+    required this.matchedAmount,
+    required this.availableAmount,
+    required this.createdAt,
+    required this.matches,
+  });
+
+  factory BankStatementEntryDto.fromJson(Map<String, dynamic> json) =>
+      BankStatementEntryDto(
+        statementEntryId: _asInt(json['statement_entry_id']),
+        companyId: _asInt(json['company_id']),
+        bankAccountId: _asInt(json['bank_account_id']),
+        entryDate: _asDate(json['entry_date']),
+        valueDate: _asNullableDate(json['value_date']),
+        description: json['description']?.toString(),
+        reference: json['reference']?.toString(),
+        externalRef: json['external_ref']?.toString(),
+        sourceType: (json['source_type'] ?? '').toString(),
+        depositAmount: _asDouble(json['deposit_amount']),
+        withdrawalAmount: _asDouble(json['withdrawal_amount']),
+        runningBalance: _asNullableDouble(json['running_balance']),
+        status: (json['status'] ?? '').toString(),
+        reviewReason: json['review_reason']?.toString(),
+        matchedAmount: _asDouble(json['matched_amount']),
+        availableAmount: _asDouble(json['available_amount']),
+        createdAt: _asDate(json['created_at']),
+        matches: (json['matches'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(BankStatementMatchDto.fromJson)
+            .toList(),
+      );
+}
+
+class AccountingPeriodDto {
+  final int periodId;
+  final int companyId;
+  final String periodName;
+  final DateTime startDate;
+  final DateTime endDate;
+  final String status;
+  final Map<String, dynamic> checklist;
+  final String? notes;
+  final DateTime? closedAt;
+  final int? closedBy;
+  final DateTime? reopenedAt;
+  final int? reopenedBy;
+  final DateTime createdAt;
+
+  AccountingPeriodDto({
+    required this.periodId,
+    required this.companyId,
+    required this.periodName,
+    required this.startDate,
+    required this.endDate,
+    required this.status,
+    required this.checklist,
+    required this.notes,
+    required this.closedAt,
+    required this.closedBy,
+    required this.reopenedAt,
+    required this.reopenedBy,
+    required this.createdAt,
+  });
+
+  factory AccountingPeriodDto.fromJson(Map<String, dynamic> json) =>
+      AccountingPeriodDto(
+        periodId: _asInt(json['period_id']),
+        companyId: _asInt(json['company_id']),
+        periodName: (json['period_name'] ?? '').toString(),
+        startDate: _asDate(json['start_date']),
+        endDate: _asDate(json['end_date']),
+        status: (json['status'] ?? '').toString(),
+        checklist: (json['checklist'] as Map<String, dynamic>? ??
+            const <String, dynamic>{}),
+        notes: json['notes']?.toString(),
+        closedAt: _asNullableDate(json['closed_at']),
+        closedBy: _asNullableInt(json['closed_by']),
+        reopenedAt: _asNullableDate(json['reopened_at']),
+        reopenedBy: _asNullableInt(json['reopened_by']),
+        createdAt: _asDate(json['created_at']),
       );
 }
 

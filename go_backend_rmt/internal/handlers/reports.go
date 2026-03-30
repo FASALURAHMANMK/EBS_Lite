@@ -289,6 +289,69 @@ func (h *ReportsHandler) GetDailyCashReport(c *gin.Context) {
 	h.handleReportResponse(c, "Daily cash report retrieved successfully", data)
 }
 
+// GET /reports/cash-book
+func (h *ReportsHandler) GetCashBookReport(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	fromDate := c.Query("from_date")
+	toDate := c.Query("to_date")
+	data, err := h.reportsService.GetCashBookReport(companyID, nil, fromDate, toDate)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get cash book report", err)
+		return
+	}
+	h.handleReportResponse(c, "Cash book report retrieved successfully", data)
+}
+
+// GET /reports/bank-book
+func (h *ReportsHandler) GetBankBookReport(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	var bankAccountID *int
+	if val := c.Query("bank_account_id"); val != "" {
+		if id, err := strconv.Atoi(val); err == nil {
+			bankAccountID = &id
+		}
+	}
+	fromDate := c.Query("from_date")
+	toDate := c.Query("to_date")
+	data, err := h.reportsService.GetBankBookReport(companyID, bankAccountID, fromDate, toDate)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get bank book report", err)
+		return
+	}
+	h.handleReportResponse(c, "Bank book report retrieved successfully", data)
+}
+
+// GET /reports/reconciliation-summary
+func (h *ReportsHandler) GetReconciliationSummaryReport(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	var bankAccountID *int
+	if val := c.Query("bank_account_id"); val != "" {
+		if id, err := strconv.Atoi(val); err == nil {
+			bankAccountID = &id
+		}
+	}
+	fromDate := c.Query("from_date")
+	toDate := c.Query("to_date")
+	data, err := h.reportsService.GetReconciliationSummaryReport(companyID, bankAccountID, fromDate, toDate)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get reconciliation summary report", err)
+		return
+	}
+	h.handleReportResponse(c, "Reconciliation summary report retrieved successfully", data)
+}
+
 // GET /reports/income-expense
 func (h *ReportsHandler) GetIncomeExpenseReport(c *gin.Context) {
 	companyID := c.GetInt("company_id")
@@ -432,6 +495,23 @@ func (h *ReportsHandler) GetTaxReport(c *gin.Context) {
 		return
 	}
 	h.handleReportResponse(c, "Tax report retrieved successfully", data)
+}
+
+// GET /reports/tax-review
+func (h *ReportsHandler) GetTaxReviewReport(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+	fromDate := c.Query("from_date")
+	toDate := c.Query("to_date")
+	data, err := h.reportsService.GetTaxReviewReport(companyID, fromDate, toDate)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get tax review report", err)
+		return
+	}
+	h.handleReportResponse(c, "Tax review report retrieved successfully", data)
 }
 
 // GET /reports/top-performers

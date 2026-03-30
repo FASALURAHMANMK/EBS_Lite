@@ -360,6 +360,69 @@ func (s *ReportsService) GetTaxReport(companyID int, fromDate, toDate string) ([
 	return reports, nil
 }
 
+func (s *ReportsService) GetTaxReviewReport(companyID int, fromDate, toDate string) ([]map[string]interface{}, error) {
+	query := `
+		WITH sales_tax AS (
+			SELECT
+				'OUTPUT'::text AS tax_side,
+				COALESCE(t.name, 'No Tax') AS tax_name,
+				COALESCE(t.percentage, 0)::float8 AS tax_rate,
+				COALESCE(SUM(sd.line_total), 0)::float8 AS taxable_amount,
+				COALESCE(SUM(sd.tax_amount), 0)::float8 AS tax_amount
+			FROM sale_details sd
+			JOIN sales s ON s.sale_id = sd.sale_id
+			JOIN locations l ON l.location_id = s.location_id
+			LEFT JOIN taxes t ON t.tax_id = sd.tax_id
+			WHERE l.company_id = $1
+			  AND s.is_deleted = FALSE
+			  AND COALESCE(s.is_training, FALSE) = FALSE
+			  AND ($2::date IS NULL OR s.sale_date >= $2)
+			  AND ($3::date IS NULL OR s.sale_date <= $3)
+			GROUP BY COALESCE(t.name, 'No Tax'), COALESCE(t.percentage, 0)
+		),
+		purchase_tax AS (
+			SELECT
+				'INPUT'::text AS tax_side,
+				COALESCE(t.name, 'No Tax') AS tax_name,
+				COALESCE(t.percentage, 0)::float8 AS tax_rate,
+				COALESCE(SUM(pd.line_total), 0)::float8 AS taxable_amount,
+				COALESCE(SUM(pd.tax_amount), 0)::float8 AS tax_amount
+			FROM purchase_details pd
+			JOIN purchases p ON p.purchase_id = pd.purchase_id
+			JOIN locations l ON l.location_id = p.location_id
+			LEFT JOIN taxes t ON t.tax_id = pd.tax_id
+			WHERE l.company_id = $1
+			  AND p.is_deleted = FALSE
+			  AND ($2::date IS NULL OR p.purchase_date >= $2)
+			  AND ($3::date IS NULL OR p.purchase_date <= $3)
+			GROUP BY COALESCE(t.name, 'No Tax'), COALESCE(t.percentage, 0)
+		),
+		net_tax AS (
+			SELECT
+				'NET'::text AS tax_side,
+				NULL::text AS tax_name,
+				NULL::float8 AS tax_rate,
+				NULL::float8 AS taxable_amount,
+				(COALESCE((SELECT SUM(tax_amount) FROM sales_tax), 0) - COALESCE((SELECT SUM(tax_amount) FROM purchase_tax), 0))::float8 AS tax_amount
+		)
+		SELECT * FROM sales_tax
+		UNION ALL
+		SELECT * FROM purchase_tax
+		UNION ALL
+		SELECT * FROM net_tax
+		ORDER BY tax_side, tax_name NULLS LAST
+	`
+	var fromArg interface{}
+	if fromDate != "" {
+		fromArg = fromDate
+	}
+	var toArg interface{}
+	if toDate != "" {
+		toArg = toDate
+	}
+	return queryToMaps(s.db, query, companyID, fromArg, toArg)
+}
+
 // The following report methods use simplified aggregations intended for MVP reporting.
 
 // GetItemMovement returns stock movement details for products
@@ -693,6 +756,132 @@ func (s *ReportsService) GetDailyCashReport(companyID int, locationID *int, from
 	return queryToMaps(s.db, query, companyID, locArg, fromArg, toArg)
 }
 
+func (s *ReportsService) GetCashBookReport(companyID int, locationID *int, fromDate, toDate string) ([]map[string]interface{}, error) {
+	query := `
+		WITH cash_entries AS (
+			SELECT
+				le.entry_id,
+				le.date,
+				coa.account_code,
+				coa.name AS account_name,
+				COALESCE(le.debit,0)::float8 AS debit,
+				COALESCE(le.credit,0)::float8 AS credit,
+				COALESCE(SUM(le.debit - le.credit) OVER (
+					PARTITION BY le.account_id
+					ORDER BY le.date, le.entry_id
+					ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+				), 0)::float8 AS running_balance,
+				le.transaction_type,
+				le.transaction_id,
+				le.reference,
+				le.description
+			FROM ledger_entries le
+			JOIN chart_of_accounts coa ON coa.account_id = le.account_id
+			WHERE le.company_id = $1
+			  AND coa.account_code = '1000'
+			  AND ($2::date IS NULL OR le.date >= $2)
+			  AND ($3::date IS NULL OR le.date <= $3)
+		)
+		SELECT *
+		FROM cash_entries
+		ORDER BY date DESC, entry_id DESC
+	`
+	var fromArg interface{}
+	if fromDate != "" {
+		fromArg = fromDate
+	}
+	var toArg interface{}
+	if toDate != "" {
+		toArg = toDate
+	}
+	return queryToMaps(s.db, query, companyID, fromArg, toArg)
+}
+
+func (s *ReportsService) GetBankBookReport(companyID int, bankAccountID *int, fromDate, toDate string) ([]map[string]interface{}, error) {
+	query := `
+		WITH bank_entries AS (
+			SELECT
+				ba.bank_account_id,
+				ba.account_name AS bank_account_name,
+				ba.bank_name,
+				le.entry_id,
+				le.date,
+				coa.account_code,
+				coa.name AS account_name,
+				COALESCE(le.debit,0)::float8 AS debit,
+				COALESCE(le.credit,0)::float8 AS credit,
+				COALESCE(SUM(le.debit - le.credit) OVER (
+					PARTITION BY ba.bank_account_id
+					ORDER BY le.date, le.entry_id
+					ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+				), 0)::float8 AS running_balance,
+				le.transaction_type,
+				le.transaction_id,
+				le.reference,
+				le.description
+			FROM bank_accounts ba
+			JOIN ledger_entries le ON le.account_id = ba.ledger_account_id AND le.company_id = ba.company_id
+			JOIN chart_of_accounts coa ON coa.account_id = le.account_id
+			WHERE ba.company_id = $1
+			  AND ($2::int IS NULL OR ba.bank_account_id = $2)
+			  AND ($3::date IS NULL OR le.date >= $3)
+			  AND ($4::date IS NULL OR le.date <= $4)
+		)
+		SELECT *
+		FROM bank_entries
+		ORDER BY date DESC, entry_id DESC
+	`
+	var bankArg interface{}
+	if bankAccountID != nil {
+		bankArg = *bankAccountID
+	}
+	var fromArg interface{}
+	if fromDate != "" {
+		fromArg = fromDate
+	}
+	var toArg interface{}
+	if toDate != "" {
+		toArg = toDate
+	}
+	return queryToMaps(s.db, query, companyID, bankArg, fromArg, toArg)
+}
+
+func (s *ReportsService) GetReconciliationSummaryReport(companyID int, bankAccountID *int, fromDate, toDate string) ([]map[string]interface{}, error) {
+	query := `
+		SELECT
+			ba.bank_account_id,
+			ba.account_name AS bank_account_name,
+			ba.bank_name,
+			COUNT(*)::int AS statement_entries,
+			COALESCE(SUM(CASE WHEN bse.status = 'MATCHED' THEN 1 ELSE 0 END), 0)::int AS matched_entries,
+			COALESCE(SUM(CASE WHEN bse.status = 'UNMATCHED' THEN 1 ELSE 0 END), 0)::int AS unmatched_entries,
+			COALESCE(SUM(CASE WHEN bse.status = 'REVIEW' THEN 1 ELSE 0 END), 0)::int AS review_entries,
+			COALESCE(SUM(bse.deposit_amount - bse.withdrawal_amount), 0)::float8 AS net_statement_amount,
+			COALESCE(SUM(CASE WHEN bse.status <> 'MATCHED' THEN ABS(bse.deposit_amount - bse.withdrawal_amount) ELSE 0 END), 0)::float8 AS open_amount
+		FROM bank_accounts ba
+		JOIN bank_statement_entries bse ON bse.bank_account_id = ba.bank_account_id AND bse.is_deleted = FALSE
+		WHERE ba.company_id = $1
+		  AND ($2::int IS NULL OR ba.bank_account_id = $2)
+		  AND ($3::date IS NULL OR bse.entry_date >= $3)
+		  AND ($4::date IS NULL OR bse.entry_date <= $4)
+		GROUP BY ba.bank_account_id, ba.account_name, ba.bank_name
+		ORDER BY ba.bank_name, ba.account_name
+	`
+	var bankArg interface{}
+	if bankAccountID != nil {
+		bankArg = *bankAccountID
+	}
+	var fromArg interface{}
+	if fromDate != "" {
+		fromArg = fromDate
+	}
+	var toArg interface{}
+	if toDate != "" {
+		toArg = toDate
+	}
+	return queryToMaps(s.db, query, companyID, bankArg, fromArg, toArg)
+}
+
 // GetIncomeExpenseReport returns income vs expense details
 func (s *ReportsService) GetIncomeExpenseReport(companyID int, locationID *int, fromDate, toDate string) ([]map[string]interface{}, error) {
 	query := `
@@ -756,9 +945,16 @@ func (s *ReportsService) GetGeneralLedger(companyID int, fromDate, toDate string
 		       le.reference,
 		       le.voucher_id,
 		       le.transaction_type,
-		       le.transaction_id
+		       le.transaction_id,
+		       COALESCE(v.reference, s.sale_number, p.purchase_number, c.collection_number, pay.payment_number, e.expense_number) AS source_number
 		FROM ledger_entries le
 		JOIN chart_of_accounts coa ON le.account_id = coa.account_id
+		LEFT JOIN vouchers v ON v.voucher_id = le.voucher_id
+		LEFT JOIN sales s ON le.transaction_type = 'sale' AND s.sale_id = le.transaction_id
+		LEFT JOIN purchases p ON le.transaction_type = 'purchase' AND p.purchase_id = le.transaction_id
+		LEFT JOIN collections c ON le.transaction_type = 'collection' AND c.collection_id = le.transaction_id
+		LEFT JOIN payments pay ON le.transaction_type = 'payment' AND pay.payment_id = le.transaction_id
+		LEFT JOIN expenses e ON le.transaction_type = 'expense' AND e.expense_id = le.transaction_id
 		WHERE le.company_id = $1
 		  AND ($2::date IS NULL OR le.date >= $2)
 		  AND ($3::date IS NULL OR le.date <= $3)

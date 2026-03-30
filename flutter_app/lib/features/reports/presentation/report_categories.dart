@@ -60,6 +60,27 @@ const accountsReports = <ReportConfig>[
         'Opening, movement, expected, closing, and variance values by day.',
   ),
   ReportConfig(
+    title: 'Cash Book',
+    endpoint: '/reports/cash-book',
+    description:
+        'Cash ledger movements with running balance for receipt, payment, and adjustment review.',
+    supportsLocation: false,
+  ),
+  ReportConfig(
+    title: 'Bank Book',
+    endpoint: '/reports/bank-book',
+    description:
+        'Bank-ledger movements with running balance for reconciled bank activity.',
+    supportsLocation: false,
+  ),
+  ReportConfig(
+    title: 'Reconciliation Summary',
+    endpoint: '/reports/reconciliation-summary',
+    description:
+        'Matched, unmatched, and review bank statement counts with open-value visibility.',
+    supportsLocation: false,
+  ),
+  ReportConfig(
     title: 'Expenses Summary',
     endpoint: '/reports/expenses-summary',
     description:
@@ -84,6 +105,13 @@ const accountsReports = <ReportConfig>[
     endpoint: '/reports/trial-balance',
     description:
         'Trial balance showing debits, credits, and net balances by ledger.',
+  ),
+  ReportConfig(
+    title: 'Tax Review',
+    endpoint: '/reports/tax-review',
+    description:
+        'Output tax, input tax, and net tax review for the selected period.',
+    supportsLocation: false,
   ),
   ReportConfig(
     title: 'Profit & Loss',

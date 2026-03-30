@@ -186,7 +186,7 @@ Controlled scope note:
 
 ---
 
-## 9) Accounting module (Cash register + Vouchers + Ledgers + Audit)
+## 9) Accounting module (Cash register + Banking + Vouchers + Close + Audit)
 
 ### Cash register
 - **Available**: Open/close cash register by location.
@@ -202,9 +202,26 @@ Controlled scope note:
 - **Partial (offline)**: Expense categories readable offline after sync; category management requires online.
 
 ### Vouchers & ledgers
-- **Available**: Voucher listing and creation (by voucher type).
+- **Available**: Voucher listing and creation for payment, receipt, and balanced journal vouchers.
+- **Available**: Voucher settlement to cash or configured bank accounts.
 - **Available**: Ledger balances + ledger entries with date range paging.
+- **Available**: Chart-of-accounts management with account code, type, subtype, parent, active flag, and balance visibility.
 - **Available**: Finance Integrity diagnostics page for backend outbox backlog, missing-ledger detection, replay, and repair.
+
+### Banking & reconciliation
+- **Available**: Bank account master linked to ledger accounts.
+- **Available**: Structured bank statement entry with unmatched, matched, and review states.
+- **Available**: Reconciliation actions for match, unmatch, review, and bank adjustments/charges.
+- **Partial**: Statement entry is currently structured/manual; parser-driven import presets and auto-match suggestions are not yet implemented.
+
+### Period close
+- **Available**: Accounting period creation, close, reopen, and checklist visibility.
+- **Available**: Close blockers for trial-balance imbalance, finance-integrity backlog, and unreconciled bank statements.
+- **Partial**: Closed-period enforcement currently covers accounting-admin flows, vouchers, and bank statement activity; full all-module posting locks still need expansion.
+
+### Fixed assets lite
+- **Available**: Asset classes, asset register, asset capitalization posting, asset register reporting, and asset value summary.
+- **Partial**: Depreciation schedules and depreciation journal automation are not yet implemented.
 
 ### Audit logs
 - **Available**: Audit log listing with filters (user/action/date range).
@@ -231,9 +248,9 @@ Controlled scope note:
   - Sales summary, top products, top performers
   - Stock summary, item movement, valuation
   - Customer balances, outstanding
-  - Expenses summary, income vs expense, daily cash
+  - Expenses summary, income vs expense, daily cash, cash book, bank book
   - Supplier report
-  - Tax report
+  - Tax report, tax review, reconciliation summary
   - General ledger, trial balance, profit & loss, balance sheet
 - **Available**: Export/share reports as **PDF/Excel** from the app UI.
 

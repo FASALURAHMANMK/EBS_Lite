@@ -15,3 +15,14 @@ Exact Remaining Gaps
 Missing: dedicated cash-register reconciliation diagnostics for legacy/historical documents.
 Missing: dedicated diagnostics rows for held-sale/void-sale/goods-receipt support trails.
 Missing: seeded reproducible finance demo/UAT dataset for this new diagnostics flow.
+
+Prompt 3
+Risk List
+Reconciliation UX still requires explicit ledger-entry selection; there is no assisted matching or parser-driven statement import yet.
+Closed-period enforcement is strong for the new accounting-admin flows, vouchers, and bank statements, but not yet globally applied to every operational posting path.
+Fixed-assets-lite exists already, but depreciation schedules and automated depreciation journals are still absent.
+Returns still behave as credit-note style adjustments unless a separate refund/payment flow is used.
+Exact Remaining Gaps
+No CSV/bank-feed import presets or auto-match suggestions were completed.
+No automated fixed-asset depreciation posting was completed.
+No full ERP-wide closed-period posting lock was completed outside the accounting/banking slice.

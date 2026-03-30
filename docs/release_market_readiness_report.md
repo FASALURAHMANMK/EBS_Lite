@@ -22,7 +22,7 @@ The current commercial conclusion is:
 
 - EBS Lite is close to a strong SMB retail/distribution release.
 - The current stack does not need a rewrite for SMB release.
-- The largest remaining SMB gaps are release hardening, finance integrity, banking depth, documentation, workflow depth, and operational readiness.
+- The largest remaining SMB gaps are release hardening, end-to-end finance transactionality, documentation, workflow depth, and operational readiness.
 - The product is not yet enterprise-release ready.
 - The largest enterprise gaps are multi-entity finance, governance, asynchronous architecture, identity/compliance controls, warehouse depth, and browser-first enterprise back-office maturity.
 
@@ -102,7 +102,7 @@ This is still a release-readiness gap because the codebase is ahead of the gover
 ### What is still not release-grade
 
 - Finance side effects are not consistently transactional
-- Banking and reconciliation depth is below strong SMB accounting products
+- Banking and reconciliation are now materially stronger, but statement import automation and match assistance are still limited
 - Documentation set is incomplete and partially stale
 - Release operations package is not formalized
 - Workflow, approvals, and notifications exist but are not deeply wired into high-risk business processes
@@ -202,7 +202,7 @@ Assessment scale:
 | Suppliers and payables operations | CRUD, summary, payments, purchase linkage | Medium | Solid operational base; procurement depth still limited |
 | Purchases and receiving | Purchase orders, GRN, quick purchase flow, returns, attachments, cost adjustments | Medium to Strong | Stronger than many SMB starters |
 | Inventory | Stock views, transfers, adjustments, products, attributes, categories, brands, serial/batch/variant support | Strong | Another major strength |
-| Accounting and cash control | Cash register, ledgers, vouchers, reports, audit logs, accounting defaults | Medium | Credible SMB accounting foundation; not yet Tally-grade completeness |
+| Accounting and cash control | Cash register, bank accounts, reconciliation, chart of accounts, vouchers, period close, reports, audit logs, accounting defaults | Medium to Strong | Strong SMB finance base with real reconciliation and close controls; still below Tally-grade due to depreciation and broader close-lock gaps |
 | Reports | Sales, inventory, supplier, tax, GL, TB, P&L, balance sheet, cash, outstanding | Medium | Good starter reporting suite |
 | HR and payroll | Attendance, leave, payroll, payslips | Medium | Useful SMB support layer |
 | Workflow and approvals | Request lists and approve/reject flow | Partial to Medium | Needs business-process wiring |
@@ -292,9 +292,8 @@ EBS Lite only partially meets this higher tier today.
 
 #### P0: Banking and close operations
 
-- bank reconciliation is not yet a first-class workflow
-- cash/bank statement matching is not mature enough
-- month-end close and review controls are not formalized
+- bank reconciliation, statement matching, and accounting-period close are now implemented as first-class workflows
+- remaining gaps are statement import automation, assisted matching, and stricter close enforcement across all source modules
 
 #### P0: Release operations and documentation
 
@@ -424,7 +423,7 @@ Phase 1 must end with an SMB release-ready product, not only code completion.
 ### Mandatory Phase 1 outcomes
 
 - transactional integrity hardened
-- finance/banking/accounting essentials completed to a stronger SMB standard
+- finance/banking/accounting essentials completed to a stronger SMB standard, with remaining depreciation and all-module close-lock work tracked explicitly
 - no reachable placeholder or dead-end navigation in production
 - production config templates completed
 - OpenAPI accurate and versioned
@@ -456,7 +455,7 @@ Recommended execution order:
 
 1. Freeze SMB edition scope and release gates.
 2. Close financial-integrity gaps.
-3. Add banking/reconciliation and stronger finance controls.
+3. Tighten finance transactionality, close enforcement, and accountant workflow polish around the new banking/reconciliation controls.
 4. Wire workflow/notifications into real approvals and exception handling.
 5. Close release operations and documentation gaps.
 6. Pilot SMB release posture.

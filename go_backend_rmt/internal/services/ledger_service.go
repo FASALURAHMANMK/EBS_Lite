@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"erp-backend/internal/database"
@@ -891,35 +892,18 @@ func (s *LedgerService) RecordSaleReturn(companyID, returnID, userID int) error 
 	return nil
 }
 
-// RecordVoucher posts minimal ledger lines for a voucher.
-// Interpretation:
-// - payment: debit voucher.account_id, credit cash
-// - receipt: debit cash, credit voucher.account_id
-// - journal: not supported for automatic posting (no lines available)
+// RecordVoucher posts ledger lines for a voucher using voucher_lines.
 func (s *LedgerService) RecordVoucher(companyID, voucherID, userID int) error {
 	var vType string
-	var amount float64
-	var accountID int
 	var vDate time.Time
 	var reference sql.NullString
 	var description sql.NullString
 	if err := s.db.QueryRow(`
-		SELECT v.type, v.amount, v.account_id, v.date, v.reference, v.description
+		SELECT v.type, v.date, v.reference, v.description
 		FROM vouchers v
 		WHERE v.voucher_id = $1 AND v.company_id = $2 AND v.is_deleted = FALSE
-	`, voucherID, companyID).Scan(&vType, &amount, &accountID, &vDate, &reference, &description); err != nil {
+	`, voucherID, companyID).Scan(&vType, &vDate, &reference, &description); err != nil {
 		return fmt.Errorf("failed to load voucher for ledger posting: %w", err)
-	}
-	if amount <= 0 {
-		return nil
-	}
-	if vType == "journal" {
-		return nil
-	}
-
-	cashID, err := s.ensureDefaultAccountID(companyID, accountCodeCash)
-	if err != nil {
-		return err
 	}
 
 	var desc *string
@@ -929,27 +913,42 @@ func (s *LedgerService) RecordVoucher(companyID, voucherID, userID int) error {
 		desc = &reference.String
 	}
 
-	switch vType {
-	case "payment":
-		ref1 := fmt.Sprintf("voucher:%d:acct:%d:debit", voucherID, accountID)
-		if err := s.insertEntryIfMissing(companyID, ref1, accountID, vDate, amount, 0, "voucher", voucherID, desc, &voucherID, userID); err != nil {
+	rows, err := s.db.Query(`
+		SELECT line_no, account_id, debit, credit, description
+		FROM voucher_lines
+		WHERE company_id = $1 AND voucher_id = $2
+		ORDER BY line_no
+	`, companyID, voucherID)
+	if err != nil {
+		return fmt.Errorf("failed to load voucher lines for ledger posting: %w", err)
+	}
+	defer rows.Close()
+
+	hasRows := false
+	for rows.Next() {
+		hasRows = true
+		var lineNo int
+		var accountID int
+		var debit float64
+		var credit float64
+		var lineDescription sql.NullString
+		if err := rows.Scan(&lineNo, &accountID, &debit, &credit, &lineDescription); err != nil {
+			return fmt.Errorf("failed to scan voucher line for ledger posting: %w", err)
+		}
+		effectiveDesc := desc
+		if lineDescription.Valid && strings.TrimSpace(lineDescription.String) != "" {
+			effectiveDesc = &lineDescription.String
+		}
+		ref := fmt.Sprintf("voucher:%d:line:%d", voucherID, lineNo)
+		if err := s.insertEntryIfMissing(companyID, ref, accountID, vDate, debit, credit, "voucher", voucherID, effectiveDesc, &voucherID, userID); err != nil {
 			return err
 		}
-		ref2 := fmt.Sprintf("voucher:%d:%s:credit", voucherID, accountCodeCash)
-		if err := s.insertEntryIfMissing(companyID, ref2, cashID, vDate, 0, amount, "voucher", voucherID, desc, &voucherID, userID); err != nil {
-			return err
-		}
-	case "receipt":
-		ref1 := fmt.Sprintf("voucher:%d:%s:debit", voucherID, accountCodeCash)
-		if err := s.insertEntryIfMissing(companyID, ref1, cashID, vDate, amount, 0, "voucher", voucherID, desc, &voucherID, userID); err != nil {
-			return err
-		}
-		ref2 := fmt.Sprintf("voucher:%d:acct:%d:credit", voucherID, accountID)
-		if err := s.insertEntryIfMissing(companyID, ref2, accountID, vDate, 0, amount, "voucher", voucherID, desc, &voucherID, userID); err != nil {
-			return err
-		}
-	default:
-		return nil
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to iterate voucher lines: %w", err)
+	}
+	if !hasRows && vType == "journal" {
+		return fmt.Errorf("journal voucher has no lines to post")
 	}
 	return nil
 }
