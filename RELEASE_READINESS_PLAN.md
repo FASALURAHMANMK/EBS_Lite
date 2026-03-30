@@ -36,7 +36,7 @@ The following assumptions were confirmed by repo inspection on 2026-03-30:
 - `tools/api_parity_report.md` currently shows no Flutter-called endpoints missing from OpenAPI and no method mismatches.
 - The read-first documents required by `AGENTS.md` now exist at the expected paths.
 - The shipped Flutter help and support entry now resolves to live operational help content rather than a placeholder action.
-- The Flutter app uses `String.fromEnvironment('API_BASE_URL')` correctly, but still falls back to `http://127.0.0.1:8080/api/v1`; this is acceptable for local development and a release risk for packaged builds if not overridden.
+- The Flutter app uses `String.fromEnvironment('API_BASE_URL')` correctly and now fails fast in release builds if that value still points at localhost.
 
 ## 3. Commercial release position
 
@@ -194,7 +194,7 @@ Severity definitions:
 | GAP-07 | P1 | Backend-ready endpoints exceed commercialized UI scope | `tools/api_parity_report.md` lists multiple OpenAPI paths unused by Flutter | Each unused endpoint is classified as internal, future, or intentionally uncommercialized |
 | GAP-08 | P1 | Production config still depends on external discipline | `go_backend_rmt/.env.example` includes `JWT_SECRET=change_me_in_production`; Flutter fallback base URL is localhost | Release gate requires production env verification and packaged build review |
 | GAP-09 | P1 | Workflow and notifications are present but lightly wired into high-risk flows | Current reports call out workflow depth as a gap | Limit claims to current approval list/review behavior until more flows are wired |
-| GAP-10 | P1 | Demo dataset repeatability is documented but not yet one-command automated | Repo now contains the governed manifest and onboarding pack, but full reseed automation is still absent | Add or accept the manual controlled reset process explicitly |
+| GAP-10 | P1 | Demo dataset automation exists, but release-candidate teams must actually run it and archive the resulting evidence | Repo now contains the governed manifest, reset command, and generated report path | Run the reset command for the release candidate and attach the generated report to UAT evidence |
 | GAP-11 | P2 | Flutter domain isolation is incomplete | Current market readiness report notes limited domain isolation | Track as architecture debt, not a launch blocker |
 | GAP-12 | P2 | Asset/consumable and similar newer backend/UI slices are not yet commercialized | Inventory surface includes assets/consumables, but they are not part of current market narrative or module feature list | Decide ship, pilot, or hide before any public claim |
 

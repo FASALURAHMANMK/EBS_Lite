@@ -39,12 +39,16 @@ Implemented behavior verified by automated evidence:
 
 Governed artifacts now present:
 - `docs/DEMO_DATASET_AND_ONBOARDING.md`
+- `docs/DEMO_DATASET_REPORT.md` after running the reset command
 - `docs/OPERATOR_SOPS.md`
 - `docs/RELEASE_OPERATIONS_RUNBOOK.md`
 - `docs/SECURITY_OPERATIONS_GUIDE.md`
 
-Current gap:
-- the repo documents the demo dataset and reset procedure, but does not yet provide a one-command full demo/UAT data loader
+Reset command now available:
+
+```powershell
+./tools/reset_demo_uat.ps1
+```
 
 ## 4. Manual UAT status against `docs/MODULE_UAT_MATRIX.md`
 
@@ -52,9 +56,10 @@ Not completed in this coding slice:
 - full operator sign-off on auth, POS, purchases, inventory, collections, accounting, reports, HR, workflow, and admin scenarios
 - seeded reconciliation proof for POS checkout, sales returns, purchases, collections, expenses, day close, and accounting reports
 
-These remain release blockers even though automated gates are green.
+Manual release-candidate sign-off still remains a launch-program blocker even though automated gates are green and the seeded reset command is now repo-backed.
 
 ## 5. Evidence conclusion
 
-Automated engineering gates are green.  
-Manual release-candidate UAT evidence is still incomplete, so the repo is not yet at final launch sign-off.
+Automated engineering gates are green.
+The demo/UAT dataset is now reproducible from the repo.
+Manual release-candidate UAT evidence is still the remaining launch sign-off gate.

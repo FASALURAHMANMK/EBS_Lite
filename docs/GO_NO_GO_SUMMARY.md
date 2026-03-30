@@ -12,10 +12,9 @@ All mandatory automated quality gates passed, and the repo now contains:
 - release operations runbook and operator SOPs
 - governed demo/onboarding and feature-matrix docs
 
-Residual blockers:
+Residual blocker:
 1. Full manual UAT evidence for the blocker scenarios in `docs/MODULE_UAT_MATRIX.md` is not yet completed and signed off.
-2. The demo/UAT dataset is governed and documented, but not yet provided as a one-command reproducible seed/reset implementation.
 
 ## Commercial posture
 
-The codebase is materially closer to SMB release-ready, but the product package is not yet at final ship approval because the remaining blockers are launch-program blockers, not code-quality blockers.
+The codebase and release package are materially ready for final UAT, but the product is not yet at final ship approval because the remaining blocker is release-program sign-off, not an unresolved engineering gate.

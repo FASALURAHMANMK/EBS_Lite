@@ -270,9 +270,8 @@ The following areas are visible in backend/OpenAPI or parity artifacts but shoul
 
 ### Release blockers or claim blockers
 
-- Flutter `Help & support` drawer action is a placeholder-quality snackbar, not a support workflow.
-- The Flutter default API base URL falls back to localhost unless `API_BASE_URL` is supplied at build time.
-- Missing demo dataset and launch operator pack mean even complete code is not yet commercially packaged.
+- Packaged Flutter builds must define a non-local `API_BASE_URL`; release builds now fail fast if they still point at localhost.
+- Manual launch-candidate UAT sign-off is still required against `docs/MODULE_UAT_MATRIX.md`.
 
 ### Partial features allowed only with narrow wording
 

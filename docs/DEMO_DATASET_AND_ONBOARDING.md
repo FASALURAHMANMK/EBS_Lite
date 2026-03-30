@@ -40,16 +40,23 @@ Transactional baseline:
 
 ## 2. Demo dataset reset guide
 
-Reproducible reset expectation:
-1. Start from a clean PostgreSQL database.
-2. Run backend migrations.
-3. Create the demo company through the supported bootstrap flow.
-4. Load the governed master data set and role assignments used by the release team.
-5. Execute the seeded transactional script or manual checklist in the same order for every UAT cycle.
+One-command reset from repo root:
 
-Current repo note:
-- the repo now contains the governed manifest and reset procedure, but not a one-command full seed loader yet
-- repeatability therefore depends on the release team running the same controlled setup steps
+```powershell
+./tools/reset_demo_uat.ps1
+```
+
+Direct Go entry point:
+
+```powershell
+go run ./go_backend_rmt/cmd/demo_uat_seed --migrations-dir go_backend_rmt/migrations --report-out docs/DEMO_DATASET_REPORT.md
+```
+
+Operational notes:
+- the reset command is destructive and drops the target database schema before reapplying migrations
+- by default it refuses non-local database hosts; use `--allow-remote` only for controlled release-lab environments
+- the generated summary is written to `docs/DEMO_DATASET_REPORT.md`
+- all seeded users share the password `DemoPass!234` for repeatable UAT setup
 
 ## 3. Customer onboarding checklist
 
