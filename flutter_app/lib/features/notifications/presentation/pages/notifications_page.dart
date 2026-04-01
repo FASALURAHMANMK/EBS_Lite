@@ -4,9 +4,7 @@ import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../../../core/error_handler.dart';
-import '../../../../core/outbox/outbox_notifier.dart';
 import '../../../../shared/widgets/app_error_view.dart';
-import '../../../dashboard/presentation/pages/sync_health_page.dart';
 import '../../../inventory/presentation/pages/product_transactions_page.dart';
 import '../../../workflow/presentation/pages/workflow_requests_page.dart';
 import '../../controllers/notifications_providers.dart';
@@ -144,7 +142,6 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
   Widget build(BuildContext context) {
     final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final theme = Theme.of(context);
-    final outbox = ref.watch(outboxNotifierProvider);
 
     final unread = _items.where((e) => !e.isRead).toList();
 
@@ -172,31 +169,6 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Card(
-              elevation: 0,
-              child: ListTile(
-                leading: Icon(
-                  outbox.isOnline
-                      ? Icons.cloud_done_rounded
-                      : Icons.cloud_off_rounded,
-                  color:
-                      outbox.isOnline ? Colors.green : theme.colorScheme.error,
-                ),
-                title: Text(outbox.isOnline ? 'Online' : 'Offline'),
-                subtitle: Text(
-                  outbox.queuedCount == 0
-                      ? 'No queued items'
-                      : '${outbox.queuedCount} queued/failed items',
-                ),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SyncHealthPage()),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 12),
             Row(
               children: [
                 Text('Alerts', style: theme.textTheme.titleMedium),

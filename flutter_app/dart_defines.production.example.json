@@ -1,5 +1,15 @@
 {
   "API_BASE_URL": "https://api.example.com/api/v1",
   "APP_VERSION": "1.0.0",
-  "BUILD_NUMBER": "100"
+  "BUILD_NUMBER": "100",
+  "RELEASE_DATE": "2026-04-01",
+  "RELEASE_CHANNEL": "Production",
+  "UPDATE_URL": "https://www.einfach-digital.net",
+  "UPDATE_POLICY": "Updates are distributed through Einfach Digital release channels. Validate backups, notify operators, and apply approved packages only after environment review.",
+  "SUPPORT_EMAIL": "support@einfach-digital.net",
+  "SUPPORT_PHONE": "+91 8943726699",
+  "SUPPORT_WEBSITE": "https://www.einfach-digital.net",
+  "SUPPORT_HOURS": "24x7",
+  "SUPPORT_TERMS_URL": "https://www.einfach-digital.net/terms",
+  "SUPPORT_PRIVACY_URL": "https://www.einfach-digital.net/privacy"
 }

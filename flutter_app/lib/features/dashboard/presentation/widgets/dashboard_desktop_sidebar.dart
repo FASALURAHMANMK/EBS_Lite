@@ -350,10 +350,25 @@ class DashboardDesktopSidebar extends ConsumerWidget {
               children: [
                 _child(
                   context,
+                  icon: Icons.account_balance_rounded,
+                  label: 'Banking',
+                  onTap: () =>
+                      onOpen(DashboardNavigation.pageForLabel('Banking')),
+                ),
+                _child(
+                  context,
                   icon: Icons.account_balance_wallet_rounded,
                   label: 'Cash Register',
                   onTap: () => onOpen(
                     DashboardNavigation.pageForLabel('Cash Register'),
+                  ),
+                ),
+                _child(
+                  context,
+                  icon: Icons.account_tree_rounded,
+                  label: 'Chart of Accounts',
+                  onTap: () => onOpen(
+                    DashboardNavigation.pageForLabel('Chart of Accounts'),
                   ),
                 ),
                 _child(
@@ -373,6 +388,22 @@ class DashboardDesktopSidebar extends ConsumerWidget {
                 ),
                 _child(
                   context,
+                  icon: Icons.rule_folder_outlined,
+                  label: 'Finance Integrity',
+                  onTap: () => onOpen(
+                    DashboardNavigation.pageForLabel('Finance Integrity'),
+                  ),
+                ),
+                _child(
+                  context,
+                  icon: Icons.event_note_rounded,
+                  label: 'Period Close',
+                  onTap: () => onOpen(
+                    DashboardNavigation.pageForLabel('Period Close'),
+                  ),
+                ),
+                _child(
+                  context,
                   icon: Icons.receipt_long_rounded,
                   label: 'Vouchers',
                   onTap: () =>
@@ -388,9 +419,9 @@ class DashboardDesktopSidebar extends ConsumerWidget {
                 _child(
                   context,
                   icon: Icons.shield_rounded,
-                  label: 'Audit',
+                  label: 'Audit Logs',
                   onTap: () =>
-                      onOpen(DashboardNavigation.pageForLabel('Audit')),
+                      onOpen(DashboardNavigation.pageForLabel('Audit Logs')),
                 ),
               ],
             ),
@@ -502,7 +533,7 @@ class DashboardDesktopSidebar extends ConsumerWidget {
             _tile(
               context,
               icon: Icons.help_outline_rounded,
-              label: 'Help & support',
+              label: 'Help & Support',
               onTap: () => onOpen(
                 const HelpSupportPage(),
               ),

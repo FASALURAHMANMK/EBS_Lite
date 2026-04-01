@@ -113,12 +113,16 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                   const Divider(height: 24),
                   _section(context, Icons.account_balance_wallet_rounded,
                       'Accounts', const [
+                    'Banking',
                     'Cash Register',
+                    'Chart of Accounts',
                     'Day Open/Close',
                     'Expenses',
+                    'Finance Integrity',
+                    'Period Close',
                     'Vouchers',
                     'Ledgers',
-                    'Audit'
+                    'Audit Logs'
                   ]),
                   _section(context, Icons.group_rounded, 'HR', const [
                     'Departments & Designations',
@@ -126,8 +130,12 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                     'Attendance Register',
                     'Payroll Management'
                   ]),
-                  _section(context, Icons.bar_chart_rounded, 'Reports',
-                      const ['Sales', 'Purchase', 'Accounts', 'Inventory']),
+                  _section(context, Icons.bar_chart_rounded, 'Reports', const [
+                    'Sales Reports',
+                    'Purchase Reports',
+                    'Accounts Reports',
+                    'Inventory Reports',
+                  ]),
                   const Divider(height: 24),
                   if (showApprovals)
                     _item(context, Icons.approval_rounded, 'Approvals'),
@@ -137,13 +145,13 @@ class _DashboardSidebarState extends ConsumerState<DashboardSidebar> {
                   ListTile(
                     leading: Icon(Icons.help_outline_rounded,
                         color: theme.colorScheme.primary),
-                    title: const Text('Help & support'),
+                    title: const Text('Help & Support'),
                     horizontalTitleGap: 12,
                     onTap: () {
                       Navigator.pop(context);
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         if (!mounted) return;
-                        widget.onSelect?.call('Help & support');
+                        widget.onSelect?.call('Help & Support');
                       });
                     },
                   ),

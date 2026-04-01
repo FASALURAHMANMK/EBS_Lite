@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../accounts/presentation/pages/accounting_page.dart';
 import '../../accounts/presentation/pages/audit_logs_page.dart';
+import '../../accounts/presentation/pages/banking_page.dart';
 import '../../accounts/presentation/pages/cash_register_page.dart';
+import '../../accounts/presentation/pages/chart_of_accounts_page.dart';
 import '../../accounts/presentation/pages/day_end_flow_page.dart';
+import '../../accounts/presentation/pages/finance_integrity_page.dart';
 import '../../accounts/presentation/pages/ledgers_page.dart';
+import '../../accounts/presentation/pages/period_close_page.dart';
 import '../../accounts/presentation/pages/vouchers_page.dart';
 import '../../customers/presentation/pages/customer_care_hub_page.dart';
 import '../../customers/presentation/pages/collections_workbench_page.dart';
@@ -54,6 +58,7 @@ class DashboardNavigation {
       case 'Reports':
         return const ReportsPage();
       case 'Sales':
+      case 'Sales Reports':
         return ReportCategoryPage(
           title: salesReportCategoryTitle,
           reports: salesReports,
@@ -61,6 +66,7 @@ class DashboardNavigation {
           onMenuSelect: onMenuSelect,
         );
       case 'Purchase':
+      case 'Purchase Reports':
         return ReportCategoryPage(
           title: purchaseReportCategoryTitle,
           reports: purchaseReports,
@@ -68,6 +74,8 @@ class DashboardNavigation {
           onMenuSelect: onMenuSelect,
         );
       case 'Accounts':
+      case 'Accounts Reports':
+      case 'Accounting Reports':
         return ReportCategoryPage(
           title: accountsReportCategoryTitle,
           reports: accountsReports,
@@ -75,6 +83,7 @@ class DashboardNavigation {
           onMenuSelect: onMenuSelect,
         );
       case 'Inventory':
+      case 'Inventory Reports':
         return ReportCategoryPage(
           title: inventoryReportCategoryTitle,
           reports: inventoryReports,
@@ -83,8 +92,12 @@ class DashboardNavigation {
         );
       case 'Accounting':
         return const AccountingPage();
+      case 'Banking':
+        return const BankingPage();
       case 'Cash Register':
         return CashRegisterPage(fromMenu: fromMenu, onMenuSelect: onMenuSelect);
+      case 'Chart of Accounts':
+        return const ChartOfAccountsPage();
       case 'Day Open/Close':
         return DayEndFlowPage(fromMenu: fromMenu, onMenuSelect: onMenuSelect);
       case 'Expenses':
@@ -98,6 +111,13 @@ class DashboardNavigation {
         return VouchersPage(fromMenu: fromMenu, onMenuSelect: onMenuSelect);
       case 'Ledgers':
         return LedgersPage(fromMenu: fromMenu, onMenuSelect: onMenuSelect);
+      case 'Period Close':
+        return const PeriodClosePage();
+      case 'Finance Integrity':
+        return FinanceIntegrityPage(
+          fromMenu: fromMenu,
+          onMenuSelect: onMenuSelect,
+        );
       case 'Audit':
       case 'Audit Logs':
         return AuditLogsPage(fromMenu: fromMenu, onMenuSelect: onMenuSelect);
@@ -127,6 +147,7 @@ class DashboardNavigation {
       case 'Settings':
         return SettingsPage(fromMenu: fromMenu, onMenuSelect: onMenuSelect);
       case 'Help & support':
+      case 'Help & Support':
         return HelpSupportPage(fromMenu: fromMenu, onMenuSelect: onMenuSelect);
       case 'Customer Care Hub':
         return const CustomerCareHubPage();
