@@ -13,7 +13,6 @@ import 'package:ebs_lite/features/inventory/presentation/pages/category_manageme
 import 'package:ebs_lite/features/inventory/presentation/pages/combo_definitions_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/consumable_management_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/inventory_management_page.dart';
-import 'package:ebs_lite/features/inventory/presentation/pages/inventory_operations_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/inventory_view_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/stock_adjustments_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/stock_transfers_page.dart';
@@ -231,12 +230,6 @@ class DashboardDesktopSidebar extends ConsumerWidget {
               icon: Icons.inventory_2_rounded,
               title: 'Inventory',
               children: [
-                _child(
-                  context,
-                  icon: Icons.qr_code_scanner_rounded,
-                  label: 'Inventory Operations',
-                  onTap: () => onOpen(const InventoryOperationsPage()),
-                ),
                 _child(
                   context,
                   icon: Icons.inventory_2_rounded,

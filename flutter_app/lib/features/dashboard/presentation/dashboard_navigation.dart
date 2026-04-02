@@ -20,7 +20,6 @@ import '../../hr/presentation/pages/employees_page.dart';
 import '../../hr/presentation/pages/hr_page.dart';
 import '../../hr/presentation/pages/payroll_page.dart';
 import '../../inventory/presentation/pages/combo_definitions_page.dart';
-import '../../inventory/presentation/pages/inventory_operations_page.dart';
 import '../../reports/presentation/pages/report_category_page.dart';
 import '../../reports/presentation/pages/reports_page.dart';
 import '../../reports/presentation/report_categories.dart';
@@ -153,8 +152,6 @@ class DashboardNavigation {
         return const CustomerCareHubPage();
       case 'Collections Workbench':
         return const CollectionsWorkbenchPage();
-      case 'Inventory Operations':
-        return const InventoryOperationsPage();
       case 'Supplier Balances':
         return const SupplierBalanceWorkbenchPage();
       case 'Combo Definitions':
