@@ -73,10 +73,18 @@ class _SaleDetailPageState extends ConsumerState<SaleDetailPage> {
               Card(
                 elevation: 0,
                 child: ListTile(
-                  leading: const Icon(Icons.point_of_sale_rounded),
+                  leading: Icon(
+                    s.isRefundInvoice
+                        ? Icons.undo_rounded
+                        : Icons.point_of_sale_rounded,
+                  ),
                   title: Text(s.saleNumber),
                   subtitle: Text([
                     if ((s.customerName ?? '').isNotEmpty) s.customerName!,
+                    if ((s.refundSourceSaleNumber ?? '').isNotEmpty)
+                      s.isRefundInvoice
+                          ? 'Refund for ${s.refundSourceSaleNumber}'
+                          : 'Includes refund from ${s.refundSourceSaleNumber}',
                   ].where((e) => e.isNotEmpty).join(' · ')),
                   trailing: Text(s.totalAmount.toStringAsFixed(2),
                       style: theme.textTheme.titleMedium),
@@ -95,11 +103,14 @@ class _SaleDetailPageState extends ConsumerState<SaleDetailPage> {
                           (it.productId != null
                               ? 'Product #${it.productId}'
                               : 'Item')),
-                      subtitle: Text(
-                          'Qty: ${it.quantity.toStringAsFixed(2)} × ${it.unitPrice.toStringAsFixed(2)}'),
+                      subtitle: Text([
+                        'Qty: ${it.quantity.toStringAsFixed(2)} × ${it.unitPrice.toStringAsFixed(2)}',
+                      ].join('\n')),
                       trailing: Text(
-                          ((it.quantity * it.unitPrice) *
-                                  (1 - (it.discountPercent / 100)))
+                          (it.lineTotal != 0
+                                  ? it.lineTotal
+                                  : ((it.quantity * it.unitPrice) -
+                                      it.discountAmount))
                               .toStringAsFixed(2),
                           style: theme.textTheme.bodyLarge),
                     ),

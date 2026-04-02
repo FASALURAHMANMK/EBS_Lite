@@ -216,12 +216,13 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 
 	// Normal flow: create a fresh sale
 	saleReq := &models.CreateSaleRequest{
-		SaleNumber:      req.SaleNumber,
-		CustomerID:      req.CustomerID,
-		Items:           req.Items,
-		PaymentMethodID: req.PaymentMethodID,
-		DiscountAmount:  req.DiscountAmount,
-		PaidAmount:      req.PaidAmount,
+		SaleNumber:       req.SaleNumber,
+		CustomerID:       req.CustomerID,
+		Items:            req.Items,
+		PaymentMethodID:  req.PaymentMethodID,
+		DiscountAmount:   req.DiscountAmount,
+		PaidAmount:       req.PaidAmount,
+		OverridePassword: req.SalesActionPassword,
 	}
 
 	// Apply loyalty points redemption as additional discount if requested
@@ -297,6 +298,12 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 		}
 	}
 
+	finalSignedTotal := preTotal - manualDiscount - plannedRedeemValue - plannedCouponDiscount
+	if finalSignedTotal < 0 {
+		saleReq.PaidAmount = -req.PaidAmount
+		cashInForSale = -cashInForSale
+	}
+
 	sale, err := s.salesService.CreateSaleWithOptions(
 		companyID,
 		locationID,
@@ -309,6 +316,7 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 			LoyaltyRedeemPoints:        plannedRedeemPoints,
 			CouponCode:                 strings.TrimSpace(ptrString(req.CouponCode)),
 			AutoFillRaffleCustomerData: req.AutoFillRaffleCustomerData,
+			SourceChannel:              "POS",
 		},
 	)
 	if err != nil {
@@ -846,13 +854,33 @@ func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int,
 	defer tx.Rollback()
 	trackingSvc := newInventoryTrackingService(s.db)
 
+	for _, item := range req.Items {
+		if item.Quantity < 0 {
+			if err := requireSalesActionPassword(tx, companyID, userID, req.SalesActionPassword); err != nil {
+				return nil, err
+			}
+			break
+		}
+	}
+	refundSource, err := s.salesService.resolveRefundSourceContextTx(tx, companyID, req.Items)
+	if err != nil {
+		return nil, err
+	}
+	var refundSourceSaleID *int
+	saleNotes := mergeSaleRefundContextNotes(nil, "")
+	if refundSource != nil {
+		refundSourceSaleID = &refundSource.SaleID
+		saleNotes = mergeSaleRefundContextNotes(nil, refundSource.SaleNumber)
+	}
+
 	// Recalculate totals (reusing SalesService for tax resolution)
 	saleReq := &models.CreateSaleRequest{
-		CustomerID:      req.CustomerID,
-		Items:           req.Items,
-		PaymentMethodID: req.PaymentMethodID,
-		DiscountAmount:  req.DiscountAmount,
-		PaidAmount:      req.PaidAmount,
+		CustomerID:       req.CustomerID,
+		Items:            req.Items,
+		PaymentMethodID:  req.PaymentMethodID,
+		DiscountAmount:   req.DiscountAmount,
+		PaidAmount:       req.PaidAmount,
+		OverridePassword: req.SalesActionPassword,
 	}
 	subtotal, tax, total, err := s.salesService.CalculateTotals(companyID, saleReq)
 	if err != nil {
@@ -965,10 +993,11 @@ func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int,
 	if _, err := tx.Exec(`
         UPDATE sales s SET customer_id=$1, subtotal=$2, tax_amount=$3, discount_amount=$4, total_amount=$5,
                           paid_amount=$6, payment_method_id=$7, status='COMPLETED', pos_status='COMPLETED',
-                          is_quick_sale=FALSE, is_training=$8, updated_by=$9, updated_at=CURRENT_TIMESTAMP
+                          is_quick_sale=FALSE, is_training=$8, notes=COALESCE($9, s.notes),
+                          refund_source_sale_id=COALESCE($10, s.refund_source_sale_id), updated_by=$11, updated_at=CURRENT_TIMESTAMP
         FROM locations l
-        WHERE s.sale_id=$10 AND s.location_id = l.location_id AND l.company_id = $11
-    `, req.CustomerID, subtotal, tax, req.DiscountAmount, total, req.PaidAmount, req.PaymentMethodID, isTraining, userID, saleID, companyID); err != nil {
+        WHERE s.sale_id=$12 AND s.location_id = l.location_id AND l.company_id = $13
+    `, req.CustomerID, subtotal, tax, req.DiscountAmount, total, req.PaidAmount, req.PaymentMethodID, isTraining, saleNotes, refundSourceSaleID, userID, saleID, companyID); err != nil {
 		return nil, fmt.Errorf("failed to update sale: %w", err)
 	}
 
@@ -1235,6 +1264,16 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback()
+	refundSource, err := s.salesService.resolveRefundSourceContextTx(tx, companyID, req.Items)
+	if err != nil {
+		return nil, err
+	}
+	var refundSourceSaleID *int
+	saleNotes := mergeSaleRefundContextNotes(nil, "")
+	if refundSource != nil {
+		refundSourceSaleID = &refundSource.SaleID
+		saleNotes = mergeSaleRefundContextNotes(nil, refundSource.SaleNumber)
+	}
 
 	// Use client-provided sale number when present (offline-first). Otherwise,
 	// allocate via numbering sequences.
@@ -1306,6 +1345,10 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate tax: %w", err)
 	}
+	taxSettings, err := loadCompanyTaxSettings(tx, companyID)
+	if err != nil {
+		return nil, err
+	}
 
 	// We'll also compute discount per line for persistence
 	type lineComputed struct {
@@ -1328,10 +1371,6 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 	lines := make([]lineComputed, 0, len(req.Items))
 
 	for _, item := range req.Items {
-		lineTotal := item.Quantity * item.UnitPrice
-		discountAmount := lineTotal * (item.DiscountPercent / 100)
-		lineTotal -= discountAmount
-		var taxAmount float64
 		var effectiveTaxID *int
 		if item.TaxID != nil {
 			effectiveTaxID = item.TaxID
@@ -1348,15 +1387,17 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 			}
 			effectiveTaxID = meta.TaxID
 		}
+		taxPercent := 0.0
 		if effectiveTaxID != nil {
 			pct, ok := taxPctByID[*effectiveTaxID]
 			if !ok {
 				return nil, fmt.Errorf("failed to calculate tax: %w", fmt.Errorf("failed to get tax percentage: %w", sql.ErrNoRows))
 			}
-			taxAmount = lineTotal * (pct / 100)
+			taxPercent = pct
 		}
-		subtotal += lineTotal
-		totalTax += taxAmount
+		lineAmounts := computeTaxLine(item.Quantity, item.UnitPrice, item.DiscountPercent, taxPercent, taxSettings.PriceMode)
+		subtotal += lineAmounts.NetAmount
+		totalTax += lineAmounts.TaxAmount
 		lineSnapshot := saleLineSnapshot{}
 		if item.ProductID != nil {
 			meta, ok := metaByID[*item.ProductID]
@@ -1374,10 +1415,10 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 			qty:           item.Quantity,
 			unit:          item.UnitPrice,
 			discPct:       item.DiscountPercent,
-			discAmt:       discountAmount,
+			discAmt:       lineAmounts.DiscountAmount,
 			taxID:         effectiveTaxID,
-			taxAmt:        taxAmount,
-			total:         lineTotal,
+			taxAmt:        lineAmounts.TaxAmount,
+			total:         lineAmounts.NetAmount,
 			pid:           item.ProductID,
 			comboPID:      item.ComboProductID,
 			barcodeID:     item.BarcodeID,
@@ -1399,10 +1440,10 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 	err = tx.QueryRow(`
         INSERT INTO sales (sale_number, location_id, customer_id, sale_date, sale_time,
                            subtotal, tax_amount, discount_amount, total_amount, paid_amount,
-                           payment_method_id, status, pos_status, is_quick_sale, is_training, notes, created_by, updated_by, idempotency_key)
-        VALUES ($1,$2,$3,CURRENT_DATE,CURRENT_TIME,$4,$5,$6,$7,$8,$9,'DRAFT','HOLD',FALSE,$10,$11,$12,$12,$13)
+                           payment_method_id, status, pos_status, is_quick_sale, is_training, notes, source_channel, refund_source_sale_id, created_by, updated_by, idempotency_key)
+        VALUES ($1,$2,$3,CURRENT_DATE,CURRENT_TIME,$4,$5,$6,$7,$8,$9,'DRAFT','HOLD',FALSE,$10,$11,'POS',$12,$13,$13,$14)
         RETURNING sale_id
-    `, saleNumber, locationID, req.CustomerID, subtotal, totalTax, req.DiscountAmount, totalAmount, 0.0, nil, isTraining, nil, userID, nullIfEmpty(idemKey)).Scan(&saleID)
+    `, saleNumber, locationID, req.CustomerID, subtotal, totalTax, req.DiscountAmount, totalAmount, 0.0, nil, isTraining, saleNotes, refundSourceSaleID, userID, nullIfEmpty(idemKey)).Scan(&saleID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create held sale: %w", err)
 	}

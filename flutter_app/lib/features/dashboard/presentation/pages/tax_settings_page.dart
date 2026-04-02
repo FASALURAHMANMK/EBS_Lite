@@ -16,6 +16,7 @@ class _TaxSettingsPageState extends ConsumerState<TaxSettingsPage> {
   final _formKey = GlobalKey<FormState>();
   final _taxName = TextEditingController();
   final _taxPercent = TextEditingController();
+  String _priceMode = 'EXCLUSIVE';
 
   bool _loading = true;
   bool _saving = false;
@@ -39,6 +40,7 @@ class _TaxSettingsPageState extends ConsumerState<TaxSettingsPage> {
       final cfg = await ref.read(settingsRepositoryProvider).getTaxSettings();
       _taxName.text = cfg.taxName ?? '';
       _taxPercent.text = cfg.taxPercent?.toString() ?? '';
+      _priceMode = cfg.priceMode;
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -64,6 +66,7 @@ class _TaxSettingsPageState extends ConsumerState<TaxSettingsPage> {
             TaxSettingsDto(
               taxName: name.isEmpty ? null : name,
               taxPercent: percent,
+              priceMode: _priceMode,
             ),
           );
       if (!mounted) return;
@@ -109,6 +112,34 @@ class _TaxSettingsPageState extends ConsumerState<TaxSettingsPage> {
                             controller: _taxName,
                             decoration:
                                 const InputDecoration(labelText: 'Tax name'),
+                          ),
+                          const SizedBox(height: 12),
+                          SegmentedButton<String>(
+                            segments: const [
+                              ButtonSegment<String>(
+                                value: 'EXCLUSIVE',
+                                icon: Icon(Icons.add_chart_rounded),
+                                label: Text('Tax Exclusive'),
+                              ),
+                              ButtonSegment<String>(
+                                value: 'INCLUSIVE',
+                                icon: Icon(Icons.price_check_rounded),
+                                label: Text('Tax Inclusive'),
+                              ),
+                            ],
+                            selected: {_priceMode},
+                            onSelectionChanged: (selection) {
+                              setState(() => _priceMode = selection.first);
+                            },
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _priceMode == 'INCLUSIVE'
+                                ? 'Unit prices already include tax. The system backs tax out of the entered price.'
+                                : 'Unit prices exclude tax. The system adds tax on top of the entered price.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
                           const SizedBox(height: 12),
                           TextFormField(

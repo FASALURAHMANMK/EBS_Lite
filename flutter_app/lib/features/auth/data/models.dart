@@ -67,6 +67,7 @@ class UserResponse {
   final String? phone;
   final bool isActive;
   final bool isLocked;
+  final bool hasSalesActionPassword;
   final String? preferredLanguage;
   final String? secondaryLanguage;
   final DateTime? lastLogin;
@@ -85,6 +86,7 @@ class UserResponse {
     this.phone,
     this.isActive = true,
     this.isLocked = false,
+    this.hasSalesActionPassword = false,
     this.preferredLanguage,
     this.secondaryLanguage,
     this.lastLogin,
@@ -104,6 +106,8 @@ class UserResponse {
         phone: json['phone'] as String?,
         isActive: json['is_active'] as bool? ?? true,
         isLocked: json['is_locked'] as bool? ?? false,
+        hasSalesActionPassword:
+            json['has_sales_action_password'] as bool? ?? false,
         preferredLanguage: json['preferred_language'] as String?,
         secondaryLanguage: json['secondary_language'] as String?,
         lastLogin: json['last_login'] != null

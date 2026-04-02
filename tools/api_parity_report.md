@@ -1,7 +1,7 @@
 # API Parity Report (Flutter <-> OpenAPI)
 
-- Flutter unique paths: **247**
-- OpenAPI unique paths: **282**
+- Flutter unique paths: **249**
+- OpenAPI unique paths: **284**
 
 ## Flutter paths missing from OpenAPI
 - None

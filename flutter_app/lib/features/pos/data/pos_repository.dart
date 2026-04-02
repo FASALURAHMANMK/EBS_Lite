@@ -30,6 +30,8 @@ class PosRepository {
       if ((item.product.comboProductId ?? 0) > 0)
         'combo_product_id': item.product.comboProductId,
       if (item.product.barcodeId > 0) 'barcode_id': item.product.barcodeId,
+      if ((item.sourceSaleDetailId ?? 0) > 0)
+        'source_sale_detail_id': item.sourceSaleDetailId,
       'quantity': item.quantity,
       'unit_price': item.unitPrice,
       'discount_percentage': item.discountPercent,
@@ -260,6 +262,7 @@ class PosRepository {
     String? idempotencyKey,
     String? managerOverrideToken,
     String? overrideReason,
+    String? salesActionPassword,
     String? overridePassword,
   }) async {
     final loc = _ref.read(locationNotifierProvider).selected;
@@ -304,6 +307,8 @@ class PosRepository {
         'manager_override_token': managerOverrideToken.trim(),
       if (overrideReason != null && overrideReason.trim().isNotEmpty)
         'override_reason': overrideReason.trim(),
+      if (salesActionPassword != null && salesActionPassword.trim().isNotEmpty)
+        'sales_action_password': salesActionPassword.trim(),
       if (overridePassword != null && overridePassword.trim().isNotEmpty)
         'override_password': overridePassword.trim(),
     };

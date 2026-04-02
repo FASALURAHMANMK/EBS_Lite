@@ -15,6 +15,7 @@ class AdminUserDto {
   final int? companyId;
   final bool isActive;
   final bool isLocked;
+  final bool hasSalesActionPassword;
   final DateTime? lastLogin;
 
   const AdminUserDto({
@@ -29,6 +30,7 @@ class AdminUserDto {
     required this.companyId,
     required this.isActive,
     required this.isLocked,
+    required this.hasSalesActionPassword,
     required this.lastLogin,
   });
 
@@ -44,6 +46,8 @@ class AdminUserDto {
         companyId: (json['company_id'] as num?)?.toInt(),
         isActive: json['is_active'] as bool? ?? true,
         isLocked: json['is_locked'] as bool? ?? false,
+        hasSalesActionPassword:
+            json['has_sales_action_password'] as bool? ?? false,
         lastLogin: DateTime.tryParse(json['last_login'] as String? ?? ''),
       );
 }
@@ -92,6 +96,7 @@ class UsersRepository {
     String? phone,
     int? roleId,
     int? locationId,
+    String? salesActionPassword,
   }) async {
     final res = await _dio.post('/users', data: {
       'company_id': companyId,
@@ -103,6 +108,8 @@ class UsersRepository {
       if (phone != null) 'phone': phone,
       if (roleId != null) 'role_id': roleId,
       if (locationId != null) 'location_id': locationId,
+      if (salesActionPassword != null)
+        'sales_action_password': salesActionPassword,
     });
     return AdminUserDto.fromJson(_extractDataMap(res.data));
   }
@@ -116,6 +123,7 @@ class UsersRepository {
     int? locationId,
     bool? isActive,
     bool? isLocked,
+    String? salesActionPassword,
   }) async {
     await _dio.put('/users/$userId', data: {
       if (firstName != null) 'first_name': firstName,
@@ -125,6 +133,8 @@ class UsersRepository {
       if (locationId != null) 'location_id': locationId,
       if (isActive != null) 'is_active': isActive,
       if (isLocked != null) 'is_locked': isLocked,
+      if (salesActionPassword != null)
+        'sales_action_password': salesActionPassword,
     });
   }
 

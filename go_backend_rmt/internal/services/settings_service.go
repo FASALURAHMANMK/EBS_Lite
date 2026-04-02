@@ -302,10 +302,12 @@ func (s *SettingsService) GetTaxSettings(companyID int) (*models.TaxSettings, er
 	if err := s.getJSONSetting(companyID, "tax", &cfg); err != nil {
 		return nil, err
 	}
+	cfg.PriceMode = normalizeTaxPriceMode(cfg.PriceMode)
 	return &cfg, nil
 }
 
 func (s *SettingsService) UpdateTaxSettings(companyID int, cfg models.TaxSettings) error {
+	cfg.PriceMode = normalizeTaxPriceMode(cfg.PriceMode)
 	return s.updateJSONSetting(companyID, "tax", cfg)
 }
 

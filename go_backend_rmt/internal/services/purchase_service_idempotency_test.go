@@ -67,6 +67,14 @@ func TestPurchaseService_CreatePurchase_IdempotencyUniqueViolationReturnsExistin
 		WithArgs(locationID, companyID).
 		WillReturnError(sql.ErrNoRows)
 
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT value
+		FROM settings
+		WHERE company_id = $1 AND key = 'tax'
+	`)).
+		WithArgs(companyID).
+		WillReturnError(sql.ErrNoRows)
+
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT company_id FROM products WHERE product_id = $1 AND is_deleted = FALSE")).
 		WithArgs(1).
 		WillReturnRows(sqlmock.NewRows([]string{"company_id"}).AddRow(companyID))

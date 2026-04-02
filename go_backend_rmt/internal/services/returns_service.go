@@ -58,6 +58,7 @@ func (s *ReturnsService) FindReturnableSaleForCustomer(companyID, customerID int
         FROM sales s
         JOIN locations l ON s.location_id=l.location_id
         WHERE l.company_id=$1 AND s.customer_id=$2 AND s.status='COMPLETED' AND s.is_deleted=FALSE
+          AND COALESCE(s.source_channel, 'INVOICE') <> 'POS'
         ORDER BY s.sale_date DESC, s.created_at DESC, s.sale_id DESC
     `, companyID, customerID)
 	if err != nil {
@@ -192,16 +193,18 @@ func (s *ReturnsService) GetSaleReturnByID(returnID, companyID int) (*models.Sal
 		SELECT sr.return_id, sr.return_number, sr.sale_id, sr.location_id, sr.customer_id,
 			   sr.return_date, sr.total_amount, sr.reason, sr.status, sr.created_by,
 			   sr.sync_status, sr.created_at, sr.updated_at, sr.is_deleted,
-			   s.sale_number, c.name as customer_name
+			   s.sale_number, c.name as customer_name, l.name as location_name,
+			   COALESCE(NULLIF(TRIM(CONCAT(COALESCE(cu.first_name, ''), ' ', COALESCE(cu.last_name, ''))), ''), cu.username, cu.email, '') AS created_by_name
 		FROM sale_returns sr
 		LEFT JOIN sales s ON sr.sale_id = s.sale_id
 		LEFT JOIN customers c ON sr.customer_id = c.customer_id
 		JOIN locations l ON sr.location_id = l.location_id
+		LEFT JOIN users cu ON sr.created_by = cu.user_id
 		WHERE sr.return_id = $1 AND l.company_id = $2 AND sr.is_deleted = FALSE
 	`
 
 	var saleReturn models.SaleReturn
-	var saleNumber, customerName sql.NullString
+	var saleNumber, customerName, locationName, createdByName sql.NullString
 
 	err := s.db.QueryRow(query, returnID, companyID).Scan(
 		&saleReturn.ReturnID, &saleReturn.ReturnNumber, &saleReturn.SaleID,
@@ -209,6 +212,7 @@ func (s *ReturnsService) GetSaleReturnByID(returnID, companyID int) (*models.Sal
 		&saleReturn.TotalAmount, &saleReturn.Reason, &saleReturn.Status,
 		&saleReturn.CreatedBy, &saleReturn.SyncStatus, &saleReturn.CreatedAt,
 		&saleReturn.UpdatedAt, &saleReturn.IsDeleted, &saleNumber, &customerName,
+		&locationName, &createdByName,
 	)
 
 	if err == sql.ErrNoRows {
@@ -229,6 +233,12 @@ func (s *ReturnsService) GetSaleReturnByID(returnID, companyID int) (*models.Sal
 			CustomerID: *saleReturn.CustomerID,
 			Name:       customerName.String,
 		}
+	}
+	if locationName.Valid {
+		saleReturn.LocationName = &locationName.String
+	}
+	if createdByName.Valid {
+		saleReturn.CreatedByName = &createdByName.String
 	}
 
 	// Get return items
@@ -256,15 +266,20 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 	var locationID int
 	var customerID *int
 	var isTraining bool
+	var sourceChannel sql.NullString
 	err = s.db.QueryRow(`
-		SELECT s.location_id, s.customer_id, COALESCE(s.is_training, FALSE)
+		SELECT s.location_id, s.customer_id, COALESCE(s.is_training, FALSE), s.source_channel
 		FROM sales s
 		JOIN locations l ON s.location_id = l.location_id
 		WHERE s.sale_id = $1 AND l.company_id = $2
-	`, req.SaleID, companyID).Scan(&locationID, &customerID, &isTraining)
+	`, req.SaleID, companyID).Scan(&locationID, &customerID, &isTraining, &sourceChannel)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sale details: %w", err)
+	}
+	normalizedSourceChannel := strings.ToUpper(strings.TrimSpace(sourceChannel.String))
+	if normalizedSourceChannel == "POS" || normalizedSourceChannel == "POS_REFUND" {
+		return nil, fmt.Errorf("pos sales must be refunded as refund invoices")
 	}
 
 	// Validate return items against original sale
@@ -284,6 +299,10 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback()
+
+	if err := requireSalesActionPassword(tx, companyID, userID, req.OverridePassword); err != nil {
+		return nil, err
+	}
 	trackingSvc := newInventoryTrackingService(s.db)
 
 	totalAmount := float64(0)
@@ -673,12 +692,24 @@ func (s *ReturnsService) getSaleReturnItems(returnID, companyID int) ([]models.S
 
 func (s *ReturnsService) GetReturnedQuantitiesBySaleDetail(companyID, saleID int) (map[int]float64, error) {
 	query := `
-                SELECT srd.sale_detail_id, COALESCE(SUM(srd.quantity), 0) as returned_quantity
-                FROM sale_return_details srd
-                JOIN sale_returns sr ON srd.return_id = sr.return_id
-				JOIN locations l ON sr.location_id = l.location_id
-                WHERE sr.sale_id = $1 AND l.company_id = $2 AND sr.status = 'COMPLETED' AND srd.sale_detail_id IS NOT NULL
-                GROUP BY srd.sale_detail_id
+                SELECT sale_detail_id, COALESCE(SUM(returned_quantity), 0) AS returned_quantity
+                FROM (
+                  SELECT srd.sale_detail_id, COALESCE(SUM(srd.quantity), 0)::float8 AS returned_quantity
+                  FROM sale_return_details srd
+                  JOIN sale_returns sr ON srd.return_id = sr.return_id
+				  JOIN locations l ON sr.location_id = l.location_id
+                  WHERE sr.sale_id = $1 AND l.company_id = $2 AND sr.status = 'COMPLETED' AND srd.sale_detail_id IS NOT NULL
+                  GROUP BY srd.sale_detail_id
+                  UNION ALL
+                  SELECT sd.source_sale_detail_id AS sale_detail_id, COALESCE(SUM(ABS(sd.quantity)), 0)::float8 AS returned_quantity
+                  FROM sale_details sd
+                  JOIN sales s ON s.sale_id = sd.sale_id
+				  JOIN locations l ON s.location_id = l.location_id
+                  WHERE s.refund_source_sale_id = $1 AND l.company_id = $2 AND s.status = 'COMPLETED'
+                    AND s.is_deleted = FALSE AND sd.source_sale_detail_id IS NOT NULL
+                  GROUP BY sd.source_sale_detail_id
+                ) returned
+                GROUP BY sale_detail_id
         `
 
 	rows, err := s.db.Query(query, saleID, companyID)
@@ -776,13 +807,28 @@ func (s *ReturnsService) availableSaleReturnQuantity(q interface {
 		JOIN sales s ON s.sale_id = sd.sale_id
 		JOIN locations l ON l.location_id = s.location_id
 		LEFT JOIN (
-			SELECT
-				srd.sale_detail_id,
-				COALESCE(SUM(srd.quantity), 0)::float8 AS returned_qty
-			FROM sale_return_details srd
-			JOIN sale_returns sr ON sr.return_id = srd.return_id
-			WHERE sr.sale_id = $1 AND sr.status = 'COMPLETED'
-			GROUP BY srd.sale_detail_id
+			SELECT sale_detail_id, SUM(returned_qty)::float8 AS returned_qty
+			FROM (
+				SELECT
+					srd.sale_detail_id,
+					COALESCE(SUM(srd.quantity), 0)::float8 AS returned_qty
+				FROM sale_return_details srd
+				JOIN sale_returns sr ON sr.return_id = srd.return_id
+				WHERE sr.sale_id = $1 AND sr.status = 'COMPLETED'
+				GROUP BY srd.sale_detail_id
+				UNION ALL
+				SELECT
+					sd.source_sale_detail_id AS sale_detail_id,
+					COALESCE(SUM(ABS(sd.quantity)), 0)::float8 AS returned_qty
+				FROM sale_details sd
+				JOIN sales s ON s.sale_id = sd.sale_id
+				WHERE s.refund_source_sale_id = $1
+				  AND s.status = 'COMPLETED'
+				  AND s.is_deleted = FALSE
+				  AND sd.source_sale_detail_id IS NOT NULL
+				GROUP BY sd.source_sale_detail_id
+			) returned
+			GROUP BY sale_detail_id
 		) ret ON ret.sale_detail_id = sd.sale_detail_id
 		WHERE sd.sale_id = $1
 		  AND sd.product_id = $2
@@ -828,44 +874,81 @@ func (s *ReturnsService) availableSaleReturnQuantity(q interface {
 
 func (s *ReturnsService) allocateSaleReturnLines(tx *sql.Tx, companyID, saleID, productID int, barcodeID *int, requestedQty float64) ([]saleReturnAllocation, error) {
 	query := `
-		SELECT
-			sd.sale_detail_id,
-			sd.combo_product_id,
-			sd.barcode_id,
-			sd.quantity,
-			sd.unit_price,
-			COALESCE(sd.tax_amount, 0)::float8 AS tax_amount,
-			COALESCE(sd.cost_price, 0)::float8 AS cost_price,
-			COALESCE(sd.selling_to_stock_factor, 1.0)::float8 AS selling_to_stock_factor,
-			COALESCE(NULLIF(sd.stock_quantity, 0), sd.quantity * COALESCE(sd.selling_to_stock_factor, 1.0))::float8 AS stock_quantity,
-			COALESCE(sd.selling_uom_mode, 'LOOSE') AS selling_uom_mode,
-			sd.stock_unit_id,
-			sd.selling_unit_id,
-			sd.serial_numbers,
-			COALESCE(ret.returned_qty, 0)::float8 AS returned_qty
-		FROM sale_details sd
-		JOIN sales s ON s.sale_id = sd.sale_id
-		JOIN locations l ON l.location_id = s.location_id
-		LEFT JOIN (
+		WITH locked_sale_details AS (
 			SELECT
-				srd.sale_detail_id,
-				COALESCE(SUM(srd.quantity), 0)::float8 AS returned_qty
-			FROM sale_return_details srd
-			JOIN sale_returns sr ON sr.return_id = srd.return_id
-			WHERE sr.sale_id = $1 AND sr.status = 'COMPLETED'
-			GROUP BY srd.sale_detail_id
-		) ret ON ret.sale_detail_id = sd.sale_detail_id
-		WHERE sd.sale_id = $1
-		  AND sd.product_id = $2
-		  AND l.company_id = $3
-		  AND s.is_deleted = FALSE
+				sd.sale_detail_id,
+				sd.combo_product_id,
+				sd.barcode_id,
+				sd.quantity,
+				sd.unit_price,
+				COALESCE(sd.tax_amount, 0)::float8 AS tax_amount,
+				COALESCE(sd.cost_price, 0)::float8 AS cost_price,
+				COALESCE(sd.selling_to_stock_factor, 1.0)::float8 AS selling_to_stock_factor,
+				COALESCE(NULLIF(sd.stock_quantity, 0), sd.quantity * COALESCE(sd.selling_to_stock_factor, 1.0))::float8 AS stock_quantity,
+				COALESCE(sd.selling_uom_mode, 'LOOSE') AS selling_uom_mode,
+				sd.stock_unit_id,
+				sd.selling_unit_id,
+				sd.serial_numbers
+			FROM sale_details sd
+			JOIN sales s ON s.sale_id = sd.sale_id
+			JOIN locations l ON l.location_id = s.location_id
+			WHERE sd.sale_id = $1
+			  AND sd.product_id = $2
+			  AND l.company_id = $3
+			  AND s.is_deleted = FALSE
 	`
 	args := []interface{}{saleID, productID, companyID}
 	if barcodeID != nil && *barcodeID > 0 {
 		query += " AND sd.barcode_id = $4"
 		args = append(args, *barcodeID)
 	}
-	query += " ORDER BY sd.sale_detail_id FOR UPDATE"
+	query += `
+			ORDER BY sd.sale_detail_id
+			FOR UPDATE OF sd
+		),
+		returned_quantities AS (
+			SELECT sale_detail_id, SUM(returned_qty)::float8 AS returned_qty
+			FROM (
+				SELECT
+					srd.sale_detail_id,
+					COALESCE(SUM(srd.quantity), 0)::float8 AS returned_qty
+				FROM sale_return_details srd
+				JOIN sale_returns sr ON sr.return_id = srd.return_id
+				WHERE sr.sale_id = $1 AND sr.status = 'COMPLETED'
+				GROUP BY srd.sale_detail_id
+				UNION ALL
+				SELECT
+					sd.source_sale_detail_id AS sale_detail_id,
+					COALESCE(SUM(ABS(sd.quantity)), 0)::float8 AS returned_qty
+				FROM sale_details sd
+				JOIN sales s ON s.sale_id = sd.sale_id
+				WHERE s.refund_source_sale_id = $1
+				  AND s.status = 'COMPLETED'
+				  AND s.is_deleted = FALSE
+				  AND sd.source_sale_detail_id IS NOT NULL
+				GROUP BY sd.source_sale_detail_id
+			) returned
+			GROUP BY sale_detail_id
+		)
+		SELECT
+			sd.sale_detail_id,
+			sd.combo_product_id,
+			sd.barcode_id,
+			sd.quantity,
+			sd.unit_price,
+			sd.tax_amount,
+			sd.cost_price,
+			sd.selling_to_stock_factor,
+			sd.stock_quantity,
+			sd.selling_uom_mode,
+			sd.stock_unit_id,
+			sd.selling_unit_id,
+			sd.serial_numbers,
+			COALESCE(ret.returned_qty, 0)::float8 AS returned_qty
+		FROM locked_sale_details sd
+		LEFT JOIN returned_quantities ret ON ret.sale_detail_id = sd.sale_detail_id
+		ORDER BY sd.sale_detail_id
+	`
 	rows, err := tx.Query(query, args...)
 	if err != nil {
 		return nil, err

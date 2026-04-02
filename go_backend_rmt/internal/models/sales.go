@@ -8,6 +8,11 @@ type Sale struct {
 	SaleID          int                `json:"sale_id" db:"sale_id"`
 	SaleNumber      string             `json:"sale_number" db:"sale_number"`
 	LocationID      int                `json:"location_id" db:"location_id"`
+	LocationName    *string            `json:"location_name,omitempty" db:"location_name"`
+	SourceChannel   *string            `json:"source_channel,omitempty" db:"source_channel"`
+	RefundSourceID  *int               `json:"refund_source_sale_id,omitempty" db:"refund_source_sale_id"`
+	RefundSourceRef *string            `json:"refund_source_sale_number,omitempty" db:"refund_source_sale_number"`
+	RefundState     *string            `json:"refund_state,omitempty" db:"refund_state"`
 	CustomerID      *int               `json:"customer_id,omitempty" db:"customer_id"`
 	SaleDate        time.Time          `json:"sale_date" db:"sale_date"`
 	SaleTime        *time.Time         `json:"sale_time,omitempty" db:"sale_time"`
@@ -24,7 +29,9 @@ type Sale struct {
 	IsTraining      bool               `json:"is_training" db:"is_training"`
 	Notes           *string            `json:"notes,omitempty" db:"notes"`
 	CreatedBy       int                `json:"created_by" db:"created_by"`
+	CreatedByName   *string            `json:"created_by_name,omitempty" db:"created_by_name"`
 	UpdatedBy       *int               `json:"updated_by,omitempty" db:"updated_by"`
+	UpdatedByName   *string            `json:"updated_by_name,omitempty" db:"updated_by_name"`
 	Items           []SaleDetail       `json:"items,omitempty"`
 	Customer        *Customer          `json:"customer,omitempty"`
 	PaymentMethod   *PaymentMethod     `json:"payment_method,omitempty"`
@@ -50,6 +57,7 @@ type SaleDetail struct {
 	TaxID                  *int                          `json:"tax_id,omitempty" db:"tax_id"`
 	TaxAmount              float64                       `json:"tax_amount" db:"tax_amount"`
 	LineTotal              float64                       `json:"line_total" db:"line_total"`
+	SourceSaleDetailID     *int                          `json:"source_sale_detail_id,omitempty" db:"source_sale_detail_id"`
 	SerialNumbers          []string                      `json:"serial_numbers,omitempty" db:"serial_numbers"`
 	ComboComponentTracking []ComboComponentTrackingInput `json:"combo_component_tracking,omitempty" db:"-"`
 	Notes                  *string                       `json:"notes,omitempty" db:"notes"`
@@ -57,19 +65,21 @@ type SaleDetail struct {
 }
 
 type SaleReturn struct {
-	ReturnID     int                `json:"return_id" db:"return_id"`
-	ReturnNumber string             `json:"return_number" db:"return_number"`
-	SaleID       int                `json:"sale_id" db:"sale_id"`
-	LocationID   int                `json:"location_id" db:"location_id"`
-	CustomerID   *int               `json:"customer_id,omitempty" db:"customer_id"`
-	ReturnDate   time.Time          `json:"return_date" db:"return_date"`
-	TotalAmount  float64            `json:"total_amount" db:"total_amount"`
-	Reason       *string            `json:"reason,omitempty" db:"reason"`
-	Status       string             `json:"status" db:"status"`
-	CreatedBy    int                `json:"created_by" db:"created_by"`
-	Items        []SaleReturnDetail `json:"items,omitempty"`
-	Sale         *Sale              `json:"sale,omitempty"`
-	Customer     *Customer          `json:"customer,omitempty"`
+	ReturnID      int                `json:"return_id" db:"return_id"`
+	ReturnNumber  string             `json:"return_number" db:"return_number"`
+	SaleID        int                `json:"sale_id" db:"sale_id"`
+	LocationID    int                `json:"location_id" db:"location_id"`
+	LocationName  *string            `json:"location_name,omitempty" db:"location_name"`
+	CustomerID    *int               `json:"customer_id,omitempty" db:"customer_id"`
+	ReturnDate    time.Time          `json:"return_date" db:"return_date"`
+	TotalAmount   float64            `json:"total_amount" db:"total_amount"`
+	Reason        *string            `json:"reason,omitempty" db:"reason"`
+	Status        string             `json:"status" db:"status"`
+	CreatedBy     int                `json:"created_by" db:"created_by"`
+	CreatedByName *string            `json:"created_by_name,omitempty" db:"created_by_name"`
+	Items         []SaleReturnDetail `json:"items,omitempty"`
+	Sale          *Sale              `json:"sale,omitempty"`
+	Customer      *Customer          `json:"customer,omitempty"`
 	SyncModel
 }
 
@@ -114,7 +124,8 @@ type CreateSaleDetailRequest struct {
 	ComboProductID         *int                           `json:"combo_product_id,omitempty"`
 	BarcodeID              *int                           `json:"barcode_id,omitempty"`
 	ProductName            *string                        `json:"product_name,omitempty"` // For quick sales
-	Quantity               float64                        `json:"quantity" validate:"required,gt=0"`
+	SourceSaleDetailID     *int                           `json:"source_sale_detail_id,omitempty"`
+	Quantity               float64                        `json:"quantity" validate:"required,ne=0"`
 	UnitPrice              float64                        `json:"unit_price" validate:"required,gt=0"`
 	DiscountPercent        float64                        `json:"discount_percentage"`
 	TaxID                  *int                           `json:"tax_id,omitempty"`
@@ -137,9 +148,10 @@ type ComboComponentTrackingInput struct {
 }
 
 type UpdateSaleRequest struct {
-	PaymentMethodID *int    `json:"payment_method_id,omitempty"`
-	Notes           *string `json:"notes,omitempty"`
-	Status          *string `json:"status,omitempty"`
+	PaymentMethodID  *int    `json:"payment_method_id,omitempty"`
+	Notes            *string `json:"notes,omitempty"`
+	Status           *string `json:"status,omitempty"`
+	OverridePassword *string `json:"override_password,omitempty"`
 }
 
 type CreateSaleReturnRequest struct {
@@ -151,6 +163,7 @@ type CreateSaleReturnRequest struct {
 
 type CreateSaleReturnItemRequest struct {
 	ProductID        int                            `json:"product_id" validate:"required"`
+	SaleDetailID     *int                           `json:"sale_detail_id,omitempty"`
 	BarcodeID        *int                           `json:"barcode_id,omitempty"`
 	Quantity         float64                        `json:"quantity" validate:"required,gt=0"`
 	UnitPrice        float64                        `json:"unit_price" validate:"required,gt=0"`
@@ -162,6 +175,17 @@ type CreateSaleReturnItemRequest struct {
 
 type QuickSaleRequest struct {
 	Items []CreateSaleDetailRequest `json:"items" validate:"required,min=1"`
+}
+
+type CreateRefundInvoiceRequest struct {
+	Items            []CreateRefundInvoiceItemRequest `json:"items" validate:"required,min=1,dive"`
+	Reason           *string                          `json:"reason,omitempty"`
+	OverridePassword *string                          `json:"override_password,omitempty"`
+}
+
+type CreateRefundInvoiceItemRequest struct {
+	SaleDetailID int     `json:"sale_detail_id" validate:"required"`
+	Quantity     float64 `json:"quantity" validate:"required,gt=0"`
 }
 
 type POSCheckoutRequest struct {
@@ -180,6 +204,7 @@ type POSCheckoutRequest struct {
 	AutoFillRaffleCustomerData *bool                     `json:"auto_fill_raffle_customer_data,omitempty"`
 	ManagerOverrideToken       *string                   `json:"manager_override_token,omitempty"`
 	OverrideReason             *string                   `json:"override_reason,omitempty"`
+	SalesActionPassword        *string                   `json:"sales_action_password,omitempty"`
 	OverridePassword           *string                   `json:"override_password,omitempty"`
 }
 

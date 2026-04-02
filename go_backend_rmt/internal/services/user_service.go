@@ -24,6 +24,7 @@ func (s *UserService) GetUsers(companyID *int, locationID *int) ([]models.UserRe
 	query := `
 		SELECT u.user_id, u.username, u.email, u.first_name, u.last_name, u.phone,
 			   u.role_id, u.location_id, u.company_id, u.is_active, u.is_locked,
+			   CASE WHEN COALESCE(NULLIF(TRIM(u.sales_action_password_hash), ''), '') <> '' THEN TRUE ELSE FALSE END,
 			   u.preferred_language, u.secondary_language, u.last_login
 		FROM users u
 		WHERE u.is_deleted = FALSE
@@ -59,6 +60,7 @@ func (s *UserService) GetUsers(companyID *int, locationID *int) ([]models.UserRe
 			&user.UserID, &user.Username, &user.Email, &user.FirstName,
 			&user.LastName, &user.Phone, &user.RoleID, &user.LocationID,
 			&user.CompanyID, &user.IsActive, &user.IsLocked,
+			&user.HasSalesActionPassword,
 			&user.PreferredLanguage, &user.SecondaryLanguage, &user.LastLogin,
 		)
 		if err != nil {
@@ -86,6 +88,20 @@ func (s *UserService) CreateUser(req *models.CreateUserRequest, creatorUserID in
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
+	var salesActionPasswordHash interface{}
+	hasSalesActionPassword := false
+	if req.SalesActionPassword != nil {
+		trimmed := strings.TrimSpace(*req.SalesActionPassword)
+		if trimmed != "" {
+			hashedActionPassword, err := utils.HashPassword(trimmed)
+			if err != nil {
+				return nil, fmt.Errorf("failed to hash sales action password: %w", err)
+			}
+			salesActionPasswordHash = hashedActionPassword
+			hasSalesActionPassword = true
+		}
+	}
+
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -95,15 +111,15 @@ func (s *UserService) CreateUser(req *models.CreateUserRequest, creatorUserID in
 	// Insert user
 	query := `
 		INSERT INTO users (company_id, location_id, role_id, username, email, password_hash,
-						  first_name, last_name, phone, preferred_language, secondary_language)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+						  sales_action_password_hash, first_name, last_name, phone, preferred_language, secondary_language)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING user_id
 	`
 
 	var userID int
 	err = tx.QueryRow(query,
 		req.CompanyID, req.LocationID, req.RoleID, req.Username, req.Email,
-		hashedPassword, req.FirstName, req.LastName, req.Phone,
+		hashedPassword, salesActionPasswordHash, req.FirstName, req.LastName, req.Phone,
 		req.PreferredLanguage, req.SecondaryLanguage,
 	).Scan(&userID)
 	if err != nil {
@@ -145,19 +161,20 @@ func (s *UserService) CreateUser(req *models.CreateUserRequest, creatorUserID in
 
 	// Return created user
 	return &models.UserResponse{
-		UserID:            userID,
-		Username:          req.Username,
-		Email:             req.Email,
-		FirstName:         req.FirstName,
-		LastName:          req.LastName,
-		Phone:             req.Phone,
-		RoleID:            req.RoleID,
-		LocationID:        req.LocationID,
-		CompanyID:         &req.CompanyID,
-		IsActive:          true,
-		IsLocked:          false,
-		PreferredLanguage: req.PreferredLanguage,
-		SecondaryLanguage: req.SecondaryLanguage,
+		UserID:                 userID,
+		Username:               req.Username,
+		Email:                  req.Email,
+		FirstName:              req.FirstName,
+		LastName:               req.LastName,
+		Phone:                  req.Phone,
+		RoleID:                 req.RoleID,
+		LocationID:             req.LocationID,
+		CompanyID:              &req.CompanyID,
+		IsActive:               true,
+		IsLocked:               false,
+		HasSalesActionPassword: hasSalesActionPassword,
+		PreferredLanguage:      req.PreferredLanguage,
+		SecondaryLanguage:      req.SecondaryLanguage,
 	}, nil
 }
 
@@ -214,6 +231,22 @@ func (s *UserService) UpdateUser(userID int, req *models.UpdateUserRequest) erro
 		setParts = append(setParts, fmt.Sprintf("location_id = $%d", argCount))
 		args = append(args, *req.LocationID)
 		changes["location_id"] = *req.LocationID
+	}
+	if req.SalesActionPassword != nil {
+		trimmed := strings.TrimSpace(*req.SalesActionPassword)
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("sales_action_password_hash = $%d", argCount))
+		if trimmed == "" {
+			args = append(args, nil)
+			changes["has_sales_action_password"] = false
+		} else {
+			hashedActionPassword, err := utils.HashPassword(trimmed)
+			if err != nil {
+				return fmt.Errorf("failed to hash sales action password: %w", err)
+			}
+			args = append(args, hashedActionPassword)
+			changes["has_sales_action_password"] = true
+		}
 	}
 	if req.PreferredLanguage != nil {
 		argCount++

@@ -274,6 +274,10 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 	}
 
 	// Calculate totals
+	taxSettings, err := loadCompanyTaxSettings(tx, companyID)
+	if err != nil {
+		return nil, err
+	}
 	var subtotal, totalTax, totalDiscount float64
 	for _, item := range req.Items {
 		// Verify product belongs to company
@@ -291,33 +295,32 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 			return nil, fmt.Errorf("product with ID %d does not belong to company", item.ProductID)
 		}
 
-		lineTotal := item.Quantity * item.UnitPrice
-
-		// Apply discount
+		discountPercent := 0.0
+		if item.DiscountPercentage != nil {
+			discountPercent = *item.DiscountPercentage
+		}
 		discountAmount := float64(0)
 		if item.DiscountPercentage != nil {
-			discountAmount = lineTotal * (*item.DiscountPercentage / 100)
+			discountAmount = (item.Quantity * item.UnitPrice) * (*item.DiscountPercentage / 100)
 		}
 		if item.DiscountAmount != nil {
 			discountAmount = *item.DiscountAmount
 		}
-
-		lineTotal -= discountAmount
-		totalDiscount += discountAmount
-
-		// Calculate tax
-		taxAmount := float64(0)
+		taxPercent := 0.0
 		if item.TaxID != nil {
-			var taxPercentage float64
 			err = tx.QueryRow("SELECT percentage FROM taxes WHERE tax_id = $1 AND company_id = $2 AND is_active = TRUE",
-				*item.TaxID, companyID).Scan(&taxPercentage)
+				*item.TaxID, companyID).Scan(&taxPercent)
 			if err == nil {
-				taxAmount = lineTotal * (taxPercentage / 100)
+				lineAmounts := computeTaxLineWithDiscount(item.Quantity, item.UnitPrice, discountPercent, discountAmount, item.DiscountAmount != nil, taxPercent, taxSettings.PriceMode)
+				totalDiscount += discountAmount
+				totalTax += lineAmounts.TaxAmount
+				subtotal += lineAmounts.GrossAmount
+				continue
 			}
 		}
-
-		totalTax += taxAmount
-		subtotal += (lineTotal + taxAmount)
+		lineAmounts := computeTaxLineWithDiscount(item.Quantity, item.UnitPrice, discountPercent, discountAmount, item.DiscountAmount != nil, 0, taxSettings.PriceMode)
+		totalDiscount += discountAmount
+		subtotal += lineAmounts.GrossAmount
 	}
 
 	totalAmount := subtotal
@@ -396,31 +399,26 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 
 	// Insert purchase details
 	for _, item := range req.Items {
-		lineTotal := item.Quantity * item.UnitPrice
-
-		// Apply discount
+		discountPercent := 0.0
+		if item.DiscountPercentage != nil {
+			discountPercent = *item.DiscountPercentage
+		}
 		discountAmount := float64(0)
 		if item.DiscountPercentage != nil {
-			discountAmount = lineTotal * (*item.DiscountPercentage / 100)
+			discountAmount = (item.Quantity * item.UnitPrice) * (*item.DiscountPercentage / 100)
 		}
 		if item.DiscountAmount != nil {
 			discountAmount = *item.DiscountAmount
 		}
-
-		lineTotal -= discountAmount
-
-		// Calculate tax
-		taxAmount := float64(0)
+		taxPercent := 0.0
 		if item.TaxID != nil {
-			var taxPercentage float64
 			err = tx.QueryRow("SELECT percentage FROM taxes WHERE tax_id = $1 AND company_id = $2 AND is_active = TRUE",
-				*item.TaxID, companyID).Scan(&taxPercentage)
+				*item.TaxID, companyID).Scan(&taxPercent)
 			if err == nil {
-				taxAmount = lineTotal * (taxPercentage / 100)
 			}
 		}
-
-		finalLineTotal := lineTotal + taxAmount
+		lineAmounts := computeTaxLineWithDiscount(item.Quantity, item.UnitPrice, discountPercent, discountAmount, item.DiscountAmount != nil, taxPercent, taxSettings.PriceMode)
+		finalLineTotal := lineAmounts.GrossAmount
 
 		// Validate serial numbers if product is serialized
 		meta, ok := productMetaByID[item.ProductID]
@@ -458,7 +456,7 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
         `,
 			purchase.PurchaseID, item.ProductID, item.BarcodeID, item.Quantity, item.UnitPrice,
-			item.DiscountPercentage, discountAmount, item.TaxID, taxAmount,
+			item.DiscountPercentage, lineAmounts.DiscountAmount, item.TaxID, lineAmounts.TaxAmount,
 			finalLineTotal, 0, pq.Array(item.SerialNumbers), item.ExpiryDate, item.BatchNumber,
 			lineSnapshot.StockUnitID, lineSnapshot.PurchaseUnitID, lineSnapshot.PurchaseUOMMode, lineSnapshot.PurchaseToStock, lineSnapshot.StockQuantity,
 		)
@@ -1084,33 +1082,32 @@ func (s *PurchaseService) UpdatePurchase(purchaseID, companyID, userID int, req 
 		if err != nil {
 			return err
 		}
+		taxSettings, err := loadCompanyTaxSettings(tx, companyID)
+		if err != nil {
+			return err
+		}
 
 		for _, item := range req.Items {
-			lineTotal := item.Quantity * item.UnitPrice
-
-			// Apply discount
+			discountPercent := 0.0
+			if item.DiscountPercentage != nil {
+				discountPercent = *item.DiscountPercentage
+			}
 			discountAmount := float64(0)
 			if item.DiscountPercentage != nil {
-				discountAmount = lineTotal * (*item.DiscountPercentage / 100)
+				discountAmount = (item.Quantity * item.UnitPrice) * (*item.DiscountPercentage / 100)
 			}
 			if item.DiscountAmount != nil {
 				discountAmount = *item.DiscountAmount
 			}
-
-			lineTotal -= discountAmount
-
-			// Calculate tax
-			taxAmount := float64(0)
+			taxPercent := 0.0
 			if item.TaxID != nil {
-				var taxPercentage float64
 				err = tx.QueryRow("SELECT percentage FROM taxes WHERE tax_id = $1 AND company_id = $2 AND is_active = TRUE",
-					*item.TaxID, companyID).Scan(&taxPercentage)
+					*item.TaxID, companyID).Scan(&taxPercent)
 				if err == nil {
-					taxAmount = lineTotal * (taxPercentage / 100)
 				}
 			}
-
-			finalLineTotal := lineTotal + taxAmount
+			lineAmounts := computeTaxLineWithDiscount(item.Quantity, item.UnitPrice, discountPercent, discountAmount, item.DiscountAmount != nil, taxPercent, taxSettings.PriceMode)
+			finalLineTotal := lineAmounts.GrossAmount
 
 			// Validate serial numbers if product is serialized
 			meta, ok := productMetaByID[item.ProductID]
@@ -1147,7 +1144,7 @@ func (s *PurchaseService) UpdatePurchase(purchaseID, companyID, userID int, req 
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 			`,
 				purchaseID, item.ProductID, item.BarcodeID, item.Quantity, item.UnitPrice,
-				item.DiscountPercentage, discountAmount, item.TaxID, taxAmount,
+				item.DiscountPercentage, lineAmounts.DiscountAmount, item.TaxID, lineAmounts.TaxAmount,
 				finalLineTotal, 0, pq.Array(item.SerialNumbers), item.ExpiryDate, item.BatchNumber,
 				lineSnapshot.StockUnitID, lineSnapshot.PurchaseUnitID, lineSnapshot.PurchaseUOMMode, lineSnapshot.PurchaseToStock, lineSnapshot.StockQuantity,
 			)

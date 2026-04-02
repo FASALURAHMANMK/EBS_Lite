@@ -151,22 +151,23 @@ func (s *AuthService) Login(req *models.LoginRequest, ipAddress, userAgent strin
 	}
 
 	userResponse := models.UserResponse{
-		UserID:            user.UserID,
-		Username:          user.Username,
-		Email:             user.Email,
-		FirstName:         user.FirstName,
-		LastName:          user.LastName,
-		Phone:             user.Phone,
-		RoleID:            user.RoleID,
-		LocationID:        user.LocationID,
-		CompanyID:         user.CompanyID,
-		IsActive:          user.IsActive,
-		IsLocked:          user.IsLocked,
-		PreferredLanguage: user.PreferredLanguage,
-		SecondaryLanguage: user.SecondaryLanguage,
-		LastLogin:         user.LastLogin,
-		Permissions:       permissions,
-		Preferences:       prefs,
+		UserID:                 user.UserID,
+		Username:               user.Username,
+		Email:                  user.Email,
+		FirstName:              user.FirstName,
+		LastName:               user.LastName,
+		Phone:                  user.Phone,
+		RoleID:                 user.RoleID,
+		LocationID:             user.LocationID,
+		CompanyID:              user.CompanyID,
+		IsActive:               user.IsActive,
+		IsLocked:               user.IsLocked,
+		HasSalesActionPassword: user.SalesActionPasswordHash != nil && strings.TrimSpace(*user.SalesActionPasswordHash) != "",
+		PreferredLanguage:      user.PreferredLanguage,
+		SecondaryLanguage:      user.SecondaryLanguage,
+		LastLogin:              user.LastLogin,
+		Permissions:            permissions,
+		Preferences:            prefs,
 	}
 
 	var company *models.Company
@@ -357,22 +358,23 @@ func (s *AuthService) GetMe(userID int) (*models.AuthMeResponse, error) {
 	}
 
 	userResp := models.UserResponse{
-		UserID:            user.UserID,
-		Username:          user.Username,
-		Email:             user.Email,
-		FirstName:         user.FirstName,
-		LastName:          user.LastName,
-		Phone:             user.Phone,
-		RoleID:            user.RoleID,
-		LocationID:        user.LocationID,
-		CompanyID:         user.CompanyID,
-		IsActive:          user.IsActive,
-		IsLocked:          user.IsLocked,
-		PreferredLanguage: user.PreferredLanguage,
-		SecondaryLanguage: user.SecondaryLanguage,
-		LastLogin:         user.LastLogin,
-		Permissions:       permissions,
-		Preferences:       prefs,
+		UserID:                 user.UserID,
+		Username:               user.Username,
+		Email:                  user.Email,
+		FirstName:              user.FirstName,
+		LastName:               user.LastName,
+		Phone:                  user.Phone,
+		RoleID:                 user.RoleID,
+		LocationID:             user.LocationID,
+		CompanyID:              user.CompanyID,
+		IsActive:               user.IsActive,
+		IsLocked:               user.IsLocked,
+		HasSalesActionPassword: user.SalesActionPasswordHash != nil && strings.TrimSpace(*user.SalesActionPasswordHash) != "",
+		PreferredLanguage:      user.PreferredLanguage,
+		SecondaryLanguage:      user.SecondaryLanguage,
+		LastLogin:              user.LastLogin,
+		Permissions:            permissions,
+		Preferences:            prefs,
 	}
 
 	var company *models.Company
@@ -482,7 +484,7 @@ func (s *AuthService) VerifyCredentials(companyID int, req *models.VerifyCredent
 // Helper methods
 func (s *AuthService) getUserByEmail(email string) (*models.User, error) {
 	query := `
-		SELECT user_id, company_id, location_id, role_id, username, email, password_hash,
+		SELECT user_id, company_id, location_id, role_id, username, email, password_hash, sales_action_password_hash,
 			   first_name, last_name, phone, preferred_language, secondary_language,
 			   max_allowed_devices, is_locked, is_active, last_login, sync_status,
 			   created_at, updated_at, is_deleted
@@ -493,7 +495,7 @@ func (s *AuthService) getUserByEmail(email string) (*models.User, error) {
 	var user models.User
 	err := s.db.QueryRow(query, email).Scan(
 		&user.UserID, &user.CompanyID, &user.LocationID, &user.RoleID,
-		&user.Username, &user.Email, &user.PasswordHash, &user.FirstName,
+		&user.Username, &user.Email, &user.PasswordHash, &user.SalesActionPasswordHash, &user.FirstName,
 		&user.LastName, &user.Phone, &user.PreferredLanguage, &user.SecondaryLanguage,
 		&user.MaxAllowedDevices, &user.IsLocked, &user.IsActive, &user.LastLogin,
 		&user.SyncStatus, &user.CreatedAt, &user.UpdatedAt, &user.IsDeleted,
@@ -504,7 +506,7 @@ func (s *AuthService) getUserByEmail(email string) (*models.User, error) {
 
 func (s *AuthService) getUserByUsername(username string) (*models.User, error) {
 	query := `
-                SELECT user_id, company_id, location_id, role_id, username, email, password_hash,
+                SELECT user_id, company_id, location_id, role_id, username, email, password_hash, sales_action_password_hash,
                            first_name, last_name, phone, preferred_language, secondary_language,
                            max_allowed_devices, is_locked, is_active, last_login, sync_status,
                            created_at, updated_at, is_deleted
@@ -515,7 +517,7 @@ func (s *AuthService) getUserByUsername(username string) (*models.User, error) {
 	var user models.User
 	err := s.db.QueryRow(query, username).Scan(
 		&user.UserID, &user.CompanyID, &user.LocationID, &user.RoleID,
-		&user.Username, &user.Email, &user.PasswordHash, &user.FirstName,
+		&user.Username, &user.Email, &user.PasswordHash, &user.SalesActionPasswordHash, &user.FirstName,
 		&user.LastName, &user.Phone, &user.PreferredLanguage, &user.SecondaryLanguage,
 		&user.MaxAllowedDevices, &user.IsLocked, &user.IsActive, &user.LastLogin,
 		&user.SyncStatus, &user.CreatedAt, &user.UpdatedAt, &user.IsDeleted,
@@ -544,7 +546,7 @@ func (s *AuthService) getCompanyByID(companyID int) (*models.Company, error) {
 
 func (s *AuthService) getUserByID(userID int) (*models.User, error) {
 	query := `
-		SELECT user_id, company_id, location_id, role_id, username, email, password_hash,
+		SELECT user_id, company_id, location_id, role_id, username, email, password_hash, sales_action_password_hash,
 			   first_name, last_name, phone, preferred_language, secondary_language,
 			   max_allowed_devices, is_locked, is_active, last_login, sync_status,
 			   created_at, updated_at, is_deleted
@@ -555,7 +557,7 @@ func (s *AuthService) getUserByID(userID int) (*models.User, error) {
 	var user models.User
 	err := s.db.QueryRow(query, userID).Scan(
 		&user.UserID, &user.CompanyID, &user.LocationID, &user.RoleID,
-		&user.Username, &user.Email, &user.PasswordHash, &user.FirstName,
+		&user.Username, &user.Email, &user.PasswordHash, &user.SalesActionPasswordHash, &user.FirstName,
 		&user.LastName, &user.Phone, &user.PreferredLanguage, &user.SecondaryLanguage,
 		&user.MaxAllowedDevices, &user.IsLocked, &user.IsActive, &user.LastLogin,
 		&user.SyncStatus, &user.CreatedAt, &user.UpdatedAt, &user.IsDeleted,

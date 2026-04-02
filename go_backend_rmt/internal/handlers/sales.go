@@ -226,11 +226,145 @@ func (h *SalesHandler) UpdateSale(c *gin.Context) {
 			utils.NotFoundResponse(c, "Sale not found")
 			return
 		}
+		if err.Error() == "sales action password is not configured for this user" ||
+			err.Error() == "sales action password is required" {
+			utils.ErrorResponse(c, http.StatusForbidden, "Failed to update sale", err)
+			return
+		}
+		if err.Error() == "invalid sales action password" {
+			utils.ErrorResponse(c, http.StatusUnauthorized, "Failed to update sale", err)
+			return
+		}
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update sale", err)
 		return
 	}
 
 	utils.SuccessResponse(c, "Sale updated successfully", nil)
+}
+
+// POST /sales/:id/refund-invoice
+func (h *SalesHandler) CreateRefundInvoice(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	userID := c.GetInt("user_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	saleID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid sale ID", err)
+		return
+	}
+
+	var req models.CreateRefundInvoiceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		validationErrors := utils.GetValidationErrors(err)
+		utils.ValidationErrorResponse(c, validationErrors)
+		return
+	}
+
+	refundSale, err := h.salesService.CreateRefundInvoice(companyID, saleID, userID, &req)
+	if err != nil {
+		switch err.Error() {
+		case "sale not found":
+			utils.NotFoundResponse(c, "Sale not found")
+			return
+		case "sales action password is not configured for this user", "sales action password is required":
+			utils.ErrorResponse(c, http.StatusForbidden, "Failed to create refund invoice", err)
+			return
+		case "invalid sales action password":
+			utils.ErrorResponse(c, http.StatusUnauthorized, "Failed to create refund invoice", err)
+			return
+		case "invoice returns must use sale return documents", "pos sales must be refunded as refund invoices", "only completed sales can be refunded":
+			utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create refund invoice", err)
+			return
+		default:
+			utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create refund invoice", err)
+			return
+		}
+	}
+
+	utils.CreatedResponse(c, "Refund invoice created successfully", refundSale)
+}
+
+// GET /sales/:id/refundable-items
+func (h *SalesHandler) GetRefundableItems(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	saleID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid sale ID", err)
+		return
+	}
+
+	sale, err := h.salesService.GetSaleByID(saleID, companyID)
+	if err != nil {
+		if err.Error() == "sale not found" {
+			utils.NotFoundResponse(c, "Sale not found")
+			return
+		}
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get sale", err)
+		return
+	}
+
+	if sale.Status != "COMPLETED" {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Only completed sales can be refunded", nil)
+		return
+	}
+	if sale.RefundSourceID != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Refund invoices cannot be refunded again", nil)
+		return
+	}
+
+	returnedQty, err := services.NewReturnsService().GetReturnedQuantitiesBySaleDetail(companyID, saleID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get refunded quantities", err)
+		return
+	}
+
+	refundableItems := make([]map[string]interface{}, 0)
+	for _, item := range sale.Items {
+		if item.ProductID == nil || item.Quantity <= 0 {
+			continue
+		}
+		returned := returnedQty[item.SaleDetailID]
+		maxQuantity := item.Quantity - returned
+		if maxQuantity < 0 {
+			maxQuantity = 0
+		}
+		refundableItems = append(refundableItems, map[string]interface{}{
+			"sale_detail_id": item.SaleDetailID,
+			"product_id":     *item.ProductID,
+			"product_name":   item.ProductName,
+			"barcode_id":     item.BarcodeID,
+			"tracking_type":  item.TrackingType,
+			"is_serialized":  item.IsSerialized,
+			"serial_numbers": item.SerialNumbers,
+			"quantity":       item.Quantity,
+			"unit_price":     item.UnitPrice,
+			"line_total":     item.LineTotal,
+			"max_quantity":   maxQuantity,
+		})
+	}
+
+	utils.SuccessResponse(c, "Refundable sale details retrieved successfully", map[string]interface{}{
+		"sale_id":            sale.SaleID,
+		"sale_number":        sale.SaleNumber,
+		"sale_date":          sale.SaleDate,
+		"customer":           sale.Customer,
+		"total_amount":       sale.TotalAmount,
+		"refundable_items":   refundableItems,
+		"refund_source_sale": sale.RefundSourceID,
+	})
 }
 
 // DELETE /sales/:id

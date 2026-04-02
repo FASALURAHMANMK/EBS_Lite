@@ -1,6 +1,7 @@
 package services
 
 import (
+	"database/sql"
 	"regexp"
 	"testing"
 
@@ -17,6 +18,14 @@ func TestSalesService_CalculateTotals_BatchedQueries(t *testing.T) {
 	defer db.Close()
 
 	svc := &SalesService{db: db}
+
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT value
+		FROM settings
+		WHERE company_id = $1 AND key = 'tax'
+	`)).
+		WithArgs(1).
+		WillReturnError(sql.ErrNoRows)
 
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT product_id, unit_id, purchase_unit_id, selling_unit_id, tax_id, CASE WHEN COALESCE(is_serialized, FALSE) OR COALESCE(tracking_type, '') = 'SERIAL' THEN TRUE ELSE FALSE END AS is_serialized, COALESCE(cost_price, 0)::float8,")).
 		WithArgs(1, sqlmock.AnyArg()).
@@ -65,6 +74,14 @@ func TestSalesService_CalculateTotals_MissingTaxUsesStableError(t *testing.T) {
 	defer db.Close()
 
 	svc := &SalesService{db: db}
+
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT value
+		FROM settings
+		WHERE company_id = $1 AND key = 'tax'
+	`)).
+		WithArgs(1).
+		WillReturnError(sql.ErrNoRows)
 
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT product_id, unit_id, purchase_unit_id, selling_unit_id, tax_id, CASE WHEN COALESCE(is_serialized, FALSE) OR COALESCE(tracking_type, '') = 'SERIAL' THEN TRUE ELSE FALSE END AS is_serialized, COALESCE(cost_price, 0)::float8,")).
 		WithArgs(1, sqlmock.AnyArg()).

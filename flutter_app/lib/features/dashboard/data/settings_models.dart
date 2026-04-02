@@ -97,17 +97,24 @@ class InvoiceSettingsDto {
 class TaxSettingsDto {
   final String? taxName;
   final double? taxPercent;
+  final String priceMode;
 
-  TaxSettingsDto({this.taxName, this.taxPercent});
+  TaxSettingsDto({
+    this.taxName,
+    this.taxPercent,
+    this.priceMode = 'EXCLUSIVE',
+  });
 
   factory TaxSettingsDto.fromJson(Map<String, dynamic> json) => TaxSettingsDto(
         taxName: json['tax_name'] as String?,
         taxPercent: (json['tax_percent'] as num?)?.toDouble(),
+        priceMode: json['price_mode'] as String? ?? 'EXCLUSIVE',
       );
 
   Map<String, dynamic> toJson() => {
         if (taxName != null) 'tax_name': taxName,
         if (taxPercent != null) 'tax_percent': taxPercent,
+        'price_mode': priceMode,
       };
 }
 

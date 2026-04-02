@@ -37,9 +37,10 @@ func (h *ReturnsHandler) CreateSaleReturnByCustomer(c *gin.Context) {
 	}
 
 	var req struct {
-		CustomerID int                                  `json:"customer_id" validate:"required"`
-		Items      []models.CreateSaleReturnItemRequest `json:"items" validate:"required,min=1"`
-		Reason     string                               `json:"reason" validate:"required"`
+		CustomerID       int                                  `json:"customer_id" validate:"required"`
+		Items            []models.CreateSaleReturnItemRequest `json:"items" validate:"required,min=1"`
+		Reason           string                               `json:"reason" validate:"required"`
+		OverridePassword *string                              `json:"override_password,omitempty"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
@@ -65,11 +66,21 @@ func (h *ReturnsHandler) CreateSaleReturnByCustomer(c *gin.Context) {
 
 	// Delegate to standard creation against the identified sale
 	saleReturn, err := h.returnsService.CreateSaleReturn(companyID, userID, &models.CreateSaleReturnRequest{
-		SaleID: saleID,
-		Items:  req.Items,
-		Reason: &reason,
+		SaleID:           saleID,
+		Items:            req.Items,
+		Reason:           &reason,
+		OverridePassword: req.OverridePassword,
 	})
 	if err != nil {
+		if err.Error() == "sales action password is not configured for this user" ||
+			err.Error() == "sales action password is required" {
+			utils.ErrorResponse(c, http.StatusForbidden, "Failed to create sale return", err)
+			return
+		}
+		if err.Error() == "invalid sales action password" {
+			utils.ErrorResponse(c, http.StatusUnauthorized, "Failed to create sale return", err)
+			return
+		}
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create sale return", err)
 		return
 	}
@@ -173,6 +184,15 @@ func (h *ReturnsHandler) CreateSaleReturn(c *gin.Context) {
 		}
 		if err.Error() == "product not found in original sale" {
 			utils.ErrorResponse(c, http.StatusBadRequest, "Product not found in original sale", err)
+			return
+		}
+		if err.Error() == "sales action password is not configured for this user" ||
+			err.Error() == "sales action password is required" {
+			utils.ErrorResponse(c, http.StatusForbidden, "Failed to create sale return", err)
+			return
+		}
+		if err.Error() == "invalid sales action password" {
+			utils.ErrorResponse(c, http.StatusUnauthorized, "Failed to create sale return", err)
 			return
 		}
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create sale return", err)
@@ -303,6 +323,13 @@ func (h *ReturnsHandler) SearchReturnableSale(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Only completed sales can be returned", nil)
 		return
 	}
+	if sale.SourceChannel != nil {
+		finalSourceChannel := strings.ToUpper(strings.TrimSpace(*sale.SourceChannel))
+		if finalSourceChannel == "POS" || finalSourceChannel == "POS_REFUND" {
+			utils.ErrorResponse(c, http.StatusBadRequest, "POS sales must be refunded as refund invoices from Sales History", nil)
+			return
+		}
+	}
 
 	returnedQty, err := h.returnsService.GetReturnedQuantitiesBySaleDetail(companyID, saleID)
 	if err != nil {
@@ -320,12 +347,17 @@ func (h *ReturnsHandler) SearchReturnableSale(c *gin.Context) {
 				maxQuantity = 0
 			}
 			returnableItems = append(returnableItems, map[string]interface{}{
-				"product_id":   *item.ProductID,
-				"product_name": item.ProductName,
-				"quantity":     item.Quantity,
-				"unit_price":   item.UnitPrice,
-				"line_total":   item.LineTotal,
-				"max_quantity": maxQuantity,
+				"sale_detail_id": item.SaleDetailID,
+				"product_id":     *item.ProductID,
+				"product_name":   item.ProductName,
+				"barcode_id":     item.BarcodeID,
+				"tracking_type":  item.TrackingType,
+				"is_serialized":  item.IsSerialized,
+				"serial_numbers": item.SerialNumbers,
+				"quantity":       item.Quantity,
+				"unit_price":     item.UnitPrice,
+				"line_total":     item.LineTotal,
+				"max_quantity":   maxQuantity,
 			})
 		}
 	}
@@ -359,8 +391,9 @@ func (h *ReturnsHandler) ProcessQuickReturn(c *gin.Context) {
 	}
 
 	var req struct {
-		Items  []models.CreateSaleReturnItemRequest `json:"items" validate:"required,min=1"`
-		Reason string                               `json:"reason" validate:"required"`
+		Items            []models.CreateSaleReturnItemRequest `json:"items" validate:"required,min=1"`
+		Reason           string                               `json:"reason" validate:"required"`
+		OverridePassword *string                              `json:"override_password,omitempty"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -382,15 +415,25 @@ func (h *ReturnsHandler) ProcessQuickReturn(c *gin.Context) {
 		return
 	}
 	returnReq := &models.CreateSaleReturnRequest{
-		SaleID: saleID,
-		Items:  req.Items,
-		Reason: &reason,
+		SaleID:           saleID,
+		Items:            req.Items,
+		Reason:           &reason,
+		OverridePassword: req.OverridePassword,
 	}
 
 	saleReturn, err := h.returnsService.CreateSaleReturn(companyID, userID, returnReq)
 	if err != nil {
 		if err.Error() == "sale not found" {
 			utils.NotFoundResponse(c, "Sale not found")
+			return
+		}
+		if err.Error() == "sales action password is not configured for this user" ||
+			err.Error() == "sales action password is required" {
+			utils.ErrorResponse(c, http.StatusForbidden, "Failed to process return", err)
+			return
+		}
+		if err.Error() == "invalid sales action password" {
+			utils.ErrorResponse(c, http.StatusUnauthorized, "Failed to process return", err)
 			return
 		}
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to process return", err)

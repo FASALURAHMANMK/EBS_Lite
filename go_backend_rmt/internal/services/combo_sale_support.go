@@ -10,21 +10,22 @@ import (
 )
 
 type preparedSaleDetail struct {
-	ProductID        *int
-	ComboProductID   *int
-	BarcodeID        *int
-	ProductName      *string
-	Quantity         float64
-	UnitPrice        float64
-	DiscountPercent  float64
-	DiscountAmount   float64
-	TaxID            *int
-	TaxAmount        float64
-	LineTotal        float64
-	SerialNumbers    []string
-	BatchAllocations []models.InventoryBatchSelectionInput
-	Notes            *string
-	Snapshot         saleLineSnapshot
+	ProductID          *int
+	ComboProductID     *int
+	BarcodeID          *int
+	ProductName        *string
+	SourceSaleDetailID *int
+	Quantity           float64
+	UnitPrice          float64
+	DiscountPercent    float64
+	DiscountAmount     float64
+	TaxID              *int
+	TaxAmount          float64
+	LineTotal          float64
+	SerialNumbers      []string
+	BatchAllocations   []models.InventoryBatchSelectionInput
+	Notes              *string
+	Snapshot           saleLineSnapshot
 }
 
 func prepareSaleDetailsTx(tx *sql.Tx, companyID, locationID int, items []models.CreateSaleDetailRequest) ([]preparedSaleDetail, error) {
@@ -81,6 +82,10 @@ func prepareSaleDetailsTx(tx *sql.Tx, companyID, locationID int, items []models.
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate tax: %w", err)
 	}
+	taxSettings, err := loadCompanyTaxSettings(tx, companyID)
+	if err != nil {
+		return nil, err
+	}
 
 	lines := make([]preparedSaleDetail, 0, len(items))
 	for _, item := range items {
@@ -93,7 +98,7 @@ func prepareSaleDetailsTx(tx *sql.Tx, companyID, locationID int, items []models.
 			if effectiveTaxID == nil {
 				effectiveTaxID = meta.TaxID
 			}
-			expanded, err := expandComboSaleItem(item, meta, effectiveTaxID, productMetaByID, taxPctByID)
+			expanded, err := expandComboSaleItem(item, meta, effectiveTaxID, productMetaByID, taxPctByID, taxSettings.PriceMode)
 			if err != nil {
 				return nil, err
 			}
@@ -101,7 +106,7 @@ func prepareSaleDetailsTx(tx *sql.Tx, companyID, locationID int, items []models.
 			continue
 		}
 
-		line, err := prepareStandardSaleDetail(item, productMetaByID, taxPctByID)
+		line, err := prepareStandardSaleDetail(item, productMetaByID, taxPctByID, taxSettings.PriceMode)
 		if err != nil {
 			return nil, err
 		}
@@ -111,11 +116,7 @@ func prepareSaleDetailsTx(tx *sql.Tx, companyID, locationID int, items []models.
 	return lines, nil
 }
 
-func prepareStandardSaleDetail(item models.CreateSaleDetailRequest, productMetaByID map[int]productMeta, taxPctByID map[int]float64) (preparedSaleDetail, error) {
-	lineTotal := item.Quantity * item.UnitPrice
-	discountAmount := lineTotal * (item.DiscountPercent / 100)
-	lineTotal -= discountAmount
-
+func prepareStandardSaleDetail(item models.CreateSaleDetailRequest, productMetaByID map[int]productMeta, taxPctByID map[int]float64, taxPriceMode string) (preparedSaleDetail, error) {
 	var effectiveTaxID *int
 	if item.TaxID != nil {
 		effectiveTaxID = item.TaxID
@@ -127,14 +128,15 @@ func prepareStandardSaleDetail(item models.CreateSaleDetailRequest, productMetaB
 		effectiveTaxID = meta.TaxID
 	}
 
-	taxAmount := 0.0
+	taxPercent := 0.0
 	if effectiveTaxID != nil {
 		pct, ok := taxPctByID[*effectiveTaxID]
 		if !ok {
 			return preparedSaleDetail{}, fmt.Errorf("failed to calculate tax: %w", sql.ErrNoRows)
 		}
-		taxAmount = lineTotal * (pct / 100)
+		taxPercent = pct
 	}
+	lineAmounts := computeTaxLine(item.Quantity, item.UnitPrice, item.DiscountPercent, taxPercent, taxPriceMode)
 
 	lineSnapshot := saleLineSnapshot{}
 	if item.ProductID != nil {
@@ -144,11 +146,16 @@ func prepareStandardSaleDetail(item models.CreateSaleDetailRequest, productMetaB
 		}
 		stockQuantity := saleQuantityToStock(meta, item.Quantity)
 		if meta.IsSerialized {
-			if stockQuantity != float64(int(stockQuantity)) {
+			absStockQuantity := math.Abs(stockQuantity)
+			if absStockQuantity != float64(int(absStockQuantity)) {
 				return preparedSaleDetail{}, fmt.Errorf("quantity must be a whole number for serialized products")
 			}
-			if len(item.SerialNumbers) != int(stockQuantity) {
-				return preparedSaleDetail{}, fmt.Errorf("serial numbers count must equal quantity for serialized products")
+			if item.Quantity > 0 {
+				if len(item.SerialNumbers) != int(absStockQuantity) {
+					return preparedSaleDetail{}, fmt.Errorf("serial numbers count must equal quantity for serialized products")
+				}
+			} else if len(item.SerialNumbers) > 0 && len(item.SerialNumbers) != int(absStockQuantity) {
+				return preparedSaleDetail{}, fmt.Errorf("serial numbers count must equal refund quantity for serialized products")
 			}
 			seen := make(map[string]struct{}, len(item.SerialNumbers))
 			for _, serial := range item.SerialNumbers {
@@ -168,36 +175,43 @@ func prepareStandardSaleDetail(item models.CreateSaleDetailRequest, productMetaB
 	}
 
 	return preparedSaleDetail{
-		ProductID:        item.ProductID,
-		ComboProductID:   nil,
-		BarcodeID:        item.BarcodeID,
-		ProductName:      item.ProductName,
-		Quantity:         item.Quantity,
-		UnitPrice:        item.UnitPrice,
-		DiscountPercent:  item.DiscountPercent,
-		DiscountAmount:   discountAmount,
-		TaxID:            effectiveTaxID,
-		TaxAmount:        taxAmount,
-		LineTotal:        lineTotal,
-		SerialNumbers:    item.SerialNumbers,
-		BatchAllocations: item.BatchAllocations,
-		Notes:            item.Notes,
-		Snapshot:         lineSnapshot,
+		ProductID:          item.ProductID,
+		ComboProductID:     nil,
+		BarcodeID:          item.BarcodeID,
+		ProductName:        item.ProductName,
+		SourceSaleDetailID: item.SourceSaleDetailID,
+		Quantity:           item.Quantity,
+		UnitPrice:          item.UnitPrice,
+		DiscountPercent:    item.DiscountPercent,
+		DiscountAmount:     lineAmounts.DiscountAmount,
+		TaxID:              effectiveTaxID,
+		TaxAmount:          lineAmounts.TaxAmount,
+		LineTotal:          lineAmounts.NetAmount,
+		SerialNumbers:      item.SerialNumbers,
+		BatchAllocations:   item.BatchAllocations,
+		Notes:              item.Notes,
+		Snapshot:           lineSnapshot,
 	}, nil
 }
 
-func expandComboSaleItem(item models.CreateSaleDetailRequest, combo comboProductMeta, effectiveTaxID *int, productMetaByID map[int]productMeta, taxPctByID map[int]float64) ([]preparedSaleDetail, error) {
+func expandComboSaleItem(item models.CreateSaleDetailRequest, combo comboProductMeta, effectiveTaxID *int, productMetaByID map[int]productMeta, taxPctByID map[int]float64, taxPriceMode string) ([]preparedSaleDetail, error) {
 	grossTotal := item.Quantity * item.UnitPrice
-	discountTotal := grossTotal * (item.DiscountPercent / 100)
-	netTotal := grossTotal - discountTotal
-
+	discountTotal := 0.0
+	netTotal := grossTotal
 	taxAmountTotal := 0.0
 	if effectiveTaxID != nil {
 		pct, ok := taxPctByID[*effectiveTaxID]
 		if !ok {
 			return nil, fmt.Errorf("failed to calculate tax: %w", sql.ErrNoRows)
 		}
-		taxAmountTotal = netTotal * (pct / 100)
+		lineAmounts := computeTaxLine(item.Quantity, item.UnitPrice, item.DiscountPercent, pct, taxPriceMode)
+		discountTotal = lineAmounts.DiscountAmount
+		netTotal = lineAmounts.NetAmount
+		taxAmountTotal = lineAmounts.TaxAmount
+	} else {
+		lineAmounts := computeTaxLine(item.Quantity, item.UnitPrice, item.DiscountPercent, 0, taxPriceMode)
+		discountTotal = lineAmounts.DiscountAmount
+		netTotal = lineAmounts.NetAmount
 	}
 
 	basis := make([]float64, 0, len(combo.Components))

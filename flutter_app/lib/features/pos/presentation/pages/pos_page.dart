@@ -98,6 +98,29 @@ class PosPage extends ConsumerWidget {
               child: Text('Customer: ${state.customerLabel}'),
             ),
           ),
+          if ((state.sessionSourceSaleNumber ?? '').isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Card(
+                elevation: 0,
+                color: Theme.of(context)
+                    .colorScheme
+                    .secondaryContainer
+                    .withValues(alpha: 0.45),
+                child: ListTile(
+                  dense: true,
+                  leading: Icon(
+                    state.hasRefundLines
+                        ? Icons.compare_arrows_rounded
+                        : Icons.edit_note_rounded,
+                  ),
+                  title: Text(state.sessionLabel ?? 'POS session'),
+                  subtitle: Text(
+                    'Source invoice: ${state.sessionSourceSaleNumber}',
+                  ),
+                ),
+              ),
+            ),
           const SizedBox(height: 8),
           // Product search with live suggestions (show 2)
           const _SearchBar(),
@@ -435,7 +458,20 @@ class _CartList extends ConsumerWidget {
       itemBuilder: (context, index) {
         final item = state.cart[index];
         final trackingLines = _trackingSummaryLines(item);
+        final scheme = Theme.of(context).colorScheme;
+        final isRefundLine = item.isRefundLine;
         return Card(
+          color: isRefundLine
+              ? scheme.errorContainer.withValues(alpha: 0.22)
+              : null,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: isRefundLine
+                  ? scheme.error.withValues(alpha: 0.30)
+                  : scheme.outlineVariant,
+            ),
+          ),
           child: ListTile(
             title: Row(
               children: [
@@ -455,34 +491,39 @@ class _CartList extends ConsumerWidget {
               ].join('\n'),
             ),
             leading: IconButton(
-              icon: const Icon(Icons.remove_circle_outline_rounded),
-              onPressed: () async {
-                final newQty = (item.quantity - 1).clamp(0.0, 1e9);
-                if (newQty == 0) {
-                  notifier.removeItem(item);
-                } else {
-                  if (item.requiresTracking) {
-                    final config = await _configureCartTracking(
-                      context: context,
-                      ref: ref,
-                      product: item.product,
-                      quantity: newQty,
-                      initialTracking: item.tracking,
-                      initialComboTracking: item.comboTracking,
-                    );
-                    if (!context.mounted) return;
-                    if (config == null) return;
-                    notifier.updateTrackedItem(
-                      item,
-                      quantity: newQty,
-                      tracking: config.tracking,
-                      comboTracking: config.comboTracking,
-                    );
-                  } else {
-                    notifier.updateQty(item, newQty);
-                  }
-                }
-              },
+              color: isRefundLine ? scheme.error : null,
+              icon: Icon(isRefundLine
+                  ? Icons.undo_rounded
+                  : Icons.remove_circle_outline_rounded),
+              onPressed: item.lockedQuantity
+                  ? () => notifier.removeItem(item)
+                  : () async {
+                      final newQty = (item.quantity - 1).clamp(0.0, 1e9);
+                      if (newQty == 0) {
+                        notifier.removeItem(item);
+                      } else {
+                        if (item.requiresTracking) {
+                          final config = await _configureCartTracking(
+                            context: context,
+                            ref: ref,
+                            product: item.product,
+                            quantity: newQty,
+                            initialTracking: item.tracking,
+                            initialComboTracking: item.comboTracking,
+                          );
+                          if (!context.mounted) return;
+                          if (config == null) return;
+                          notifier.updateTrackedItem(
+                            item,
+                            quantity: newQty,
+                            tracking: config.tracking,
+                            comboTracking: config.comboTracking,
+                          );
+                        } else {
+                          notifier.updateQty(item, newQty);
+                        }
+                      }
+                    },
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -518,78 +559,82 @@ class _CartList extends ConsumerWidget {
                     },
                   ),
                 Text(
-                    'x ${item.quantity.toStringAsFixed(item.product.isWeighable ? 3 : 0)}  '),
+                    'x ${item.quantity.abs().toStringAsFixed(item.product.isWeighable ? 3 : 0)}  '),
                 IconButton(
                   icon: const Icon(Icons.add_circle_outline_rounded),
-                  onPressed: () async {
-                    if (item.product.isWeighable) {
-                      final extra =
-                          await _promptWeighableQuantity(context, item.product);
-                      if (!context.mounted) return;
-                      if (extra == null || extra <= 0) return;
-                      final newQty = item.quantity + extra;
-                      if (item.requiresTracking) {
-                        final config = await _configureCartTracking(
-                          context: context,
-                          ref: ref,
-                          product: item.product,
-                          quantity: newQty,
-                          initialTracking: item.tracking,
-                          initialComboTracking: item.comboTracking,
-                        );
-                        if (!context.mounted) return;
-                        if (config == null) return;
-                        notifier.updateTrackedItem(
-                          item,
-                          quantity: newQty,
-                          tracking: config.tracking,
-                          comboTracking: config.comboTracking,
-                        );
-                      } else {
-                        notifier.updateQty(item, newQty);
-                      }
-                      return;
-                    }
-                    final newQty = item.quantity + 1;
-                    if (item.requiresTracking) {
-                      final config = await _configureCartTracking(
-                        context: context,
-                        ref: ref,
-                        product: item.product,
-                        quantity: newQty,
-                        initialTracking: item.tracking,
-                        initialComboTracking: item.comboTracking,
-                      );
-                      if (!context.mounted) return;
-                      if (config == null) return;
-                      notifier.updateTrackedItem(
-                        item,
-                        quantity: newQty,
-                        tracking: config.tracking,
-                        comboTracking: config.comboTracking,
-                      );
-                    } else {
-                      notifier.updateQty(item, item.quantity + 1);
-                    }
-                  },
+                  onPressed: item.lockedQuantity
+                      ? null
+                      : () async {
+                          if (item.product.isWeighable) {
+                            final extra = await _promptWeighableQuantity(
+                                context, item.product);
+                            if (!context.mounted) return;
+                            if (extra == null || extra <= 0) return;
+                            final newQty = item.quantity + extra;
+                            if (item.requiresTracking) {
+                              final config = await _configureCartTracking(
+                                context: context,
+                                ref: ref,
+                                product: item.product,
+                                quantity: newQty,
+                                initialTracking: item.tracking,
+                                initialComboTracking: item.comboTracking,
+                              );
+                              if (!context.mounted) return;
+                              if (config == null) return;
+                              notifier.updateTrackedItem(
+                                item,
+                                quantity: newQty,
+                                tracking: config.tracking,
+                                comboTracking: config.comboTracking,
+                              );
+                            } else {
+                              notifier.updateQty(item, newQty);
+                            }
+                            return;
+                          }
+                          final newQty = item.quantity + 1;
+                          if (item.requiresTracking) {
+                            final config = await _configureCartTracking(
+                              context: context,
+                              ref: ref,
+                              product: item.product,
+                              quantity: newQty,
+                              initialTracking: item.tracking,
+                              initialComboTracking: item.comboTracking,
+                            );
+                            if (!context.mounted) return;
+                            if (config == null) return;
+                            notifier.updateTrackedItem(
+                              item,
+                              quantity: newQty,
+                              tracking: config.tracking,
+                              comboTracking: config.comboTracking,
+                            );
+                          } else {
+                            notifier.updateQty(item, item.quantity + 1);
+                          }
+                        },
                 ),
                 const SizedBox(width: 8),
                 Text(item.lineTotal.toStringAsFixed(2),
                     style: Theme.of(context).textTheme.titleMedium),
               ],
             ),
-            onTap: () async {
-              final percent = await showDialog<double>(
-                context: context,
-                builder: (_) => _LineDiscountDialog(
-                  initialPercent: item.discountPercent,
-                  lineGross: item.quantity * item.unitPrice,
-                ),
-              );
-              if (percent != null) {
-                notifier.setItemDiscount(item, percent);
-              }
-            },
+            onTap: item.isRefundLine
+                ? null
+                : () async {
+                    final percent = await showDialog<double>(
+                      context: context,
+                      builder: (_) => _LineDiscountDialog(
+                        initialPercent: item.discountPercent,
+                        lineGross: item.quantity * item.unitPrice,
+                      ),
+                    );
+                    if (percent != null) {
+                      notifier.setItemDiscount(item, percent);
+                    }
+                  },
           ),
         );
       },
@@ -695,6 +740,8 @@ class _BottomBar extends ConsumerWidget {
                   Builder(builder: (context) {
                     final hasLineDiscount =
                         state.cart.any((i) => i.discountPercent > 0);
+                    final discountsLocked =
+                        hasLineDiscount || state.hasRefundLines;
                     final lineDisc = state.cart.fold<double>(
                         0.0,
                         (s, i) =>
@@ -704,11 +751,11 @@ class _BottomBar extends ConsumerWidget {
                                 (i.discountPercent.clamp(0.0, 100.0) / 100.0)));
                     final displayDiscount =
                         hasLineDiscount ? lineDisc : state.discount;
-                    final color = hasLineDiscount
+                    final color = discountsLocked
                         ? Theme.of(context).disabledColor
                         : Theme.of(context).colorScheme.onSurface;
                     return InkWell(
-                      onTap: hasLineDiscount
+                      onTap: discountsLocked
                           ? null
                           : () async {
                               final value = await showDialog<double>(
@@ -752,7 +799,7 @@ class _BottomBar extends ConsumerWidget {
               children: [
                 Row(children: [
                   OutlinedButton.icon(
-                    onPressed: state.cart.isEmpty
+                    onPressed: state.cart.isEmpty || state.hasRefundLines
                         ? null
                         : () async {
                             await notifier.holdCurrent();
@@ -801,7 +848,7 @@ class _BottomBar extends ConsumerWidget {
                           );
                         },
                   icon: const Icon(Icons.arrow_forward_rounded),
-                  label: const Text('Payment'),
+                  label: Text(state.hasRefundLines ? 'Settle' : 'Payment'),
                   style:
                       FilledButton.styleFrom(minimumSize: const Size(180, 48)),
                 ),

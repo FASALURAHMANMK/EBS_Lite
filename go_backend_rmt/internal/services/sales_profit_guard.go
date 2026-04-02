@@ -117,6 +117,9 @@ func buildProfitGuardDetails(lines []preparedSaleDetail, actualCosts []issuedSal
 	}
 
 	for index, line := range lines {
+		if line.Quantity <= 0 || line.LineTotal <= 0 {
+			continue
+		}
 		actual := issuedSaleLineCost{}
 		if index < len(actualCosts) {
 			actual = actualCosts[index]

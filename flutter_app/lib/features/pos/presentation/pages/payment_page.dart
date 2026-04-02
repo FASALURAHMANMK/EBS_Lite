@@ -14,6 +14,7 @@ import '../../../../core/negative_stock_override.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/widgets/manager_override_dialog.dart';
+import '../../../../shared/widgets/sales_action_password_dialog.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 
 import '../../../dashboard/data/payment_methods_repository.dart';
@@ -139,7 +140,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 exchangeRate: 1.0,
               ),
       );
-      final total = ref.read(posNotifierProvider).total;
+      final total = ref.read(posNotifierProvider).total.abs();
       final defaultMethod =
           _methods.isNotEmpty ? _methods.first.methodId : null;
       final defaultCurrency = _baseCurrency?.currencyId;
@@ -162,7 +163,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
   void _syncPrimaryLineToTotal(double total) {
     if (_lines.isEmpty) return;
-    _lines.first.controller.text = total.toStringAsFixed(2);
+    _lines.first.controller.text = total.abs().toStringAsFixed(2);
   }
 
   Future<void> _validateCoupon(double saleAmount) async {
@@ -230,6 +231,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     final state = ref.watch(posNotifierProvider);
     final theme = Theme.of(context);
     final total = state.total;
+    final hasRefundLines = state.hasRefundLines;
+    final isRefundSettlement = total < 0;
     final allowDiscountRedemption = _redemptionType == 'DISCOUNT';
     final redeemPts = allowDiscountRedemption && _useLoyalty
         ? (double.tryParse(_redeemCtrl.text.trim()) ?? 0.0)
@@ -237,11 +240,13 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     final redeemClamped = redeemPts.clamp(0.0, _availablePoints);
     final redeemValue = redeemClamped * _pointValue;
     final couponDiscount = _validatedCoupon?.discountAmount ?? 0.0;
-    final effectiveTotal =
-        (total - redeemValue - couponDiscount).clamp(0.0, double.infinity);
+    final effectiveTotal = hasRefundLines
+        ? total
+        : (total - redeemValue - couponDiscount).clamp(0.0, double.infinity);
+    final effectiveSettlementAbs = effectiveTotal.abs();
     final paidBase = _sumPaidInBase();
-    final balance = (effectiveTotal - paidBase);
-    final isChange = balance < 0;
+    final balance = (effectiveSettlementAbs - paidBase);
+    final isChange = !isRefundSettlement && balance < 0;
     final displayBalance = balance.abs();
 
     return Scaffold(
@@ -260,7 +265,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (_availablePoints > 0 &&
+                        if (!hasRefundLines &&
+                            _availablePoints > 0 &&
                             allowDiscountRedemption) ...[
                           Row(children: [
                             Checkbox(
@@ -397,7 +403,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                           ],
                           const Divider(height: 24),
                         ],
-                        if (_availablePoints > 0 &&
+                        if (!hasRefundLines &&
+                            _availablePoints > 0 &&
                             !allowDiscountRedemption) ...[
                           Card(
                             elevation: 0,
@@ -412,27 +419,43 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                           ),
                           const SizedBox(height: 16),
                         ],
-
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: TextField(
-                                        controller: _couponCtrl,
-                                        decoration: InputDecoration(
-                                          labelText: 'Coupon Code',
-                                          hintText:
-                                              'Validate coupon for this payment',
-                                          suffixIcon: IconButton(
-                                            tooltip: 'Clear coupon',
-                                            onPressed: () {
+                        if (!hasRefundLines) ...[
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextField(
+                                          controller: _couponCtrl,
+                                          decoration: InputDecoration(
+                                            labelText: 'Coupon Code',
+                                            hintText:
+                                                'Validate coupon for this payment',
+                                            suffixIcon: IconButton(
+                                              tooltip: 'Clear coupon',
+                                              onPressed: () {
+                                                setState(() {
+                                                  _couponCtrl.clear();
+                                                  _validatedCoupon = null;
+                                                  _syncPrimaryLineToTotal(
+                                                    (state.total - redeemValue)
+                                                        .clamp(0.0,
+                                                            double.infinity),
+                                                  );
+                                                });
+                                              },
+                                              icon: const Icon(
+                                                Icons.clear_rounded,
+                                              ),
+                                            ),
+                                          ),
+                                          onChanged: (_) {
+                                            if (_validatedCoupon != null) {
                                               setState(() {
-                                                _couponCtrl.clear();
                                                 _validatedCoupon = null;
                                                 _syncPrimaryLineToTotal(
                                                   (state.total - redeemValue)
@@ -440,86 +463,89 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                                           0.0, double.infinity),
                                                 );
                                               });
-                                            },
-                                            icon:
-                                                const Icon(Icons.clear_rounded),
-                                          ),
+                                            }
+                                          },
                                         ),
-                                        onChanged: (_) {
-                                          if (_validatedCoupon != null) {
-                                            setState(() {
-                                              _validatedCoupon = null;
-                                              _syncPrimaryLineToTotal(
-                                                (state.total - redeemValue)
-                                                    .clamp(
-                                                        0.0, double.infinity),
-                                              );
-                                            });
-                                          }
-                                        },
+                                      ),
+                                      const SizedBox(width: 12),
+                                      FilledButton.icon(
+                                        onPressed: _validatingCoupon
+                                            ? null
+                                            : () => _validateCoupon(
+                                                  (total - redeemValue).clamp(
+                                                    0.0,
+                                                    double.infinity,
+                                                  ),
+                                                ),
+                                        icon: _validatingCoupon
+                                            ? const SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                ),
+                                              )
+                                            : const Icon(
+                                                Icons.local_offer_outlined,
+                                              ),
+                                        label: const Text('Apply'),
+                                      ),
+                                    ],
+                                  ),
+                                  if (_validatedCoupon != null) ...[
+                                    const SizedBox(height: 12),
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primaryContainer
+                                            .withValues(alpha: 0.45),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            _validatedCoupon!.seriesName,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleSmall,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Code ${_validatedCoupon!.code} • '
+                                            '${_validatedCoupon!.discountType} • '
+                                            'Discount ${_validatedCoupon!.discountAmount.toStringAsFixed(2)}',
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    const SizedBox(width: 12),
-                                    FilledButton.icon(
-                                      onPressed: _validatingCoupon
-                                          ? null
-                                          : () => _validateCoupon(
-                                                (total - redeemValue).clamp(
-                                                  0.0,
-                                                  double.infinity,
-                                                ),
-                                              ),
-                                      icon: _validatingCoupon
-                                          ? const SizedBox(
-                                              width: 16,
-                                              height: 16,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Icon(
-                                              Icons.local_offer_outlined),
-                                      label: const Text('Apply'),
-                                    ),
                                   ],
-                                ),
-                                if (_validatedCoupon != null) ...[
-                                  const SizedBox(height: 12),
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primaryContainer
-                                          .withValues(alpha: 0.45),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          _validatedCoupon!.seriesName,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleSmall,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Code ${_validatedCoupon!.code} • '
-                                          '${_validatedCoupon!.discountType} • '
-                                          'Discount ${_validatedCoupon!.discountAmount.toStringAsFixed(2)}',
-                                        ),
-                                      ],
-                                    ),
-                                  ),
                                 ],
-                              ],
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
+                          const SizedBox(height: 12),
+                        ] else ...[
+                          Card(
+                            elevation: 0,
+                            color: theme.colorScheme.secondaryContainer
+                                .withValues(alpha: 0.35),
+                            child: const ListTile(
+                              leading: Icon(Icons.undo_rounded),
+                              title:
+                                  Text('Refund / edit authorization required'),
+                              subtitle: Text(
+                                'Coupon and loyalty discounts are disabled when refund lines are included in the settlement.',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
                           value: _autoFillRaffleCustomerData,
@@ -675,7 +701,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                 style: Theme.of(context).textTheme.bodyLarge),
                           ],
                         ),
-                        if (redeemValue > 0) ...[
+                        if (!hasRefundLines && redeemValue > 0) ...[
                           const SizedBox(height: 6),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -689,7 +715,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                             ],
                           ),
                         ],
-                        if (couponDiscount > 0) ...[
+                        if (!hasRefundLines && couponDiscount > 0) ...[
                           const SizedBox(height: 6),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -707,9 +733,12 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Amount Due',
+                            Text(
+                                isRefundSettlement
+                                    ? 'Refund Total'
+                                    : 'Amount Due',
                                 style: Theme.of(context).textTheme.titleMedium),
-                            Text(effectiveTotal.toStringAsFixed(2),
+                            Text(effectiveSettlementAbs.toStringAsFixed(2),
                                 style: Theme.of(context).textTheme.titleMedium),
                           ],
                         ),
@@ -727,7 +756,10 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(isChange ? 'Change' : 'Due',
+                            Text(
+                                isRefundSettlement
+                                    ? 'Refund Remaining'
+                                    : (isChange ? 'Change' : 'Due'),
                                 style: Theme.of(context).textTheme.titleSmall),
                             Text(displayBalance.toStringAsFixed(2),
                                 style: Theme.of(context).textTheme.titleSmall),
@@ -779,6 +811,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                         Future<PosCheckoutResult> runCheckout({
                                           String? overrideToken,
                                           String? overrideReason,
+                                          String? salesActionPassword,
                                           String? overridePassword,
                                         }) {
                                           final cart = ref
@@ -790,7 +823,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                               'Configure batch / serial details for all tracked items before checkout.',
                                             );
                                           }
-                                          if (_couponCtrl.text
+                                          if (!hasRefundLines &&
+                                              _couponCtrl.text
                                                   .trim()
                                                   .isNotEmpty &&
                                               _validatedCoupon == null) {
@@ -816,14 +850,37 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                                 managerOverrideToken:
                                                     overrideToken,
                                                 overrideReason: overrideReason,
+                                                salesActionPassword:
+                                                    salesActionPassword,
                                                 overridePassword:
                                                     overridePassword,
                                               );
                                         }
 
                                         PosCheckoutResult result;
+                                        String? salesActionPassword;
+                                        if (hasRefundLines) {
+                                          salesActionPassword =
+                                              await showSalesActionPasswordDialog(
+                                            context,
+                                            title: isRefundSettlement
+                                                ? 'Authorize Refund'
+                                                : 'Authorize Edit / Exchange',
+                                            message:
+                                                'Enter the separate edit/refund PIN or password configured for your user.',
+                                            actionLabel: 'Authorize',
+                                          );
+                                          if (!context.mounted) return;
+                                          if (salesActionPassword == null) {
+                                            setState(() => _submitting = false);
+                                            return;
+                                          }
+                                        }
                                         try {
-                                          result = await runCheckout();
+                                          result = await runCheckout(
+                                            salesActionPassword:
+                                                salesActionPassword,
+                                          );
                                         } on DioException catch (e) {
                                           final data = e.response?.data;
                                           final maybe = (data is Map &&
@@ -866,6 +923,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                               overrideToken:
                                                   approved.overrideToken,
                                               overrideReason: approved.reason,
+                                              salesActionPassword:
+                                                  salesActionPassword,
                                             );
                                           } else {
                                             rethrow;
@@ -884,6 +943,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                             return;
                                           }
                                           result = await runCheckout(
+                                            salesActionPassword:
+                                                salesActionPassword,
                                             overridePassword: password,
                                           );
                                         } on NegativeProfitApprovalRequiredException catch (e) {
@@ -900,6 +961,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                             return;
                                           }
                                           result = await runCheckout(
+                                            salesActionPassword:
+                                                salesActionPassword,
                                             overridePassword: password,
                                           );
                                         }

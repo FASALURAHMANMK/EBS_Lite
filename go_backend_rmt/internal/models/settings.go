@@ -56,6 +56,7 @@ type InvoiceSettings struct {
 type TaxSettings struct {
 	TaxName    *string  `json:"tax_name,omitempty"`
 	TaxPercent *float64 `json:"tax_percent,omitempty"`
+	PriceMode  string   `json:"price_mode,omitempty"`
 }
 
 // DeviceControlSettings holds device control related configuration

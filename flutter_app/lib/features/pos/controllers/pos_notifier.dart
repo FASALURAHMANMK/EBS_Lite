@@ -24,6 +24,8 @@ class PosState {
   final String? error;
   final List<PaymentMethodDto> paymentMethods;
   final int? activeSaleId; // when resuming a held sale
+  final String? sessionLabel;
+  final String? sessionSourceSaleNumber;
 
   const PosState({
     this.receiptPreview,
@@ -39,10 +41,13 @@ class PosState {
     this.error,
     this.paymentMethods = const [],
     this.activeSaleId,
+    this.sessionLabel,
+    this.sessionSourceSaleNumber,
   });
 
   double get subtotal => cart.fold(0.0, (s, i) => s + i.lineTotal);
-  double get total => (subtotal + tax - discount).clamp(0.0, double.infinity);
+  double get total => subtotal + tax - discount;
+  bool get hasRefundLines => cart.any((item) => item.isRefundLine);
 
   PosState copyWith({
     String? receiptPreview,
@@ -58,9 +63,12 @@ class PosState {
     String? error,
     List<PaymentMethodDto>? paymentMethods,
     int? activeSaleId,
+    String? sessionLabel,
+    String? sessionSourceSaleNumber,
     bool clearCommittedReceipt = false,
     bool clearActiveSaleId = false,
     bool clearCustomer = false,
+    bool clearSession = false,
   }) {
     return PosState(
       receiptPreview: receiptPreview ?? this.receiptPreview,
@@ -80,6 +88,10 @@ class PosState {
       paymentMethods: paymentMethods ?? this.paymentMethods,
       activeSaleId:
           clearActiveSaleId ? null : (activeSaleId ?? this.activeSaleId),
+      sessionLabel: clearSession ? null : (sessionLabel ?? this.sessionLabel),
+      sessionSourceSaleNumber: clearSession
+          ? null
+          : (sessionSourceSaleNumber ?? this.sessionSourceSaleNumber),
     );
   }
 }
@@ -164,7 +176,10 @@ class PosNotifier extends StateNotifier<PosState> {
       tracking: tracking,
       comboTracking: comboTracking,
     );
-    final shouldMerge = !incoming.requiresTracking;
+    // In refund/edit sessions, keep every scan/add as its own row so staff can
+    // clearly distinguish replacement lines from refund lines.
+    final sessionKeepsSeparateRows = state.hasRefundLines;
+    final shouldMerge = !sessionKeepsSeparateRows && !incoming.requiresTracking;
     final idx = shouldMerge
         ? items.indexWhere((i) => i.identityKey == incoming.identityKey)
         : -1;
@@ -260,6 +275,7 @@ class PosNotifier extends StateNotifier<PosState> {
     bool? autoFillRaffleCustomerData,
     String? managerOverrideToken,
     String? overrideReason,
+    String? salesActionPassword,
     String? overridePassword,
   }) async {
     _checkoutIdemKey ??= const Uuid().v4();
@@ -278,6 +294,7 @@ class PosNotifier extends StateNotifier<PosState> {
         idempotencyKey: _checkoutIdemKey,
         managerOverrideToken: managerOverrideToken,
         overrideReason: overrideReason,
+        salesActionPassword: salesActionPassword,
         overridePassword: overridePassword,
       );
       _checkoutIdemKey = null;
@@ -285,6 +302,7 @@ class PosNotifier extends StateNotifier<PosState> {
       state = state.copyWith(
         clearCommittedReceipt: true,
         clearActiveSaleId: true,
+        clearSession: true,
         clearCustomer: true,
         receiptPreview: nextPreview ?? state.receiptPreview,
         cart: const [],
@@ -299,6 +317,7 @@ class PosNotifier extends StateNotifier<PosState> {
       state = state.copyWith(
         clearCommittedReceipt: true,
         clearActiveSaleId: true,
+        clearSession: true,
         clearCustomer: true,
         receiptPreview: nextPreview ?? state.receiptPreview,
         cart: const [],
@@ -327,6 +346,7 @@ class PosNotifier extends StateNotifier<PosState> {
       state = state.copyWith(
         clearCommittedReceipt: true,
         clearActiveSaleId: true,
+        clearSession: true,
         cart: const [],
         suggestions: const [],
         discount: 0.0,
@@ -346,6 +366,7 @@ class PosNotifier extends StateNotifier<PosState> {
       tax: 0.0,
       clearCommittedReceipt: true,
       clearActiveSaleId: true,
+      clearSession: true,
     );
   }
 
@@ -392,6 +413,74 @@ class PosNotifier extends StateNotifier<PosState> {
       customerLabel: sale.customerName ?? state.customerLabel,
       committedReceipt: sale.saleNumber,
       activeSaleId: saleId,
+      sessionLabel: 'Held sale resumed',
+      sessionSourceSaleNumber: sale.saleNumber,
+    );
+    // ignore: unawaited_futures
+    _recalculateTotals();
+  }
+
+  void loadRefundExchangeSession(
+    SaleDto sale,
+    List<SaleItemDto> items, {
+    String label = 'Refund / exchange session',
+  }) {
+    final cartItems = items
+        .where((item) => (item.productId ?? 0) > 0 && item.quantity > 0)
+        .map((item) => _refundCartItemFromSaleItem(sale, item, item.quantity))
+        .toList(growable: false);
+    state = state.copyWith(
+      cart: cartItems,
+      customer:
+          sale.customerId != null && (sale.customerName ?? '').trim().isNotEmpty
+              ? PosCustomerDto(
+                  customerId: sale.customerId!,
+                  name: sale.customerName!,
+                )
+              : null,
+      customerLabel: sale.customerName ?? 'Walk in',
+      clearCommittedReceipt: true,
+      clearActiveSaleId: true,
+      clearCustomer:
+          sale.customerId == null || (sale.customerName ?? '').trim().isEmpty,
+      sessionLabel: label,
+      sessionSourceSaleNumber: sale.saleNumber,
+      query: '',
+      suggestions: const [],
+      discount: 0.0,
+    );
+    // ignore: unawaited_futures
+    _recalculateTotals();
+  }
+
+  void loadInvoiceEditSession(SaleDto sale) {
+    final cartItems = <PosCartItem>[];
+    for (final item in sale.items) {
+      if ((item.productId ?? 0) <= 0 || item.quantity <= 0) {
+        continue;
+      }
+      cartItems.add(_refundCartItemFromSaleItem(sale, item, item.quantity));
+      cartItems.add(_saleCartItemFromSaleItem(item));
+    }
+    state = state.copyWith(
+      cart: cartItems,
+      customer:
+          sale.customerId != null && (sale.customerName ?? '').trim().isNotEmpty
+              ? PosCustomerDto(
+                  customerId: sale.customerId!,
+                  name: sale.customerName!,
+                )
+              : null,
+      customerLabel: sale.customerName ?? 'Walk in',
+      clearCommittedReceipt: true,
+      clearActiveSaleId: true,
+      clearCustomer:
+          sale.customerId == null || (sale.customerName ?? '').trim().isEmpty,
+      sessionLabel: 'Edit session',
+      sessionSourceSaleNumber: sale.saleNumber,
+      query: '',
+      suggestions: const [],
+      discount: 0.0,
     );
     // ignore: unawaited_futures
     _recalculateTotals();
@@ -418,6 +507,54 @@ class PosNotifier extends StateNotifier<PosState> {
           state.copyWith(receiptPreview: preview, clearCommittedReceipt: true);
     } catch (_) {}
   }
+}
+
+PosCartItem _saleCartItemFromSaleItem(SaleItemDto item) {
+  final product = PosProductDto(
+    productId: item.productId ?? 0,
+    comboProductId: item.comboProductId,
+    barcodeId: item.barcodeId ?? 0,
+    name: item.productName ?? 'Item',
+    price: item.unitPrice,
+    stock: 0,
+    barcode: item.barcode,
+    variantName: item.variantName,
+    isVirtualCombo: item.isVirtualCombo,
+    trackingType: item.trackingType,
+    isSerialized: item.isSerialized,
+  );
+  return PosCartItem(
+    product: product,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice,
+    discountPercent: item.discountPercent,
+    tracking: item.isSerialized || item.trackingType == 'BATCH'
+        ? InventoryTrackingSelection(
+            barcodeId: item.barcodeId,
+            trackingType: item.trackingType,
+            isSerialized: item.isSerialized,
+            barcode: item.barcode,
+            variantName: item.variantName,
+            serialNumbers: item.serialNumbers,
+          )
+        : null,
+    comboTracking: item.comboComponentTracking,
+  );
+}
+
+PosCartItem _refundCartItemFromSaleItem(
+  SaleDto sale,
+  SaleItemDto item,
+  double quantity,
+) {
+  final base = _saleCartItemFromSaleItem(item);
+  return base.copyWith(
+    quantity: -quantity.abs(),
+    sourceSaleDetailId: item.saleDetailId ?? item.sourceSaleDetailId,
+    sourceSaleId: sale.saleId,
+    sourceSaleNumber: sale.saleNumber,
+    lockedQuantity: true,
+  );
 }
 
 final posNotifierProvider = StateNotifierProvider<PosNotifier, PosState>((ref) {

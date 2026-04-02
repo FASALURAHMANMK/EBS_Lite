@@ -157,6 +157,7 @@ class _UsersAdminPageState extends ConsumerState<UsersAdminPage> {
                       final subtitle = [
                         u.email,
                         if (_roles.isNotEmpty) _roleName(u.roleId),
+                        if (u.hasSalesActionPassword) 'Edit/Refund PIN set',
                         if (!u.isActive) 'Inactive',
                         if (u.isLocked) 'Locked',
                       ].join(' • ');
@@ -210,11 +211,13 @@ class _UserEditorPageState extends ConsumerState<_UserEditorPage> {
   final _firstName = TextEditingController();
   final _lastName = TextEditingController();
   final _phone = TextEditingController();
+  final _salesActionPassword = TextEditingController();
 
   int? _roleId;
   int? _locationId;
   bool _isActive = true;
   bool _isLocked = false;
+  bool _clearSalesActionPassword = false;
   bool _saving = false;
 
   @override
@@ -242,6 +245,7 @@ class _UserEditorPageState extends ConsumerState<_UserEditorPage> {
     _firstName.dispose();
     _lastName.dispose();
     _phone.dispose();
+    _salesActionPassword.dispose();
     super.dispose();
   }
 
@@ -263,6 +267,7 @@ class _UserEditorPageState extends ConsumerState<_UserEditorPage> {
       final repo = ref.read(usersRepositoryProvider);
       final initial = widget.initial;
       if (initial == null) {
+        final actionPassword = _salesActionPassword.text.trim();
         await repo.createUser(
           companyId: companyId,
           username: _username.text.trim(),
@@ -275,8 +280,16 @@ class _UserEditorPageState extends ConsumerState<_UserEditorPage> {
           phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
           roleId: _roleId,
           locationId: _locationId,
+          salesActionPassword:
+              actionPassword.isEmpty ? null : _salesActionPassword.text.trim(),
         );
       } else {
+        String? salesActionPassword;
+        if (_clearSalesActionPassword) {
+          salesActionPassword = '';
+        } else if (_salesActionPassword.text.trim().isNotEmpty) {
+          salesActionPassword = _salesActionPassword.text.trim();
+        }
         await repo.updateUser(
           userId: initial.userId,
           firstName:
@@ -288,6 +301,7 @@ class _UserEditorPageState extends ConsumerState<_UserEditorPage> {
           locationId: _locationId,
           isActive: _isActive,
           isLocked: _isLocked,
+          salesActionPassword: salesActionPassword,
         );
       }
       if (!mounted) return;
@@ -387,6 +401,44 @@ class _UserEditorPageState extends ConsumerState<_UserEditorPage> {
                   controller: _phone,
                   decoration: const InputDecoration(labelText: 'Phone'),
                 ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _salesActionPassword,
+                  enabled: !_clearSalesActionPassword,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Edit / Refund PIN or Password',
+                    helperText: initial == null
+                        ? 'Optional. Set a separate credential for sale edits and refunds.'
+                        : (initial.hasSalesActionPassword
+                            ? 'Leave blank to keep the current credential.'
+                            : 'Optional. Set a separate credential for sale edits and refunds.'),
+                  ),
+                  validator: (value) {
+                    final trimmed = (value ?? '').trim();
+                    if (trimmed.isEmpty) return null;
+                    if (trimmed.length < 4) return 'Min 4 characters';
+                    return null;
+                  },
+                ),
+                if (initial != null) ...[
+                  const SizedBox(height: 4),
+                  SwitchListTile(
+                    value: _clearSalesActionPassword,
+                    onChanged: (value) => setState(() {
+                      _clearSalesActionPassword = value;
+                      if (value) {
+                        _salesActionPassword.clear();
+                      }
+                    }),
+                    title: const Text('Clear edit / refund credential'),
+                    subtitle: Text(
+                      initial.hasSalesActionPassword
+                          ? 'The current action credential will be removed.'
+                          : 'No action credential is configured yet.',
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 InputDecorator(
                   decoration: const InputDecoration(labelText: 'Role'),

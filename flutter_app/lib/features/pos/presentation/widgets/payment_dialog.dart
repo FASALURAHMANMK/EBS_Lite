@@ -12,6 +12,7 @@ import '../../../customers/data/models.dart';
 import '../../../loyalty/data/loyalty_repository.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/sales_action_password_dialog.dart';
 
 class PaymentDialog extends ConsumerStatefulWidget {
   const PaymentDialog({super.key});
@@ -469,7 +470,10 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                   if (primaryMethod == null) return;
                   setState(() => _submitting = true);
                   try {
-                    final total = ref.read(posNotifierProvider).total;
+                    final posState = ref.read(posNotifierProvider);
+                    final total = posState.total;
+                    final hasRefundLines = posState.hasRefundLines;
+                    final isRefundSettlement = total < 0;
                     final paidBase = _sumPaidInBase();
                     final paid = paidBase > total ? total : paidBase;
                     // Resolve redeem points within allowed range
@@ -491,6 +495,23 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                                       0.0,
                             ))
                         .toList();
+                    String? salesActionPassword;
+                    if (hasRefundLines) {
+                      salesActionPassword = await showSalesActionPasswordDialog(
+                        context,
+                        title: isRefundSettlement
+                            ? 'Authorize Refund'
+                            : 'Authorize Edit / Exchange',
+                        message:
+                            'Enter the separate edit/refund PIN or password configured for your user.',
+                        actionLabel: 'Authorize',
+                      );
+                      if (!context.mounted) return;
+                      if (salesActionPassword == null) {
+                        setState(() => _submitting = false);
+                        return;
+                      }
+                    }
                     try {
                       final cart = ref.read(posNotifierProvider).cart;
                       if (cart.any((item) => !item.hasTrackingConfigured)) {
@@ -505,6 +526,7 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                             paidAmount: paid,
                             payments: payments,
                             redeemPoints: redeemPoints,
+                            salesActionPassword: salesActionPassword,
                           );
                       if (!context.mounted) return;
                       Navigator.of(context).pop(result);
@@ -525,6 +547,7 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                             paidAmount: paid,
                             payments: payments,
                             redeemPoints: redeemPoints,
+                            salesActionPassword: salesActionPassword,
                             overridePassword: password,
                           );
                       if (!context.mounted) return;
@@ -546,6 +569,7 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                             paidAmount: paid,
                             payments: payments,
                             redeemPoints: redeemPoints,
+                            salesActionPassword: salesActionPassword,
                             overridePassword: password,
                           );
                       if (!context.mounted) return;

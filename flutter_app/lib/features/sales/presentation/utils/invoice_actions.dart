@@ -21,6 +21,56 @@ class InvoiceActions {
   final WidgetRef ref;
   final BuildContext context;
 
+  Future<void> printA4(int saleId) async {
+    try {
+      final data = await _loadPrintData(saleId);
+      final sale = (data['sale'] as Map<String, dynamic>? ?? {});
+      final company = (data['company'] as Map<String, dynamic>? ?? {});
+      final logoUrl = _resolveLogoUrl(company);
+      await Printing.layoutPdf(
+        onLayout: (format) => InvoicePdfBuilder.buildPdfFromWidgets(
+          sale,
+          company,
+          format: PdfPageFormat.a4,
+          logoUrl: logoUrl,
+        ),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
+      }
+    }
+  }
+
+  Future<void> printThermal80(int saleId) async {
+    try {
+      final data = await _loadPrintData(saleId);
+      final sale = (data['sale'] as Map<String, dynamic>? ?? {});
+      final company = (data['company'] as Map<String, dynamic>? ?? {});
+      final printers =
+          await ref.read(printerSettingsRepositoryProvider).loadAll();
+      final printer = printers.firstWhere(
+        (item) => item.kind == 'thermal_80',
+        orElse: () => PrinterDevice(
+          id: '',
+          name: '',
+          kind: 'thermal_80',
+          connectionType: '',
+        ),
+      );
+      if (printer.id.isEmpty) {
+        throw Exception('No 80mm printer configured');
+      }
+      await _printToPrinter(printer, sale, company);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
+      }
+    }
+  }
+
   Future<void> printSmart(int saleId) async {
     final data = await _loadPrintData(saleId);
     final sale = (data['sale'] as Map<String, dynamic>? ?? {});

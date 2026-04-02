@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -17,6 +18,11 @@ import (
 
 type SalesService struct {
 	db *sql.DB
+}
+
+type refundSourceContext struct {
+	SaleID     int
+	SaleNumber string
 }
 
 func NewSalesService() *SalesService {
@@ -165,6 +171,10 @@ func fetchTaxPercentages(q sqlQueryer, companyID int, taxIDs []int) (map[int]flo
 func (s *SalesService) CalculateTotals(companyID int, req *models.CreateSaleRequest) (float64, float64, float64, error) {
 	subtotal := float64(0)
 	totalTax := float64(0)
+	taxSettings, err := loadCompanyTaxSettings(s.db, companyID)
+	if err != nil {
+		return 0, 0, 0, err
+	}
 
 	productIDs := make([]int, 0, len(req.Items))
 	comboProductIDs := make([]int, 0, len(req.Items))
@@ -218,11 +228,6 @@ func (s *SalesService) CalculateTotals(companyID int, req *models.CreateSaleRequ
 	}
 
 	for _, item := range req.Items {
-		lineTotal := item.Quantity * item.UnitPrice
-		discountAmount := lineTotal * (item.DiscountPercent / 100)
-		lineTotal -= discountAmount
-		subtotal += lineTotal
-
 		var effectiveTaxID *int
 		if item.TaxID != nil {
 			effectiveTaxID = item.TaxID
@@ -240,13 +245,17 @@ func (s *SalesService) CalculateTotals(companyID int, req *models.CreateSaleRequ
 			effectiveTaxID = meta.TaxID
 		}
 
+		taxPercent := 0.0
 		if effectiveTaxID != nil {
 			pct, ok := taxPct[*effectiveTaxID]
 			if !ok {
 				return 0, 0, 0, fmt.Errorf("failed to calculate tax: %w", fmt.Errorf("failed to get tax percentage: %w", sql.ErrNoRows))
 			}
-			totalTax += lineTotal * (pct / 100)
+			taxPercent = pct
 		}
+		line := computeTaxLine(item.Quantity, item.UnitPrice, item.DiscountPercent, taxPercent, taxSettings.PriceMode)
+		subtotal += line.NetAmount
+		totalTax += line.TaxAmount
 	}
 
 	totalAmount := subtotal + totalTax - req.DiscountAmount
@@ -255,13 +264,15 @@ func (s *SalesService) CalculateTotals(companyID int, req *models.CreateSaleRequ
 
 func (s *SalesService) GetSales(companyID, locationID int, filters map[string]string) ([]models.Sale, error) {
 	query := `
-		SELECT s.sale_id, s.sale_number, s.location_id, s.customer_id, s.sale_date, s.sale_time,
+		SELECT s.sale_id, s.sale_number, s.location_id, s.source_channel, s.refund_source_sale_id, rs.sale_number AS refund_source_sale_number,
+			   s.customer_id, s.sale_date, s.sale_time,
 			   s.subtotal, s.tax_amount, s.discount_amount, s.total_amount, s.paid_amount,
 			   s.payment_method_id, s.status, s.pos_status, s.is_quick_sale, COALESCE(s.is_training, FALSE) AS is_training, s.notes,
 			   s.created_by, s.updated_by, s.sync_status, s.created_at, s.updated_at,
 			   c.name as customer_name, pm.name as payment_method_name
 		FROM sales s
 		JOIN locations l ON s.location_id = l.location_id
+		LEFT JOIN sales rs ON rs.sale_id = s.refund_source_sale_id
 		LEFT JOIN customers c ON s.customer_id = c.customer_id
 		LEFT JOIN payment_methods pm ON s.payment_method_id = pm.method_id
 		WHERE l.company_id = $1 AND s.location_id = $2 AND s.is_deleted = FALSE
@@ -314,9 +325,11 @@ func (s *SalesService) GetSales(companyID, locationID int, filters map[string]st
 	for rows.Next() {
 		var sale models.Sale
 		var customerName, paymentMethodName sql.NullString
+		var sourceChannel, refundSourceSaleNumber sql.NullString
+		var refundSourceSaleID sql.NullInt64
 
 		err := rows.Scan(
-			&sale.SaleID, &sale.SaleNumber, &sale.LocationID, &sale.CustomerID,
+			&sale.SaleID, &sale.SaleNumber, &sale.LocationID, &sourceChannel, &refundSourceSaleID, &refundSourceSaleNumber, &sale.CustomerID,
 			&sale.SaleDate, &sale.SaleTime, &sale.Subtotal, &sale.TaxAmount,
 			&sale.DiscountAmount, &sale.TotalAmount, &sale.PaidAmount,
 			&sale.PaymentMethodID, &sale.Status, &sale.POSStatus, &sale.IsQuickSale,
@@ -325,6 +338,16 @@ func (s *SalesService) GetSales(companyID, locationID int, filters map[string]st
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan sale: %w", err)
+		}
+		if sourceChannel.Valid {
+			sale.SourceChannel = &sourceChannel.String
+		}
+		if refundSourceSaleID.Valid {
+			v := int(refundSourceSaleID.Int64)
+			sale.RefundSourceID = &v
+		}
+		if refundSourceSaleNumber.Valid {
+			sale.RefundSourceRef = &refundSourceSaleNumber.String
 		}
 
 		// Set customer info if exists
@@ -352,28 +375,38 @@ func (s *SalesService) GetSales(companyID, locationID int, filters map[string]st
 func (s *SalesService) GetSaleByID(saleID, companyID int) (*models.Sale, error) {
 	// Get sale details
 	query := `
-		SELECT s.sale_id, s.sale_number, s.location_id, s.customer_id, s.sale_date, s.sale_time,
+		SELECT s.sale_id, s.sale_number, s.location_id, s.source_channel, s.refund_source_sale_id, rs.sale_number AS refund_source_sale_number,
+			   s.customer_id, s.sale_date, s.sale_time,
 			   s.subtotal, s.tax_amount, s.discount_amount, s.total_amount, s.paid_amount,
 			   s.payment_method_id, s.status, s.pos_status, s.is_quick_sale, COALESCE(s.is_training, FALSE) AS is_training, s.notes,
 			   s.created_by, s.updated_by, s.sync_status, s.created_at, s.updated_at,
-			   c.name as customer_name, pm.name as payment_method_name
+			   c.name as customer_name, pm.name as payment_method_name, l.name as location_name,
+			   COALESCE(NULLIF(TRIM(CONCAT(COALESCE(cu.first_name, ''), ' ', COALESCE(cu.last_name, ''))), ''), cu.username, cu.email, '') AS created_by_name,
+			   COALESCE(NULLIF(TRIM(CONCAT(COALESCE(uu.first_name, ''), ' ', COALESCE(uu.last_name, ''))), ''), uu.username, uu.email, '') AS updated_by_name
 		FROM sales s
+		LEFT JOIN sales rs ON rs.sale_id = s.refund_source_sale_id
 		LEFT JOIN customers c ON s.customer_id = c.customer_id
 		LEFT JOIN payment_methods pm ON s.payment_method_id = pm.method_id
 		JOIN locations l ON s.location_id = l.location_id
+		LEFT JOIN users cu ON s.created_by = cu.user_id
+		LEFT JOIN users uu ON s.updated_by = uu.user_id
 		WHERE s.sale_id = $1 AND l.company_id = $2 AND s.is_deleted = FALSE
 	`
 
 	var sale models.Sale
 	var customerName, paymentMethodName sql.NullString
+	var locationName, createdByName, updatedByName sql.NullString
+	var sourceChannel, refundSourceSaleNumber sql.NullString
+	var refundSourceSaleID sql.NullInt64
 
 	err := s.db.QueryRow(query, saleID, companyID).Scan(
-		&sale.SaleID, &sale.SaleNumber, &sale.LocationID, &sale.CustomerID,
+		&sale.SaleID, &sale.SaleNumber, &sale.LocationID, &sourceChannel, &refundSourceSaleID, &refundSourceSaleNumber, &sale.CustomerID,
 		&sale.SaleDate, &sale.SaleTime, &sale.Subtotal, &sale.TaxAmount,
 		&sale.DiscountAmount, &sale.TotalAmount, &sale.PaidAmount,
 		&sale.PaymentMethodID, &sale.Status, &sale.POSStatus, &sale.IsQuickSale,
 		&sale.IsTraining, &sale.Notes, &sale.CreatedBy, &sale.UpdatedBy, &sale.SyncStatus,
 		&sale.CreatedAt, &sale.UpdatedAt, &customerName, &paymentMethodName,
+		&locationName, &createdByName, &updatedByName,
 	)
 
 	if err == sql.ErrNoRows {
@@ -381,6 +414,16 @@ func (s *SalesService) GetSaleByID(saleID, companyID int) (*models.Sale, error) 
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sale: %w", err)
+	}
+	if sourceChannel.Valid {
+		sale.SourceChannel = &sourceChannel.String
+	}
+	if refundSourceSaleID.Valid {
+		v := int(refundSourceSaleID.Int64)
+		sale.RefundSourceID = &v
+	}
+	if refundSourceSaleNumber.Valid {
+		sale.RefundSourceRef = &refundSourceSaleNumber.String
 	}
 
 	// Set customer info if exists
@@ -398,6 +441,15 @@ func (s *SalesService) GetSaleByID(saleID, companyID int) (*models.Sale, error) 
 			Name:     paymentMethodName.String,
 		}
 	}
+	if locationName.Valid {
+		sale.LocationName = &locationName.String
+	}
+	if createdByName.Valid {
+		sale.CreatedByName = &createdByName.String
+	}
+	if updatedByName.Valid {
+		sale.UpdatedByName = &updatedByName.String
+	}
 
 	// Get sale items
 	items, err := s.getSaleItems(saleID, companyID)
@@ -405,6 +457,33 @@ func (s *SalesService) GetSaleByID(saleID, companyID int) (*models.Sale, error) 
 		return nil, fmt.Errorf("failed to get sale items: %w", err)
 	}
 	sale.Items = items
+
+	if sale.RefundSourceID == nil {
+		returnedQty, err := (&ReturnsService{db: s.db}).GetReturnedQuantitiesBySaleDetail(companyID, saleID)
+		if err == nil {
+			totalQty := 0.0
+			returnedTotalQty := 0.0
+			for _, item := range sale.Items {
+				if item.Quantity <= 0 {
+					continue
+				}
+				totalQty += item.Quantity
+				if qty := returnedQty[item.SaleDetailID]; qty > 0 {
+					if qty > item.Quantity {
+						qty = item.Quantity
+					}
+					returnedTotalQty += qty
+				}
+			}
+			if totalQty > 0 && returnedTotalQty > 0 {
+				state := "PARTIAL"
+				if returnedTotalQty >= totalQty-0.0001 {
+					state = "FULL"
+				}
+				sale.RefundState = &state
+			}
+		}
+	}
 
 	if bd, berr := s.computeSaleTaxBreakdown(companyID, sale.Items); berr == nil {
 		sale.TaxBreakdown = bd
@@ -712,6 +791,7 @@ type CreateSaleOptions struct {
 	LoyaltyRedeemPoints        float64
 	CouponCode                 string
 	AutoFillRaffleCustomerData *bool
+	SourceChannel              string
 }
 
 func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models.CreateSaleRequest, idempotencyKey *string) (*models.Sale, error) {
@@ -810,11 +890,20 @@ func (s *SalesService) CreateSaleWithOptions(
 		return nil, fmt.Errorf("failed to calculate totals: %w", err)
 	}
 
-	if req.PaidAmount < 0 {
-		return nil, fmt.Errorf("paid amount cannot be negative")
-	}
-	if req.PaidAmount > totalAmount {
-		return nil, fmt.Errorf("paid amount cannot exceed total amount")
+	if totalAmount >= 0 {
+		if req.PaidAmount < 0 {
+			return nil, fmt.Errorf("paid amount cannot be negative")
+		}
+		if req.PaidAmount > totalAmount {
+			return nil, fmt.Errorf("paid amount cannot exceed total amount")
+		}
+	} else {
+		if req.PaidAmount > 0 {
+			return nil, fmt.Errorf("refund paid amount must be stored as a negative amount")
+		}
+		if req.PaidAmount < totalAmount {
+			return nil, fmt.Errorf("refund paid amount cannot exceed refund total")
+		}
 	}
 
 	if err := s.validateLocationInCompany(locationID, companyID); err != nil {
@@ -846,9 +935,36 @@ func (s *SalesService) CreateSaleWithOptions(
 	defer tx.Rollback()
 	trackingSvc := newInventoryTrackingService(s.db)
 
+	hasRefundLines := false
+	for _, item := range req.Items {
+		if item.Quantity < 0 {
+			hasRefundLines = true
+			break
+		}
+	}
+	if hasRefundLines {
+		if err := requireSalesActionPassword(tx, companyID, userID, req.OverridePassword); err != nil {
+			return nil, err
+		}
+	}
+	refundSource, err := s.resolveRefundSourceContextTx(tx, companyID, req.Items)
+	if err != nil {
+		return nil, err
+	}
+	saleNotes := req.Notes
+	var refundSourceSaleID *int
+	if refundSource != nil {
+		refundSourceSaleID = &refundSource.SaleID
+		saleNotes = mergeSaleRefundContextNotes(req.Notes, refundSource.SaleNumber)
+	}
+
 	// Use client-provided sale number when present (offline-first). Otherwise,
 	// allocate via numbering sequences.
 	saleNumber := strings.TrimSpace(ptrString(req.SaleNumber))
+	sourceChannel := strings.ToUpper(strings.TrimSpace(opts.SourceChannel))
+	if sourceChannel == "" {
+		sourceChannel = "INVOICE"
+	}
 	if saleNumber != "" {
 		if len(saleNumber) > 100 {
 			return nil, fmt.Errorf("sale number too long")
@@ -870,11 +986,11 @@ func (s *SalesService) CreateSaleWithOptions(
 	err = tx.QueryRow(`
                INSERT INTO sales (sale_number, location_id, customer_id, sale_date, sale_time,
                                                   subtotal, tax_amount, discount_amount, total_amount, paid_amount,
-                                                  payment_method_id, status, pos_status, is_quick_sale, is_training, notes, created_by, updated_by, idempotency_key)
-               VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIME, $4, $5, $6, $7, $8, $9, 'COMPLETED', 'COMPLETED', FALSE, $10, $11, $12, $12, $13)
+                                                  payment_method_id, status, pos_status, is_quick_sale, is_training, notes, source_channel, refund_source_sale_id, created_by, updated_by, idempotency_key)
+               VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIME, $4, $5, $6, $7, $8, $9, 'COMPLETED', 'COMPLETED', FALSE, $10, $11, $12, $13, $14, $14, $15)
                RETURNING sale_id
        `, saleNumber, locationID, req.CustomerID, subtotal, totalTax, req.DiscountAmount,
-		totalAmount, req.PaidAmount, req.PaymentMethodID, opts.IsTraining, req.Notes, userID, nullIfEmpty(idemKey)).Scan(&saleID)
+		totalAmount, req.PaidAmount, req.PaymentMethodID, opts.IsTraining, saleNotes, sourceChannel, refundSourceSaleID, userID, nullIfEmpty(idemKey)).Scan(&saleID)
 
 	if err != nil {
 		if idemKey != "" && isUniqueViolation(err) {
@@ -904,12 +1020,12 @@ func (s *SalesService) CreateSaleWithOptions(
 		err = tx.QueryRow(`
 			INSERT INTO sale_details (sale_id, product_id, combo_product_id, barcode_id, product_name, quantity, unit_price,
 									 discount_percentage, discount_amount, tax_id, tax_amount,
-									 line_total, serial_numbers, notes, cost_price,
+									 line_total, source_sale_detail_id, serial_numbers, notes, cost_price,
 									 stock_unit_id, selling_unit_id, selling_uom_mode, selling_to_stock_factor, stock_quantity)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
 			RETURNING sale_detail_id
 		`, saleID, line.ProductID, line.ComboProductID, line.BarcodeID, line.ProductName, line.Quantity, line.UnitPrice,
-			line.DiscountPercent, line.DiscountAmount, line.TaxID, line.TaxAmount, line.LineTotal,
+			line.DiscountPercent, line.DiscountAmount, line.TaxID, line.TaxAmount, line.LineTotal, line.SourceSaleDetailID,
 			pq.Array(line.SerialNumbers), line.Notes, line.Snapshot.CostPricePerUnit,
 			line.Snapshot.StockUnitID, line.Snapshot.SellingUnitID, line.Snapshot.SellingUOMMode, line.Snapshot.SellingToStock, line.Snapshot.StockQuantity).Scan(&saleDetailID)
 		if err != nil {
@@ -925,31 +1041,73 @@ func (s *SalesService) CreateSaleWithOptions(
 			continue
 		}
 
-		selection := inventorySelection{
-			ProductID:        *line.ProductID,
-			BarcodeID:        line.BarcodeID,
-			ComboProductID:   line.ComboProductID,
-			Quantity:         line.Snapshot.StockQuantity,
-			SerialNumbers:    line.SerialNumbers,
-			BatchAllocations: line.BatchAllocations,
-			Notes:            line.Notes,
-			OverridePassword: req.OverridePassword,
+		if line.Quantity > 0 {
+			selection := inventorySelection{
+				ProductID:        *line.ProductID,
+				BarcodeID:        line.BarcodeID,
+				ComboProductID:   line.ComboProductID,
+				Quantity:         line.Snapshot.StockQuantity,
+				SerialNumbers:    line.SerialNumbers,
+				BatchAllocations: line.BatchAllocations,
+				Notes:            line.Notes,
+				OverridePassword: req.OverridePassword,
+			}
+
+			issue, err := trackingSvc.IssueStockTx(tx, companyID, locationID, userID, "SALE", "sale_detail", &saleDetailID, nil, selection)
+			if err != nil {
+				return nil, fmt.Errorf("failed to update stock: %w", err)
+			}
+			actualCost := actualSaleLineCost(line, issue)
+			actualCosts = append(actualCosts, actualCost)
+			if _, err := tx.Exec(`
+				UPDATE sale_details
+				SET barcode_id = COALESCE($1, barcode_id),
+				    cost_price = $2,
+				    serial_numbers = $3
+				WHERE sale_detail_id = $4
+			`, issue.BarcodeID, actualCost.CostPricePerUnit, pq.Array(selection.SerialNumbers), saleDetailID); err != nil {
+				return nil, fmt.Errorf("failed to update sale item cost snapshot: %w", err)
+			}
+			continue
 		}
 
-		issue, err := trackingSvc.IssueStockTx(tx, companyID, locationID, userID, "SALE", "sale_detail", &saleDetailID, nil, selection)
-		if err != nil {
-			return nil, fmt.Errorf("failed to update stock: %w", err)
+		if line.SourceSaleDetailID == nil {
+			return nil, fmt.Errorf("refund line is missing source sale detail")
 		}
-		actualCost := actualSaleLineCost(line, issue)
-		actualCosts = append(actualCosts, actualCost)
+		sourceLine, err := s.loadRefundableSaleLineByDetailTx(tx, companyID, *line.SourceSaleDetailID)
+		if err != nil {
+			return nil, err
+		}
+		refundQuantity := -line.Quantity
+		if refundQuantity > sourceLine.AvailableQuantity+0.0001 {
+			return nil, fmt.Errorf("refund quantity for line %d exceeds available quantity", *line.SourceSaleDetailID)
+		}
+		if len(sourceLine.SerialNumbers) > 0 &&
+			math.Abs(refundQuantity-sourceLine.AvailableQuantity) > 0.0001 {
+			return nil, fmt.Errorf("serialized refund lines must return the full remaining quantity")
+		}
+		serialNumbers := line.SerialNumbers
+		if len(serialNumbers) == 0 {
+			serialNumbers = sourceLine.SerialNumbers
+		}
+		if _, err := trackingSvc.ReceiveStockTx(tx, companyID, locationID, userID, "SALE_RETURN", "sale_detail", &saleDetailID, nil, inventorySelection{
+			ProductID:      *line.ProductID,
+			BarcodeID:      line.BarcodeID,
+			ComboProductID: line.ComboProductID,
+			Quantity:       -line.Snapshot.StockQuantity,
+			SerialNumbers:  serialNumbers,
+			UnitCost:       line.Snapshot.CostPricePerUnit,
+			Notes:          line.Notes,
+		}); err != nil {
+			return nil, fmt.Errorf("failed to receive refund stock: %w", err)
+		}
+		actualCosts = append(actualCosts, issuedSaleLineCost{})
 		if _, err := tx.Exec(`
 			UPDATE sale_details
-			SET barcode_id = COALESCE($1, barcode_id),
-			    cost_price = $2,
-			    serial_numbers = $3
-			WHERE sale_detail_id = $4
-		`, issue.BarcodeID, actualCost.CostPricePerUnit, pq.Array(selection.SerialNumbers), saleDetailID); err != nil {
-			return nil, fmt.Errorf("failed to update sale item cost snapshot: %w", err)
+			SET serial_numbers = $1
+			WHERE sale_detail_id = $2
+		`, pq.Array(serialNumbers), saleDetailID); err != nil {
+			return nil, fmt.Errorf("failed to update refund sale item tracking snapshot: %w", err)
 		}
 	}
 
@@ -993,7 +1151,15 @@ func (s *SalesService) CreateSaleWithOptions(
 		if err != nil {
 			return nil, err
 		}
-		if cashInAmount > 0 {
+		if cashInAmount != 0 {
+			direction := "IN"
+			eventType := "SALE"
+			amount := cashInAmount
+			if amount < 0 {
+				direction = "OUT"
+				eventType = "SALE_REFUND"
+				amount = -amount
+			}
 			note := fmt.Sprintf("sale_id=%d sale_number=%s", saleID, saleNumber)
 			if err := finance.EnqueueTx(tx, &models.FinanceOutboxEntry{
 				CompanyID:     companyID,
@@ -1002,9 +1168,9 @@ func (s *SalesService) CreateSaleWithOptions(
 				AggregateType: "sale",
 				AggregateID:   saleID,
 				Payload: models.JSONB{
-					"amount":      cashInAmount,
-					"direction":   "IN",
-					"event_type":  "SALE",
+					"amount":      amount,
+					"direction":   direction,
+					"event_type":  eventType,
 					"reason_code": fmt.Sprintf("sale:%d", saleID),
 					"notes":       note,
 				},
@@ -1147,11 +1313,97 @@ func (s *SalesService) getSaleByIdempotencyKey(key string, companyID, locationID
 	return s.GetSaleByID(saleID, companyID)
 }
 
+func (s *SalesService) resolveRefundSourceContextTx(tx *sql.Tx, companyID int, items []models.CreateSaleDetailRequest) (*refundSourceContext, error) {
+	detailIDs := make([]int, 0, len(items))
+	seen := make(map[int]struct{}, len(items))
+	for _, item := range items {
+		if item.Quantity >= 0 {
+			continue
+		}
+		if item.SourceSaleDetailID == nil || *item.SourceSaleDetailID <= 0 {
+			return nil, fmt.Errorf("refund line is missing source sale detail")
+		}
+		if _, ok := seen[*item.SourceSaleDetailID]; ok {
+			continue
+		}
+		seen[*item.SourceSaleDetailID] = struct{}{}
+		detailIDs = append(detailIDs, *item.SourceSaleDetailID)
+	}
+	if len(detailIDs) == 0 {
+		return nil, nil
+	}
+
+	rows, err := tx.Query(`
+		SELECT sd.sale_detail_id, sd.sale_id, s.sale_number
+		FROM sale_details sd
+		JOIN sales s ON s.sale_id = sd.sale_id
+		JOIN locations l ON l.location_id = s.location_id
+		WHERE sd.sale_detail_id = ANY($1)
+		  AND l.company_id = $2
+		  AND s.is_deleted = FALSE
+	`, pq.Array(detailIDs), companyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve refund source sale: %w", err)
+	}
+	defer rows.Close()
+
+	found := make(map[int]struct{}, len(detailIDs))
+	var source *refundSourceContext
+	for rows.Next() {
+		var saleDetailID int
+		var saleID int
+		var saleNumber string
+		if err := rows.Scan(&saleDetailID, &saleID, &saleNumber); err != nil {
+			return nil, fmt.Errorf("failed to scan refund source sale: %w", err)
+		}
+		found[saleDetailID] = struct{}{}
+		if source == nil {
+			source = &refundSourceContext{
+				SaleID:     saleID,
+				SaleNumber: strings.TrimSpace(saleNumber),
+			}
+			continue
+		}
+		if source.SaleID != saleID {
+			return nil, fmt.Errorf("refund lines must belong to the same source invoice")
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate refund source sale rows: %w", err)
+	}
+	if len(found) != len(detailIDs) {
+		return nil, fmt.Errorf("source sale detail not found")
+	}
+	return source, nil
+}
+
+func mergeSaleRefundContextNotes(notes *string, sourceSaleNumber string) *string {
+	sourceSaleNumber = strings.TrimSpace(sourceSaleNumber)
+	base := strings.TrimSpace(ptrString(notes))
+	if sourceSaleNumber == "" {
+		return nullIfEmpty(base)
+	}
+
+	refLine := fmt.Sprintf("Includes refund from invoice %s.", sourceSaleNumber)
+	if base == "" {
+		return &refLine
+	}
+
+	lowerBase := strings.ToLower(base)
+	lowerSaleNumber := strings.ToLower(sourceSaleNumber)
+	if strings.Contains(lowerBase, lowerSaleNumber) && strings.Contains(lowerBase, "refund") {
+		return &base
+	}
+
+	combined := strings.TrimSpace(base + "\n" + refLine)
+	return &combined
+}
+
 func (s *SalesService) resolveCashInAmountTx(tx *sql.Tx, companyID int, req *models.CreateSaleRequest, opts CreateSaleOptions) (float64, error) {
-	if opts.CashInAmount > 0 {
+	if opts.CashInAmount != 0 {
 		return opts.CashInAmount, nil
 	}
-	if req == nil || req.PaymentMethodID == nil || req.PaidAmount <= 0 {
+	if req == nil || req.PaymentMethodID == nil || req.PaidAmount == 0 {
 		return 0, nil
 	}
 	var paymentType string
@@ -1200,6 +1452,10 @@ func (s *SalesService) UpdateSale(saleID, companyID, userID int, req *models.Upd
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
+
+	if err := requireSalesActionPassword(tx, companyID, userID, req.OverridePassword); err != nil {
+		return err
+	}
 
 	setParts := []string{}
 	args := []interface{}{}
@@ -1307,6 +1563,446 @@ func (s *SalesService) DeleteSale(saleID, companyID, userID int) error {
 	return nil
 }
 
+type refundableSaleLine struct {
+	SaleDetailID      int
+	ProductID         *int
+	ComboProductID    *int
+	BarcodeID         *int
+	ProductName       *string
+	Quantity          float64
+	UnitPrice         float64
+	DiscountPercent   float64
+	DiscountAmount    float64
+	TaxID             *int
+	TaxAmount         float64
+	LineTotal         float64
+	CostPrice         float64
+	StockUnitID       *int
+	SellingUnitID     *int
+	SellingUOMMode    string
+	SellingToStock    float64
+	StockQuantity     float64
+	SerialNumbers     []string
+	AlreadyReturned   float64
+	AvailableQuantity float64
+}
+
+func (s *SalesService) CreateRefundInvoice(companyID, sourceSaleID, userID int, req *models.CreateRefundInvoiceRequest) (*models.Sale, error) {
+	if req == nil || len(req.Items) == 0 {
+		return nil, fmt.Errorf("at least one refund item is required")
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start refund transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	if err := requireSalesActionPassword(tx, companyID, userID, req.OverridePassword); err != nil {
+		return nil, err
+	}
+
+	var locationID int
+	var customerID sql.NullInt64
+	var paymentMethodID sql.NullInt64
+	var sourceSaleNumber string
+	var status string
+	var sourceChannel sql.NullString
+	var sourcePaidAmount float64
+	var sourceSubtotal float64
+	var sourceTax float64
+	var sourceDiscount float64
+	var isTraining bool
+
+	err = tx.QueryRow(`
+		SELECT
+			s.location_id,
+			s.customer_id,
+			s.payment_method_id,
+			s.sale_number,
+			s.status,
+			s.source_channel,
+			s.paid_amount,
+			s.subtotal,
+			s.tax_amount,
+			s.discount_amount,
+			COALESCE(s.is_training, FALSE)
+		FROM sales s
+		JOIN locations l ON l.location_id = s.location_id
+		WHERE s.sale_id = $1
+		  AND l.company_id = $2
+		  AND s.is_deleted = FALSE
+		FOR UPDATE
+	`, sourceSaleID, companyID).Scan(
+		&locationID,
+		&customerID,
+		&paymentMethodID,
+		&sourceSaleNumber,
+		&status,
+		&sourceChannel,
+		&sourcePaidAmount,
+		&sourceSubtotal,
+		&sourceTax,
+		&sourceDiscount,
+		&isTraining,
+	)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("sale not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to load source sale: %w", err)
+	}
+	if status != "COMPLETED" {
+		return nil, fmt.Errorf("only completed sales can be refunded")
+	}
+
+	channel := strings.ToUpper(strings.TrimSpace(sourceChannel.String))
+	switch channel {
+	case "INVOICE", "QUOTE":
+		return nil, fmt.Errorf("invoice returns must use sale return documents")
+	case "POS_REFUND":
+		return nil, fmt.Errorf("refund invoices cannot be refunded again")
+	}
+
+	refundLines := make([]refundableSaleLine, 0, len(req.Items))
+	refundSubtotal := 0.0
+	refundTax := 0.0
+	refundableGrossAbs := 0.0
+	seenDetails := make(map[int]struct{}, len(req.Items))
+
+	for _, item := range req.Items {
+		if _, exists := seenDetails[item.SaleDetailID]; exists {
+			return nil, fmt.Errorf("duplicate sale detail %d in refund request", item.SaleDetailID)
+		}
+		seenDetails[item.SaleDetailID] = struct{}{}
+
+		line, err := s.loadRefundableSaleLineTx(tx, companyID, sourceSaleID, item.SaleDetailID)
+		if err != nil {
+			return nil, err
+		}
+		if item.Quantity > line.AvailableQuantity+0.0001 {
+			return nil, fmt.Errorf("refund quantity for line %d exceeds available quantity", item.SaleDetailID)
+		}
+		if item.Quantity <= 0 {
+			return nil, fmt.Errorf("refund quantity must be greater than zero")
+		}
+		if line.Quantity <= 0 {
+			return nil, fmt.Errorf("invalid source sale quantity for line %d", item.SaleDetailID)
+		}
+
+		ratio := item.Quantity / line.Quantity
+		refundLine := line
+		refundLine.Quantity = -item.Quantity
+		refundLine.DiscountAmount = -(line.DiscountAmount * ratio)
+		refundLine.TaxAmount = -(line.TaxAmount * ratio)
+		refundLine.LineTotal = -(line.LineTotal * ratio)
+		refundLine.StockQuantity = -(line.StockQuantity * ratio)
+
+		if len(line.SerialNumbers) > 0 {
+			if item.Quantity != line.AvailableQuantity || item.Quantity != line.Quantity {
+				return nil, fmt.Errorf("serialized refund lines must return the full remaining quantity")
+			}
+			refundLine.SerialNumbers = append([]string(nil), line.SerialNumbers...)
+		}
+
+		refundSubtotal += refundLine.LineTotal
+		refundTax += refundLine.TaxAmount
+		refundableGrossAbs += (-refundLine.LineTotal) + (-refundLine.TaxAmount)
+		refundLines = append(refundLines, *refundLine)
+	}
+
+	sourceGross := sourceSubtotal + sourceTax
+	refundHeaderDiscount := 0.0
+	if sourceDiscount > 0 && sourceGross > 0 && refundableGrossAbs > 0 {
+		refundHeaderDiscount = -(sourceDiscount * (refundableGrossAbs / sourceGross))
+	}
+	refundTotal := refundSubtotal + refundTax - refundHeaderDiscount
+	if refundTotal >= 0 {
+		return nil, fmt.Errorf("refund total must be negative")
+	}
+
+	refundPaidAbs := sourcePaidAmount
+	refundTotalAbs := -refundTotal
+	if refundPaidAbs > refundTotalAbs {
+		refundPaidAbs = refundTotalAbs
+	}
+	if refundPaidAbs < 0 {
+		refundPaidAbs = 0
+	}
+	refundPaidAmount := -refundPaidAbs
+
+	ns := NewNumberingSequenceService()
+	refundSaleNumber, err := ns.NextNumber(tx, "sale", companyID, &locationID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate refund invoice number: %w", err)
+	}
+
+	var refundSaleID int
+	err = tx.QueryRow(`
+		INSERT INTO sales (
+			sale_number, location_id, customer_id, sale_date, sale_time,
+			subtotal, tax_amount, discount_amount, total_amount, paid_amount,
+			payment_method_id, status, pos_status, is_quick_sale, is_training, notes,
+			source_channel, refund_source_sale_id, created_by, updated_by
+		)
+		VALUES (
+			$1, $2, $3, CURRENT_DATE, CURRENT_TIME,
+			$4, $5, $6, $7, $8,
+			$9, 'COMPLETED', 'COMPLETED', FALSE, $10, $11,
+			'POS_REFUND', $12, $13, $13
+		)
+		RETURNING sale_id
+	`, refundSaleNumber, locationID, nullIntToPtr(customerID), refundSubtotal, refundTax, refundHeaderDiscount, refundTotal, refundPaidAmount,
+		nullIntToPtr(paymentMethodID), isTraining, req.Reason, sourceSaleID, userID).Scan(&refundSaleID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create refund invoice: %w", err)
+	}
+
+	trackingSvc := newInventoryTrackingService(s.db)
+	for _, line := range refundLines {
+		var refundDetailID int
+		err = tx.QueryRow(`
+			INSERT INTO sale_details (
+				sale_id, product_id, combo_product_id, barcode_id, product_name, quantity, unit_price,
+				discount_percentage, discount_amount, tax_id, tax_amount, line_total, source_sale_detail_id,
+				serial_numbers, notes, cost_price, stock_unit_id, selling_unit_id, selling_uom_mode,
+				selling_to_stock_factor, stock_quantity
+			)
+			VALUES (
+				$1, $2, $3, $4, $5, $6, $7,
+				$8, $9, $10, $11, $12, $13,
+				$14, $15, $16, $17, $18, $19,
+				$20, $21
+			)
+			RETURNING sale_detail_id
+		`, refundSaleID, line.ProductID, line.ComboProductID, line.BarcodeID, line.ProductName, line.Quantity, line.UnitPrice,
+			line.DiscountPercent, line.DiscountAmount, line.TaxID, line.TaxAmount, line.LineTotal, line.SaleDetailID,
+			pq.Array(line.SerialNumbers), req.Reason, line.CostPrice, line.StockUnitID, line.SellingUnitID, line.SellingUOMMode,
+			line.SellingToStock, line.StockQuantity).Scan(&refundDetailID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create refund invoice line: %w", err)
+		}
+
+		if !isTraining && line.ProductID != nil {
+			receivedStockQty := -line.StockQuantity
+			if receivedStockQty < 0 {
+				receivedStockQty = 0
+			}
+			if _, err := trackingSvc.ReceiveStockTx(tx, companyID, locationID, userID, "SALE_RETURN", "sale_detail", &refundDetailID, nil, inventorySelection{
+				ProductID:      *line.ProductID,
+				BarcodeID:      line.BarcodeID,
+				ComboProductID: line.ComboProductID,
+				Quantity:       receivedStockQty,
+				SerialNumbers:  line.SerialNumbers,
+				UnitCost:       line.CostPrice,
+				Notes:          req.Reason,
+			}); err != nil {
+				return nil, fmt.Errorf("failed to receive refunded stock: %w", err)
+			}
+		}
+	}
+
+	if refundPaidAbs > 0 {
+		if _, err := tx.Exec(`
+			UPDATE sales
+			SET paid_amount = paid_amount - $1,
+			    updated_at = CURRENT_TIMESTAMP,
+			    updated_by = $2
+			WHERE sale_id = $3
+		`, refundPaidAbs, userID, sourceSaleID); err != nil {
+			return nil, fmt.Errorf("failed to update source sale paid amount: %w", err)
+		}
+	}
+
+	recordID := refundSaleID
+	actorID := userID
+	changes := models.JSONB{
+		"refund_source_sale_id": sourceSaleID,
+		"refund_source_sale_no": sourceSaleNumber,
+		"reason":                strings.TrimSpace(ptrString(req.Reason)),
+	}
+	if err := LogAudit(tx, "CREATE", "sales", &recordID, &actorID, nil, nil, &changes, nil, nil); err != nil {
+		return nil, fmt.Errorf("failed to log refund invoice audit: %w", err)
+	}
+
+	if !isTraining {
+		finance := NewFinanceIntegrityServiceWithDB(s.db)
+		if err := finance.EnqueueTx(tx, &models.FinanceOutboxEntry{
+			CompanyID:     companyID,
+			LocationID:    &locationID,
+			EventType:     financeEventLedgerSale,
+			AggregateType: "sale",
+			AggregateID:   refundSaleID,
+			Payload:       models.JSONB{},
+			CreatedBy:     &userID,
+		}); err != nil {
+			return nil, fmt.Errorf("failed to enqueue refund ledger posting: %w", err)
+		}
+
+		if refundPaidAbs > 0 && paymentMethodID.Valid {
+			var paymentType string
+			if err := tx.QueryRow(`
+				SELECT type
+				FROM payment_methods
+				WHERE method_id = $1
+				  AND is_active = TRUE
+				  AND (company_id = $2 OR company_id IS NULL)
+			`, int(paymentMethodID.Int64), companyID).Scan(&paymentType); err == nil && strings.EqualFold(strings.TrimSpace(paymentType), "CASH") {
+				note := fmt.Sprintf("refund_sale_id=%d refund_sale_number=%s source_sale_id=%d source_sale_number=%s", refundSaleID, refundSaleNumber, sourceSaleID, sourceSaleNumber)
+				if err := finance.EnqueueTx(tx, &models.FinanceOutboxEntry{
+					CompanyID:     companyID,
+					LocationID:    &locationID,
+					EventType:     financeEventCashSale,
+					AggregateType: "sale",
+					AggregateID:   refundSaleID,
+					Payload: models.JSONB{
+						"amount":      refundPaidAbs,
+						"direction":   "OUT",
+						"event_type":  "SALE_REFUND",
+						"reason_code": fmt.Sprintf("sale:%d:refund", refundSaleID),
+						"notes":       note,
+					},
+					CreatedBy: &userID,
+				}); err != nil {
+					return nil, fmt.Errorf("failed to enqueue refund cash event: %w", err)
+				}
+			}
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit refund invoice: %w", err)
+	}
+
+	if !isTraining {
+		if err := NewFinanceIntegrityServiceWithDB(s.db).ProcessAggregate(companyID, "sale", refundSaleID); err != nil {
+			log.Printf("sales_service: failed to process finance outbox for refund sale %d: %v", refundSaleID, err)
+		}
+	}
+
+	return s.GetSaleByID(refundSaleID, companyID)
+}
+
+func (s *SalesService) loadRefundableSaleLineTx(tx *sql.Tx, companyID, sourceSaleID, saleDetailID int) (*refundableSaleLine, error) {
+	var line refundableSaleLine
+	var saleReturnQty float64
+	var refundInvoiceQty float64
+	var serialNumbers pq.StringArray
+
+	err := tx.QueryRow(`
+		SELECT
+			sd.sale_detail_id,
+			sd.product_id,
+			sd.combo_product_id,
+			sd.barcode_id,
+			sd.product_name,
+			sd.quantity::float8,
+			sd.unit_price::float8,
+			COALESCE(sd.discount_percentage, 0)::float8,
+			COALESCE(sd.discount_amount, 0)::float8,
+			sd.tax_id,
+			COALESCE(sd.tax_amount, 0)::float8,
+			sd.line_total::float8,
+			COALESCE(sd.cost_price, 0)::float8,
+			sd.stock_unit_id,
+			sd.selling_unit_id,
+			COALESCE(sd.selling_uom_mode, 'LOOSE'),
+			COALESCE(sd.selling_to_stock_factor, 1.0)::float8,
+			COALESCE(NULLIF(sd.stock_quantity, 0), sd.quantity * COALESCE(sd.selling_to_stock_factor, 1.0))::float8,
+			sd.serial_numbers,
+			COALESCE((
+				SELECT SUM(srd.quantity)::float8
+				FROM sale_return_details srd
+				JOIN sale_returns sr ON sr.return_id = srd.return_id
+				WHERE sr.sale_id = $1
+				  AND sr.status = 'COMPLETED'
+				  AND srd.sale_detail_id = sd.sale_detail_id
+			), 0)::float8 AS sale_returned_qty,
+			COALESCE((
+				SELECT SUM(ABS(rsd.quantity))::float8
+				FROM sale_details rsd
+				JOIN sales rs ON rs.sale_id = rsd.sale_id
+				WHERE rs.refund_source_sale_id = $1
+				  AND rs.status = 'COMPLETED'
+				  AND rs.is_deleted = FALSE
+				  AND rsd.source_sale_detail_id = sd.sale_detail_id
+			), 0)::float8 AS refund_invoice_qty
+		FROM sale_details sd
+		JOIN sales s ON s.sale_id = sd.sale_id
+		JOIN locations l ON l.location_id = s.location_id
+		WHERE sd.sale_detail_id = $2
+		  AND sd.sale_id = $1
+		  AND l.company_id = $3
+		  AND s.is_deleted = FALSE
+		FOR UPDATE OF sd
+	`, sourceSaleID, saleDetailID, companyID).Scan(
+		&line.SaleDetailID,
+		&line.ProductID,
+		&line.ComboProductID,
+		&line.BarcodeID,
+		&line.ProductName,
+		&line.Quantity,
+		&line.UnitPrice,
+		&line.DiscountPercent,
+		&line.DiscountAmount,
+		&line.TaxID,
+		&line.TaxAmount,
+		&line.LineTotal,
+		&line.CostPrice,
+		&line.StockUnitID,
+		&line.SellingUnitID,
+		&line.SellingUOMMode,
+		&line.SellingToStock,
+		&line.StockQuantity,
+		&serialNumbers,
+		&saleReturnQty,
+		&refundInvoiceQty,
+	)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("sale detail not found in source sale")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to load refundable sale detail: %w", err)
+	}
+	if len(serialNumbers) > 0 {
+		line.SerialNumbers = []string(serialNumbers)
+	}
+	line.AlreadyReturned = saleReturnQty + refundInvoiceQty
+	line.AvailableQuantity = line.Quantity - line.AlreadyReturned
+	if line.AvailableQuantity < 0 {
+		line.AvailableQuantity = 0
+	}
+	return &line, nil
+}
+
+func (s *SalesService) loadRefundableSaleLineByDetailTx(tx *sql.Tx, companyID, saleDetailID int) (*refundableSaleLine, error) {
+	var sourceSaleID int
+	err := tx.QueryRow(`
+		SELECT sd.sale_id
+		FROM sale_details sd
+		JOIN sales s ON s.sale_id = sd.sale_id
+		JOIN locations l ON l.location_id = s.location_id
+		WHERE sd.sale_detail_id = $1
+		  AND l.company_id = $2
+		  AND s.is_deleted = FALSE
+	`, saleDetailID, companyID).Scan(&sourceSaleID)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("source sale detail not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve source sale detail: %w", err)
+	}
+	return s.loadRefundableSaleLineTx(tx, companyID, sourceSaleID, saleDetailID)
+}
+
+func nullIntToPtr(value sql.NullInt64) *int {
+	if !value.Valid {
+		return nil
+	}
+	v := int(value.Int64)
+	return &v
+}
+
 func (s *SalesService) HoldSale(saleID, companyID, userID int) error {
 	err := s.verifySaleInCompany(saleID, companyID)
 	if err != nil {
@@ -1399,7 +2095,7 @@ func (s *SalesService) getSaleItems(saleID, companyID int) ([]models.SaleDetail,
 			   CASE WHEN sd.product_id IS NULL AND sd.combo_product_id IS NOT NULL THEN TRUE ELSE FALSE END AS is_virtual_combo,
 			   sd.quantity,
 			   sd.unit_price, sd.discount_percentage, sd.discount_amount, sd.tax_id,
-			   sd.tax_amount, sd.line_total, sd.serial_numbers, sd.combo_component_tracking, sd.notes,
+			   sd.tax_amount, sd.line_total, sd.source_sale_detail_id, sd.serial_numbers, sd.combo_component_tracking, sd.notes,
 			   COALESCE(p.name, cp.name) as product_name_from_table
 		FROM sale_details sd
 		JOIN sales s ON sd.sale_id = s.sale_id
@@ -1428,7 +2124,7 @@ func (s *SalesService) getSaleItems(saleID, companyID int) ([]models.SaleDetail,
 			&item.SaleDetailID, &item.SaleID, &item.ProductID, &item.ComboProductID, &item.BarcodeID, &item.ProductName,
 			&item.Barcode, &item.VariantName, &item.TrackingType, &item.IsSerialized, &item.IsVirtualCombo,
 			&item.Quantity, &item.UnitPrice, &item.DiscountPercent, &item.DiscountAmount,
-			&item.TaxID, &item.TaxAmount, &item.LineTotal, &serialNumbers, &comboTrackingRaw, &item.Notes,
+			&item.TaxID, &item.TaxAmount, &item.LineTotal, &item.SourceSaleDetailID, &serialNumbers, &comboTrackingRaw, &item.Notes,
 			&productNameFromTable,
 		)
 		if err != nil {
@@ -1503,13 +2199,15 @@ func (s *SalesService) verifySaleInCompany(saleID, companyID int) error {
 // history endpoint.
 func (s *SalesService) GetSalesHistory(companyID int, filters map[string]string) ([]models.Sale, error) {
 	query := `
-                SELECT s.sale_id, s.sale_number, s.location_id, s.customer_id, s.sale_date, s.sale_time,
+                SELECT s.sale_id, s.sale_number, s.location_id, s.source_channel, s.refund_source_sale_id, rs.sale_number AS refund_source_sale_number,
+                       s.customer_id, s.sale_date, s.sale_time,
                        s.subtotal, s.tax_amount, s.discount_amount, s.total_amount, s.paid_amount,
                        s.payment_method_id, s.status, s.pos_status, s.is_quick_sale, COALESCE(s.is_training, FALSE) AS is_training, s.notes,
                        s.created_by, s.updated_by, s.sync_status, s.created_at, s.updated_at,
                        c.name as customer_name, pm.name as payment_method_name
                 FROM sales s
                 JOIN locations l ON s.location_id = l.location_id
+                LEFT JOIN sales rs ON rs.sale_id = s.refund_source_sale_id
                 LEFT JOIN customers c ON s.customer_id = c.customer_id
                 LEFT JOIN payment_methods pm ON s.payment_method_id = pm.method_id
                 WHERE l.company_id = $1 AND s.is_deleted = FALSE
@@ -1561,9 +2259,11 @@ func (s *SalesService) GetSalesHistory(companyID int, filters map[string]string)
 	for rows.Next() {
 		var sale models.Sale
 		var customerName, paymentMethodName sql.NullString
+		var sourceChannel, refundSourceSaleNumber sql.NullString
+		var refundSourceSaleID sql.NullInt64
 
 		err := rows.Scan(
-			&sale.SaleID, &sale.SaleNumber, &sale.LocationID, &sale.CustomerID,
+			&sale.SaleID, &sale.SaleNumber, &sale.LocationID, &sourceChannel, &refundSourceSaleID, &refundSourceSaleNumber, &sale.CustomerID,
 			&sale.SaleDate, &sale.SaleTime, &sale.Subtotal, &sale.TaxAmount,
 			&sale.DiscountAmount, &sale.TotalAmount, &sale.PaidAmount,
 			&sale.PaymentMethodID, &sale.Status, &sale.POSStatus, &sale.IsQuickSale,
@@ -1572,6 +2272,16 @@ func (s *SalesService) GetSalesHistory(companyID int, filters map[string]string)
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan sale: %w", err)
+		}
+		if sourceChannel.Valid {
+			sale.SourceChannel = &sourceChannel.String
+		}
+		if refundSourceSaleID.Valid {
+			v := int(refundSourceSaleID.Int64)
+			sale.RefundSourceID = &v
+		}
+		if refundSourceSaleNumber.Valid {
+			sale.RefundSourceRef = &refundSourceSaleNumber.String
 		}
 
 		if customerName.Valid {
@@ -1792,12 +2502,12 @@ func (s *SalesService) CreateQuote(companyID, locationID, userID int, req *model
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate tax: %w", err)
 	}
+	taxSettings, err := loadCompanyTaxSettings(tx, companyID)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, item := range req.Items {
-		lineTotal := item.Quantity * item.UnitPrice
-		discountAmount := lineTotal * (item.DiscountPercent / 100)
-		lineTotal -= discountAmount
-
 		var effectiveTaxID *int
 		if item.TaxID != nil {
 			effectiveTaxID = item.TaxID
@@ -1815,22 +2525,23 @@ func (s *SalesService) CreateQuote(companyID, locationID, userID int, req *model
 			effectiveTaxID = meta.TaxID
 		}
 
-		var taxAmount float64
+		taxPercent := 0.0
 		if effectiveTaxID != nil {
 			pct, ok := taxPctByID[*effectiveTaxID]
 			if !ok {
 				return nil, fmt.Errorf("failed to calculate tax: %w", fmt.Errorf("failed to get tax percentage: %w", sql.ErrNoRows))
 			}
-			taxAmount = lineTotal * (pct / 100)
+			taxPercent = pct
 		}
+		lineAmounts := computeTaxLine(item.Quantity, item.UnitPrice, item.DiscountPercent, taxPercent, taxSettings.PriceMode)
 
-		subtotal += lineTotal
-		totalTax += taxAmount
+		subtotal += lineAmounts.NetAmount
+		totalTax += lineAmounts.TaxAmount
 		calcs = append(calcs, itemCalc{
 			item:         item,
-			discountAmt:  discountAmount,
-			taxAmt:       taxAmount,
-			lineTotal:    lineTotal,
+			discountAmt:  lineAmounts.DiscountAmount,
+			taxAmt:       lineAmounts.TaxAmount,
+			lineTotal:    lineAmounts.NetAmount,
 			effectiveTax: effectiveTaxID,
 		})
 	}
@@ -1990,12 +2701,12 @@ func (s *SalesService) UpdateQuote(quoteID, companyID, userID int, req *models.U
 		if err != nil {
 			return fmt.Errorf("failed to calculate tax: %w", err)
 		}
+		taxSettings, err := loadCompanyTaxSettings(tx, companyID)
+		if err != nil {
+			return err
+		}
 
 		for _, item := range req.Items {
-			lineTotal := item.Quantity * item.UnitPrice
-			discountAmt := lineTotal * (item.DiscountPercent / 100)
-			lineTotal -= discountAmt
-
 			var effectiveTaxID *int
 			if item.TaxID != nil {
 				effectiveTaxID = item.TaxID
@@ -2013,17 +2724,18 @@ func (s *SalesService) UpdateQuote(quoteID, companyID, userID int, req *models.U
 				effectiveTaxID = meta.TaxID
 			}
 
-			var taxAmount float64
+			taxPercent := 0.0
 			if effectiveTaxID != nil {
 				pct, ok := taxPctByID[*effectiveTaxID]
 				if !ok {
 					return fmt.Errorf("failed to calculate tax: %w", fmt.Errorf("failed to get tax percentage: %w", sql.ErrNoRows))
 				}
-				taxAmount = lineTotal * (pct / 100)
+				taxPercent = pct
 			}
+			lineAmounts := computeTaxLine(item.Quantity, item.UnitPrice, item.DiscountPercent, taxPercent, taxSettings.PriceMode)
 
-			subtotal += lineTotal
-			totalTax += taxAmount
+			subtotal += lineAmounts.NetAmount
+			totalTax += lineAmounts.TaxAmount
 
 			lineProductName := item.ProductName
 			if item.ComboProductID != nil {
@@ -2036,8 +2748,8 @@ func (s *SalesService) UpdateQuote(quoteID, companyID, userID int, req *models.U
 										line_total, serial_numbers, notes)
 				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 			`, quoteID, item.ProductID, item.ComboProductID, lineProductName, item.Quantity, item.UnitPrice,
-				item.DiscountPercent, discountAmt, effectiveTaxID, taxAmount,
-				lineTotal, pq.Array(item.SerialNumbers), item.Notes)
+				item.DiscountPercent, lineAmounts.DiscountAmount, effectiveTaxID, lineAmounts.TaxAmount,
+				lineAmounts.NetAmount, pq.Array(item.SerialNumbers), item.Notes)
 			if err != nil {
 				return fmt.Errorf("failed to insert quote item: %w", err)
 			}
@@ -2272,7 +2984,9 @@ func (s *SalesService) ConvertQuoteToSale(quoteID, companyID, userID int, overri
 	}
 
 	idemKey := fmt.Sprintf("quote:%d", quoteID)
-	sale, err := s.CreateSale(companyID, locationID, userID, req, &idemKey)
+	sale, err := s.CreateSaleWithOptions(companyID, locationID, userID, req, &idemKey, CreateSaleOptions{
+		SourceChannel: "QUOTE",
+	})
 	if err != nil {
 		return nil, err
 	}

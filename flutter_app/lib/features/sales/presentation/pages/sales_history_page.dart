@@ -4,15 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/app_date_time.dart';
+import '../../../../core/error_handler.dart';
 import '../../../../core/locale_preferences.dart';
 import '../../../../shared/widgets/app_empty_view.dart';
 import '../../../../shared/widgets/app_selection_dialog.dart';
+import '../../../pos/controllers/pos_notifier.dart';
 import '../../../pos/data/models.dart';
 import '../../../pos/data/pos_repository.dart';
 import '../../../pos/presentation/pages/pos_page.dart';
 import '../../data/sales_repository.dart';
 import 'sale_detail_page.dart';
-import 'sale_return_detail_page.dart';
+import 'sales_returns_page.dart';
+import '../utils/invoice_actions.dart';
 
 class SalesHistoryPage extends ConsumerStatefulWidget {
   const SalesHistoryPage({super.key});
@@ -27,7 +30,6 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   Map<String, dynamic>? _summaryToday;
   Map<String, dynamic>? _summaryAll;
   List<Map<String, dynamic>> _sales = const [];
-  List<Map<String, dynamic>> _returns = const [];
   final _search = TextEditingController();
   DateTimeRange? _dateRange;
   List<PosCustomerDto> _selectedCustomers = const [];
@@ -35,6 +37,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   _HistoryDocumentDetail? _selectedDetail;
   Object? _detailError;
   int _detailRequestToken = 0;
+  bool _actionBusy = false;
 
   @override
   void initState() {
@@ -52,10 +55,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   List<_HistoryDocument> _buildVisibleDocuments(String query) {
-    final merged = <_HistoryDocument>[
-      ..._sales.map((row) => _HistoryDocument.sale(row)),
-      ..._returns.map((row) => _HistoryDocument.saleReturn(row)),
-    ];
+    final merged = _sales.map((row) => _HistoryDocument.sale(row)).toList();
 
     merged.sort((a, b) => b.sortDate.compareTo(a.sortDate));
 
@@ -90,7 +90,6 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
     Map<String, dynamic>? summaryToday = _summaryToday;
     Map<String, dynamic>? summaryAll = _summaryAll;
     List<Map<String, dynamic>> sales = _sales;
-    List<Map<String, dynamic>> returns = _returns;
 
     try {
       try {
@@ -110,22 +109,12 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
         );
         sales = _filterByCustomers(data, selectedIds);
       } catch (_) {}
-
-      try {
-        final data = await repo.getSaleReturns(
-          dateFrom: fromDate,
-          dateTo: toDate,
-          customerId: singleCustomerId,
-        );
-        returns = _filterByCustomers(data, selectedIds);
-      } catch (_) {}
     } finally {
       if (mounted) {
         setState(() {
           _summaryToday = summaryToday;
           _summaryAll = summaryAll;
           _sales = sales;
-          _returns = returns;
           _loading = false;
         });
       }
@@ -190,15 +179,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
     });
 
     try {
-      _HistoryDocumentDetail detail;
-      if (doc.type == _HistoryDocumentType.sale) {
-        final sale = await ref.read(posRepositoryProvider).getSaleById(doc.id);
-        detail = _HistoryDocumentDetail.fromSale(doc, sale);
-      } else {
-        final data =
-            await ref.read(salesRepositoryProvider).getSaleReturn(doc.id);
-        detail = _HistoryDocumentDetail.fromReturn(doc, data);
-      }
+      final sale = await ref.read(posRepositoryProvider).getSaleById(doc.id);
+      final detail = _HistoryDocumentDetail.fromSale(doc, sale);
 
       if (!mounted || requestToken != _detailRequestToken) return;
       setState(() {
@@ -211,6 +193,97 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
         _detailError = error;
         _detailLoading = false;
       });
+    }
+  }
+
+  Future<void> _reloadSelection() async {
+    final selectedKey = _selectedDocumentKey;
+    await _load();
+    if (!mounted || selectedKey == null) return;
+    final docs = _buildVisibleDocuments(_search.text);
+    final match = docs.where((doc) => doc.key == selectedKey);
+    if (match.isNotEmpty) {
+      await _selectDocument(match.first);
+    }
+  }
+
+  Future<void> _printSelectedSaleA4() async {
+    final sale = _selectedDetail?.sale;
+    if (sale == null) return;
+    setState(() => _actionBusy = true);
+    try {
+      await InvoiceActions(ref: ref, context: context).printA4(sale.saleId);
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
+    }
+  }
+
+  Future<void> _printSelectedSale80mm() async {
+    final sale = _selectedDetail?.sale;
+    if (sale == null) return;
+    setState(() => _actionBusy = true);
+    try {
+      await InvoiceActions(ref: ref, context: context)
+          .printThermal80(sale.saleId);
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
+    }
+  }
+
+  Future<void> _shareSelectedSalePdf() async {
+    final sale = _selectedDetail?.sale;
+    if (sale == null) return;
+    setState(() => _actionBusy = true);
+    try {
+      await InvoiceActions(ref: ref, context: context)
+          .shareInvoice(sale.saleId);
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
+    }
+  }
+
+  Future<void> _editSelectedSale() async {
+    final sale = _selectedDetail?.sale;
+    if (sale == null) return;
+
+    setState(() => _actionBusy = true);
+    try {
+      ref.read(posNotifierProvider.notifier).loadInvoiceEditSession(sale);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const PosPage()),
+      );
+      if (!mounted) return;
+      await _reloadSelection();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(ErrorHandler.message(error))),
+        );
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
+    }
+  }
+
+  Future<void> _refundSelectedSale() async {
+    final sale = _selectedDetail?.sale;
+    if (sale == null) return;
+    setState(() => _actionBusy = true);
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SaleReturnFormPage(
+            initialSaleId: sale.saleId,
+            mode: SaleReturnDocumentMode.refundInvoice,
+          ),
+        ),
+      );
+      if (!mounted) return;
+      await _reloadSelection();
+    } finally {
+      if (mounted) setState(() => _actionBusy = false);
     }
   }
 
@@ -350,16 +423,8 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   }
 
   void _openDocument(_HistoryDocument document) {
-    if (document.type == _HistoryDocumentType.sale) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => SaleDetailPage(saleId: document.id)),
-      );
-      return;
-    }
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => SaleReturnDetailPage(returnId: document.id),
-      ),
+      MaterialPageRoute(builder: (_) => SaleDetailPage(saleId: document.id)),
     );
   }
 
@@ -477,26 +542,14 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                               ),
                             ),
                             const SizedBox(height: 10),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                  child: Wrap(
-                                    spacing: 6,
-                                    runSpacing: 6,
-                                    children: [
-                                      _StatusChip(status: document.statusLabel),
-                                    ],
-                                  ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                document.amountLabel,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
                                 ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  document.amountLabel,
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
                           ],
                         ),
@@ -515,6 +568,14 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
               subtitle: selectedDetail == null
                   ? 'Select a document from the list'
                   : 'Selected document',
+              headerTrailing: selectedDetail?.sale != null &&
+                      !selectedDetail!.sale!.isRefundInvoice
+                  ? IconButton(
+                      tooltip: 'Edit sale',
+                      onPressed: _actionBusy ? null : _editSelectedSale,
+                      icon: const Icon(Icons.edit_outlined),
+                    )
+                  : null,
               child: _buildMetadataPane(context, theme, localePrefs),
             ),
           ),
@@ -563,7 +624,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
     if (detail == null) {
       return const AppEmptyView(
         title: 'No document selected',
-        message: 'Choose a sale or return to inspect its details.',
+        message: 'Choose an invoice to inspect its details.',
         icon: Icons.touch_app_rounded,
       );
     }
@@ -639,22 +700,47 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                 children: [
                   _DocumentTypeBadge(type: detail.document.type),
                   _StatusChip(status: detail.document.statusLabel),
+                  if (detail.sale?.isFullyRefunded == true)
+                    const _RefundStateChip(label: 'Fully refunded'),
+                  if (detail.sale?.isPartiallyRefunded == true)
+                    const _RefundStateChip(label: 'Partially refunded'),
                 ],
               ),
             ],
           ),
         ),
+        if (detail.sale != null && !detail.sale!.isRefundInvoice) ...[
+          const SizedBox(height: 12),
+          _SaleActionsBar(
+            busy: _actionBusy,
+            onPrintA4: _printSelectedSaleA4,
+            onPrint80mm: _printSelectedSale80mm,
+            onSharePdf: _shareSelectedSalePdf,
+            onRefund: _refundSelectedSale,
+          ),
+        ],
         const SizedBox(height: 14),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            for (final entry in detail.metadata)
-              SizedBox(
-                width: 164,
-                child: _MetadataTile(entry: entry),
-              ),
-          ],
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
+          ),
+          child: Column(
+            children: [
+              for (var index = 0; index < detail.metadata.length; index++) ...[
+                _DetailTextRow(entry: detail.metadata[index]),
+                if (index != detail.metadata.length - 1)
+                  Divider(
+                    height: 18,
+                    color: theme.colorScheme.outlineVariant.withValues(
+                      alpha: 0.7,
+                    ),
+                  ),
+              ],
+            ],
+          ),
         ),
         if ((detail.note ?? '').trim().isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -937,7 +1023,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   }
 }
 
-enum _HistoryDocumentType { sale, saleReturn }
+enum _HistoryDocumentType { sale, refund }
 
 class _HistoryDocument {
   const _HistoryDocument({
@@ -945,27 +1031,23 @@ class _HistoryDocument {
     required this.raw,
   });
 
-  factory _HistoryDocument.sale(Map<String, dynamic> raw) =>
-      _HistoryDocument(type: _HistoryDocumentType.sale, raw: raw);
-
-  factory _HistoryDocument.saleReturn(Map<String, dynamic> raw) =>
-      _HistoryDocument(type: _HistoryDocumentType.saleReturn, raw: raw);
+  factory _HistoryDocument.sale(Map<String, dynamic> raw) => _HistoryDocument(
+        type: (((raw['source_channel'] as String?)?.toUpperCase() ==
+                    'POS_REFUND') ||
+                (((raw['total_amount'] as num?)?.toDouble() ?? 0) < 0))
+            ? _HistoryDocumentType.refund
+            : _HistoryDocumentType.sale,
+        raw: raw,
+      );
 
   final _HistoryDocumentType type;
   final Map<String, dynamic> raw;
 
-  int get id => type == _HistoryDocumentType.sale
-      ? ((raw['sale_id'] as num?)?.toInt() ?? 0)
-      : ((raw['return_id'] as num?)?.toInt() ?? 0);
+  int get id => ((raw['sale_id'] as num?)?.toInt() ?? 0);
 
   String get key => '${type.name}:$id';
 
-  String get number =>
-      (type == _HistoryDocumentType.sale
-              ? raw['sale_number']
-              : raw['return_number'])
-          ?.toString() ??
-      'Document #$id';
+  String get number => raw['sale_number']?.toString() ?? 'Document #$id';
 
   String? get customerName {
     final customer = raw['customer'];
@@ -981,9 +1063,7 @@ class _HistoryDocument {
     final value = (customerName ?? '').trim();
     if (value.isNotEmpty) return value;
     if (customerId != null) return 'Customer #$customerId';
-    return type == _HistoryDocumentType.sale
-        ? 'Walk-in customer'
-        : 'No customer';
+    return 'Walk-in customer';
   }
 
   DateTime get sortDate {
@@ -994,9 +1074,7 @@ class _HistoryDocument {
   }
 
   String dateLabel(BuildContext context, LocalePreferencesState localePrefs) {
-    final rawDate = type == _HistoryDocumentType.sale
-        ? raw['sale_date']?.toString()
-        : raw['return_date']?.toString();
+    final rawDate = raw['sale_date']?.toString();
     if ((rawDate ?? '').isEmpty) {
       return 'Date unavailable';
     }
@@ -1028,7 +1106,7 @@ class _HistoryDocument {
       return secondary;
     }
     if (primary.isNotEmpty) return primary;
-    return type == _HistoryDocumentType.sale ? 'Sale' : 'Return';
+    return type == _HistoryDocumentType.sale ? 'Sale' : 'Refund';
   }
 
   double get amount => (raw['total_amount'] as num?)?.toDouble() ?? 0;
@@ -1037,7 +1115,7 @@ class _HistoryDocument {
 
   IconData get icon => type == _HistoryDocumentType.sale
       ? Icons.receipt_long_rounded
-      : Icons.assignment_return_rounded;
+      : Icons.undo_rounded;
 }
 
 class _HistoryDocumentDetail {
@@ -1046,6 +1124,7 @@ class _HistoryDocumentDetail {
     required this.metadata,
     required this.items,
     required this.noteLabel,
+    this.sale,
     this.note,
   });
 
@@ -1054,8 +1133,29 @@ class _HistoryDocumentDetail {
     SaleDto sale,
   ) {
     final metadata = <_MetadataEntry>[
-      _MetadataEntry(label: 'Sale ID', value: sale.saleId.toString()),
-      _MetadataEntry(label: 'Location', value: sale.locationId.toString()),
+      _MetadataEntry(
+        label: sale.isRefundInvoice ? 'Refund Invoice ID' : 'Sale ID',
+        value: sale.saleId.toString(),
+      ),
+      if (sale.isRefundInvoice)
+        _MetadataEntry(
+          label: 'Refund For',
+          value: (sale.refundSourceSaleNumber ?? '').trim().isNotEmpty
+              ? sale.refundSourceSaleNumber!
+              : 'Sale #${sale.refundSourceSaleId ?? 0}',
+        ),
+      if (!sale.isRefundInvoice &&
+          (sale.refundSourceSaleNumber ?? '').trim().isNotEmpty)
+        _MetadataEntry(
+          label: 'Includes Refund From',
+          value: sale.refundSourceSaleNumber!,
+        ),
+      _MetadataEntry(
+        label: 'Location',
+        value: (sale.locationName ?? '').trim().isNotEmpty
+            ? sale.locationName!
+            : 'Location #${sale.locationId}',
+      ),
       _MetadataEntry(
         label: 'Payment',
         value: (sale.paymentMethodName ?? '').trim().isEmpty
@@ -1063,14 +1163,33 @@ class _HistoryDocumentDetail {
             : sale.paymentMethodName!,
       ),
       _MetadataEntry(
-          label: 'Subtotal', value: sale.subtotal.toStringAsFixed(2)),
+        label: 'Created By',
+        value: (sale.createdByName ?? '').trim().isNotEmpty
+            ? sale.createdByName!
+            : 'User #${sale.createdBy}',
+      ),
+      _MetadataEntry(
+        label: 'Created At',
+        value: _displayDateTime(sale.createdAt),
+      ),
+      _MetadataEntry(
+        label: 'Updated At',
+        value: _displayDateTime(sale.updatedAt),
+      ),
+      _MetadataEntry(
+        label: 'Number of Items',
+        value: sale.items.length.toString(),
+      ),
+      _MetadataEntry(
+        label: 'Subtotal',
+        value: sale.subtotal.toStringAsFixed(2),
+      ),
       _MetadataEntry(label: 'Tax', value: sale.taxAmount.toStringAsFixed(2)),
       _MetadataEntry(
         label: 'Discount',
         value: sale.discountAmount.toStringAsFixed(2),
       ),
       _MetadataEntry(label: 'Paid', value: sale.paidAmount.toStringAsFixed(2)),
-      _MetadataEntry(label: 'Lines', value: sale.items.length.toString()),
       if ((sale.posStatus ?? '').trim().isNotEmpty &&
           (sale.posStatus ?? '').trim().toUpperCase() !=
               (sale.status ?? '').trim().toUpperCase())
@@ -1081,54 +1200,33 @@ class _HistoryDocumentDetail {
       document: document,
       metadata: metadata,
       items: sale.items.map(_HistoryLineItem.fromSaleItem).toList(),
-      noteLabel: 'Notes',
+      noteLabel: sale.isRefundInvoice ? 'Refund Reason' : 'Notes',
+      sale: sale,
       note: sale.notes,
     );
   }
 
-  factory _HistoryDocumentDetail.fromReturn(
-    _HistoryDocument document,
-    Map<String, dynamic> data,
-  ) {
-    final sale = data['sale'];
-    final itemsRaw = (data['items'] as List<dynamic>? ?? const [])
-        .cast<Map<String, dynamic>>();
-    final subtotal = itemsRaw.fold<double>(
-      0,
-      (sum, item) => sum + ((item['line_total'] as num?)?.toDouble() ?? 0),
-    );
-
-    return _HistoryDocumentDetail(
-      document: document,
-      metadata: [
-        _MetadataEntry(
-          label: 'Return ID',
-          value: ((data['return_id'] as num?)?.toInt() ?? 0).toString(),
-        ),
-        _MetadataEntry(
-          label: 'Sale Ref',
-          value: sale is Map<String, dynamic>
-              ? (sale['sale_number']?.toString() ??
-                  'Sale #${document.raw['sale_id']}')
-              : 'Sale #${document.raw['sale_id']}',
-        ),
-        _MetadataEntry(
-          label: 'Location',
-          value: ((data['location_id'] as num?)?.toInt() ?? 0).toString(),
-        ),
-        _MetadataEntry(label: 'Subtotal', value: subtotal.toStringAsFixed(2)),
-        _MetadataEntry(label: 'Lines', value: itemsRaw.length.toString()),
-      ],
-      items: itemsRaw.map(_HistoryLineItem.fromReturnItem).toList(),
-      noteLabel: 'Reason',
-      note: data['reason']?.toString(),
-    );
+  static String _displayDateTime(dynamic value) {
+    DateTime? parsed;
+    if (value is DateTime) {
+      parsed = value;
+    } else if (value != null) {
+      parsed = DateTime.tryParse(value.toString());
+    }
+    if (parsed == null) return '-';
+    final local = parsed.toLocal();
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${local.year}-$month-$day $hour:$minute';
   }
 
   final _HistoryDocument document;
   final List<_MetadataEntry> metadata;
   final List<_HistoryLineItem> items;
   final String noteLabel;
+  final SaleDto? sale;
   final String? note;
 }
 
@@ -1169,21 +1267,6 @@ class _HistoryLineItem {
     );
   }
 
-  factory _HistoryLineItem.fromReturnItem(Map<String, dynamic> item) {
-    return _HistoryLineItem(
-      title: (item['product_name']?.toString() ?? '').trim().isNotEmpty
-          ? item['product_name'].toString()
-          : 'Product #${item['product_id']}',
-      subtitle:
-          'Qty ${((item['quantity'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)} × ${((item['unit_price'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}',
-      extra: (item['sale_detail_id'] as num?) != null
-          ? 'Original line #${(item['sale_detail_id'] as num).toInt()}'
-          : null,
-      amountLabel:
-          ((item['line_total'] as num?)?.toDouble() ?? 0).toStringAsFixed(2),
-    );
-  }
-
   final String title;
   final String amountLabel;
   final String? subtitle;
@@ -1205,11 +1288,13 @@ class _DesktopPane extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.child,
+    this.headerTrailing,
   });
 
   final String title;
   final String subtitle;
   final Widget child;
+  final Widget? headerTrailing;
 
   @override
   Widget build(BuildContext context) {
@@ -1244,6 +1329,10 @@ class _DesktopPane extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (headerTrailing != null) ...[
+                  const SizedBox(width: 8),
+                  headerTrailing!,
+                ],
               ],
             ),
           ),
@@ -1271,7 +1360,7 @@ class _DocumentTypeBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        isSale ? 'Sale' : 'Return',
+        isSale ? 'Sale' : 'Refund',
         style: theme.textTheme.labelSmall?.copyWith(
           fontWeight: FontWeight.w700,
           color: isSale ? const Color(0xFF8EE6B0) : const Color(0xFFF1C87A),
@@ -1320,36 +1409,109 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-class _MetadataTile extends StatelessWidget {
-  const _MetadataTile({required this.entry});
+class _RefundStateChip extends StatelessWidget {
+  const _RefundStateChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF17324C),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: const Color(0xFF9ED0FF),
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
+  }
+}
+
+class _DetailTextRow extends StatelessWidget {
+  const _DetailTextRow({required this.entry});
 
   final _MetadataEntry entry;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 108,
+          child: Text(
             entry.label,
             style: theme.textTheme.labelSmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            entry.value,
-            style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
             ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            entry.value,
+            textAlign: TextAlign.right,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SaleActionsBar extends StatelessWidget {
+  const _SaleActionsBar({
+    required this.busy,
+    required this.onPrintA4,
+    required this.onPrint80mm,
+    required this.onSharePdf,
+    required this.onRefund,
+  });
+
+  final bool busy;
+  final Future<void> Function() onPrintA4;
+  final Future<void> Function() onPrint80mm;
+  final Future<void> Function() onSharePdf;
+  final Future<void> Function() onRefund;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          FilledButton.tonalIcon(
+            onPressed: busy ? null : onPrintA4,
+            icon: const Icon(Icons.print_rounded),
+            label: const Text('A4'),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.tonalIcon(
+            onPressed: busy ? null : onPrint80mm,
+            icon: const Icon(Icons.print_rounded),
+            label: const Text('80mm'),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            onPressed: busy ? null : onSharePdf,
+            icon: const Icon(Icons.share_rounded),
+            label: const Text('Share'),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            onPressed: busy ? null : onRefund,
+            icon: const Icon(Icons.undo_rounded),
+            label: const Text('Refund'),
           ),
         ],
       ),

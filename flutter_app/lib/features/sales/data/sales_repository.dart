@@ -103,16 +103,27 @@ class SalesRepository {
     return body;
   }
 
+  Future<Map<String, dynamic>> getRefundableForSale(int saleId) async {
+    final res = await _dio.get('/sales/$saleId/refundable-items');
+    final body = res.data is Map && (res.data['data'] != null)
+        ? res.data['data'] as Map<String, dynamic>
+        : res.data as Map<String, dynamic>;
+    return body;
+  }
+
   Future<int> createSaleReturn({
     required int saleId,
     required List<Map<String, dynamic>>
         items, // {product_id, quantity, unit_price}
     String? reason,
+    String? overridePassword,
   }) async {
     final payload = <String, dynamic>{
       'sale_id': saleId,
       'items': items,
       if (reason != null && reason.isNotEmpty) 'reason': reason,
+      if (overridePassword != null && overridePassword.trim().isNotEmpty)
+        'override_password': overridePassword.trim(),
     };
     final res = await _dio.post('/sale-returns', data: payload);
     final body = res.data is Map && (res.data['data'] != null)
@@ -121,15 +132,37 @@ class SalesRepository {
     return (body['return_id'] as int?) ?? (body['returnId'] as int? ?? 0);
   }
 
+  Future<int> createRefundInvoice({
+    required int saleId,
+    required List<Map<String, dynamic>> items,
+    String? reason,
+    String? overridePassword,
+  }) async {
+    final payload = <String, dynamic>{
+      'items': items,
+      if (reason != null && reason.isNotEmpty) 'reason': reason,
+      if (overridePassword != null && overridePassword.trim().isNotEmpty)
+        'override_password': overridePassword.trim(),
+    };
+    final res = await _dio.post('/sales/$saleId/refund-invoice', data: payload);
+    final body = res.data is Map && (res.data['data'] != null)
+        ? res.data['data'] as Map<String, dynamic>
+        : res.data as Map<String, dynamic>;
+    return (body['sale_id'] as int?) ?? (body['saleId'] as int? ?? 0);
+  }
+
   Future<int> createSaleReturnByCustomer({
     required int customerId,
     required List<Map<String, dynamic>> items,
     String? reason,
+    String? overridePassword,
   }) async {
     final payload = <String, dynamic>{
       'customer_id': customerId,
       'items': items,
       if (reason != null && reason.isNotEmpty) 'reason': reason,
+      if (overridePassword != null && overridePassword.trim().isNotEmpty)
+        'override_password': overridePassword.trim(),
     };
     final res = await _dio.post('/sale-returns/by-customer', data: payload);
     final body = res.data is Map && (res.data['data'] != null)
@@ -270,6 +303,21 @@ class SalesRepository {
 
   Future<void> markQuoteShared(int id) async {
     await _dio.post('/sales/quotes/$id/share');
+  }
+
+  Future<void> updateSale(
+    int id, {
+    int? paymentMethodId,
+    String? notes,
+    String? overridePassword,
+  }) async {
+    final payload = <String, dynamic>{
+      if (paymentMethodId != null) 'payment_method_id': paymentMethodId,
+      if (notes != null) 'notes': notes,
+      if (overridePassword != null && overridePassword.trim().isNotEmpty)
+        'override_password': overridePassword.trim(),
+    };
+    await _dio.put('/sales/$id', data: payload);
   }
 }
 

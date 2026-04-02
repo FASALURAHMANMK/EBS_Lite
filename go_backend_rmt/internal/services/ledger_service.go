@@ -104,6 +104,22 @@ func (s *LedgerService) insertEntryIfMissing(companyID int, reference string, ac
 	return nil
 }
 
+func signedLedgerAmounts(amount float64, positiveAsDebit bool) (float64, float64, bool) {
+	if math.Abs(amount) < 0.0001 {
+		return 0, 0, false
+	}
+	if amount > 0 {
+		if positiveAsDebit {
+			return amount, 0, true
+		}
+		return 0, amount, true
+	}
+	if positiveAsDebit {
+		return 0, -amount, true
+	}
+	return -amount, 0, true
+}
+
 func (s *LedgerService) saleCOGSAmount(companyID, saleID int) (float64, error) {
 	var amount float64
 	if err := s.db.QueryRow(`
@@ -178,13 +194,7 @@ func (s *LedgerService) RecordSale(companyID, saleID, userID int) error {
 	}
 
 	netSales := total - tax
-	if netSales < 0 {
-		netSales = 0
-	}
 	outstanding := total - paid
-	if outstanding < 0 {
-		outstanding = 0
-	}
 
 	cashID, err := s.ensureDefaultAccountID(companyID, accountCodeCash)
 	if err != nil {
@@ -215,37 +225,39 @@ func (s *LedgerService) RecordSale(companyID, saleID, userID int) error {
 		return err
 	}
 
-	if paid > 0 {
+	if debit, credit, ok := signedLedgerAmounts(paid, true); ok {
 		ref := fmt.Sprintf("sale:%d:%s", saleID, accountCodeCash)
-		if err := s.insertEntryIfMissing(companyID, ref, cashID, saleDate, paid, 0, "sale", saleID, nil, nil, userID); err != nil {
+		if err := s.insertEntryIfMissing(companyID, ref, cashID, saleDate, debit, credit, "sale", saleID, nil, nil, userID); err != nil {
 			return err
 		}
 	}
-	if outstanding > 0 {
+	if debit, credit, ok := signedLedgerAmounts(outstanding, true); ok {
 		ref := fmt.Sprintf("sale:%d:%s", saleID, accountCodeAR)
-		if err := s.insertEntryIfMissing(companyID, ref, arID, saleDate, outstanding, 0, "sale", saleID, nil, nil, userID); err != nil {
+		if err := s.insertEntryIfMissing(companyID, ref, arID, saleDate, debit, credit, "sale", saleID, nil, nil, userID); err != nil {
 			return err
 		}
 	}
-	if netSales > 0 {
+	if debit, credit, ok := signedLedgerAmounts(netSales, false); ok {
 		ref := fmt.Sprintf("sale:%d:%s", saleID, accountCodeSalesRevenue)
-		if err := s.insertEntryIfMissing(companyID, ref, salesID, saleDate, 0, netSales, "sale", saleID, nil, nil, userID); err != nil {
+		if err := s.insertEntryIfMissing(companyID, ref, salesID, saleDate, debit, credit, "sale", saleID, nil, nil, userID); err != nil {
 			return err
 		}
 	}
-	if tax > 0 {
+	if debit, credit, ok := signedLedgerAmounts(tax, false); ok {
 		ref := fmt.Sprintf("sale:%d:%s", saleID, accountCodeTaxPayable)
-		if err := s.insertEntryIfMissing(companyID, ref, taxPayableID, saleDate, 0, tax, "sale", saleID, nil, nil, userID); err != nil {
+		if err := s.insertEntryIfMissing(companyID, ref, taxPayableID, saleDate, debit, credit, "sale", saleID, nil, nil, userID); err != nil {
 			return err
 		}
 	}
-	if cogsAmount > 0 {
+	if debit, credit, ok := signedLedgerAmounts(cogsAmount, true); ok {
 		ref := fmt.Sprintf("sale:%d:%s", saleID, accountCodeCOGS)
-		if err := s.insertEntryIfMissing(companyID, ref, cogsID, saleDate, cogsAmount, 0, "sale", saleID, nil, nil, userID); err != nil {
+		if err := s.insertEntryIfMissing(companyID, ref, cogsID, saleDate, debit, credit, "sale", saleID, nil, nil, userID); err != nil {
 			return err
 		}
-		ref = fmt.Sprintf("sale:%d:%s", saleID, accountCodeInventory)
-		if err := s.insertEntryIfMissing(companyID, ref, inventoryID, saleDate, 0, cogsAmount, "sale", saleID, nil, nil, userID); err != nil {
+	}
+	if debit, credit, ok := signedLedgerAmounts(cogsAmount, false); ok {
+		ref := fmt.Sprintf("sale:%d:%s", saleID, accountCodeInventory)
+		if err := s.insertEntryIfMissing(companyID, ref, inventoryID, saleDate, debit, credit, "sale", saleID, nil, nil, userID); err != nil {
 			return err
 		}
 	}

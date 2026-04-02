@@ -5,67 +5,71 @@ import (
 )
 
 type User struct {
-	UserID            int        `json:"user_id" db:"user_id"`
-	CompanyID         *int       `json:"company_id,omitempty" db:"company_id"` // CHANGE: int -> *int
-	LocationID        *int       `json:"location_id,omitempty" db:"location_id"`
-	RoleID            *int       `json:"role_id,omitempty" db:"role_id"` // CHANGE: int -> *int
-	Username          string     `json:"username" db:"username" validate:"required,min=3,max=50"`
-	Email             string     `json:"email" db:"email" validate:"required,email"`
-	PasswordHash      string     `json:"-" db:"password_hash"`
-	FirstName         *string    `json:"first_name,omitempty" db:"first_name"`
-	LastName          *string    `json:"last_name,omitempty" db:"last_name"`
-	Phone             *string    `json:"phone,omitempty" db:"phone"`
-	PreferredLanguage *string    `json:"preferred_language,omitempty" db:"preferred_language"`
-	SecondaryLanguage *string    `json:"secondary_language,omitempty" db:"secondary_language"`
-	MaxAllowedDevices int        `json:"max_allowed_devices" db:"max_allowed_devices"`
-	IsLocked          bool       `json:"is_locked" db:"is_locked"`
-	IsActive          bool       `json:"is_active" db:"is_active"`
-	LastLogin         *time.Time `json:"last_login,omitempty" db:"last_login"`
+	UserID                  int        `json:"user_id" db:"user_id"`
+	CompanyID               *int       `json:"company_id,omitempty" db:"company_id"` // CHANGE: int -> *int
+	LocationID              *int       `json:"location_id,omitempty" db:"location_id"`
+	RoleID                  *int       `json:"role_id,omitempty" db:"role_id"` // CHANGE: int -> *int
+	Username                string     `json:"username" db:"username" validate:"required,min=3,max=50"`
+	Email                   string     `json:"email" db:"email" validate:"required,email"`
+	PasswordHash            string     `json:"-" db:"password_hash"`
+	SalesActionPasswordHash *string    `json:"-" db:"sales_action_password_hash"`
+	FirstName               *string    `json:"first_name,omitempty" db:"first_name"`
+	LastName                *string    `json:"last_name,omitempty" db:"last_name"`
+	Phone                   *string    `json:"phone,omitempty" db:"phone"`
+	PreferredLanguage       *string    `json:"preferred_language,omitempty" db:"preferred_language"`
+	SecondaryLanguage       *string    `json:"secondary_language,omitempty" db:"secondary_language"`
+	MaxAllowedDevices       int        `json:"max_allowed_devices" db:"max_allowed_devices"`
+	IsLocked                bool       `json:"is_locked" db:"is_locked"`
+	IsActive                bool       `json:"is_active" db:"is_active"`
+	LastLogin               *time.Time `json:"last_login,omitempty" db:"last_login"`
 	SyncModel
 }
 
 type UserResponse struct {
-	UserID            int               `json:"user_id"`
-	Username          string            `json:"username"`
-	Email             string            `json:"email"`
-	FirstName         *string           `json:"first_name,omitempty"`
-	LastName          *string           `json:"last_name,omitempty"`
-	Phone             *string           `json:"phone,omitempty"`
-	RoleID            *int              `json:"role_id,omitempty"` // CHANGE: int -> *int
-	LocationID        *int              `json:"location_id,omitempty"`
-	CompanyID         *int              `json:"company_id,omitempty"` // CHANGE: int -> *int
-	IsActive          bool              `json:"is_active"`
-	IsLocked          bool              `json:"is_locked"`
-	PreferredLanguage *string           `json:"preferred_language,omitempty"`
-	SecondaryLanguage *string           `json:"secondary_language,omitempty"`
-	LastLogin         *time.Time        `json:"last_login,omitempty"`
-	Permissions       []string          `json:"permissions,omitempty"`
-	Preferences       map[string]string `json:"preferences,omitempty"`
+	UserID                 int               `json:"user_id"`
+	Username               string            `json:"username"`
+	Email                  string            `json:"email"`
+	FirstName              *string           `json:"first_name,omitempty"`
+	LastName               *string           `json:"last_name,omitempty"`
+	Phone                  *string           `json:"phone,omitempty"`
+	RoleID                 *int              `json:"role_id,omitempty"` // CHANGE: int -> *int
+	LocationID             *int              `json:"location_id,omitempty"`
+	CompanyID              *int              `json:"company_id,omitempty"` // CHANGE: int -> *int
+	IsActive               bool              `json:"is_active"`
+	IsLocked               bool              `json:"is_locked"`
+	HasSalesActionPassword bool              `json:"has_sales_action_password"`
+	PreferredLanguage      *string           `json:"preferred_language,omitempty"`
+	SecondaryLanguage      *string           `json:"secondary_language,omitempty"`
+	LastLogin              *time.Time        `json:"last_login,omitempty"`
+	Permissions            []string          `json:"permissions,omitempty"`
+	Preferences            map[string]string `json:"preferences,omitempty"`
 }
 type CreateUserRequest struct {
-	Username          string  `json:"username" validate:"required,min=3,max=50"`
-	Email             string  `json:"email" validate:"required,email"`
-	Password          string  `json:"password" validate:"required,min=6"`
-	FirstName         *string `json:"first_name,omitempty"`
-	LastName          *string `json:"last_name,omitempty"`
-	Phone             *string `json:"phone,omitempty"`
-	RoleID            *int    `json:"role_id,omitempty"`
-	LocationID        *int    `json:"location_id,omitempty"`
-	CompanyID         int     `json:"company_id" validate:"required"`
-	PreferredLanguage *string `json:"preferred_language,omitempty"`
-	SecondaryLanguage *string `json:"secondary_language,omitempty"`
+	Username            string  `json:"username" validate:"required,min=3,max=50"`
+	Email               string  `json:"email" validate:"required,email"`
+	Password            string  `json:"password" validate:"required,min=6"`
+	FirstName           *string `json:"first_name,omitempty"`
+	LastName            *string `json:"last_name,omitempty"`
+	Phone               *string `json:"phone,omitempty"`
+	RoleID              *int    `json:"role_id,omitempty"`
+	LocationID          *int    `json:"location_id,omitempty"`
+	CompanyID           int     `json:"company_id" validate:"required"`
+	SalesActionPassword *string `json:"sales_action_password,omitempty" validate:"omitempty,min=4,max=64"`
+	PreferredLanguage   *string `json:"preferred_language,omitempty"`
+	SecondaryLanguage   *string `json:"secondary_language,omitempty"`
 }
 
 type UpdateUserRequest struct {
-	FirstName         *string `json:"first_name,omitempty"`
-	LastName          *string `json:"last_name,omitempty"`
-	Phone             *string `json:"phone,omitempty"`
-	IsActive          *bool   `json:"is_active,omitempty"`
-	IsLocked          *bool   `json:"is_locked,omitempty"`
-	RoleID            *int    `json:"role_id,omitempty"`
-	LocationID        *int    `json:"location_id,omitempty"`
-	PreferredLanguage *string `json:"preferred_language,omitempty"`
-	SecondaryLanguage *string `json:"secondary_language,omitempty"`
+	FirstName           *string `json:"first_name,omitempty"`
+	LastName            *string `json:"last_name,omitempty"`
+	Phone               *string `json:"phone,omitempty"`
+	IsActive            *bool   `json:"is_active,omitempty"`
+	IsLocked            *bool   `json:"is_locked,omitempty"`
+	RoleID              *int    `json:"role_id,omitempty"`
+	LocationID          *int    `json:"location_id,omitempty"`
+	SalesActionPassword *string `json:"sales_action_password,omitempty" validate:"omitempty,min=4,max=64"`
+	PreferredLanguage   *string `json:"preferred_language,omitempty"`
+	SecondaryLanguage   *string `json:"secondary_language,omitempty"`
 }
 
 type UserPreference struct {

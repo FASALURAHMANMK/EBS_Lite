@@ -1280,7 +1280,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/UpdateSaleRequest'
   /inventory/combo-products:
     get:
       summary: GET /api/v1/inventory/combo-products
@@ -1504,7 +1504,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/TaxSettings'
   /inventory/asset-categories:
     get:
       summary: GET /api/v1/inventory/asset-categories
@@ -1886,7 +1886,44 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/UpdateSaleRequest'
+  /sales/{id}/refund-invoice:
+    post:
+      summary: POST /api/v1/sales/{id}/refund-invoice
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRefundInvoiceRequest'
+  /sales/{id}/refundable-items:
+    get:
+      summary: GET /api/v1/sales/{id}/refundable-items
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
     delete:
       summary: DELETE /api/v1/sales/{id}
       responses:
@@ -2977,11 +3014,6 @@ paths:
         required: true
         schema:
           type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenericObject'
   /purchases:
     get:
       summary: GET /api/v1/purchases
@@ -8546,6 +8578,21 @@ components:
           type: integer
         elevated_access_window_mins:
           type: integer
+    TaxSettings:
+      type: object
+      properties:
+        tax_name:
+          type: string
+          nullable: true
+        tax_percent:
+          type: number
+          format: float
+          nullable: true
+        price_mode:
+          type: string
+          enum:
+            - EXCLUSIVE
+            - INCLUSIVE
     POSPaymentLine:
       type: object
       properties:
@@ -8599,6 +8646,9 @@ components:
           type: string
           nullable: true
         override_reason:
+          type: string
+          nullable: true
+        sales_action_password:
           type: string
           nullable: true
         override_password:
@@ -9077,6 +9127,21 @@ components:
         override_password:
           type: string
           nullable: true
+    UpdateSaleRequest:
+      type: object
+      properties:
+        payment_method_id:
+          type: integer
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+        override_password:
+          type: string
+          nullable: true
     ConvertQuoteToSaleRequest:
       type: object
       properties:
@@ -9100,6 +9165,9 @@ components:
           nullable: true
         product_name:
           type: string
+          nullable: true
+        source_sale_detail_id:
+          type: integer
           nullable: true
         quantity:
           type: number
@@ -9368,6 +9436,9 @@ components:
       properties:
         product_id:
           type: integer
+        sale_detail_id:
+          type: integer
+          nullable: true
         barcode_id:
           type: integer
           nullable: true
@@ -9392,6 +9463,32 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/InventoryBatchSelectionInput'
+    CreateRefundInvoiceRequest:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateRefundInvoiceItemRequest'
+        reason:
+          type: string
+          nullable: true
+        override_password:
+          type: string
+          nullable: true
+      required:
+        - items
+    CreateRefundInvoiceItemRequest:
+      type: object
+      properties:
+        sale_detail_id:
+          type: integer
+        quantity:
+          type: number
+          format: float
+      required:
+        - sale_detail_id
+        - quantity
     CreateSaleReturnByCustomerRequest:
       type: object
       properties:
@@ -9403,6 +9500,9 @@ components:
             $ref: '#/components/schemas/GenericObject'
         reason:
           type: string
+        override_password:
+          type: string
+          nullable: true
       required:
         - customer_id
         - items
@@ -9416,6 +9516,9 @@ components:
             $ref: '#/components/schemas/GenericObject'
         reason:
           type: string
+        override_password:
+          type: string
+          nullable: true
       required:
         - items
         - reason
@@ -9449,6 +9552,8 @@ components:
         is_active:
           type: boolean
         is_locked:
+          type: boolean
+        has_sales_action_password:
           type: boolean
         preferred_language:
           type: string
@@ -9496,6 +9601,9 @@ components:
           nullable: true
         company_id:
           type: integer
+        sales_action_password:
+          type: string
+          nullable: true
         preferred_language:
           type: string
           nullable: true
@@ -9525,6 +9633,9 @@ components:
           nullable: true
         location_id:
           type: integer
+          nullable: true
+        sales_action_password:
+          type: string
           nullable: true
         preferred_language:
           type: string

@@ -250,6 +250,10 @@ class PosCartItem {
   final double quantity;
   final double unitPrice;
   final double discountPercent; // 0-100, per-line
+  final int? sourceSaleDetailId;
+  final int? sourceSaleId;
+  final String? sourceSaleNumber;
+  final bool lockedQuantity;
   final InventoryTrackingSelection? tracking;
   final List<PosComboComponentTracking> comboTracking;
 
@@ -258,6 +262,10 @@ class PosCartItem {
     required this.quantity,
     required this.unitPrice,
     this.discountPercent = 0.0,
+    this.sourceSaleDetailId,
+    this.sourceSaleId,
+    this.sourceSaleNumber,
+    this.lockedQuantity = false,
     this.tracking,
     this.comboTracking = const [],
   });
@@ -266,6 +274,10 @@ class PosCartItem {
           {double? quantity,
           double? unitPrice,
           double? discountPercent,
+          int? sourceSaleDetailId,
+          int? sourceSaleId,
+          String? sourceSaleNumber,
+          bool? lockedQuantity,
           InventoryTrackingSelection? tracking,
           List<PosComboComponentTracking>? comboTracking,
           bool clearTracking = false}) =>
@@ -274,6 +286,10 @@ class PosCartItem {
         quantity: quantity ?? this.quantity,
         unitPrice: unitPrice ?? this.unitPrice,
         discountPercent: discountPercent ?? this.discountPercent,
+        sourceSaleDetailId: sourceSaleDetailId ?? this.sourceSaleDetailId,
+        sourceSaleId: sourceSaleId ?? this.sourceSaleId,
+        sourceSaleNumber: sourceSaleNumber ?? this.sourceSaleNumber,
+        lockedQuantity: lockedQuantity ?? this.lockedQuantity,
         tracking: clearTracking ? null : (tracking ?? this.tracking),
         comboTracking: comboTracking ?? this.comboTracking,
       );
@@ -298,11 +314,13 @@ class PosCartItem {
         .where((c) => c.requiresTracking)
         .map((c) => c.identityKey(quantity))
         .join('|');
-    return '${product.identityKey}|$trackingKey|$comboKey';
+    return '${product.identityKey}|$trackingKey|$comboKey|src:${sourceSaleDetailId ?? 0}|sign:${quantity < 0 ? "neg" : "pos"}';
   }
 
   bool get requiresTracking =>
       product.requiresTracking || comboTracking.any((c) => c.requiresTracking);
+
+  bool get isRefundLine => quantity < 0;
 
   bool get requiresDirectTracking => product.requiresTracking;
 
@@ -336,7 +354,7 @@ class PosCartItem {
   double get lineTotal {
     final gross = quantity * unitPrice;
     final disc = gross * (discountPercent.clamp(0.0, 100.0) / 100.0);
-    return (gross - disc).clamp(0.0, double.infinity);
+    return gross - disc;
   }
 }
 
@@ -442,6 +460,7 @@ class CurrencyDto {
 }
 
 class SaleItemDto {
+  final int? saleDetailId;
   final int? productId;
   final int? comboProductId;
   final int? barcodeId;
@@ -456,11 +475,13 @@ class SaleItemDto {
   final double discountPercent;
   final double discountAmount;
   final double lineTotal;
+  final int? sourceSaleDetailId;
   final List<String> serialNumbers;
   final List<PosComboComponentTracking> comboComponentTracking;
 
   SaleItemDto(
-      {this.productId,
+      {this.saleDetailId,
+      this.productId,
       this.comboProductId,
       this.barcodeId,
       this.productName,
@@ -474,10 +495,12 @@ class SaleItemDto {
       this.discountPercent = 0.0,
       this.discountAmount = 0.0,
       this.lineTotal = 0.0,
+      this.sourceSaleDetailId,
       this.serialNumbers = const [],
       this.comboComponentTracking = const []});
 
   factory SaleItemDto.fromJson(Map<String, dynamic> json) => SaleItemDto(
+        saleDetailId: (json['sale_detail_id'] as num?)?.toInt(),
         productId: json['product_id'] as int?,
         comboProductId: json['combo_product_id'] as int?,
         barcodeId: json['barcode_id'] as int?,
@@ -493,6 +516,7 @@ class SaleItemDto {
             (json['discount_percentage'] as num?)?.toDouble() ?? 0.0,
         discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0.0,
         lineTotal: (json['line_total'] as num?)?.toDouble() ?? 0.0,
+        sourceSaleDetailId: (json['source_sale_detail_id'] as num?)?.toInt(),
         serialNumbers: (json['serial_numbers'] as List<dynamic>? ?? const [])
             .map((e) => e.toString())
             .toList(),
@@ -509,6 +533,11 @@ class SaleDto {
   final int saleId;
   final String saleNumber;
   final int locationId;
+  final String? locationName;
+  final String? sourceChannel;
+  final int? refundSourceSaleId;
+  final String? refundSourceSaleNumber;
+  final String? refundState;
   final int? customerId;
   final String? customerName;
   final DateTime? saleDate;
@@ -517,8 +546,15 @@ class SaleDto {
   final double discountAmount;
   final double totalAmount;
   final double paidAmount;
+  final int? paymentMethodId;
   final String? status;
   final String? posStatus;
+  final int createdBy;
+  final String? createdByName;
+  final int? updatedBy;
+  final String? updatedByName;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
   final String? paymentMethodName;
   final String? notes;
   final List<SaleItemDto> items;
@@ -527,6 +563,11 @@ class SaleDto {
     required this.saleId,
     required this.saleNumber,
     required this.locationId,
+    this.locationName,
+    this.sourceChannel,
+    this.refundSourceSaleId,
+    this.refundSourceSaleNumber,
+    this.refundState,
     this.customerId,
     this.customerName,
     this.saleDate,
@@ -535,8 +576,15 @@ class SaleDto {
     required this.discountAmount,
     required this.totalAmount,
     required this.paidAmount,
+    this.paymentMethodId,
     this.status,
     this.posStatus,
+    required this.createdBy,
+    this.createdByName,
+    this.updatedBy,
+    this.updatedByName,
+    this.createdAt,
+    this.updatedAt,
     this.paymentMethodName,
     this.notes,
     required this.items,
@@ -552,6 +600,11 @@ class SaleDto {
       saleId: json['sale_id'] as int,
       saleNumber: json['sale_number'] as String? ?? '',
       locationId: (json['location_id'] as num?)?.toInt() ?? 0,
+      locationName: json['location_name'] as String?,
+      sourceChannel: json['source_channel'] as String?,
+      refundSourceSaleId: (json['refund_source_sale_id'] as num?)?.toInt(),
+      refundSourceSaleNumber: json['refund_source_sale_number'] as String?,
+      refundState: json['refund_state'] as String?,
       customerId: json['customer_id'] as int?,
       customerName: customer != null ? customer['name'] as String? : null,
       saleDate: DateTime.tryParse(json['sale_date']?.toString() ?? ''),
@@ -560,14 +613,30 @@ class SaleDto {
       discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0.0,
       totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0.0,
       paidAmount: (json['paid_amount'] as num?)?.toDouble() ?? 0.0,
+      paymentMethodId: (json['payment_method_id'] as num?)?.toInt(),
       status: json['status'] as String?,
       posStatus: json['pos_status'] as String?,
+      createdBy: (json['created_by'] as num?)?.toInt() ?? 0,
+      createdByName: json['created_by_name'] as String?,
+      updatedBy: (json['updated_by'] as num?)?.toInt(),
+      updatedByName: json['updated_by_name'] as String?,
+      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? ''),
+      updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? ''),
       paymentMethodName:
           paymentMethod != null ? paymentMethod['name'] as String? : null,
       notes: json['notes'] as String?,
       items: items,
     );
   }
+
+  bool get isRefundInvoice =>
+      (sourceChannel ?? '').toUpperCase() == 'POS_REFUND' || totalAmount < 0;
+
+  bool get isFullyRefunded =>
+      (refundState ?? '').trim().toUpperCase() == 'FULL';
+
+  bool get isPartiallyRefunded =>
+      (refundState ?? '').trim().toUpperCase() == 'PARTIAL';
 }
 
 class CustomerDetailDto {
