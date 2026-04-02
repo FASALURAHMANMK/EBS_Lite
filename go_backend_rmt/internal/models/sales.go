@@ -68,6 +68,8 @@ type SaleReturn struct {
 	Status       string             `json:"status" db:"status"`
 	CreatedBy    int                `json:"created_by" db:"created_by"`
 	Items        []SaleReturnDetail `json:"items,omitempty"`
+	Sale         *Sale              `json:"sale,omitempty"`
+	Customer     *Customer          `json:"customer,omitempty"`
 	SyncModel
 }
 
@@ -78,6 +80,7 @@ type SaleReturnDetail struct {
 	ProductID      *int    `json:"product_id,omitempty" db:"product_id"`
 	ComboProductID *int    `json:"combo_product_id,omitempty" db:"combo_product_id"`
 	BarcodeID      *int    `json:"barcode_id,omitempty" db:"barcode_id"`
+	ProductName    *string `json:"product_name,omitempty" db:"product_name"`
 	Quantity       float64 `json:"quantity" db:"quantity"`
 	UnitPrice      float64 `json:"unit_price" db:"unit_price"`
 	LineTotal      float64 `json:"line_total" db:"line_total"`

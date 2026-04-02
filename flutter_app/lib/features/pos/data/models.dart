@@ -454,6 +454,8 @@ class SaleItemDto {
   final double quantity;
   final double unitPrice;
   final double discountPercent;
+  final double discountAmount;
+  final double lineTotal;
   final List<String> serialNumbers;
   final List<PosComboComponentTracking> comboComponentTracking;
 
@@ -470,6 +472,8 @@ class SaleItemDto {
       required this.quantity,
       required this.unitPrice,
       this.discountPercent = 0.0,
+      this.discountAmount = 0.0,
+      this.lineTotal = 0.0,
       this.serialNumbers = const [],
       this.comboComponentTracking = const []});
 
@@ -487,6 +491,8 @@ class SaleItemDto {
         unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0.0,
         discountPercent:
             (json['discount_percentage'] as num?)?.toDouble() ?? 0.0,
+        discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0.0,
+        lineTotal: (json['line_total'] as num?)?.toDouble() ?? 0.0,
         serialNumbers: (json['serial_numbers'] as List<dynamic>? ?? const [])
             .map((e) => e.toString())
             .toList(),
@@ -502,17 +508,37 @@ class SaleItemDto {
 class SaleDto {
   final int saleId;
   final String saleNumber;
+  final int locationId;
   final int? customerId;
   final String? customerName;
+  final DateTime? saleDate;
+  final double subtotal;
+  final double taxAmount;
+  final double discountAmount;
   final double totalAmount;
+  final double paidAmount;
+  final String? status;
+  final String? posStatus;
+  final String? paymentMethodName;
+  final String? notes;
   final List<SaleItemDto> items;
 
   SaleDto({
     required this.saleId,
     required this.saleNumber,
+    required this.locationId,
     this.customerId,
     this.customerName,
+    this.saleDate,
+    required this.subtotal,
+    required this.taxAmount,
+    required this.discountAmount,
     required this.totalAmount,
+    required this.paidAmount,
+    this.status,
+    this.posStatus,
+    this.paymentMethodName,
+    this.notes,
     required this.items,
   });
 
@@ -521,12 +547,24 @@ class SaleDto {
         .map((e) => SaleItemDto.fromJson(e as Map<String, dynamic>))
         .toList();
     final customer = json['customer'] as Map<String, dynamic>?;
+    final paymentMethod = json['payment_method'] as Map<String, dynamic>?;
     return SaleDto(
       saleId: json['sale_id'] as int,
       saleNumber: json['sale_number'] as String? ?? '',
+      locationId: (json['location_id'] as num?)?.toInt() ?? 0,
       customerId: json['customer_id'] as int?,
       customerName: customer != null ? customer['name'] as String? : null,
+      saleDate: DateTime.tryParse(json['sale_date']?.toString() ?? ''),
+      subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
+      taxAmount: (json['tax_amount'] as num?)?.toDouble() ?? 0.0,
+      discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0.0,
       totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0.0,
+      paidAmount: (json['paid_amount'] as num?)?.toDouble() ?? 0.0,
+      status: json['status'] as String?,
+      posStatus: json['pos_status'] as String?,
+      paymentMethodName:
+          paymentMethod != null ? paymentMethod['name'] as String? : null,
+      notes: json['notes'] as String?,
       items: items,
     );
   }

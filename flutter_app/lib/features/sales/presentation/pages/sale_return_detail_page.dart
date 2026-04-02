@@ -87,8 +87,11 @@ class _SaleReturnDetailPageState extends ConsumerState<SaleReturnDetailPage> {
                 for (final it in items)
                   ListTile(
                     leading: const Icon(Icons.inventory_2_rounded),
-                    title: Text(it['product']?['name']?.toString() ??
-                        'Product #${it['product_id']}'),
+                    title: Text(
+                      it['product_name']?.toString() ??
+                          it['product']?['name']?.toString() ??
+                          'Product #${it['product_id']}',
+                    ),
                     subtitle: Text(
                         'Qty: ${((it['quantity'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}'),
                     trailing: Text(

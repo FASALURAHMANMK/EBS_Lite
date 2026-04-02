@@ -161,6 +161,19 @@ func (s *ReturnsService) GetSaleReturns(companyID int, filters map[string]string
 			return nil, fmt.Errorf("failed to scan sale return: %w", err)
 		}
 
+		if saleNumber.Valid {
+			saleReturn.Sale = &models.Sale{
+				SaleID:     saleReturn.SaleID,
+				SaleNumber: saleNumber.String,
+			}
+		}
+		if customerName.Valid && saleReturn.CustomerID != nil {
+			saleReturn.Customer = &models.Customer{
+				CustomerID: *saleReturn.CustomerID,
+				Name:       customerName.String,
+			}
+		}
+
 		// Get return items
 		items, err := s.getSaleReturnItems(saleReturn.ReturnID, companyID)
 		if err != nil {
@@ -203,6 +216,19 @@ func (s *ReturnsService) GetSaleReturnByID(returnID, companyID int) (*models.Sal
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sale return: %w", err)
+	}
+
+	if saleNumber.Valid {
+		saleReturn.Sale = &models.Sale{
+			SaleID:     saleReturn.SaleID,
+			SaleNumber: saleNumber.String,
+		}
+	}
+	if customerName.Valid && saleReturn.CustomerID != nil {
+		saleReturn.Customer = &models.Customer{
+			CustomerID: *saleReturn.CustomerID,
+			Name:       customerName.String,
+		}
 	}
 
 	// Get return items
@@ -634,6 +660,9 @@ func (s *ReturnsService) getSaleReturnItems(returnID, companyID int) ([]models.S
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan return item: %w", err)
+		}
+		if productName.Valid {
+			item.ProductName = &productName.String
 		}
 
 		items = append(items, item)
