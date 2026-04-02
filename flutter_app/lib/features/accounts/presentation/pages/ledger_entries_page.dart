@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../data/accounts_repository.dart';
 import '../../data/models.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 
 class LedgerEntriesPage extends ConsumerStatefulWidget {
@@ -96,8 +97,9 @@ class _LedgerEntriesPageState extends ConsumerState<LedgerEntriesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final df = DateFormat('yyyy-MM-dd');
-    String dateLabel(DateTime? d) => d == null ? 'Any' : df.format(d);
+    final localePrefs = ref.watch(localePreferencesProvider);
+    String dateLabel(DateTime? d) =>
+        d == null ? 'Any' : AppDateTime.formatDate(context, localePrefs, d);
 
     return Scaffold(
       appBar: AppBar(
@@ -170,7 +172,10 @@ class _LedgerEntriesPageState extends ConsumerState<LedgerEntriesPage> {
                                     );
                                   }
                                   final entry = _entries[index];
-                                  return _LedgerEntryCard(entry: entry);
+                                  return _LedgerEntryCard(
+                                    entry: entry,
+                                    localePrefs: localePrefs,
+                                  );
                                 },
                               ),
                       ),
@@ -182,13 +187,16 @@ class _LedgerEntriesPageState extends ConsumerState<LedgerEntriesPage> {
 }
 
 class _LedgerEntryCard extends StatelessWidget {
-  const _LedgerEntryCard({required this.entry});
+  const _LedgerEntryCard({
+    required this.entry,
+    required this.localePrefs,
+  });
 
   final LedgerEntryDto entry;
+  final LocalePreferencesState localePrefs;
 
   @override
   Widget build(BuildContext context) {
-    final df = DateFormat('yyyy-MM-dd');
     final details = <String>[];
     if (entry.voucher != null) {
       details.add(
@@ -209,7 +217,7 @@ class _LedgerEntryCard extends StatelessWidget {
       child: ListTile(
         leading: const Icon(Icons.swap_horiz_rounded),
         title: Text(
-            '${df.format(entry.date.toLocal())} • ${entry.debit.toStringAsFixed(2)} / ${entry.credit.toStringAsFixed(2)}'),
+            '${AppDateTime.formatDate(context, localePrefs, entry.date)} • ${entry.debit.toStringAsFixed(2)} / ${entry.credit.toStringAsFixed(2)}'),
         subtitle: Text(
             details.isEmpty ? 'Entry #${entry.entryId}' : details.join(' • ')),
         trailing: Text('Bal: ${entry.balance.toStringAsFixed(2)}'),

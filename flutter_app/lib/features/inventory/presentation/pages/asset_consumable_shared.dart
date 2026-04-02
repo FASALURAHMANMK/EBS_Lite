@@ -147,7 +147,7 @@ String formatQuantity(double value) =>
 
 String formatShortDate(DateTime? value) {
   if (value == null) return '—';
-  return DateFormat('yyyy-MM-dd').format(value.toLocal());
+  return DateFormat.yMMMd().format(value.toLocal());
 }
 
 String humanizeToken(String raw) {

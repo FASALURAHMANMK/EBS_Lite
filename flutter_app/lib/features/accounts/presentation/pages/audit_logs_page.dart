@@ -2,10 +2,11 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
+import '../../../../core/app_date_time.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../data/accounts_repository.dart';
 import '../../data/models.dart';
 import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
@@ -162,9 +163,9 @@ class _AuditLogsPageState extends ConsumerState<AuditLogsPage> {
   @override
   Widget build(BuildContext context) {
     final isWide = AppBreakpoints.isTabletOrDesktop(context);
-    final df = DateFormat('yyyy-MM-dd HH:mm');
+    final localePrefs = ref.watch(localePreferencesProvider);
     String dateLabel(DateTime? d) =>
-        d == null ? 'Any' : DateFormat('yyyy-MM-dd').format(d);
+        d == null ? 'Any' : AppDateTime.formatDate(context, localePrefs, d);
 
     final scaffold = Scaffold(
       appBar: AppBar(
@@ -270,7 +271,11 @@ class _AuditLogsPageState extends ConsumerState<AuditLogsPage> {
                                       'Record: ${log.recordId}',
                                     if (log.userId != null)
                                       'User: ${log.userId}',
-                                    df.format(log.timestamp.toLocal()),
+                                    AppDateTime.formatDateTime(
+                                      context,
+                                      localePrefs,
+                                      log.timestamp,
+                                    ),
                                   ].join(' • ');
                                   return Card(
                                     elevation: 0,

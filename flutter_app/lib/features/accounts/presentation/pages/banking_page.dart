@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../data/accounts_repository.dart';
 import '../../data/models.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../../shared/widgets/app_empty_view.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import '../../../../shared/widgets/app_loading_view.dart';
@@ -235,9 +237,8 @@ class _BankingPageState extends ConsumerState<BankingPage> {
   Future<void> _openStatementEntryDialog() async {
     final bankAccount = _selectedBankAccount;
     if (bankAccount == null) return;
-    final dateCtrl = TextEditingController(
-      text: DateFormat('yyyy-MM-dd').format(DateTime.now()),
-    );
+    final localePrefs = ref.read(localePreferencesProvider);
+    var entryDate = DateTime.now();
     final descriptionCtrl = TextEditingController();
     final referenceCtrl = TextEditingController();
     final depositCtrl = TextEditingController();
@@ -246,66 +247,84 @@ class _BankingPageState extends ConsumerState<BankingPage> {
 
     final saved = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('New Statement Entry • ${bankAccount.accountName}'),
-        content: SizedBox(
-          width: 420,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: dateCtrl,
-                  decoration: const InputDecoration(labelText: 'Entry Date'),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: descriptionCtrl,
-                  decoration: const InputDecoration(labelText: 'Description'),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: referenceCtrl,
-                  decoration: const InputDecoration(labelText: 'Reference'),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: depositCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration:
-                      const InputDecoration(labelText: 'Deposit Amount'),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: withdrawalCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration:
-                      const InputDecoration(labelText: 'Withdrawal Amount'),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: balanceCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration:
-                      const InputDecoration(labelText: 'Running Balance'),
-                ),
-              ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          title: Text('New Statement Entry • ${bankAccount.accountName}'),
+          content: SizedBox(
+            width: 420,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.event_rounded),
+                    title: Text(
+                      AppDateTime.formatDate(context, localePrefs, entryDate),
+                    ),
+                    subtitle: const Text('Entry date'),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: entryDate,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) {
+                        setStateDialog(() => entryDate = picked);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: descriptionCtrl,
+                    decoration: const InputDecoration(labelText: 'Description'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: referenceCtrl,
+                    decoration: const InputDecoration(labelText: 'Reference'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: depositCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration:
+                        const InputDecoration(labelText: 'Deposit Amount'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: withdrawalCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration:
+                        const InputDecoration(labelText: 'Withdrawal Amount'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: balanceCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration:
+                        const InputDecoration(labelText: 'Running Balance'),
+                  ),
+                ],
+              ),
             ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Save'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
 
@@ -314,7 +333,7 @@ class _BankingPageState extends ConsumerState<BankingPage> {
     try {
       await ref.read(accountsRepositoryProvider).createBankStatementEntry(
             bankAccountId: bankAccount.bankAccountId,
-            entryDate: DateTime.parse(dateCtrl.text.trim()),
+            entryDate: entryDate,
             description: descriptionCtrl.text,
             reference: referenceCtrl.text,
             depositAmount: double.tryParse(depositCtrl.text.trim()) ?? 0,
@@ -556,6 +575,7 @@ class _BankingPageState extends ConsumerState<BankingPage> {
   Widget build(BuildContext context) {
     final bankAccount = _selectedBankAccount;
     final money = NumberFormat('#,##0.00');
+    final localePrefs = ref.watch(localePreferencesProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -724,7 +744,7 @@ class _BankingPageState extends ConsumerState<BankingPage> {
                                             ),
                                           ),
                                           title: Text(
-                                            '${DateFormat('yyyy-MM-dd').format(entry.entryDate.toLocal())} • ${money.format(signedAmount)}',
+                                            '${AppDateTime.formatDate(context, localePrefs, entry.entryDate)} • ${money.format(signedAmount)}',
                                           ),
                                           subtitle: Text(
                                             [

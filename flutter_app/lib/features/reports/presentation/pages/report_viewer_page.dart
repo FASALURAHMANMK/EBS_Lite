@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 
+import '../../../../core/app_date_time.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../../dashboard/data/models.dart';
 import '../../data/reports_repository.dart';
@@ -161,6 +163,7 @@ class _ReportViewerPageState extends ConsumerState<ReportViewerPage> {
   @override
   Widget build(BuildContext context) {
     final locationState = ref.watch(locationNotifierProvider);
+    final localePrefs = ref.watch(localePreferencesProvider);
     final locations = locationState.locations;
 
     return Scaffold(
@@ -195,6 +198,7 @@ class _ReportViewerPageState extends ConsumerState<ReportViewerPage> {
               config: widget.config,
               fromDate: _fromDate,
               toDate: _toDate,
+              localePrefs: localePrefs,
               onPickFrom: () => _pickDate(from: true),
               onPickTo: () => _pickDate(from: false),
               locations: locations,
@@ -217,6 +221,7 @@ class _ReportViewerPageState extends ConsumerState<ReportViewerPage> {
                       : _ReportDataView(
                           endpoint: widget.config.endpoint,
                           data: _data,
+                          localePrefs: localePrefs,
                         ),
             ),
           ],
@@ -231,6 +236,7 @@ class _FiltersCard extends StatelessWidget {
     required this.config,
     required this.fromDate,
     required this.toDate,
+    required this.localePrefs,
     required this.onPickFrom,
     required this.onPickTo,
     required this.locations,
@@ -248,6 +254,7 @@ class _FiltersCard extends StatelessWidget {
   final ReportConfig config;
   final DateTime? fromDate;
   final DateTime? toDate;
+  final LocalePreferencesState localePrefs;
   final VoidCallback onPickFrom;
   final VoidCallback onPickTo;
   final List<Location> locations;
@@ -264,7 +271,7 @@ class _FiltersCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     String dateLabel(DateTime? d) =>
-        d == null ? 'Any' : DateFormat('yyyy-MM-dd').format(d);
+        d == null ? 'Any' : AppDateTime.formatDate(context, localePrefs, d);
 
     return Card(
       elevation: 0,
@@ -409,10 +416,12 @@ class _ReportDataView extends StatelessWidget {
   const _ReportDataView({
     required this.endpoint,
     required this.data,
+    required this.localePrefs,
   });
 
   final String endpoint;
   final dynamic data;
+  final LocalePreferencesState localePrefs;
 
   @override
   Widget build(BuildContext context) {
@@ -438,6 +447,7 @@ class _ReportDataView extends StatelessWidget {
         return _MapTableView(
           endpoint: endpoint,
           rows: rows,
+          localePrefs: localePrefs,
         );
       }
       return ListView.separated(
@@ -458,6 +468,7 @@ class _ReportDataView extends StatelessWidget {
       return _KeyValueTableView(
         endpoint: endpoint,
         map: map,
+        localePrefs: localePrefs,
       );
     }
     return Center(
@@ -512,10 +523,12 @@ class _KeyValueTableView extends StatelessWidget {
   const _KeyValueTableView({
     required this.endpoint,
     required this.map,
+    required this.localePrefs,
   });
 
   final String endpoint;
   final Map<dynamic, dynamic> map;
+  final LocalePreferencesState localePrefs;
 
   @override
   Widget build(BuildContext context) {
@@ -544,7 +557,12 @@ class _KeyValueTableView extends StatelessWidget {
                             Text(_ReportDisplay.labelForKey(endpoint, e.key))),
                         DataCell(
                           Text(_ReportDisplay.formatValue(
-                              endpoint, e.key, e.value)),
+                            context,
+                            localePrefs,
+                            endpoint,
+                            e.key,
+                            e.value,
+                          )),
                         ),
                       ],
                     ),
@@ -562,10 +580,12 @@ class _MapTableView extends StatelessWidget {
   const _MapTableView({
     required this.endpoint,
     required this.rows,
+    required this.localePrefs,
   });
 
   final String endpoint;
   final List<Map> rows;
+  final LocalePreferencesState localePrefs;
 
   @override
   Widget build(BuildContext context) {
@@ -607,6 +627,8 @@ class _MapTableView extends StatelessWidget {
                               (c) => DataCell(
                                 Text(
                                   _ReportDisplay.formatValue(
+                                    context,
+                                    localePrefs,
                                     endpoint,
                                     c,
                                     r[c],
@@ -628,9 +650,6 @@ class _MapTableView extends StatelessWidget {
 }
 
 class _ReportDisplay {
-  static final DateFormat _dateFormat = DateFormat('yyyy-MM-dd');
-  static final DateFormat _dateTimeFormat = DateFormat('yyyy-MM-dd HH:mm');
-
   static const Map<String, List<String>> _columnOrderByEndpoint = {
     '/reports/sales-summary': [
       'period',
@@ -906,7 +925,13 @@ class _ReportDisplay {
     return _globalLabels[normalized] ?? _humanizeKey(normalized);
   }
 
-  static String formatValue(String endpoint, String key, dynamic value) {
+  static String formatValue(
+    BuildContext context,
+    LocalePreferencesState localePrefs,
+    String endpoint,
+    String key,
+    dynamic value,
+  ) {
     if (value == null) return '—';
 
     if (key == 'section') {
@@ -921,12 +946,16 @@ class _ReportDisplay {
       return _humanizeKey(value.toString());
     }
     if (value is DateTime) {
-      return _dateTimeFormat.format(value.toLocal());
+      return _looksLikeDateTimeKey(key)
+          ? AppDateTime.formatDateTime(context, localePrefs, value)
+          : AppDateTime.formatDate(context, localePrefs, value);
     }
     if (_looksLikeDateKey(key)) {
       final parsed = DateTime.tryParse(value.toString());
       if (parsed != null) {
-        return _dateFormat.format(parsed.toLocal());
+        return _looksLikeDateTimeKey(key)
+            ? AppDateTime.formatDateTime(context, localePrefs, parsed)
+            : AppDateTime.formatDate(context, localePrefs, parsed);
       }
     }
     if (value is num) {
@@ -946,6 +975,9 @@ class _ReportDisplay {
       key == 'day' ||
       key.endsWith('_date') ||
       key.endsWith('_at');
+
+  static bool _looksLikeDateTimeKey(String key) =>
+      key.endsWith('_at') || key.contains('timestamp');
 
   static bool _looksLikePercentKey(String key) =>
       key.contains('rate') || key.contains('percent');

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../../../core/layout/app_breakpoints.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import '../../../../shared/widgets/app_loading_view.dart';
 import '../../../../shared/widgets/app_message_view.dart';
@@ -28,7 +30,6 @@ class _DashboardContentState extends ConsumerState<DashboardContent> {
 
   static final NumberFormat _moneyFormat = NumberFormat('#,##0.00');
   static final NumberFormat _stockFormat = NumberFormat('#,##0.##');
-  static final DateFormat _dateFormat = DateFormat('yyyy-MM-dd');
 
   @override
   void initState() {
@@ -48,9 +49,13 @@ class _DashboardContentState extends ConsumerState<DashboardContent> {
   String _formatStock(num? value) =>
       _stockFormat.format((value ?? 0).toDouble());
 
-  String _formatDate(DateTime? value) {
+  String _formatDateTime(
+    BuildContext context,
+    LocalePreferencesState localePrefs,
+    DateTime? value,
+  ) {
     if (value == null) return '--';
-    return _dateFormat.format(value.toLocal());
+    return AppDateTime.formatDateTime(context, localePrefs, value);
   }
 
   @override
@@ -59,6 +64,7 @@ class _DashboardContentState extends ConsumerState<DashboardContent> {
     final state = ref.watch(dashboardNotifierProvider);
     final outbox = ref.watch(outboxNotifierProvider);
     final customization = ref.watch(dashboardCustomizationProvider);
+    final localePrefs = ref.watch(localePreferencesProvider);
     final metrics = state.metrics;
 
     if (state.isLoading) {
@@ -175,7 +181,8 @@ class _DashboardContentState extends ConsumerState<DashboardContent> {
                             flex: 7,
                             child: _TransactionsPanel(
                               transactions: state.recentTransactions,
-                              formatDate: _formatDate,
+                              formatDate: (value) =>
+                                  _formatDateTime(context, localePrefs, value),
                               formatMoney: _formatMoney,
                             ),
                           ),
@@ -203,7 +210,8 @@ class _DashboardContentState extends ConsumerState<DashboardContent> {
                     else ...[
                       _TransactionsPanel(
                         transactions: state.recentTransactions,
-                        formatDate: _formatDate,
+                        formatDate: (value) =>
+                            _formatDateTime(context, localePrefs, value),
                         formatMoney: _formatMoney,
                       ),
                       const SizedBox(height: 16),
@@ -437,7 +445,7 @@ class _TransactionsTable extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Expanded(flex: 3, child: Text('Date', style: headerStyle)),
+                Expanded(flex: 3, child: Text('When', style: headerStyle)),
                 Expanded(
                   flex: 4,
                   child: Text('Transaction', style: headerStyle),

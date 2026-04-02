@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/app_date_time.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../data/purchase_returns_repository.dart';
 
 class PurchaseReturnDetailPage extends ConsumerStatefulWidget {
@@ -41,6 +43,7 @@ class _PurchaseReturnDetailPageState
     final items =
         (d?['items'] as List? ?? const []).cast<Map<String, dynamic>>();
     final theme = Theme.of(context);
+    final localePrefs = ref.watch(localePreferencesProvider);
     return Scaffold(
       appBar: AppBar(
           title: Text(d?['return_number']?.toString() ?? 'Purchase Return')),
@@ -57,7 +60,13 @@ class _PurchaseReturnDetailPageState
                 subtitle: Text([
                   if ((d?['supplier']?['name'] ?? '') != '')
                     (d?['supplier']?['name']).toString(),
-                  if (d?['return_date'] != null) (d?['return_date']).toString(),
+                  if (d?['return_date'] != null)
+                    AppDateTime.formatFlexibleDate(
+                      context,
+                      localePrefs,
+                      d?['return_date']?.toString(),
+                      fallback: d?['return_date']?.toString() ?? '',
+                    ),
                 ].where((e) => e.isNotEmpty).join(' · ')),
               ),
             ),

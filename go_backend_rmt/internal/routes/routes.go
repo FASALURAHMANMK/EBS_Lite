@@ -70,6 +70,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 	taxHandler := handlers.NewTaxHandler()
 	userPreferencesHandler := handlers.NewUserPreferencesHandler()
 	supportHandler := handlers.NewSupportHandler(cfg)
+	supportIssueHandler := handlers.NewSupportIssueHandler()
 	notificationsHandler := handlers.NewNotificationsHandler()
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
@@ -878,8 +879,12 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 
 			// Support bundle (non-prod by default)
 			support := protected.Group("/support")
+			support.Use(middleware.RequireCompanyAccess())
 			{
 				support.GET("/bundle", middleware.RequirePermission("VIEW_SETTINGS"), supportHandler.GetSupportBundle)
+				support.POST("/issues", supportIssueHandler.CreateIssue)
+				support.GET("/issues", middleware.RequirePermission("VIEW_SETTINGS"), supportIssueHandler.ListIssues)
+				support.GET("/issues/:id", middleware.RequirePermission("VIEW_SETTINGS"), supportIssueHandler.GetIssue)
 			}
 		}
 	}

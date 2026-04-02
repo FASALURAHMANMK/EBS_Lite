@@ -6,6 +6,7 @@ import 'company_settings_page.dart';
 import 'dashboard_customization_page.dart';
 import 'inventory_settings_page.dart';
 import 'invoice_settings_page.dart';
+import 'language_region_settings_page.dart';
 import 'printer_profiles_page.dart';
 import 'security_settings_page.dart';
 import 'theme_settings_page.dart';
@@ -95,6 +96,23 @@ class SettingsPage extends ConsumerWidget {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const NotificationsPage()),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          ListTile(
+            leading: const Icon(Icons.language_rounded),
+            title: const Text('Language & Region'),
+            subtitle:
+                const Text('App language, receipt language, region, time zone'),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            tileColor: theme.colorScheme.surface,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const LanguageRegionSettingsPage(),
+                ),
               );
             },
           ),

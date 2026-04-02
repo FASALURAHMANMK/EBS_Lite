@@ -6500,6 +6500,86 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIResponse'
+  /support/issues:
+    get:
+      summary: GET /api/v1/support/issues
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: severity
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Support issues retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/SupportIssue'
+    post:
+      summary: POST /api/v1/support/issues
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSupportIssueRequest'
+      responses:
+        '201':
+          description: Support issue created
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/SupportIssue'
+  /support/issues/{id}:
+    get:
+      summary: GET /api/v1/support/issues/{id}
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Support issue retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/APIResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/SupportIssue'
+        '404':
+          description: Support issue not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
   /workflow-requests:
     get:
       summary: GET /api/v1/workflow-requests
@@ -6866,6 +6946,91 @@ components:
         payload:
           type: object
           additionalProperties: true
+    SupportIssue:
+      type: object
+      properties:
+        issue_id:
+          type: integer
+        issue_number:
+          type: string
+        company_id:
+          type: integer
+        location_id:
+          type: integer
+          nullable: true
+        reported_by_user_id:
+          type: integer
+        reported_by_name:
+          type: string
+          nullable: true
+        title:
+          type: string
+        severity:
+          type: string
+        details:
+          type: string
+        status:
+          type: string
+        app_version:
+          type: string
+        build_number:
+          type: string
+        release_channel:
+          type: string
+        platform:
+          type: string
+        platform_version:
+          type: string
+        backend_reachable:
+          type: boolean
+        queued_sync_items:
+          type: integer
+        last_sync_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CreateSupportIssueRequest:
+      type: object
+      required:
+        - title
+        - severity
+        - details
+      properties:
+        title:
+          type: string
+        severity:
+          type: string
+          enum:
+            - LOW
+            - NORMAL
+            - HIGH
+            - CRITICAL
+        details:
+          type: string
+        app_version:
+          type: string
+        build_number:
+          type: string
+        release_channel:
+          type: string
+        platform:
+          type: string
+        platform_version:
+          type: string
+        backend_reachable:
+          type: boolean
+        queued_sync_items:
+          type: integer
+        last_sync_at:
+          type: string
+          format: date-time
+          nullable: true
         result_snapshot:
           type: object
           additionalProperties: true

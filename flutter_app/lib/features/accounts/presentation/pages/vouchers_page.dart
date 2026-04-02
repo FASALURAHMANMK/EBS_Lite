@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../data/accounts_repository.dart';
 import '../../data/models.dart';
 import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 
 class VouchersPage extends ConsumerStatefulWidget {
@@ -440,8 +441,9 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
   @override
   Widget build(BuildContext context) {
     final isWide = AppBreakpoints.isTabletOrDesktop(context);
-    final df = DateFormat('yyyy-MM-dd');
-    String dateLabel(DateTime? d) => d == null ? 'Any' : df.format(d);
+    final localePrefs = ref.watch(localePreferencesProvider);
+    String dateLabel(DateTime? d) =>
+        d == null ? 'Any' : AppDateTime.formatDate(context, localePrefs, d);
 
     final scaffold = Scaffold(
       appBar: AppBar(
@@ -562,7 +564,7 @@ class _VouchersPageState extends ConsumerState<VouchersPage> {
                                       title: Text(
                                           '${v.type.toUpperCase()} • ${v.amount.toStringAsFixed(2)}'),
                                       subtitle: Text(
-                                          '${v.reference} • ${df.format(v.date.toLocal())}'),
+                                          '${v.reference} • ${AppDateTime.formatDate(context, localePrefs, v.date)}'),
                                       trailing: Text('Acct #${v.accountId}'),
                                     ),
                                   );

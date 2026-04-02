@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
+import '../../../../core/app_date_time.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../data/hr_repository.dart';
 import '../../data/models.dart';
 import '../../../../shared/widgets/app_error_view.dart';
@@ -46,7 +47,7 @@ class _PayslipPageState extends ConsumerState<PayslipPage> {
 
   @override
   Widget build(BuildContext context) {
-    final df = DateFormat('yyyy-MM-dd');
+    final localePrefs = ref.watch(localePreferencesProvider);
     return Scaffold(
       appBar: AppBar(
         title: Text('Payslip #${widget.payrollId}'),
@@ -82,7 +83,7 @@ class _PayslipPageState extends ConsumerState<PayslipPage> {
                                           .titleSmall),
                                   const SizedBox(height: 6),
                                   Text(
-                                      'Period: ${df.format(_payslip!.payroll.payPeriodStart.toLocal())} → ${df.format(_payslip!.payroll.payPeriodEnd.toLocal())}'),
+                                      'Period: ${AppDateTime.formatDate(context, localePrefs, _payslip!.payroll.payPeriodStart)} → ${AppDateTime.formatDate(context, localePrefs, _payslip!.payroll.payPeriodEnd)}'),
                                   Text(
                                       'Basic: ${_payslip!.payroll.basicSalary.toStringAsFixed(2)}'),
                                   Text(
@@ -113,7 +114,7 @@ class _PayslipPageState extends ConsumerState<PayslipPage> {
                               : _listCards(
                                   _payslip!.advances
                                       .map((a) =>
-                                          '${df.format(a.date.toLocal())} • ${a.amount.toStringAsFixed(2)}')
+                                          '${AppDateTime.formatDate(context, localePrefs, a.date)} • ${a.amount.toStringAsFixed(2)}')
                                       .toList(),
                                 ),
                           const SizedBox(height: 12),
@@ -123,7 +124,7 @@ class _PayslipPageState extends ConsumerState<PayslipPage> {
                               : _listCards(
                                   _payslip!.deductions
                                       .map((d) =>
-                                          '${d.type} • ${d.amount.toStringAsFixed(2)} • ${df.format(d.date.toLocal())}')
+                                          '${d.type} • ${d.amount.toStringAsFixed(2)} • ${AppDateTime.formatDate(context, localePrefs, d.date)}')
                                       .toList(),
                                 ),
                           const SizedBox(height: 12),

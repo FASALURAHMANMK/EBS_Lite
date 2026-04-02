@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
+import '../../../../core/app_date_time.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../data/purchases_repository.dart';
 import 'po_form_page.dart';
 import 'po_detail_page.dart';
@@ -62,6 +64,7 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
   @override
   Widget build(BuildContext context) {
     final isWide = AppBreakpoints.isTabletOrDesktop(context);
+    final localePrefs = ref.watch(localePreferencesProvider);
     final q = _search.text.trim().toLowerCase();
     final filtered = q.isEmpty
         ? _all
@@ -155,7 +158,12 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
                                             po['supplier_name'])
                                         .toString(),
                                   if (po['purchase_date'] != null)
-                                    po['purchase_date'].toString(),
+                                    AppDateTime.formatFlexibleDate(
+                                      context,
+                                      localePrefs,
+                                      po['purchase_date']?.toString(),
+                                      fallback: po['purchase_date'].toString(),
+                                    ),
                                   if ((po['status'] ?? '') != '')
                                     'Status: ${po['status']}',
                                 ].where((e) => e.isNotEmpty).join(' • ')),

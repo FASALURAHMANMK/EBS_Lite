@@ -4,7 +4,9 @@ import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 import 'package:ebs_lite/shared/widgets/app_selection_dialog.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../../core/negative_stock_override.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
@@ -63,6 +65,7 @@ class _StockAdjustmentsPageState extends ConsumerState<StockAdjustmentsPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = ref.watch(locationNotifierProvider).selected;
+    final localePrefs = ref.watch(localePreferencesProvider);
     final locName = loc?.name ?? '—';
     final isWide = AppBreakpoints.isTabletOrDesktop(context);
 
@@ -163,7 +166,12 @@ class _StockAdjustmentsPageState extends ConsumerState<StockAdjustmentsPage> {
                                 title: Text(g.documentNumber),
                                 subtitle: Text([
                                   if ((g.reason ?? '').isNotEmpty) g.reason!,
-                                  if (g.createdAt != null) _fmt(g.createdAt!),
+                                  if (g.createdAt != null)
+                                    AppDateTime.formatDateTime(
+                                      context,
+                                      localePrefs,
+                                      g.createdAt,
+                                    ),
                                   '${g.items.length} item(s)'
                                 ].join(' • ')),
                                 trailing: Text(
@@ -606,12 +614,3 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
 }
 
 // Helpers
-
-String _fmt(DateTime dt) {
-  final y = dt.year.toString().padLeft(4, '0');
-  final m = dt.month.toString().padLeft(2, '0');
-  final d = dt.day.toString().padLeft(2, '0');
-  final hh = dt.hour.toString().padLeft(2, '0');
-  final mm = dt.minute.toString().padLeft(2, '0');
-  return '$y-$m-$d $hh:$mm';
-}

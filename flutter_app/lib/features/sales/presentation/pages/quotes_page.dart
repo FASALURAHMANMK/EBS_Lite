@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
+import '../../../../core/app_date_time.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../../shared/widgets/app_empty_view.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import '../../data/sales_repository.dart';
@@ -61,6 +63,7 @@ class _QuotesPageState extends ConsumerState<QuotesPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isWide = AppBreakpoints.isTabletOrDesktop(context);
+    final localePrefs = ref.watch(localePreferencesProvider);
     return Scaffold(
       appBar: AppBar(
         leadingWidth: isWide ? 104 : null,
@@ -143,7 +146,12 @@ class _QuotesPageState extends ConsumerState<QuotesPage> {
                                 (q['customer'] is Map<String, dynamic>)
                                     ? (q['customer']['name']?.toString() ?? '')
                                     : '';
-                            final dateStr = q['quote_date']?.toString() ?? '';
+                            final dateStr = AppDateTime.formatFlexibleDate(
+                              context,
+                              localePrefs,
+                              q['quote_date']?.toString(),
+                              fallback: q['quote_date']?.toString() ?? '',
+                            );
 
                             return Card(
                               elevation: 0,

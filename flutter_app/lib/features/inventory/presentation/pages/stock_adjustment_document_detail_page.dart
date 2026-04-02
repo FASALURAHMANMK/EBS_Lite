@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/app_date_time.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
 
@@ -53,6 +55,7 @@ class _StockAdjustmentDocumentDetailPageState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final d = _doc;
+    final localePrefs = ref.watch(localePreferencesProvider);
     return Scaffold(
       appBar: AppBar(title: Text(d?.documentNumber ?? 'Document')),
       body: SafeArea(
@@ -61,7 +64,14 @@ class _StockAdjustmentDocumentDetailPageState
           children: [
             Text(d?.reason ?? '-', style: theme.textTheme.titleMedium),
             const SizedBox(height: 4),
-            Text(d?.createdAt != null ? _fmt(d!.createdAt!) : '',
+            Text(
+                d?.createdAt != null
+                    ? AppDateTime.formatDateTime(
+                        context,
+                        localePrefs,
+                        d!.createdAt,
+                      )
+                    : '',
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 12),
@@ -88,13 +98,4 @@ class _StockAdjustmentDocumentDetailPageState
       ),
     );
   }
-}
-
-String _fmt(DateTime dt) {
-  final y = dt.year.toString().padLeft(4, '0');
-  final m = dt.month.toString().padLeft(2, '0');
-  final d = dt.day.toString().padLeft(2, '0');
-  final hh = dt.hour.toString().padLeft(2, '0');
-  final mm = dt.minute.toString().padLeft(2, '0');
-  return '$y-$m-$d $hh:$mm';
 }

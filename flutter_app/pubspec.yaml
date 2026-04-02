@@ -54,6 +54,7 @@ dependencies:
   flutter_pos_printer_platform_image_3: ^1.2.4
   intl: ^0.20.2
   mobile_scanner: ^7.2.0
+  timezone: ^0.10.1
 
 dev_dependencies:
   flutter_test:
@@ -80,6 +81,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - dart_defines.production.json
     - assets/pdf_fonts/
 
   fonts:

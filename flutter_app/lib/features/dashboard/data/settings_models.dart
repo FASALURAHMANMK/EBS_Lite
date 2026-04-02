@@ -179,3 +179,67 @@ class SecurityPolicyDto {
         'elevated_access_window_mins': elevatedAccessWindowMins,
       };
 }
+
+class SupportIssueSubmissionDto {
+  final String title;
+  final String severity;
+  final String details;
+  final String appVersion;
+  final String buildNumber;
+  final String releaseChannel;
+  final String platform;
+  final String platformVersion;
+  final bool backendReachable;
+  final int queuedSyncItems;
+  final String? lastSyncAt;
+
+  const SupportIssueSubmissionDto({
+    required this.title,
+    required this.severity,
+    required this.details,
+    required this.appVersion,
+    required this.buildNumber,
+    required this.releaseChannel,
+    required this.platform,
+    required this.platformVersion,
+    required this.backendReachable,
+    required this.queuedSyncItems,
+    this.lastSyncAt,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'severity': severity,
+        'details': details,
+        'app_version': appVersion,
+        'build_number': buildNumber,
+        'release_channel': releaseChannel,
+        'platform': platform,
+        'platform_version': platformVersion,
+        'backend_reachable': backendReachable,
+        'queued_sync_items': queuedSyncItems,
+        if ((lastSyncAt ?? '').trim().isNotEmpty) 'last_sync_at': lastSyncAt,
+      };
+}
+
+class SubmittedSupportIssueDto {
+  final int issueId;
+  final String issueNumber;
+  final String status;
+  final DateTime? createdAt;
+
+  const SubmittedSupportIssueDto({
+    required this.issueId,
+    required this.issueNumber,
+    required this.status,
+    required this.createdAt,
+  });
+
+  factory SubmittedSupportIssueDto.fromJson(Map<String, dynamic> json) =>
+      SubmittedSupportIssueDto(
+        issueId: (json['issue_id'] as num?)?.toInt() ?? 0,
+        issueNumber: json['issue_number'] as String? ?? '',
+        status: json['status'] as String? ?? '',
+        createdAt: DateTime.tryParse(json['created_at'] as String? ?? ''),
+      );
+}

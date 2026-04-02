@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 
+import '../../../../core/app_date_time.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../../shared/widgets/app_selection_dialog.dart';
 import '../../../../shared/widgets/app_empty_view.dart';
 import '../../data/sales_repository.dart';
@@ -38,7 +40,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
     super.dispose();
   }
 
-  String _fmtDate(DateTime d) =>
+  String _toApiDate(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   Future<void> _load() async {
@@ -46,12 +48,12 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
     try {
       final repo = ref.read(salesRepositoryProvider);
       final now = DateTime.now();
-      String fromDate = _fmtDate(now.subtract(const Duration(days: 30)));
+      String fromDate = _toApiDate(now.subtract(const Duration(days: 30)));
       String? toDate;
       final dr = _dateRange;
       if (dr != null) {
-        fromDate = _fmtDate(dr.start);
-        toDate = _fmtDate(dr.end);
+        fromDate = _toApiDate(dr.start);
+        toDate = _toApiDate(dr.end);
       }
 
       // Single or multi-customer filtering
@@ -240,6 +242,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isWide = AppBreakpoints.isTabletOrDesktop(context);
+    final localePrefs = ref.watch(localePreferencesProvider);
     final q = _search.text.trim().toLowerCase();
 
     // Sort newest first
@@ -309,7 +312,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
                   IconButton(
                     tooltip: _dateRange == null
                         ? 'Filter by date range'
-                        : 'Date: ${_fmtDate(_dateRange!.start)} → ${_fmtDate(_dateRange!.end)}',
+                        : 'Date: ${AppDateTime.formatDate(context, localePrefs, _dateRange!.start)} → ${AppDateTime.formatDate(context, localePrefs, _dateRange!.end)}',
                     icon: Icon(
                       Icons.calendar_month_rounded,
                       color:
@@ -392,7 +395,12 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
                           else if (row['customer_id'] != null)
                             'Customer #${row['customer_id']}',
                           if (row['sale_date'] != null)
-                            row['sale_date'].toString(),
+                            AppDateTime.formatFlexibleDate(
+                              context,
+                              localePrefs,
+                              row['sale_date']?.toString(),
+                              fallback: row['sale_date'].toString(),
+                            ),
                         ];
                         final saleId = row['sale_id'] as int?;
                         return Card(

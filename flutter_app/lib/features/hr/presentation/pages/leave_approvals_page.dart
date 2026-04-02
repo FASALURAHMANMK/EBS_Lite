@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../data/hr_repository.dart';
 import '../../data/models.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../../shared/widgets/app_empty_view.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import '../../../../shared/widgets/app_loading_view.dart';
@@ -123,7 +124,7 @@ class _LeaveApprovalsPageState extends ConsumerState<LeaveApprovalsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final df = DateFormat('yyyy-MM-dd');
+    final localePrefs = ref.watch(localePreferencesProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -204,12 +205,12 @@ class _LeaveApprovalsPageState extends ConsumerState<LeaveApprovalsPage> {
                                 itemBuilder: (context, i) {
                                   final l = _leaves[i];
                                   final subtitle = <String>[
-                                    '${df.format(l.startDate)} → ${df.format(l.endDate)}',
+                                    '${AppDateTime.formatDate(context, localePrefs, l.startDate)} → ${AppDateTime.formatDate(context, localePrefs, l.endDate)}',
                                     'Status: ${l.status}',
                                     if ((l.reason).trim().isNotEmpty)
                                       'Reason: ${l.reason}',
                                     if (l.approvedAt != null)
-                                      'Decided: ${df.format(l.approvedAt!)}',
+                                      'Decided: ${AppDateTime.formatDateTime(context, localePrefs, l.approvedAt)}',
                                   ].join('\n');
 
                                   final isPending =

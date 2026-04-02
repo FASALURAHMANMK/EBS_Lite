@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../../core/outbox/outbox_item.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 
@@ -131,6 +133,7 @@ class _SyncHealthPageState extends ConsumerState<SyncHealthPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final outbox = ref.watch(outboxNotifierProvider);
+    final localePrefs = ref.watch(localePreferencesProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -240,7 +243,7 @@ class _SyncHealthPageState extends ConsumerState<SyncHealthPage> {
                           children: [
                             const SizedBox(height: 4),
                             Text(
-                              'status: ${item.status} • attempts: ${item.attempts} • created: $created',
+                              'status: ${item.status} • attempts: ${item.attempts} • created: ${AppDateTime.formatDateTime(context, localePrefs, created)}',
                             ),
                             if ((item.idempotencyKey ?? '').isNotEmpty)
                               Text('idempotency: ${item.idempotencyKey}'),

@@ -6,7 +6,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../features/auth/data/auth_repository.dart';
-import 'app_config.dart';
 import 'auth_events.dart';
 
 class ApiClient {
@@ -134,8 +133,7 @@ class ApiClient {
   }
 
   static String _resolveBaseUrl(String? override) {
-    final candidate = (override ?? AppConfig.apiBaseUrl).trim();
-    return candidate.isEmpty ? AppConfig.apiBaseUrl : candidate;
+    return (override ?? '').trim();
   }
 }
 

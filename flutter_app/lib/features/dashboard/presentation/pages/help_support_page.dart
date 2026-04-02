@@ -9,40 +9,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../../core/app_date_time.dart';
+import '../../../../core/app_environment.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import '../../../../shared/widgets/app_confirm_dialog.dart';
 import '../../data/settings_repository.dart';
+import '../../data/settings_models.dart';
 import '../widgets/dashboard_sidebar.dart';
 import 'sync_health_page.dart';
 
 class HelpSupportPage extends ConsumerWidget {
   const HelpSupportPage({super.key, this.fromMenu = false, this.onMenuSelect});
-
-  static const String appVersion =
-      String.fromEnvironment('APP_VERSION', defaultValue: 'unknown');
-  static const String buildNumber =
-      String.fromEnvironment('BUILD_NUMBER', defaultValue: 'unknown');
-  static const String releaseDate =
-      String.fromEnvironment('RELEASE_DATE', defaultValue: 'Not configured');
-  static const String releaseChannel =
-      String.fromEnvironment('RELEASE_CHANNEL', defaultValue: 'Production');
-  static const String updateUrl =
-      String.fromEnvironment('UPDATE_URL', defaultValue: '');
-  static const String updatePolicy =
-      String.fromEnvironment('UPDATE_POLICY', defaultValue: '');
-  static const String supportEmail =
-      String.fromEnvironment('SUPPORT_EMAIL', defaultValue: '');
-  static const String supportPhone =
-      String.fromEnvironment('SUPPORT_PHONE', defaultValue: '');
-  static const String supportWebsite =
-      String.fromEnvironment('SUPPORT_WEBSITE', defaultValue: '');
-  static const String supportHours =
-      String.fromEnvironment('SUPPORT_HOURS', defaultValue: '');
-  static const String termsUrl =
-      String.fromEnvironment('SUPPORT_TERMS_URL', defaultValue: '');
-  static const String privacyUrl =
-      String.fromEnvironment('SUPPORT_PRIVACY_URL', defaultValue: '');
 
   final bool fromMenu;
   final void Function(BuildContext context, String label)? onMenuSelect;
@@ -50,10 +29,11 @@ class HelpSupportPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isWide = AppBreakpoints.isTabletOrDesktop(context);
+    final environment = ref.watch(appEnvironmentProvider);
+    final localePrefs = ref.watch(localePreferencesProvider);
     final theme = Theme.of(context);
-    final outbox = ref.watch(outboxNotifierProvider);
-    final supportWebsiteDisplay = _displayUrl(supportWebsite);
-    final updateUrlDisplay = _displayUrl(updateUrl);
+    final supportWebsiteDisplay = _displayUrl(environment.supportWebsite);
+    final updateUrlDisplay = _displayUrl(environment.updateUrl);
     final scaffold = Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: !fromMenu,
@@ -77,47 +57,6 @@ class HelpSupportPage extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Card(
-            elevation: 0,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Application support center',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Use this page for support operations, release information, diagnostics, issue reporting, and legal guidance.',
-                  ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      Chip(label: Text('Version $appVersion+$buildNumber')),
-                      Chip(label: Text(releaseChannel)),
-                      Chip(
-                          label:
-                              Text('Queued sync items: ${outbox.queuedCount}')),
-                      Chip(
-                        label: Text(
-                          outbox.isOnline
-                              ? 'Backend reachable'
-                              : 'Offline mode',
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
           Text(
             'Support tools',
             style: theme.textTheme.titleMedium?.copyWith(
@@ -130,7 +69,7 @@ class HelpSupportPage extends ConsumerWidget {
             title: 'Generate support bundle',
             subtitle:
                 'Create a JSON bundle with app, outbox, and backend diagnostics to share with support.',
-            onTap: () => _generateSupportBundle(context, ref),
+            onTap: () => _generateSupportBundle(context, ref, environment),
           ),
           _HelpTile(
             icon: Icons.sync_rounded,
@@ -148,7 +87,7 @@ class HelpSupportPage extends ConsumerWidget {
             title: 'Report an issue',
             subtitle:
                 'Share a structured incident report with version, platform, and sync-state context.',
-            onTap: () => _reportIssue(context, ref),
+            onTap: () => _reportIssue(context, ref, environment),
           ),
           const SizedBox(height: 16),
           Text(
@@ -165,6 +104,8 @@ class HelpSupportPage extends ConsumerWidget {
                 'Review the installed build, release channel, update path, and support portal for new packages.',
             onTap: () => _showVersionAndUpdates(
               context,
+              environment: environment,
+              localePrefs: localePrefs,
               updateUrlDisplay: updateUrlDisplay,
             ),
           ),
@@ -173,7 +114,7 @@ class HelpSupportPage extends ConsumerWidget {
             title: 'Support contact',
             subtitle:
                 'View the configured support email, phone, website, and operating hours for this build.',
-            onTap: () => _showSupportContact(context),
+            onTap: () => _showSupportContact(context, environment),
           ),
           const SizedBox(height: 16),
           Text(
@@ -200,7 +141,7 @@ class HelpSupportPage extends ConsumerWidget {
                 "Diagnostic artifacts should be transmitted only to approved support contacts and retained according to the customer organization's security, privacy, and retention policy.",
                 'Where the application is used to manage employee or customer records, the customer organization remains responsible for compliance with local employment, privacy, consumer, and record-retention obligations.',
               ],
-              link: privacyUrl,
+              link: environment.privacyUrl,
             ),
           ),
           _HelpTile(
@@ -220,7 +161,7 @@ class HelpSupportPage extends ConsumerWidget {
                 'Support services rely on timely access to accurate incident details, reproducible steps, and, where required, sanitized diagnostic bundles. Resolution timelines may depend on customer responsiveness and environment access.',
                 'Any customer-specific compliance, statutory reporting, archival, or regulatory obligations remain the responsibility of the customer unless separately agreed in writing.',
               ],
-              link: termsUrl,
+              link: environment.termsUrl,
             ),
           ),
           const SizedBox(height: 16),
@@ -265,6 +206,7 @@ class HelpSupportPage extends ConsumerWidget {
   Future<void> _generateSupportBundle(
     BuildContext context,
     WidgetRef ref,
+    AppEnvironment environment,
   ) async {
     final messenger = ScaffoldMessenger.of(context);
     final outboxState = ref.read(outboxNotifierProvider);
@@ -290,8 +232,8 @@ class HelpSupportPage extends ConsumerWidget {
       final payload = <String, dynamic>{
         'generated_at': DateTime.now().toUtc().toIso8601String(),
         'app': {
-          'version': appVersion,
-          'build_number': buildNumber,
+          'version': environment.appVersion,
+          'build_number': environment.buildNumber,
           'platform': Platform.operatingSystem,
           'platform_version': Platform.operatingSystemVersion,
         },
@@ -346,7 +288,11 @@ class HelpSupportPage extends ConsumerWidget {
     }
   }
 
-  Future<void> _reportIssue(BuildContext context, WidgetRef ref) async {
+  Future<void> _reportIssue(
+    BuildContext context,
+    WidgetRef ref,
+    AppEnvironment environment,
+  ) async {
     final titleController = TextEditingController();
     final detailsController = TextEditingController();
     String severity = 'Normal';
@@ -443,7 +389,7 @@ class HelpSupportPage extends ConsumerWidget {
                       ),
                     );
                   },
-                  child: const Text('Share report'),
+                  child: const Text('Submit issue'),
                 ),
               ],
             );
@@ -456,20 +402,26 @@ class HelpSupportPage extends ConsumerWidget {
     detailsController.dispose();
 
     if (draft == null) return;
+    if (!context.mounted) return;
 
     final outbox = ref.read(outboxNotifierProvider);
-    final report = StringBuffer()
+    final localePrefs = ref.read(localePreferencesProvider);
+    final reportBody = StringBuffer()
       ..writeln('EBS Lite Issue Report')
       ..writeln()
       ..writeln('Title: ${draft.title}')
       ..writeln('Severity: ${draft.severity}')
-      ..writeln('Generated at: ${DateTime.now().toUtc().toIso8601String()}')
-      ..writeln('App version: $appVersion+$buildNumber')
+      ..writeln(
+        'Generated at: ${AppDateTime.formatDateTime(context, localePrefs, DateTime.now())}',
+      )
+      ..writeln(
+          'App version: ${environment.appVersion}+${environment.buildNumber}')
       ..writeln('Platform: ${Platform.operatingSystem}')
       ..writeln('Online: ${outbox.isOnline}')
       ..writeln('Queued sync items: ${outbox.queuedCount}')
       ..writeln(
-          'Last sync at: ${outbox.lastSyncAt?.toIso8601String() ?? 'Unknown'}')
+        'Last sync at: ${AppDateTime.formatDateTime(context, localePrefs, outbox.lastSyncAt, fallback: 'Unknown')}',
+      )
       ..writeln()
       ..writeln('Details')
       ..writeln(draft.details)
@@ -477,14 +429,107 @@ class HelpSupportPage extends ConsumerWidget {
       ..writeln(
           'Recommended attachment: generate and share a support bundle if backend, sync, or permissions are involved.');
 
-    await Share.share(
-      report.toString(),
-      subject: 'EBS Lite issue report: ${draft.title}',
+    final submission = SupportIssueSubmissionDto(
+      title: draft.title,
+      severity: draft.severity.toUpperCase(),
+      details: draft.details,
+      appVersion: environment.appVersion,
+      buildNumber: environment.buildNumber,
+      releaseChannel: environment.releaseChannel,
+      platform: Platform.operatingSystem,
+      platformVersion: Platform.operatingSystemVersion,
+      backendReachable: outbox.isOnline,
+      queuedSyncItems: outbox.queuedCount,
+      lastSyncAt: outbox.lastSyncAt?.toIso8601String(),
     );
+
+    if (!context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    showAppBlockingProgressDialog(
+      context,
+      message: 'Submitting issue...',
+    );
+    var progressDialogOpen = true;
+
+    try {
+      final result = await ref
+          .read(settingsRepositoryProvider)
+          .submitSupportIssue(submission);
+      if (context.mounted) {
+        Navigator.of(context).pop();
+        progressDialogOpen = false;
+      }
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Issue submitted'),
+          content: SelectionArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Reference: ${result.issueNumber}'),
+                const SizedBox(height: 8),
+                Text('Status: ${result.status}'),
+                const SizedBox(height: 8),
+                Text(
+                  'Created at: ${AppDateTime.formatDateTime(context, localePrefs, result.createdAt, fallback: 'Unknown')}',
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => _copyText(
+                dialogContext,
+                label: 'Issue reference',
+                value: result.issueNumber,
+              ),
+              child: const Text('Copy reference'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                await Share.share(
+                  '${reportBody.toString()}\nIssue reference: ${result.issueNumber}',
+                  subject: 'EBS Lite issue report: ${draft.title}',
+                );
+              },
+              child: const Text('Share summary'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (context.mounted && progressDialogOpen) {
+        Navigator.of(context).pop();
+      }
+      if (context.mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Issue submission failed. Sharing local report instead: ${ErrorHandler.message(e)}',
+            ),
+          ),
+        );
+      }
+      await Share.share(
+        reportBody.toString(),
+        subject: 'EBS Lite issue report: ${draft.title}',
+      );
+    }
   }
 
-  Future<void> _showSupportContact(BuildContext context) async {
-    final supportWebsiteDisplay = _displayUrl(supportWebsite);
+  Future<void> _showSupportContact(
+    BuildContext context,
+    AppEnvironment environment,
+  ) async {
+    final supportWebsiteDisplay = _displayUrl(environment.supportWebsite);
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
@@ -500,27 +545,29 @@ class HelpSupportPage extends ConsumerWidget {
                 children: [
                   _ContactRow(
                     label: 'Email',
-                    value:
-                        supportEmail.isEmpty ? 'Not configured' : supportEmail,
-                    onCopy: supportEmail.isEmpty
+                    value: environment.supportEmail.isEmpty
+                        ? 'Not configured'
+                        : environment.supportEmail,
+                    onCopy: environment.supportEmail.isEmpty
                         ? null
                         : () => _copyText(
                               dialogContext,
                               label: 'Support email',
-                              value: supportEmail,
+                              value: environment.supportEmail,
                             ),
                   ),
                   const SizedBox(height: 12),
                   _ContactRow(
                     label: 'Phone',
-                    value:
-                        supportPhone.isEmpty ? 'Not configured' : supportPhone,
-                    onCopy: supportPhone.isEmpty
+                    value: environment.supportPhone.isEmpty
+                        ? 'Not configured'
+                        : environment.supportPhone,
+                    onCopy: environment.supportPhone.isEmpty
                         ? null
                         : () => _copyText(
                               dialogContext,
                               label: 'Support phone',
-                              value: supportPhone,
+                              value: environment.supportPhone,
                             ),
                   ),
                   const SizedBox(height: 12),
@@ -540,13 +587,14 @@ class HelpSupportPage extends ConsumerWidget {
                   const SizedBox(height: 12),
                   _ContactRow(
                     label: 'Hours',
-                    value:
-                        supportHours.isEmpty ? 'Not configured' : supportHours,
+                    value: environment.supportHours.isEmpty
+                        ? 'Not configured'
+                        : environment.supportHours,
                   ),
-                  if (supportEmail.isEmpty &&
-                      supportPhone.isEmpty &&
-                      supportWebsite.isEmpty &&
-                      supportHours.isEmpty) ...[
+                  if (environment.supportEmail.isEmpty &&
+                      environment.supportPhone.isEmpty &&
+                      environment.supportWebsite.isEmpty &&
+                      environment.supportHours.isEmpty) ...[
                     const SizedBox(height: 16),
                     Text(
                       'Support contact details are not configured for this build. Add SUPPORT_EMAIL, SUPPORT_PHONE, SUPPORT_WEBSITE, and SUPPORT_HOURS in the release dart defines.',
@@ -570,15 +618,17 @@ class HelpSupportPage extends ConsumerWidget {
 
   Future<void> _showVersionAndUpdates(
     BuildContext context, {
+    required AppEnvironment environment,
+    required LocalePreferencesState localePrefs,
     required String updateUrlDisplay,
   }) async {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         final theme = Theme.of(dialogContext);
-        final effectivePolicy = updatePolicy.trim().isEmpty
+        final effectivePolicy = environment.updatePolicy.trim().isEmpty
             ? 'Updates should be deployed through approved release procedures after environment validation, operator communication, and backup verification.'
-            : updatePolicy.trim();
+            : environment.updatePolicy.trim();
         return AlertDialog(
           title: const Text('Version & updates'),
           content: SizedBox(
@@ -591,13 +641,23 @@ class HelpSupportPage extends ConsumerWidget {
                   children: [
                     _VersionRow(label: 'Application', value: 'EBS Lite'),
                     const SizedBox(height: 12),
-                    _VersionRow(label: 'Version', value: appVersion),
+                    _VersionRow(
+                        label: 'Version', value: environment.appVersion),
                     const SizedBox(height: 12),
-                    _VersionRow(label: 'Build', value: buildNumber),
+                    _VersionRow(label: 'Build', value: environment.buildNumber),
                     const SizedBox(height: 12),
-                    _VersionRow(label: 'Channel', value: releaseChannel),
+                    _VersionRow(
+                        label: 'Channel', value: environment.releaseChannel),
                     const SizedBox(height: 12),
-                    _VersionRow(label: 'Release date', value: releaseDate),
+                    _VersionRow(
+                      label: 'Release date',
+                      value: AppDateTime.formatFlexibleDate(
+                        context,
+                        localePrefs,
+                        environment.releaseDate,
+                        fallback: environment.releaseDate,
+                      ),
+                    ),
                     const SizedBox(height: 18),
                     Text(
                       'Update guidance',
@@ -630,7 +690,7 @@ class HelpSupportPage extends ConsumerWidget {
                 dialogContext,
                 label: 'Build details',
                 value:
-                    'EBS Lite $appVersion+$buildNumber | $releaseChannel | $releaseDate',
+                    'EBS Lite ${environment.appVersion}+${environment.buildNumber} | ${environment.releaseChannel} | ${environment.releaseDate}',
               ),
               child: const Text('Copy build info'),
             ),

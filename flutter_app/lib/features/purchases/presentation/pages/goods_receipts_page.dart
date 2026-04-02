@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../data/grn_repository.dart';
 import '../../data/purchases_repository.dart';
 import '../../data/models.dart';
@@ -51,7 +53,7 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
   @override
   Widget build(BuildContext context) {
     final isWide = AppBreakpoints.isTabletOrDesktop(context);
-    Theme.of(context);
+    final localePrefs = ref.watch(localePreferencesProvider);
     final q = _search.text.trim().toLowerCase();
     final filtered = q.isEmpty
         ? _list
@@ -115,7 +117,11 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
                                 subtitle: Text([
                                   if ((gr.supplierName ?? '').isNotEmpty)
                                     gr.supplierName!,
-                                  _fmt(gr.receivedDate),
+                                  AppDateTime.formatDate(
+                                    context,
+                                    localePrefs,
+                                    gr.receivedDate,
+                                  ),
                                 ].join(' • ')),
                                 onTap: () async {
                                   await Navigator.of(context).push(
@@ -245,13 +251,6 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
       ),
     );
   }
-}
-
-String _fmt(DateTime dt) {
-  final y = dt.year.toString().padLeft(4, '0');
-  final m = dt.month.toString().padLeft(2, '0');
-  final d = dt.day.toString().padLeft(2, '0');
-  return '$y-$m-$d';
 }
 
 class _ReceiveAgainstPoPage extends ConsumerStatefulWidget {

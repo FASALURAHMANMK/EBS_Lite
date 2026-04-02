@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../data/accounts_repository.dart';
 import '../../data/models.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../../shared/widgets/app_empty_view.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import '../../../../shared/widgets/app_loading_view.dart';
@@ -47,58 +48,98 @@ class _PeriodClosePageState extends ConsumerState<PeriodClosePage> {
 
   Future<void> _openCreateDialog() async {
     final nameCtrl = TextEditingController();
-    final startCtrl = TextEditingController();
-    final endCtrl = TextEditingController();
     final notesCtrl = TextEditingController();
+    final localePrefs = ref.read(localePreferencesProvider);
+    var startDate = DateTime.now();
+    var endDate = DateTime.now();
     final saved = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create Accounting Period'),
-        content: SizedBox(
-          width: 380,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Period Name'),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: startCtrl,
-                decoration: const InputDecoration(labelText: 'Start Date'),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: endCtrl,
-                decoration: const InputDecoration(labelText: 'End Date'),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: notesCtrl,
-                decoration: const InputDecoration(labelText: 'Notes'),
-              ),
-            ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          title: const Text('Create Accounting Period'),
+          content: SizedBox(
+            width: 380,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Period Name'),
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.event_rounded),
+                  title: Text(
+                    AppDateTime.formatDate(context, localePrefs, startDate),
+                  ),
+                  subtitle: const Text('Start date'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: startDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      setStateDialog(() {
+                        startDate = picked;
+                        if (endDate.isBefore(startDate)) {
+                          endDate = startDate;
+                        }
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.event_available_rounded),
+                  title: Text(
+                    AppDateTime.formatDate(context, localePrefs, endDate),
+                  ),
+                  subtitle: const Text('End date'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: endDate,
+                      firstDate: startDate,
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      setStateDialog(() => endDate = picked);
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: notesCtrl,
+                  decoration: const InputDecoration(labelText: 'Notes'),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Create'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Create'),
-          ),
-        ],
       ),
     );
     if (saved != true || !mounted) return;
     try {
       await ref.read(accountsRepositoryProvider).createAccountingPeriod(
             periodName: nameCtrl.text,
-            startDate: DateTime.parse(startCtrl.text.trim()),
-            endDate: DateTime.parse(endCtrl.text.trim()),
+            startDate: startDate,
+            endDate: endDate,
             notes: notesCtrl.text,
           );
       await _load();
@@ -129,7 +170,7 @@ class _PeriodClosePageState extends ConsumerState<PeriodClosePage> {
 
   @override
   Widget build(BuildContext context) {
-    final df = DateFormat('yyyy-MM-dd');
+    final localePrefs = ref.watch(localePreferencesProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -177,7 +218,7 @@ class _PeriodClosePageState extends ConsumerState<PeriodClosePage> {
                                     children: [
                                       Expanded(
                                         child: Text(
-                                          '${item.periodName} • ${df.format(item.startDate)} to ${df.format(item.endDate)}',
+                                          '${item.periodName} • ${AppDateTime.formatDate(context, localePrefs, item.startDate)} to ${AppDateTime.formatDate(context, localePrefs, item.endDate)}',
                                           style: Theme.of(context)
                                               .textTheme
                                               .titleMedium,
@@ -201,7 +242,7 @@ class _PeriodClosePageState extends ConsumerState<PeriodClosePage> {
                                     [
                                       'Status ${item.status}',
                                       if (item.closedAt != null)
-                                        'Closed ${df.format(item.closedAt!.toLocal())}',
+                                        'Closed ${AppDateTime.formatDateTime(context, localePrefs, item.closedAt)}',
                                       if ((item.notes ?? '').isNotEmpty)
                                         item.notes!,
                                     ].join(' • '),

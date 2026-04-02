@@ -3,9 +3,10 @@ import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../inventory/data/inventory_repository.dart';
 import '../../../inventory/data/models.dart';
 import '../../../loyalty/data/loyalty_repository.dart';
@@ -20,8 +21,6 @@ class PromotionsPage extends ConsumerStatefulWidget {
 }
 
 class _PromotionsPageState extends ConsumerState<PromotionsPage> {
-  final DateFormat _dateFormat = DateFormat('yyyy-MM-dd');
-
   bool _loading = true;
   bool _activeOnly = false;
   bool _importing = false;
@@ -38,7 +37,10 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
     _load();
   }
 
-  String _fmtDate(DateTime date) => _dateFormat.format(date);
+  String _fmtDate(DateTime date) {
+    final localePrefs = ref.read(localePreferencesProvider);
+    return AppDateTime.formatDate(context, localePrefs, date);
+  }
 
   List<int> _parseIdCsv(String raw) {
     return raw

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../../dashboard/controllers/location_notifier.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
 import '../../../../shared/widgets/app_error_view.dart';
@@ -39,6 +41,7 @@ class _StockTransferViewPageState extends ConsumerState<StockTransferViewPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final localePrefs = ref.watch(localePreferencesProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Transfer Details')),
       body: RefreshIndicator(
@@ -65,7 +68,7 @@ class _StockTransferViewPageState extends ConsumerState<StockTransferViewPage> {
             return ListView(
               padding: const EdgeInsets.all(12),
               children: [
-                _Header(t: t),
+                _Header(t: t, localePrefs: localePrefs),
                 const SizedBox(height: 12),
                 _Actions(t: t, onChanged: _refresh),
                 const SizedBox(height: 12),
@@ -97,8 +100,9 @@ class _StockTransferViewPageState extends ConsumerState<StockTransferViewPage> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.t});
+  const _Header({required this.t, required this.localePrefs});
   final StockTransferDetailDto t;
+  final LocalePreferencesState localePrefs;
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -110,8 +114,8 @@ class _Header extends StatelessWidget {
         title: Text('${t.transferNumber} • ${t.status.replaceAll('_', ' ')}',
             style: theme.textTheme.titleMedium
                 ?.copyWith(fontWeight: FontWeight.w700)),
-        subtitle: Text(
-            '${t.fromLocationName} → ${t.toLocationName}\n${t.transferDate.toLocal()}'),
+        subtitle: Text('${t.fromLocationName} → ${t.toLocationName}\n'
+            '${AppDateTime.formatDateTime(context, localePrefs, t.transferDate)}'),
         isThreeLine: true,
       ),
     );

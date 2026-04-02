@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
+import '../../../../core/app_date_time.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
 import '../../../../shared/widgets/app_error_view.dart';
@@ -143,6 +145,7 @@ class _ProductTransactionsPageState
   @override
   Widget build(BuildContext context) {
     final isWide = AppBreakpoints.isTabletOrDesktop(context);
+    final localePrefs = ref.watch(localePreferencesProvider);
     return Scaffold(
       appBar: AppBar(
         leadingWidth: isWide ? 104 : null,
@@ -192,7 +195,11 @@ class _ProductTransactionsPageState
                   ))
                 else ...[
                   for (final t in items) ...[
-                    _TransactionTile(t: t, onTap: () => _openTransaction(t)),
+                    _TransactionTile(
+                      t: t,
+                      localePrefs: localePrefs,
+                      onTap: () => _openTransaction(t),
+                    ),
                     const SizedBox(height: 8),
                   ]
                 ]
@@ -396,8 +403,13 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _TransactionTile extends StatelessWidget {
-  const _TransactionTile({required this.t, this.onTap});
+  const _TransactionTile({
+    required this.t,
+    required this.localePrefs,
+    this.onTap,
+  });
   final ProductTransactionDto t;
+  final LocalePreferencesState localePrefs;
   final VoidCallback? onTap;
 
   @override
@@ -411,7 +423,12 @@ class _TransactionTile extends StatelessWidget {
     final amountColor = hasAmount
         ? ((t.amount ?? 0) > 0 ? Colors.green : theme.colorScheme.error)
         : theme.colorScheme.onSurfaceVariant;
-    final ts = t.occurredAt != null ? '${t.occurredAt!.toLocal()}' : '';
+    final ts = AppDateTime.formatDateTime(
+      context,
+      localePrefs,
+      t.occurredAt,
+      fallback: '',
+    );
     return ListTile(
       tileColor: theme.colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../data/hr_repository.dart';
 import '../../data/models.dart';
 import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/locale_preferences.dart';
 
 class AttendancePage extends ConsumerStatefulWidget {
   const AttendancePage({
@@ -273,7 +274,7 @@ class _AttendancePageState extends ConsumerState<AttendancePage>
   }
 
   Widget _buildCheckInOut() {
-    final df = DateFormat('yyyy-MM-dd HH:mm');
+    final localePrefs = ref.watch(localePreferencesProvider);
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -319,9 +320,10 @@ class _AttendancePageState extends ConsumerState<AttendancePage>
                           style: Theme.of(context).textTheme.titleSmall),
                       const SizedBox(height: 6),
                       Text(
-                          'Check-in: ${df.format(_lastCheck!.checkIn.toLocal())}'),
+                        'Check-in: ${AppDateTime.formatDateTime(context, localePrefs, _lastCheck!.checkIn)}',
+                      ),
                       Text(
-                        'Check-out: ${_lastCheck!.checkOut == null ? '—' : df.format(_lastCheck!.checkOut!.toLocal())}',
+                        'Check-out: ${_lastCheck!.checkOut == null ? '—' : AppDateTime.formatDateTime(context, localePrefs, _lastCheck!.checkOut)}',
                       ),
                     ],
                   ),
@@ -332,9 +334,9 @@ class _AttendancePageState extends ConsumerState<AttendancePage>
   }
 
   Widget _buildRecords() {
-    final df = DateFormat('yyyy-MM-dd HH:mm');
+    final localePrefs = ref.watch(localePreferencesProvider);
     String dateLabel(DateTime? d) =>
-        d == null ? 'Any' : DateFormat('yyyy-MM-dd').format(d);
+        d == null ? 'Any' : AppDateTime.formatDate(context, localePrefs, d);
 
     return Column(
       children: [
@@ -394,7 +396,7 @@ class _AttendancePageState extends ConsumerState<AttendancePage>
                                 leading: const Icon(Icons.access_time_rounded),
                                 title: Text('Employee #${r.employeeId}'),
                                 subtitle: Text(
-                                  'In: ${df.format(r.checkIn.toLocal())}\nOut: ${r.checkOut == null ? '—' : df.format(r.checkOut!.toLocal())}',
+                                  'In: ${AppDateTime.formatDateTime(context, localePrefs, r.checkIn)}\nOut: ${r.checkOut == null ? '—' : AppDateTime.formatDateTime(context, localePrefs, r.checkOut)}',
                                 ),
                               ),
                             );
@@ -406,8 +408,9 @@ class _AttendancePageState extends ConsumerState<AttendancePage>
   }
 
   Widget _buildLeave() {
+    final localePrefs = ref.watch(localePreferencesProvider);
     String dateLabel(DateTime? d) =>
-        d == null ? 'Select' : DateFormat('yyyy-MM-dd').format(d);
+        d == null ? 'Select' : AppDateTime.formatDate(context, localePrefs, d);
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -473,7 +476,7 @@ class _AttendancePageState extends ConsumerState<AttendancePage>
   }
 
   Widget _buildHolidays() {
-    final df = DateFormat('yyyy-MM-dd');
+    final localePrefs = ref.watch(localePreferencesProvider);
     return _loadingHolidays
         ? const Center(child: CircularProgressIndicator())
         : _holidaysError != null
@@ -491,7 +494,10 @@ class _AttendancePageState extends ConsumerState<AttendancePage>
                         child: ListTile(
                           leading: const Icon(Icons.calendar_today_rounded),
                           title: Text(h.name),
-                          subtitle: Text(df.format(h.date.toLocal())),
+                          subtitle: Text(
+                            AppDateTime.formatDate(
+                                context, localePrefs, h.date),
+                          ),
                         ),
                       );
                     },

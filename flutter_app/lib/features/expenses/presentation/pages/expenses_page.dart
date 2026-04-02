@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
@@ -74,6 +76,7 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
 
   Future<void> _openNewExpense(List<ExpenseCategoryDto> categories) async {
     final outbox = ref.read(outboxNotifierProvider);
+    final localePrefs = ref.read(localePreferencesProvider);
     if (categories.isEmpty) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -143,7 +146,8 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.calendar_today_rounded),
                       title: Text(
-                          'Date: ${date.toIso8601String().split('T').first}'),
+                        'Date: ${AppDateTime.formatDate(context, localePrefs, date)}',
+                      ),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: () async {
                         final picked = await showDatePicker(
@@ -328,10 +332,13 @@ class _ExpensesPageState extends ConsumerState<ExpensesPage> {
                               const SizedBox(height: 8),
                           itemBuilder: (context, i) {
                             final e = items[i];
-                            final date = e.expenseDate
-                                .toIso8601String()
-                                .split('T')
-                                .first;
+                            final localePrefs =
+                                ref.watch(localePreferencesProvider);
+                            final date = AppDateTime.formatDate(
+                              context,
+                              localePrefs,
+                              e.expenseDate,
+                            );
                             return Card(
                               elevation: 0,
                               child: ListTile(

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../../shared/widgets/app_selection_dialog.dart';
 import '../../../pos/data/models.dart';
 import '../../../pos/data/pos_repository.dart';
@@ -420,6 +422,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final localePrefs = ref.watch(localePreferencesProvider);
     final subtotal = _items.fold<double>(0, (sum, i) => sum + _lineTotal(i));
     final discount = double.tryParse(_discountCtrl.text.trim()) ?? 0.0;
     final total = (subtotal - discount).clamp(0.0, double.infinity);
@@ -495,7 +498,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                     leading: const Icon(Icons.event_rounded),
                     title: Text(_validUntil == null
                         ? 'Valid until: not set'
-                        : 'Valid until: ${_validUntil!.toIso8601String().split('T').first}'),
+                        : 'Valid until: ${AppDateTime.formatDate(context, localePrefs, _validUntil)}'),
                     trailing: TextButton(
                       onPressed:
                           (_loading || _readOnly) ? null : _pickValidUntil,

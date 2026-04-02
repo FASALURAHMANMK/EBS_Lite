@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
+import '../../../../core/app_date_time.dart';
+import '../../../../core/locale_preferences.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
@@ -283,7 +284,7 @@ class _FinanceIntegrityPageState extends ConsumerState<FinanceIntegrityPage> {
   }
 
   Widget _buildOutboxCard(FinanceOutboxEntryDto entry) {
-    final df = DateFormat('yyyy-MM-dd HH:mm');
+    final localePrefs = ref.read(localePreferencesProvider);
     return Card(
       child: ListTile(
         leading: Icon(
@@ -299,7 +300,7 @@ class _FinanceIntegrityPageState extends ConsumerState<FinanceIntegrityPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Status: ${entry.status} • Attempts: ${entry.attemptCount} • Next: ${df.format(entry.nextAttemptAt.toLocal())}',
+              'Status: ${entry.status} • Attempts: ${entry.attemptCount} • Next: ${AppDateTime.formatDateTime(context, localePrefs, entry.nextAttemptAt)}',
             ),
             if ((entry.lastError ?? '').isNotEmpty) Text(entry.lastError!),
           ],
@@ -309,10 +310,10 @@ class _FinanceIntegrityPageState extends ConsumerState<FinanceIntegrityPage> {
   }
 
   Widget _buildMismatchCard(FinanceLedgerMismatchDto item) {
-    final df = DateFormat('yyyy-MM-dd');
+    final localePrefs = ref.read(localePreferencesProvider);
     final date = item.documentDate == null
         ? 'Unknown date'
-        : df.format(item.documentDate!.toLocal());
+        : AppDateTime.formatDate(context, localePrefs, item.documentDate);
     return Card(
       child: ListTile(
         leading: const Icon(Icons.warning_amber_rounded),

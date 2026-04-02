@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/app_date_time.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../data/sales_repository.dart';
 
 class SaleReturnDetailPage extends ConsumerStatefulWidget {
@@ -40,6 +42,7 @@ class _SaleReturnDetailPageState extends ConsumerState<SaleReturnDetailPage> {
     final items =
         (d?['items'] as List? ?? const []).cast<Map<String, dynamic>>();
     final theme = Theme.of(context);
+    final localePrefs = ref.watch(localePreferencesProvider);
     return Scaffold(
       appBar:
           AppBar(title: Text(d?['return_number']?.toString() ?? 'Sale Return')),
@@ -61,7 +64,13 @@ class _SaleReturnDetailPageState extends ConsumerState<SaleReturnDetailPage> {
                     (d?['customer']?['name']).toString()
                   else if (d?['customer_id'] != null)
                     'Customer #${d?['customer_id']}',
-                  if (d?['return_date'] != null) (d?['return_date']).toString(),
+                  if (d?['return_date'] != null)
+                    AppDateTime.formatFlexibleDate(
+                      context,
+                      localePrefs,
+                      d?['return_date']?.toString(),
+                      fallback: d?['return_date']?.toString() ?? '',
+                    ),
                 ].where((e) => e.isNotEmpty).join(' · ')),
                 trailing: Text(
                     ((d?['total_amount'] as num?)?.toDouble() ?? 0)

@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
+import '../../../../core/app_date_time.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../data/hr_repository.dart';
 import '../../data/models.dart';
 import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
@@ -313,7 +315,7 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
   @override
   Widget build(BuildContext context) {
     final isWide = AppBreakpoints.isTabletOrDesktop(context);
-    final df = DateFormat('yyyy-MM-dd');
+    final localePrefs = ref.watch(localePreferencesProvider);
     final scaffold = Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: !widget.fromMenu,
@@ -412,7 +414,7 @@ class _PayrollPageState extends ConsumerState<PayrollPage> {
                                       title: Text(
                                           'Employee #${p.employeeId} • ${p.netSalary.toStringAsFixed(2)}'),
                                       subtitle: Text(
-                                          '${df.format(p.payPeriodStart.toLocal())} → ${df.format(p.payPeriodEnd.toLocal())}\nStatus: ${p.status}'),
+                                          '${AppDateTime.formatDate(context, localePrefs, p.payPeriodStart)} → ${AppDateTime.formatDate(context, localePrefs, p.payPeriodEnd)}\nStatus: ${p.status}'),
                                       isThreeLine: true,
                                       trailing: PopupMenuButton<String>(
                                         onSelected: (v) {

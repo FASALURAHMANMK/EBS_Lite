@@ -214,7 +214,7 @@ class QuotePdfBuilder {
     if (v is String) {
       final dt = DateTime.tryParse(v);
       if (dt == null) return '';
-      return dt.toIso8601String().split('T').first;
+      return DateFormat.yMMMd().format(dt.toLocal());
     }
     return '';
   }

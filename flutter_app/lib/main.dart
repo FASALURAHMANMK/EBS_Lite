@@ -8,8 +8,10 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:ebs_lite/l10n/app_localizations.dart';
+import 'package:timezone/data/latest_all.dart' as tz_data;
 
 import 'core/theme_notifier.dart';
+import 'core/app_environment.dart';
 import 'core/app_theme.dart';
 import 'core/api_client.dart';
 import 'core/secure_storage.dart';
@@ -28,10 +30,16 @@ import 'shared/widgets/training_mode_overlay.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  tz_data.initializeTimeZones();
 
   final prefs = await SharedPreferences.getInstance();
   const secureStorage = FlutterSecureStorage();
-  final apiClient = ApiClient(prefs, secureStorage);
+  final appEnvironment = await AppEnvironment.load();
+  final apiClient = ApiClient(
+    prefs,
+    secureStorage,
+    baseUrl: appEnvironment.apiBaseUrl,
+  );
 
   // 1) Determine if we *really* have a session
   final hasTokens =
@@ -52,6 +60,7 @@ Future<void> main() async {
     ProviderScope(
       overrides: [
         dioProvider.overrideWithValue(apiClient.dio),
+        appEnvironmentProvider.overrideWithValue(appEnvironment),
         sharedPreferencesProvider.overrideWithValue(prefs),
         secureStorageProvider.overrideWithValue(secureStorage),
       ],

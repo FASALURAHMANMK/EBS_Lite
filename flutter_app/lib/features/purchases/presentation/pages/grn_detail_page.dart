@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../data/grn_repository.dart';
 import '../../data/models.dart';
 
@@ -50,6 +52,7 @@ class _GoodsReceiptDetailPageState
   @override
   Widget build(BuildContext context) {
     final d = _detail;
+    final localePrefs = ref.watch(localePreferencesProvider);
     return Scaffold(
       appBar: AppBar(title: Text(d?.receiptNumber ?? 'Goods Receipt')),
       body: SafeArea(
@@ -60,7 +63,10 @@ class _GoodsReceiptDetailPageState
                 : ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
-                      _Header(detail: d),
+                      _Header(
+                        detail: d,
+                        localePrefs: localePrefs,
+                      ),
                       const SizedBox(height: 12),
                       _Items(items: d.items),
                       const SizedBox(height: 12),
@@ -73,8 +79,12 @@ class _GoodsReceiptDetailPageState
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.detail});
+  const _Header({
+    required this.detail,
+    required this.localePrefs,
+  });
   final GoodsReceiptDetailDto detail;
+  final LocalePreferencesState localePrefs;
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +102,7 @@ class _Header extends StatelessWidget {
                 [
                   if ((detail.supplierName ?? '').isNotEmpty)
                     'Supplier: ${detail.supplierName}',
-                  'Date: ${_fmt(detail.receivedDate)}',
+                  'Date: ${AppDateTime.formatDate(context, localePrefs, detail.receivedDate)}',
                 ].join(' • '),
                 style: theme.textTheme.bodyMedium),
             if (detail.purchaseId != null) ...[
@@ -179,11 +189,4 @@ class _Addons extends StatelessWidget {
       ),
     );
   }
-}
-
-String _fmt(DateTime dt) {
-  final y = dt.year.toString().padLeft(4, '0');
-  final m = dt.month.toString().padLeft(2, '0');
-  final d = dt.day.toString().padLeft(2, '0');
-  return '$y-$m-$d';
 }

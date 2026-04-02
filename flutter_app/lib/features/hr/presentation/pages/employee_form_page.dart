@@ -2,8 +2,9 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
+import '../../../../core/app_date_time.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../../admin/data/roles_repository.dart';
 import '../../data/hr_repository.dart';
@@ -318,8 +319,10 @@ class _EmployeeFormPageState extends ConsumerState<EmployeeFormPage> {
             ? _appRoleId
             : null;
 
-    final df = DateFormat('yyyy-MM-dd');
-    final hireLabel = _hireDate == null ? 'Select' : df.format(_hireDate!);
+    final localePrefs = ref.watch(localePreferencesProvider);
+    final hireLabel = _hireDate == null
+        ? 'Select'
+        : AppDateTime.formatDate(context, localePrefs, _hireDate);
 
     return Scaffold(
       appBar: AppBar(

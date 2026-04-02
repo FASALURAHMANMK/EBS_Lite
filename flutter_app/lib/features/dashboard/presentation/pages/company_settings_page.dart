@@ -13,7 +13,6 @@ import 'package:file_picker/file_picker.dart';
 import '../../../auth/controllers/auth_notifier.dart';
 import '../../../../core/api_client.dart';
 import '../../../../core/error_handler.dart';
-import '../../../../core/locale_preferences.dart';
 import 'locations_management_page.dart';
 import 'printer_settings_page.dart';
 
@@ -161,17 +160,6 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final localePrefs = ref.watch(localePreferencesProvider);
-    final languageOptions = [
-      DropdownMenuItem<Locale>(
-        value: const Locale('en'),
-        child: Text(l10n.languageEnglish),
-      ),
-      DropdownMenuItem<Locale>(
-        value: const Locale('ar'),
-        child: Text(l10n.languageArabic),
-      ),
-    ];
     return Scaffold(
       appBar: AppBar(title: Text(l10n.companySettingsTitle)),
       body: _loading
@@ -288,53 +276,6 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                                 ))
                             .toList(),
                         onChanged: (v) => setState(() => _currencyId = v),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    l10n.languageSectionTitle,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: l10n.uiLanguageLabel,
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.language_rounded),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<Locale>(
-                        isExpanded: true,
-                        value: localePrefs.uiLocale,
-                        items: languageOptions,
-                        onChanged: (v) {
-                          if (v == null) return;
-                          ref
-                              .read(localePreferencesProvider.notifier)
-                              .setUiLocale(v);
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: l10n.receiptLanguageLabel,
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.receipt_long_rounded),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<Locale>(
-                        isExpanded: true,
-                        value: localePrefs.receiptLocale,
-                        items: languageOptions,
-                        onChanged: (v) {
-                          if (v == null) return;
-                          ref
-                              .read(localePreferencesProvider.notifier)
-                              .setReceiptLocale(v);
-                        },
                       ),
                     ),
                   ),

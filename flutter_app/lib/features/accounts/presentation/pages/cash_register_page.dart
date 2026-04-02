@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
-import 'package:intl/intl.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../../dashboard/data/models.dart';
 import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
 import '../../../accounts/data/accounts_repository.dart';
 import '../../../accounts/data/models.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../../shared/widgets/app_confirm_dialog.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import '../../../../shared/widgets/manager_override_dialog.dart';
@@ -643,7 +644,12 @@ class _CashRegisterPageState extends ConsumerState<CashRegisterPage> {
                       if (_registers.isEmpty)
                         const Center(child: Text('No cash registers found'))
                       else
-                        ..._registers.map((r) => _RegisterCard(register: r)),
+                        ..._registers.map(
+                          (r) => _RegisterCard(
+                            register: r,
+                            localePrefs: ref.watch(localePreferencesProvider),
+                          ),
+                        ),
                     ],
                   ),
       ),
@@ -767,16 +773,19 @@ class _RegisterSummary extends StatelessWidget {
 }
 
 class _RegisterCard extends StatelessWidget {
-  const _RegisterCard({required this.register});
+  const _RegisterCard({
+    required this.register,
+    required this.localePrefs,
+  });
 
   final CashRegisterDto register;
+  final LocalePreferencesState localePrefs;
 
   @override
   Widget build(BuildContext context) {
-    final df = DateFormat('yyyy-MM-dd HH:mm');
     final title = 'Register #${register.registerId}';
     final subtitle = [
-      'Date: ${df.format(register.date.toLocal())}',
+      'Date: ${AppDateTime.formatDateTime(context, localePrefs, register.date)}',
       'Status: ${register.status}',
     ].join(' • ');
     return Card(

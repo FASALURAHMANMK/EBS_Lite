@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
+import '../../../../core/app_date_time.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../data/inventory_repository.dart';
 import '../../data/models.dart';
@@ -160,7 +162,10 @@ class _StockTransfersPageState extends ConsumerState<StockTransfersPage> {
                     padding: const EdgeInsets.all(12),
                     itemCount: items.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, i) => _TransferTile(item: items[i]),
+                    itemBuilder: (context, i) => _TransferTile(
+                      item: items[i],
+                      localePrefs: ref.watch(localePreferencesProvider),
+                    ),
                   );
                 },
               ),
@@ -173,8 +178,12 @@ class _StockTransfersPageState extends ConsumerState<StockTransfersPage> {
 }
 
 class _TransferTile extends ConsumerWidget {
-  const _TransferTile({required this.item});
+  const _TransferTile({
+    required this.item,
+    required this.localePrefs,
+  });
   final StockTransferListItemDto item;
+  final LocalePreferencesState localePrefs;
 
   Color _statusColor(BuildContext context) {
     final theme = Theme.of(context);
@@ -223,8 +232,8 @@ class _TransferTile extends ConsumerWidget {
                 style: theme.textTheme.titleMedium
                     ?.copyWith(fontWeight: FontWeight.w700))),
       ]),
-      subtitle: Text(
-          '${item.fromLocationName} → ${item.toLocationName} • ${item.transferDate.toLocal()}'),
+      subtitle: Text('${item.fromLocationName} → ${item.toLocationName} • '
+          '${AppDateTime.formatDateTime(context, localePrefs, item.transferDate)}'),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

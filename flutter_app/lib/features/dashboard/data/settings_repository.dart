@@ -117,6 +117,13 @@ class SettingsRepository {
     final res = await _dio.get('/support/bundle');
     return _extractDataMap(res.data);
   }
+
+  Future<SubmittedSupportIssueDto> submitSupportIssue(
+    SupportIssueSubmissionDto request,
+  ) async {
+    final res = await _dio.post('/support/issues', data: request.toJson());
+    return SubmittedSupportIssueDto.fromJson(_extractDataMap(res.data));
+  }
 }
 
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
