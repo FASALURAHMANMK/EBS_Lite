@@ -350,6 +350,7 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 				pos.GET("/customers", middleware.RequirePermission("VIEW_CUSTOMERS"), posHandler.GetPOSCustomers)
 				pos.POST("/numbering/reserve", middleware.RequirePermission("CREATE_SALES"), posHandler.ReserveNumberBlock)
 				pos.POST("/checkout", middleware.RequirePermission("CREATE_SALES"), posHandler.ProcessCheckout)
+				pos.PUT("/sales/:id", middleware.RequirePermission("UPDATE_SALES"), posHandler.EditSale)
 				pos.POST("/calculate", middleware.RequirePermission("CREATE_SALES"), posHandler.CalculateTotals)
 				pos.POST("/hold", middleware.RequirePermission("CREATE_SALES"), posHandler.HoldSale)
 				pos.POST("/void/:id", middleware.RequirePermission("UPDATE_SALES"), posHandler.VoidSale)

@@ -5,6 +5,7 @@ import 'package:ebs_lite/features/promotions/presentation/pages/promotions_page.
 import 'package:ebs_lite/features/sales/presentation/pages/sales_history_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/sales_returns_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/invoices_page.dart';
+import 'b2b_party_management_page.dart';
 import 'quotes_page.dart';
 
 class SalesPage extends StatelessWidget {
@@ -22,7 +23,7 @@ class SalesPage extends StatelessWidget {
       ),
       FeatureItem(
         icon: Icons.receipt_long_rounded,
-        label: 'Invoices',
+        label: 'B2B Invoices',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const InvoicesPage()),
         ),
@@ -36,9 +37,18 @@ class SalesPage extends StatelessWidget {
       ),
       FeatureItem(
         icon: Icons.assignment_return_rounded,
-        label: 'Returns',
+        label: 'B2B Returns',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const SaleReturnFormPage()),
+        ),
+      ),
+      FeatureItem(
+        icon: Icons.business_rounded,
+        label: 'B2B Parties',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const B2BPartyManagementPage(),
+          ),
         ),
       ),
       FeatureItem(

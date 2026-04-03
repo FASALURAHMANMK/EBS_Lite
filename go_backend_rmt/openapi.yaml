@@ -1810,6 +1810,30 @@ paths:
   /sales:
     get:
       summary: GET /api/v1/sales
+      parameters:
+        - in: query
+          name: location_id
+          required: false
+          schema:
+            type: integer
+        - in: query
+          name: customer_id
+          required: false
+          schema:
+            type: integer
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: transaction_type
+          required: false
+          schema:
+            type: string
+            enum:
+              - RETAIL
+              - B2B
       responses:
         '200':
           description: Successful response
@@ -1834,6 +1858,47 @@ paths:
   /sales/history:
     get:
       summary: GET /api/v1/sales/history
+      parameters:
+        - in: query
+          name: date_from
+          required: false
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: date_to
+          required: false
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: customer_id
+          required: false
+          schema:
+            type: integer
+        - in: query
+          name: payment_method_id
+          required: false
+          schema:
+            type: integer
+        - in: query
+          name: product_id
+          required: false
+          schema:
+            type: integer
+        - in: query
+          name: sale_number
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: transaction_type
+          required: false
+          schema:
+            type: string
+            enum:
+              - RETAIL
+              - B2B
       responses:
         '200':
           description: Successful response
@@ -2004,6 +2069,37 @@ paths:
   /sales/quotes:
     get:
       summary: GET /api/v1/sales/quotes
+      parameters:
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: customer_id
+          required: false
+          schema:
+            type: integer
+        - in: query
+          name: date_from
+          required: false
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: date_to
+          required: false
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: transaction_type
+          required: false
+          schema:
+            type: string
+            enum:
+              - RETAIL
+              - B2B
       responses:
         '200':
           description: Successful response
@@ -2229,6 +2325,15 @@ paths:
   /pos/customers:
     get:
       summary: GET /api/v1/pos/customers
+      parameters:
+        - in: query
+          name: customer_type
+          required: false
+          schema:
+            type: string
+            enum:
+              - RETAIL
+              - B2B
       responses:
         '200':
           description: Successful response
@@ -2266,6 +2371,27 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/POSCheckoutRequest'
+  /pos/sales/{id}:
+    put:
+      summary: PUT /api/v1/pos/sales/{id}
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/POSEditSaleRequest'
   /pos/calculate:
     post:
       summary: POST /api/v1/pos/calculate
@@ -2875,6 +3001,42 @@ paths:
   /sale-returns:
     get:
       summary: GET /api/v1/sale-returns
+      parameters:
+        - in: query
+          name: date_from
+          required: false
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: date_to
+          required: false
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: customer_id
+          required: false
+          schema:
+            type: integer
+        - in: query
+          name: sale_id
+          required: false
+          schema:
+            type: integer
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: transaction_type
+          required: false
+          schema:
+            type: string
+            enum:
+              - RETAIL
+              - B2B
       responses:
         '200':
           description: Successful response
@@ -3528,6 +3690,20 @@ paths:
   /customers:
     get:
       summary: GET /api/v1/customers
+      parameters:
+        - in: query
+          name: search
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: customer_type
+          required: false
+          schema:
+            type: string
+            enum:
+              - RETAIL
+              - B2B
       responses:
         '200':
           description: Successful response
@@ -3711,7 +3887,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreateSaleRequest'
   /warranties/prepare:
     get:
       summary: GET /api/v1/warranties/prepare
@@ -4086,7 +4262,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/UpdateQuoteRequest'
   /attendance/check-in:
     post:
       summary: POST /api/v1/attendance/check-in
@@ -4101,7 +4277,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/CreateCustomerRequest'
   /attendance/check-out:
     post:
       summary: POST /api/v1/attendance/check-out
@@ -4131,7 +4307,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenericObject'
+              $ref: '#/components/schemas/UpdateCustomerRequest'
   /attendance/leaves:
     get:
       summary: GET /api/v1/attendance/leaves
@@ -8654,6 +8830,48 @@ components:
         override_password:
           type: string
           nullable: true
+    POSEditSaleRequest:
+      type: object
+      required:
+      - baseline_updated_at
+      - items
+      properties:
+        baseline_updated_at:
+          type: string
+          format: date-time
+        customer_id:
+          type: integer
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateSaleDetailRequest'
+        payment_method_id:
+          type: integer
+          nullable: true
+        discount_amount:
+          type: number
+        paid_amount:
+          type: number
+        payments:
+          type: array
+          items:
+            $ref: '#/components/schemas/POSPaymentLine'
+        notes:
+          type: string
+          nullable: true
+        manager_override_token:
+          type: string
+          nullable: true
+        override_reason:
+          type: string
+          nullable: true
+        sales_action_password:
+          type: string
+          nullable: true
+        override_password:
+          type: string
+          nullable: true
     CreateCouponSeriesRequest:
       type: object
       properties:
@@ -9099,6 +9317,90 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/InventoryBatchSelectionInput'
+    CreateCustomerRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        customer_type:
+          type: string
+          enum:
+            - RETAIL
+            - B2B
+          nullable: true
+        contact_person:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        shipping_address:
+          type: string
+          nullable: true
+        tax_number:
+          type: string
+          nullable: true
+        payment_terms:
+          type: integer
+          nullable: true
+        credit_limit:
+          type: number
+          format: float
+          nullable: true
+        is_loyalty:
+          type: boolean
+          nullable: true
+    UpdateCustomerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        customer_type:
+          type: string
+          enum:
+            - RETAIL
+            - B2B
+          nullable: true
+        contact_person:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        shipping_address:
+          type: string
+          nullable: true
+        tax_number:
+          type: string
+          nullable: true
+        payment_terms:
+          type: integer
+          nullable: true
+        credit_limit:
+          type: number
+          format: float
+          nullable: true
+        is_loyalty:
+          type: boolean
+          nullable: true
+        is_active:
+          type: boolean
+          nullable: true
     CreateSaleRequest:
       type: object
       required:
@@ -9109,6 +9411,12 @@ components:
           nullable: true
         customer_id:
           type: integer
+          nullable: true
+        transaction_type:
+          type: string
+          enum:
+            - RETAIL
+            - B2B
           nullable: true
         items:
           type: array
@@ -9272,6 +9580,12 @@ components:
         customer_id:
           type: integer
           nullable: true
+        transaction_type:
+          type: string
+          enum:
+            - RETAIL
+            - B2B
+          nullable: true
         items:
           type: array
           items:
@@ -9289,8 +9603,17 @@ components:
     UpdateQuoteRequest:
       type: object
       properties:
+        customer_id:
+          type: integer
+          nullable: true
         status:
           type: string
+          nullable: true
+        transaction_type:
+          type: string
+          enum:
+            - RETAIL
+            - B2B
           nullable: true
         notes:
           type: string
@@ -9363,6 +9686,11 @@ components:
         customer_id:
           type: integer
           nullable: true
+        transaction_type:
+          type: string
+          enum:
+            - RETAIL
+            - B2B
         quote_date:
           type: string
           format: date-time

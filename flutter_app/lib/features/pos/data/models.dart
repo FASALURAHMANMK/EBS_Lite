@@ -90,12 +90,16 @@ class PosProductDto {
 class PosCustomerDto {
   final int customerId;
   final String name;
+  final String customerType;
+  final String? contactPerson;
   final String? phone;
   final String? email;
 
   PosCustomerDto({
     required this.customerId,
     required this.name,
+    this.customerType = 'RETAIL',
+    this.contactPerson,
     this.phone,
     this.email,
   });
@@ -103,6 +107,8 @@ class PosCustomerDto {
   factory PosCustomerDto.fromJson(Map<String, dynamic> json) => PosCustomerDto(
         customerId: json['customer_id'] as int,
         name: json['name'] as String? ?? '',
+        customerType: json['customer_type'] as String? ?? 'RETAIL',
+        contactPerson: json['contact_person'] as String?,
         phone: json['phone'] as String?,
         email: json['email'] as String?,
       );
@@ -362,18 +368,28 @@ class PosCheckoutResult {
   final int saleId;
   final String saleNumber;
   final double totalAmount;
+  final bool updatedExistingSale;
+  final bool unchanged;
 
   PosCheckoutResult({
     required this.saleId,
     required this.saleNumber,
     required this.totalAmount,
+    this.updatedExistingSale = false,
+    this.unchanged = false,
   });
 
-  factory PosCheckoutResult.fromSale(Map<String, dynamic> sale) =>
+  factory PosCheckoutResult.fromSale(
+    Map<String, dynamic> sale, {
+    bool updatedExistingSale = false,
+    bool unchanged = false,
+  }) =>
       PosCheckoutResult(
         saleId: sale['sale_id'] as int,
         saleNumber: sale['sale_number'] as String? ?? '',
         totalAmount: (sale['total_amount'] as num?)?.toDouble() ?? 0.0,
+        updatedExistingSale: updatedExistingSale,
+        unchanged: unchanged,
       );
 }
 
@@ -535,6 +551,7 @@ class SaleDto {
   final int locationId;
   final String? locationName;
   final String? sourceChannel;
+  final String transactionType;
   final int? refundSourceSaleId;
   final String? refundSourceSaleNumber;
   final String? refundState;
@@ -565,6 +582,7 @@ class SaleDto {
     required this.locationId,
     this.locationName,
     this.sourceChannel,
+    this.transactionType = 'RETAIL',
     this.refundSourceSaleId,
     this.refundSourceSaleNumber,
     this.refundState,
@@ -602,6 +620,7 @@ class SaleDto {
       locationId: (json['location_id'] as num?)?.toInt() ?? 0,
       locationName: json['location_name'] as String?,
       sourceChannel: json['source_channel'] as String?,
+      transactionType: json['transaction_type'] as String? ?? 'RETAIL',
       refundSourceSaleId: (json['refund_source_sale_id'] as num?)?.toInt(),
       refundSourceSaleNumber: json['refund_source_sale_number'] as String?,
       refundState: json['refund_state'] as String?,

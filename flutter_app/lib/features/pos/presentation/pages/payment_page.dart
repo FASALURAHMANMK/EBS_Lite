@@ -231,9 +231,11 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     final state = ref.watch(posNotifierProvider);
     final theme = Theme.of(context);
     final total = state.total;
+    final isEditSession = state.isEditingSale;
     final hasRefundLines = state.hasRefundLines;
     final isRefundSettlement = total < 0;
-    final allowDiscountRedemption = _redemptionType == 'DISCOUNT';
+    final allowDiscountRedemption =
+        !isEditSession && _redemptionType == 'DISCOUNT';
     final redeemPts = allowDiscountRedemption && _useLoyalty
         ? (double.tryParse(_redeemCtrl.text.trim()) ?? 0.0)
         : 0.0;
@@ -250,7 +252,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     final displayBalance = balance.abs();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Payment')),
+      appBar: AppBar(title: Text(isEditSession ? 'Save Sale' : 'Payment')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -266,6 +268,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (!hasRefundLines &&
+                            !isEditSession &&
                             _availablePoints > 0 &&
                             allowDiscountRedemption) ...[
                           Row(children: [
@@ -404,6 +407,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                           const Divider(height: 24),
                         ],
                         if (!hasRefundLines &&
+                            !isEditSession &&
                             _availablePoints > 0 &&
                             !allowDiscountRedemption) ...[
                           Card(
@@ -419,7 +423,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                           ),
                           const SizedBox(height: 16),
                         ],
-                        if (!hasRefundLines) ...[
+                        if (!hasRefundLines && !isEditSession) ...[
                           Card(
                             child: Padding(
                               padding: const EdgeInsets.all(12),
@@ -535,12 +539,14 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                             elevation: 0,
                             color: theme.colorScheme.secondaryContainer
                                 .withValues(alpha: 0.35),
-                            child: const ListTile(
+                            child: ListTile(
                               leading: Icon(Icons.undo_rounded),
                               title:
                                   Text('Refund / edit authorization required'),
                               subtitle: Text(
-                                'Coupon and loyalty discounts are disabled when refund lines are included in the settlement.',
+                                isEditSession
+                                    ? 'Coupon and loyalty discounts are disabled while editing an existing sale.'
+                                    : 'Coupon and loyalty discounts are disabled when refund lines are included in the settlement.',
                               ),
                             ),
                           ),
@@ -701,7 +707,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                 style: Theme.of(context).textTheme.bodyLarge),
                           ],
                         ),
-                        if (!hasRefundLines && redeemValue > 0) ...[
+                        if (!hasRefundLines &&
+                            !isEditSession &&
+                            redeemValue > 0) ...[
                           const SizedBox(height: 6),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -715,7 +723,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                             ],
                           ),
                         ],
-                        if (!hasRefundLines && couponDiscount > 0) ...[
+                        if (!hasRefundLines &&
+                            !isEditSession &&
+                            couponDiscount > 0) ...[
                           const SizedBox(height: 6),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -824,6 +834,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                             );
                                           }
                                           if (!hasRefundLines &&
+                                              !isEditSession &&
                                               _couponCtrl.text
                                                   .trim()
                                                   .isNotEmpty &&
@@ -859,13 +870,16 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
                                         PosCheckoutResult result;
                                         String? salesActionPassword;
-                                        if (hasRefundLines) {
+                                        if (hasRefundLines || isEditSession) {
                                           salesActionPassword =
                                               await showSalesActionPasswordDialog(
                                             context,
-                                            title: isRefundSettlement
+                                            title: hasRefundLines &&
+                                                    isRefundSettlement
                                                 ? 'Authorize Refund'
-                                                : 'Authorize Edit / Exchange',
+                                                : isEditSession
+                                                    ? 'Authorize Sale Edit'
+                                                    : 'Authorize Edit / Exchange',
                                             message:
                                                 'Enter the separate edit/refund PIN or password configured for your user.',
                                             actionLabel: 'Authorize',
@@ -969,6 +983,15 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                         if (!mounted) return;
                                         setState(() => _submitting = false);
 
+                                        if (result.unchanged) {
+                                          _showMessage(
+                                            'No changes were detected. The existing sale was left unchanged.',
+                                          );
+                                          if (!context.mounted) return;
+                                          Navigator.of(context).pop();
+                                          return;
+                                        }
+
                                         await _showSuccessDialog(result);
 
                                         if (!context.mounted) return;
@@ -1012,7 +1035,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                       child: CircularProgressIndicator(
                                           strokeWidth: 2))
                                   : const Icon(Icons.check_circle_rounded),
-                              label: const Text('Finalize'),
+                              label: Text(
+                                isEditSession ? 'Save Changes' : 'Finalize',
+                              ),
                             ),
                           ]),
                         ),
@@ -1040,11 +1065,15 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       barrierDismissible: false,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Payment Successful'),
+          title: Text(
+            result.updatedExistingSale ? 'Sale Updated' : 'Payment Successful',
+          ),
           content: Text(
-            raffleCount > 0
-                ? 'Invoice ${result.saleNumber} created.\n$raffleCount raffle coupon(s) issued.'
-                : 'Invoice ${result.saleNumber} created',
+            result.updatedExistingSale
+                ? 'Invoice ${result.saleNumber} updated'
+                : raffleCount > 0
+                    ? 'Invoice ${result.saleNumber} created.\n$raffleCount raffle coupon(s) issued.'
+                    : 'Invoice ${result.saleNumber} created',
           ),
           actions: [
             TextButton(

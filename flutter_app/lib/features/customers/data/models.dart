@@ -1,9 +1,12 @@
 class CustomerDto {
   final int customerId;
   final String name;
+  final String customerType;
+  final String? contactPerson;
   final String? phone;
   final String? email;
   final String? address;
+  final String? shippingAddress;
   final String? taxNumber;
   final int paymentTerms; // days
   final double creditLimit;
@@ -15,9 +18,12 @@ class CustomerDto {
   CustomerDto({
     required this.customerId,
     required this.name,
+    required this.customerType,
+    this.contactPerson,
     this.phone,
     this.email,
     this.address,
+    this.shippingAddress,
     this.taxNumber,
     required this.paymentTerms,
     required this.creditLimit,
@@ -30,9 +36,12 @@ class CustomerDto {
   factory CustomerDto.fromJson(Map<String, dynamic> json) => CustomerDto(
         customerId: json['customer_id'] as int,
         name: json['name'] as String? ?? '',
+        customerType: json['customer_type'] as String? ?? 'RETAIL',
+        contactPerson: json['contact_person'] as String?,
         phone: json['phone'] as String?,
         email: json['email'] as String?,
         address: json['address'] as String?,
+        shippingAddress: json['shipping_address'] as String?,
         taxNumber: json['tax_number'] as String?,
         paymentTerms: (json['payment_terms'] as num?)?.toInt() ?? 0,
         creditLimit: (json['credit_limit'] as num?)?.toDouble() ?? 0,

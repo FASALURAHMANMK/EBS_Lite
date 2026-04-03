@@ -82,8 +82,9 @@ func (h *POSHandler) GetPOSCustomers(c *gin.Context) {
 	}
 
 	// Check if it's a search request
+	customerType := c.Query("customer_type")
 	if searchTerm := c.Query("search"); searchTerm != "" {
-		customers, err := h.posService.SearchCustomers(companyID, searchTerm)
+		customers, err := h.posService.SearchCustomers(companyID, searchTerm, customerType)
 		if err != nil {
 			utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to search customers", err)
 			return
@@ -92,7 +93,7 @@ func (h *POSHandler) GetPOSCustomers(c *gin.Context) {
 		return
 	}
 
-	customers, err := h.posService.GetPOSCustomers(companyID)
+	customers, err := h.posService.GetPOSCustomers(companyID, customerType)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get POS customers", err)
 		return
@@ -203,6 +204,116 @@ func (h *POSHandler) ProcessCheckout(c *gin.Context) {
 	}
 
 	utils.CreatedResponse(c, "Checkout completed successfully", map[string]interface{}{
+		"sale":       sale,
+		"invoice_id": sale.SaleID,
+	})
+}
+
+// PUT /pos/sales/:id
+func (h *POSHandler) EditSale(c *gin.Context) {
+	companyID := c.GetInt("company_id")
+	locationID := c.GetInt("location_id")
+	userID := c.GetInt("user_id")
+
+	if companyID == 0 {
+		utils.ForbiddenResponse(c, "Company access required")
+		return
+	}
+
+	if locationParam := c.Query("location_id"); locationParam != "" {
+		if id, err := strconv.Atoi(locationParam); err == nil {
+			locationID = id
+		}
+	}
+	if locationID == 0 {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Location ID required", nil)
+		return
+	}
+
+	saleID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid sale ID", err)
+		return
+	}
+
+	var req models.POSEditSaleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if err := utils.ValidateStruct(&req); err != nil {
+		utils.ValidationErrorResponse(c, utils.GetValidationErrors(err))
+		return
+	}
+
+	requestID := c.GetString("request_id")
+	if requestID == "" {
+		requestID = c.GetHeader("X-Request-ID")
+	}
+
+	sale, err := h.posService.EditCompletedSale(companyID, locationID, userID, saleID, &req, requestID)
+	if err != nil {
+		var ov *services.OverrideRequiredError
+		if errors.As(err, &ov) {
+			utils.JSONResponse(c, http.StatusForbidden, false, ov.Error(), gin.H{
+				"code":                 "OVERRIDE_REQUIRED",
+				"required_permissions": ov.RequiredPermissions,
+				"reason_required":      ov.ReasonRequired,
+			}, nil)
+			return
+		}
+		var approvalErr *services.NegativeStockApprovalRequiredError
+		if errors.As(err, &approvalErr) {
+			utils.JSONResponse(c, http.StatusForbidden, false, approvalErr.Error(), gin.H{
+				"code": "NEGATIVE_STOCK_APPROVAL_REQUIRED",
+			}, nil)
+			return
+		}
+		var profitApprovalErr *services.NegativeProfitApprovalRequiredError
+		if errors.As(err, &profitApprovalErr) {
+			utils.JSONResponse(c, http.StatusForbidden, false, profitApprovalErr.Error(), gin.H{
+				"code":    "NEGATIVE_PROFIT_APPROVAL_REQUIRED",
+				"details": profitApprovalErr.Details,
+			}, nil)
+			return
+		}
+		var profitBlockedErr *services.NegativeProfitNotAllowedError
+		if errors.As(err, &profitBlockedErr) {
+			utils.JSONResponse(c, http.StatusBadRequest, false, profitBlockedErr.Error(), gin.H{
+				"code":    "NEGATIVE_PROFIT_NOT_ALLOWED",
+				"details": profitBlockedErr.Details,
+			}, nil)
+			return
+		}
+		var cl *services.CreditLimitExceededError
+		if errors.As(err, &cl) {
+			utils.JSONResponse(c, http.StatusBadRequest, false, "Credit limit exceeded", gin.H{
+				"code":             "CREDIT_LIMIT_EXCEEDED",
+				"credit_limit":     cl.CreditLimit,
+				"current_outstand": cl.CurrentBalance,
+				"attempted_new":    cl.AttemptedDelta,
+			}, nil)
+			return
+		}
+		switch err.Error() {
+		case "sale not found":
+			utils.NotFoundResponse(c, "Sale not found")
+			return
+		case "sales action password is not configured for this user", "sales action password is required":
+			utils.ErrorResponse(c, http.StatusForbidden, "Failed to edit sale", err)
+			return
+		case "invalid sales action password":
+			utils.ErrorResponse(c, http.StatusUnauthorized, "Failed to edit sale", err)
+			return
+		case "sale has changed since the edit session started":
+			utils.ErrorResponse(c, http.StatusConflict, "Failed to edit sale", err)
+			return
+		}
+		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to edit sale", err)
+		return
+	}
+
+	utils.SuccessResponse(c, "Sale updated successfully", map[string]interface{}{
 		"sale":       sale,
 		"invoice_id": sale.SaleID,
 	})

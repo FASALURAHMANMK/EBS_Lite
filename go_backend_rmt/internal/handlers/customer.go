@@ -62,6 +62,9 @@ func (h *CustomerHandler) GetCustomers(c *gin.Context) {
 	if phone := c.Query("phone"); phone != "" {
 		filters["phone"] = phone
 	}
+	if customerType := c.Query("customer_type"); customerType != "" {
+		filters["customer_type"] = customerType
+	}
 	if creditMin := c.Query("credit_min"); creditMin != "" {
 		filters["credit_min"] = creditMin
 	}

@@ -59,6 +59,9 @@ func (h *SalesHandler) GetSales(c *gin.Context) {
 	if status := c.Query("status"); status != "" {
 		filters["status"] = status
 	}
+	if transactionType := c.Query("transaction_type"); transactionType != "" {
+		filters["transaction_type"] = transactionType
+	}
 
 	sales, err := h.salesService.GetSales(companyID, locationID, filters)
 	if err != nil {
@@ -175,6 +178,10 @@ func (h *SalesHandler) CreateSale(c *gin.Context) {
 		}
 		if err.Error() == "customer not found" {
 			utils.NotFoundResponse(c, "Customer not found")
+			return
+		}
+		if err.Error() == "b2b transactions require customer_id" || err.Error() == "invalid transaction_type" {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create sale", err)
 			return
 		}
 		if err.Error() == "paid amount cannot exceed total amount" {
@@ -527,6 +534,9 @@ func (h *SalesHandler) GetSalesHistory(c *gin.Context) {
 	if saleNumber := c.Query("sale_number"); saleNumber != "" {
 		filters["sale_number"] = saleNumber
 	}
+	if transactionType := c.Query("transaction_type"); transactionType != "" {
+		filters["transaction_type"] = transactionType
+	}
 
 	sales, err := h.salesService.GetSalesHistory(companyID, filters)
 	if err != nil {
@@ -561,6 +571,9 @@ func (h *SalesHandler) ExportInvoices(c *gin.Context) {
 	if paymentMethodID := c.Query("payment_method_id"); paymentMethodID != "" {
 		filters["payment_method_id"] = paymentMethodID
 	}
+	if transactionType := c.Query("transaction_type"); transactionType != "" {
+		filters["transaction_type"] = transactionType
+	}
 
 	invoices, err := h.salesService.ExportInvoices(companyID, filters)
 	if err != nil {
@@ -579,7 +592,24 @@ func (h *SalesHandler) GetQuotes(c *gin.Context) {
 		return
 	}
 
-	quotes, err := h.salesService.GetQuotes(companyID, nil)
+	filters := make(map[string]string)
+	if status := c.Query("status"); status != "" {
+		filters["status"] = status
+	}
+	if customerID := c.Query("customer_id"); customerID != "" {
+		filters["customer_id"] = customerID
+	}
+	if dateFrom := c.Query("date_from"); dateFrom != "" {
+		filters["date_from"] = dateFrom
+	}
+	if dateTo := c.Query("date_to"); dateTo != "" {
+		filters["date_to"] = dateTo
+	}
+	if transactionType := c.Query("transaction_type"); transactionType != "" {
+		filters["transaction_type"] = transactionType
+	}
+
+	quotes, err := h.salesService.GetQuotes(companyID, filters)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get quotes", err)
 		return
@@ -652,6 +682,10 @@ func (h *SalesHandler) CreateQuote(c *gin.Context) {
 
 	quote, err := h.salesService.CreateQuote(companyID, locationID, userID, &req)
 	if err != nil {
+		if err.Error() == "b2b quotes require customer_id" || err.Error() == "invalid transaction_type" {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create quote", err)
+			return
+		}
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to create quote", err)
 		return
 	}
@@ -689,6 +723,10 @@ func (h *SalesHandler) UpdateQuote(c *gin.Context) {
 	if err := h.salesService.UpdateQuote(quoteID, companyID, userID, &req); err != nil {
 		if err.Error() == "quote not found" {
 			utils.NotFoundResponse(c, "Quote not found")
+			return
+		}
+		if err.Error() == "b2b quotes require customer_id" || err.Error() == "invalid transaction_type" {
+			utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update quote", err)
 			return
 		}
 		utils.ErrorResponse(c, http.StatusBadRequest, "Failed to update quote", err)
@@ -887,7 +925,24 @@ func (h *SalesHandler) ExportQuotes(c *gin.Context) {
 		return
 	}
 
-	quotes, err := h.salesService.ExportQuotes(companyID, nil)
+	filters := make(map[string]string)
+	if status := c.Query("status"); status != "" {
+		filters["status"] = status
+	}
+	if customerID := c.Query("customer_id"); customerID != "" {
+		filters["customer_id"] = customerID
+	}
+	if dateFrom := c.Query("date_from"); dateFrom != "" {
+		filters["date_from"] = dateFrom
+	}
+	if dateTo := c.Query("date_to"); dateTo != "" {
+		filters["date_to"] = dateTo
+	}
+	if transactionType := c.Query("transaction_type"); transactionType != "" {
+		filters["transaction_type"] = transactionType
+	}
+
+	quotes, err := h.salesService.ExportQuotes(companyID, filters)
 	if err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to export quotes", err)
 		return

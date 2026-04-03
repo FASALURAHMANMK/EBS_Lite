@@ -28,7 +28,10 @@ class CustomerRepository {
     return const [];
   }
 
-  Future<List<CustomerDto>> getCustomers({String? search}) async {
+  Future<List<CustomerDto>> getCustomers({
+    String? search,
+    String? customerType,
+  }) async {
     final outbox = _ref.read(outboxNotifierProvider.notifier);
     final store = _ref.read(cacheStoreProvider);
     final q = (search ?? '').trim();
@@ -43,6 +46,9 @@ class CustomerRepository {
     final qp = <String, dynamic>{};
     if (search != null && search.trim().isNotEmpty) {
       qp['search'] = search.trim();
+    }
+    if (customerType != null && customerType.trim().isNotEmpty) {
+      qp['customer_type'] = customerType.trim().toUpperCase();
     }
     final res =
         await _dio.get('/customers', queryParameters: qp.isEmpty ? null : qp);
@@ -204,18 +210,26 @@ class CustomerRepository {
 
   Future<CustomerDto> createCustomer({
     required String name,
+    String? customerType,
+    String? contactPerson,
     String? phone,
     String? email,
     String? address,
+    String? shippingAddress,
     String? taxNumber,
     int? paymentTerms,
     double? creditLimit,
     bool isLoyalty = false,
   }) async {
     final body = <String, dynamic>{'name': name};
+    if (customerType != null && customerType.trim().isNotEmpty) {
+      body['customer_type'] = customerType.trim().toUpperCase();
+    }
+    if (contactPerson != null) body['contact_person'] = contactPerson;
     if (phone != null) body['phone'] = phone;
     if (email != null) body['email'] = email;
     if (address != null) body['address'] = address;
+    if (shippingAddress != null) body['shipping_address'] = shippingAddress;
     if (taxNumber != null) body['tax_number'] = taxNumber;
     if (paymentTerms != null) body['payment_terms'] = paymentTerms;
     if (creditLimit != null) body['credit_limit'] = creditLimit;
@@ -229,9 +243,12 @@ class CustomerRepository {
   Future<CustomerDto> updateCustomer({
     required int customerId,
     String? name,
+    String? customerType,
+    String? contactPerson,
     String? phone,
     String? email,
     String? address,
+    String? shippingAddress,
     String? taxNumber,
     int? paymentTerms,
     double? creditLimit,
@@ -240,9 +257,14 @@ class CustomerRepository {
   }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
+    if (customerType != null && customerType.trim().isNotEmpty) {
+      body['customer_type'] = customerType.trim().toUpperCase();
+    }
+    if (contactPerson != null) body['contact_person'] = contactPerson;
     if (phone != null) body['phone'] = phone;
     if (email != null) body['email'] = email;
     if (address != null) body['address'] = address;
+    if (shippingAddress != null) body['shipping_address'] = shippingAddress;
     if (taxNumber != null) body['tax_number'] = taxNumber;
     if (paymentTerms != null) body['payment_terms'] = paymentTerms;
     if (creditLimit != null) body['credit_limit'] = creditLimit;

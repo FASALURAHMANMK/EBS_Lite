@@ -80,6 +80,7 @@ class _SaleDetailPageState extends ConsumerState<SaleDetailPage> {
                   ),
                   title: Text(s.saleNumber),
                   subtitle: Text([
+                    s.transactionType == 'B2B' ? 'B2B Invoice' : 'Retail Sale',
                     if ((s.customerName ?? '').isNotEmpty) s.customerName!,
                     if ((s.refundSourceSaleNumber ?? '').isNotEmpty)
                       s.isRefundInvoice

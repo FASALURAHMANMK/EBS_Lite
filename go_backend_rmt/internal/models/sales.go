@@ -10,6 +10,7 @@ type Sale struct {
 	LocationID      int                `json:"location_id" db:"location_id"`
 	LocationName    *string            `json:"location_name,omitempty" db:"location_name"`
 	SourceChannel   *string            `json:"source_channel,omitempty" db:"source_channel"`
+	TransactionType string             `json:"transaction_type" db:"transaction_type"`
 	RefundSourceID  *int               `json:"refund_source_sale_id,omitempty" db:"refund_source_sale_id"`
 	RefundSourceRef *string            `json:"refund_source_sale_number,omitempty" db:"refund_source_sale_number"`
 	RefundState     *string            `json:"refund_state,omitempty" db:"refund_state"`
@@ -65,21 +66,22 @@ type SaleDetail struct {
 }
 
 type SaleReturn struct {
-	ReturnID      int                `json:"return_id" db:"return_id"`
-	ReturnNumber  string             `json:"return_number" db:"return_number"`
-	SaleID        int                `json:"sale_id" db:"sale_id"`
-	LocationID    int                `json:"location_id" db:"location_id"`
-	LocationName  *string            `json:"location_name,omitempty" db:"location_name"`
-	CustomerID    *int               `json:"customer_id,omitempty" db:"customer_id"`
-	ReturnDate    time.Time          `json:"return_date" db:"return_date"`
-	TotalAmount   float64            `json:"total_amount" db:"total_amount"`
-	Reason        *string            `json:"reason,omitempty" db:"reason"`
-	Status        string             `json:"status" db:"status"`
-	CreatedBy     int                `json:"created_by" db:"created_by"`
-	CreatedByName *string            `json:"created_by_name,omitempty" db:"created_by_name"`
-	Items         []SaleReturnDetail `json:"items,omitempty"`
-	Sale          *Sale              `json:"sale,omitempty"`
-	Customer      *Customer          `json:"customer,omitempty"`
+	ReturnID        int                `json:"return_id" db:"return_id"`
+	ReturnNumber    string             `json:"return_number" db:"return_number"`
+	SaleID          int                `json:"sale_id" db:"sale_id"`
+	LocationID      int                `json:"location_id" db:"location_id"`
+	LocationName    *string            `json:"location_name,omitempty" db:"location_name"`
+	CustomerID      *int               `json:"customer_id,omitempty" db:"customer_id"`
+	TransactionType string             `json:"transaction_type" db:"transaction_type"`
+	ReturnDate      time.Time          `json:"return_date" db:"return_date"`
+	TotalAmount     float64            `json:"total_amount" db:"total_amount"`
+	Reason          *string            `json:"reason,omitempty" db:"reason"`
+	Status          string             `json:"status" db:"status"`
+	CreatedBy       int                `json:"created_by" db:"created_by"`
+	CreatedByName   *string            `json:"created_by_name,omitempty" db:"created_by_name"`
+	Items           []SaleReturnDetail `json:"items,omitempty"`
+	Sale            *Sale              `json:"sale,omitempty"`
+	Customer        *Customer          `json:"customer,omitempty"`
 	SyncModel
 }
 
@@ -110,6 +112,7 @@ type CreateSaleRequest struct {
 	// SaleNumber is optional. When provided (e.g. offline-first POS), the server
 	// will persist it as-is instead of allocating from numbering sequences.
 	SaleNumber       *string                   `json:"sale_number,omitempty"`
+	TransactionType  *string                   `json:"transaction_type,omitempty"`
 	CustomerID       *int                      `json:"customer_id,omitempty"`
 	Items            []CreateSaleDetailRequest `json:"items" validate:"required,min=1"`
 	PaymentMethodID  *int                      `json:"payment_method_id,omitempty"`
@@ -208,6 +211,21 @@ type POSCheckoutRequest struct {
 	OverridePassword           *string                   `json:"override_password,omitempty"`
 }
 
+type POSEditSaleRequest struct {
+	BaselineUpdatedAt    *time.Time                `json:"baseline_updated_at" validate:"required"`
+	CustomerID           *int                      `json:"customer_id,omitempty"`
+	Items                []CreateSaleDetailRequest `json:"items" validate:"required,min=1"`
+	PaymentMethodID      *int                      `json:"payment_method_id,omitempty"`
+	DiscountAmount       float64                   `json:"discount_amount"`
+	PaidAmount           float64                   `json:"paid_amount" validate:"gte=0"`
+	Payments             []POSPaymentLine          `json:"payments,omitempty"`
+	Notes                *string                   `json:"notes,omitempty"`
+	ManagerOverrideToken *string                   `json:"manager_override_token,omitempty"`
+	OverrideReason       *string                   `json:"override_reason,omitempty"`
+	SalesActionPassword  *string                   `json:"sales_action_password,omitempty"`
+	OverridePassword     *string                   `json:"override_password,omitempty"`
+}
+
 type POSPrintRequest struct {
 	InvoiceID  *int    `json:"invoice_id,omitempty"`
 	SaleNumber *string `json:"sale_number,omitempty"`
@@ -258,10 +276,12 @@ type POSPaymentLine struct {
 }
 
 type POSCustomerResponse struct {
-	CustomerID int     `json:"customer_id"`
-	Name       string  `json:"name"`
-	Phone      *string `json:"phone,omitempty"`
-	Email      *string `json:"email,omitempty"`
+	CustomerID    int     `json:"customer_id"`
+	Name          string  `json:"name"`
+	CustomerType  string  `json:"customer_type"`
+	ContactPerson *string `json:"contact_person,omitempty"`
+	Phone         *string `json:"phone,omitempty"`
+	Email         *string `json:"email,omitempty"`
 }
 
 type SalesSummaryResponse struct {

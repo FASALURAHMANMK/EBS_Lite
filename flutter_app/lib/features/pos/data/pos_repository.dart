@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -38,6 +40,110 @@ class PosRepository {
       if (item.tracking != null) ...item.tracking!.toIssueJson(),
       if (comboTracking.isNotEmpty) 'combo_component_tracking': comboTracking,
     };
+  }
+
+  String _normalizedCartSignature(List<PosCartItem> items) {
+    final normalized = items
+        .map((item) => {
+              'product_id':
+                  item.product.productId > 0 ? item.product.productId : null,
+              'combo_product_id': item.product.comboProductId,
+              'barcode_id':
+                  item.product.barcodeId > 0 ? item.product.barcodeId : null,
+              'quantity': item.quantity.toStringAsFixed(4),
+              'unit_price': item.unitPrice.toStringAsFixed(4),
+              'discount_percentage': item.discountPercent.toStringAsFixed(4),
+              'serial_numbers': [...?item.tracking?.serialNumbers]..sort(),
+              'batch_allocations': (item.tracking?.batchAllocations ?? const [])
+                  .map((batch) =>
+                      '${batch.lotId}:${batch.quantity.toStringAsFixed(4)}')
+                  .toList()
+                ..sort(),
+              'combo_tracking': item.comboTracking
+                  .map((component) => {
+                        'product_id': component.productId,
+                        'barcode_id': component.barcodeId,
+                        'tracking_type': component.trackingType,
+                        'is_serialized': component.isSerialized,
+                        'serial_numbers': [
+                          ...?component.tracking?.serialNumbers
+                        ]..sort(),
+                        'batch_allocations': (component
+                                    .tracking?.batchAllocations ??
+                                const [])
+                            .map((batch) =>
+                                '${batch.lotId}:${batch.quantity.toStringAsFixed(4)}')
+                            .toList()
+                          ..sort(),
+                      })
+                  .toList(),
+            })
+        .toList()
+      ..sort((a, b) => jsonEncode(a).compareTo(jsonEncode(b)));
+    return jsonEncode(normalized);
+  }
+
+  String _normalizedSaleSignature(SaleDto sale) {
+    final normalized = sale.items
+        .where((item) => (item.productId ?? 0) > 0 && item.quantity > 0)
+        .map((item) => {
+              'product_id': item.productId,
+              'combo_product_id': item.comboProductId,
+              'barcode_id': item.barcodeId,
+              'quantity': item.quantity.toStringAsFixed(4),
+              'unit_price': item.unitPrice.toStringAsFixed(4),
+              'discount_percentage': item.discountPercent.toStringAsFixed(4),
+              'serial_numbers': [...item.serialNumbers]..sort(),
+              'batch_allocations': const <String>[],
+              'combo_tracking': item.comboComponentTracking
+                  .map((component) => {
+                        'product_id': component.productId,
+                        'barcode_id': component.barcodeId,
+                        'tracking_type': component.trackingType,
+                        'is_serialized': component.isSerialized,
+                        'serial_numbers': [
+                          ...?component.tracking?.serialNumbers
+                        ]..sort(),
+                        'batch_allocations': (component
+                                    .tracking?.batchAllocations ??
+                                const [])
+                            .map((batch) =>
+                                '${batch.lotId}:${batch.quantity.toStringAsFixed(4)}')
+                            .toList()
+                          ..sort(),
+                      })
+                  .toList(),
+            })
+        .toList()
+      ..sort((a, b) => jsonEncode(a).compareTo(jsonEncode(b)));
+    return jsonEncode(normalized);
+  }
+
+  bool _saleEditHasChanges({
+    required SaleDto baseline,
+    required int? customerId,
+    required List<PosCartItem> items,
+    required int? paymentMethodId,
+    required double paidAmount,
+    required double discountAmount,
+    List<PosPaymentLineDto>? payments,
+  }) {
+    final normalizedCustomerId = customerId ?? 0;
+    final baselineCustomerId = baseline.customerId ?? 0;
+    if (normalizedCustomerId != baselineCustomerId) return true;
+    if ((discountAmount - baseline.discountAmount).abs() > 0.0001) return true;
+    if ((paidAmount - baseline.paidAmount).abs() > 0.0001) return true;
+    if ((paymentMethodId ?? 0) != (baseline.paymentMethodId ?? 0)) return true;
+    if (_normalizedCartSignature(items) != _normalizedSaleSignature(baseline)) {
+      return true;
+    }
+    if (payments != null && payments.isNotEmpty) {
+      if (payments.length != 1) return true;
+      final line = payments.first;
+      if (line.methodId != (baseline.paymentMethodId ?? 0)) return true;
+      if ((line.amount - baseline.paidAmount).abs() > 0.0001) return true;
+    }
+    return false;
   }
 
   // Small helper to unwrap list payloads that may be wrapped in {data: []}
@@ -133,7 +239,10 @@ class PosRepository {
     return list.map(PosProductDto.fromJson).toList();
   }
 
-  Future<List<PosCustomerDto>> searchCustomers(String query) async {
+  Future<List<PosCustomerDto>> searchCustomers(
+    String query, {
+    String? customerType,
+  }) async {
     final outbox = _ref.read(outboxNotifierProvider.notifier);
     final store = _ref.read(cacheStoreProvider);
 
@@ -146,11 +255,16 @@ class PosRepository {
               'Offline customer list not available yet. Connect to internet once to sync master data.');
         }
       }
-      return cached.map(PosCustomerDto.fromJson).toList();
+      final parsed = cached.map(PosCustomerDto.fromJson).toList();
+      final type = (customerType ?? '').trim().toUpperCase();
+      if (type.isEmpty) return parsed;
+      return parsed.where((c) => c.customerType.toUpperCase() == type).toList();
     }
 
     final res = await _dio.get('/pos/customers', queryParameters: {
       'search': query,
+      if ((customerType ?? '').trim().isNotEmpty)
+        'customer_type': customerType!.trim().toUpperCase(),
     });
     final list = _asList(res).cast<Map<String, dynamic>>();
     // ignore: unawaited_futures
@@ -373,6 +487,90 @@ class PosRepository {
     final sale =
         (data?['sale'] as Map<String, dynamic>?) ?? <String, dynamic>{};
     return PosCheckoutResult.fromSale(sale);
+  }
+
+  Future<PosCheckoutResult> editSale({
+    required SaleDto baseline,
+    int? customerId,
+    required List<PosCartItem> items,
+    int? paymentMethodId,
+    required double paidAmount,
+    double discountAmount = 0.0,
+    List<PosPaymentLineDto>? payments,
+    String? salesActionPassword,
+    String? overridePassword,
+    String? managerOverrideToken,
+    String? overrideReason,
+  }) async {
+    final loc = _ref.read(locationNotifierProvider).selected;
+    if (loc == null) {
+      throw Exception('Select a location first');
+    }
+
+    final outbox = _ref.read(outboxNotifierProvider.notifier);
+    if (!outbox.isOnline) {
+      throw OfflineException('Sale edits require an online connection.');
+    }
+
+    final hasChanges = _saleEditHasChanges(
+      baseline: baseline,
+      customerId: customerId,
+      items: items,
+      paymentMethodId: paymentMethodId,
+      paidAmount: paidAmount,
+      discountAmount: discountAmount,
+      payments: payments,
+    );
+    if (!hasChanges) {
+      return PosCheckoutResult(
+        saleId: baseline.saleId,
+        saleNumber: baseline.saleNumber,
+        totalAmount: baseline.totalAmount,
+        updatedExistingSale: true,
+        unchanged: true,
+      );
+    }
+
+    final baselineUpdatedAt =
+        baseline.updatedAt ?? baseline.createdAt ?? baseline.saleDate;
+    if (baselineUpdatedAt == null) {
+      throw Exception('Sale edit baseline is missing updated_at');
+    }
+
+    final payload = {
+      'baseline_updated_at': baselineUpdatedAt.toUtc().toIso8601String(),
+      if (customerId != null) 'customer_id': customerId,
+      'items': items.map(_saleItemPayload).toList(),
+      if (paymentMethodId != null) 'payment_method_id': paymentMethodId,
+      'paid_amount': paidAmount,
+      'discount_amount': discountAmount,
+      if (payments != null && payments.isNotEmpty)
+        'payments': payments.map((p) => p.toJson()).toList(),
+      if (managerOverrideToken != null &&
+          managerOverrideToken.trim().isNotEmpty)
+        'manager_override_token': managerOverrideToken.trim(),
+      if (overrideReason != null && overrideReason.trim().isNotEmpty)
+        'override_reason': overrideReason.trim(),
+      if (salesActionPassword != null && salesActionPassword.trim().isNotEmpty)
+        'sales_action_password': salesActionPassword.trim(),
+      if (overridePassword != null && overridePassword.trim().isNotEmpty)
+        'override_password': overridePassword.trim(),
+    };
+
+    final res = await _dio.put(
+      '/pos/sales/${baseline.saleId}',
+      queryParameters: {'location_id': loc.locationId},
+      data: payload,
+    );
+    final data = (res.data is Map<String, dynamic>)
+        ? (res.data['data'] as Map<String, dynamic>?)
+        : null;
+    final sale =
+        (data?['sale'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+    return PosCheckoutResult.fromSale(
+      sale,
+      updatedExistingSale: true,
+    );
   }
 
   Future<PosCouponValidationDto> validateCoupon({

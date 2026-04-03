@@ -45,7 +45,8 @@ func NewReturnsService() *ReturnsService {
 func (s *ReturnsService) FindReturnableSaleForCustomer(companyID, customerID int, items []models.CreateSaleReturnItemRequest) (int, error) {
 	// Verify customer belongs to company
 	var cnt int
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM customers WHERE customer_id=$1 AND company_id=$2 AND is_deleted=FALSE`, customerID, companyID).Scan(&cnt); err != nil {
+	var customerType string
+	if err := s.db.QueryRow(`SELECT COUNT(*), COALESCE(MAX(customer_type), 'RETAIL') FROM customers WHERE customer_id=$1 AND company_id=$2 AND is_deleted=FALSE`, customerID, companyID).Scan(&cnt, &customerType); err != nil {
 		return 0, fmt.Errorf("failed to verify customer: %w", err)
 	}
 	if cnt == 0 {
@@ -59,8 +60,9 @@ func (s *ReturnsService) FindReturnableSaleForCustomer(companyID, customerID int
         JOIN locations l ON s.location_id=l.location_id
         WHERE l.company_id=$1 AND s.customer_id=$2 AND s.status='COMPLETED' AND s.is_deleted=FALSE
           AND COALESCE(s.source_channel, 'INVOICE') <> 'POS'
+          AND COALESCE(s.transaction_type, 'RETAIL') = $3
         ORDER BY s.sale_date DESC, s.created_at DESC, s.sale_id DESC
-    `, companyID, customerID)
+    `, companyID, customerID, normalizeTransactionType(customerType))
 	if err != nil {
 		return 0, fmt.Errorf("failed to query candidate sales: %w", err)
 	}
@@ -93,7 +95,7 @@ func (s *ReturnsService) FindReturnableSaleForCustomer(companyID, customerID int
 
 func (s *ReturnsService) GetSaleReturns(companyID int, filters map[string]string) ([]models.SaleReturn, error) {
 	query := `
-		SELECT sr.return_id, sr.return_number, sr.sale_id, sr.location_id, sr.customer_id,
+		SELECT sr.return_id, sr.return_number, sr.sale_id, sr.location_id, sr.customer_id, sr.transaction_type,
 			   sr.return_date, sr.total_amount, sr.reason, sr.status, sr.created_by,
 			   sr.sync_status, sr.created_at, sr.updated_at, sr.is_deleted,
 			   s.sale_number, c.name as customer_name
@@ -137,6 +139,11 @@ func (s *ReturnsService) GetSaleReturns(companyID int, filters map[string]string
 		query += fmt.Sprintf(" AND sr.status = $%d", argCount)
 		args = append(args, status)
 	}
+	if transactionType := filters["transaction_type"]; transactionType != "" {
+		argCount++
+		query += fmt.Sprintf(" AND sr.transaction_type = $%d", argCount)
+		args = append(args, normalizeTransactionType(transactionType))
+	}
 
 	query += " ORDER BY sr.created_at DESC"
 
@@ -153,7 +160,7 @@ func (s *ReturnsService) GetSaleReturns(companyID int, filters map[string]string
 
 		err := rows.Scan(
 			&saleReturn.ReturnID, &saleReturn.ReturnNumber, &saleReturn.SaleID,
-			&saleReturn.LocationID, &saleReturn.CustomerID, &saleReturn.ReturnDate,
+			&saleReturn.LocationID, &saleReturn.CustomerID, &saleReturn.TransactionType, &saleReturn.ReturnDate,
 			&saleReturn.TotalAmount, &saleReturn.Reason, &saleReturn.Status,
 			&saleReturn.CreatedBy, &saleReturn.SyncStatus, &saleReturn.CreatedAt,
 			&saleReturn.UpdatedAt, &saleReturn.IsDeleted, &saleNumber, &customerName,
@@ -190,7 +197,7 @@ func (s *ReturnsService) GetSaleReturns(companyID int, filters map[string]string
 
 func (s *ReturnsService) GetSaleReturnByID(returnID, companyID int) (*models.SaleReturn, error) {
 	query := `
-		SELECT sr.return_id, sr.return_number, sr.sale_id, sr.location_id, sr.customer_id,
+		SELECT sr.return_id, sr.return_number, sr.sale_id, sr.location_id, sr.customer_id, sr.transaction_type,
 			   sr.return_date, sr.total_amount, sr.reason, sr.status, sr.created_by,
 			   sr.sync_status, sr.created_at, sr.updated_at, sr.is_deleted,
 			   s.sale_number, c.name as customer_name, l.name as location_name,
@@ -208,7 +215,7 @@ func (s *ReturnsService) GetSaleReturnByID(returnID, companyID int) (*models.Sal
 
 	err := s.db.QueryRow(query, returnID, companyID).Scan(
 		&saleReturn.ReturnID, &saleReturn.ReturnNumber, &saleReturn.SaleID,
-		&saleReturn.LocationID, &saleReturn.CustomerID, &saleReturn.ReturnDate,
+		&saleReturn.LocationID, &saleReturn.CustomerID, &saleReturn.TransactionType, &saleReturn.ReturnDate,
 		&saleReturn.TotalAmount, &saleReturn.Reason, &saleReturn.Status,
 		&saleReturn.CreatedBy, &saleReturn.SyncStatus, &saleReturn.CreatedAt,
 		&saleReturn.UpdatedAt, &saleReturn.IsDeleted, &saleNumber, &customerName,
@@ -267,12 +274,13 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 	var customerID *int
 	var isTraining bool
 	var sourceChannel sql.NullString
+	var transactionType string
 	err = s.db.QueryRow(`
-		SELECT s.location_id, s.customer_id, COALESCE(s.is_training, FALSE), s.source_channel
+		SELECT s.location_id, s.customer_id, COALESCE(s.is_training, FALSE), s.source_channel, COALESCE(s.transaction_type, 'RETAIL')
 		FROM sales s
 		JOIN locations l ON s.location_id = l.location_id
 		WHERE s.sale_id = $1 AND l.company_id = $2
-	`, req.SaleID, companyID).Scan(&locationID, &customerID, &isTraining, &sourceChannel)
+	`, req.SaleID, companyID).Scan(&locationID, &customerID, &isTraining, &sourceChannel, &transactionType)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sale details: %w", err)
@@ -316,11 +324,11 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 	// Create return
 	var returnID int
 	err = tx.QueryRow(`
-               INSERT INTO sale_returns (return_number, sale_id, location_id, customer_id, return_date,
+               INSERT INTO sale_returns (return_number, sale_id, location_id, customer_id, transaction_type, return_date,
                                                                 total_amount, reason, created_by, updated_by)
-               VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, $6, $7, $8)
+               VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, $6, $7, $8, $9)
                RETURNING return_id
-       `, returnNumber, req.SaleID, locationID, customerID, totalAmount, req.Reason, userID, userID).Scan(&returnID)
+       `, returnNumber, req.SaleID, locationID, customerID, transactionType, totalAmount, req.Reason, userID, userID).Scan(&returnID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create return: %w", err)
@@ -383,20 +391,11 @@ func (s *ReturnsService) CreateSaleReturn(companyID, userID int, req *models.Cre
 		return nil, fmt.Errorf("failed to update return total: %w", err)
 	}
 
-	// Update original sale's paid amount if needed
-	// This is optional business logic - you might want to create a credit note instead
-	if !isTraining {
-		_, err = tx.Exec(`
-			UPDATE sales s
-			SET paid_amount = paid_amount - $1, updated_at = CURRENT_TIMESTAMP
-			FROM locations l
-			WHERE s.sale_id = $2 AND s.location_id = l.location_id AND l.company_id = $3
-		`, totalAmount, req.SaleID, companyID)
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to update original sale: %w", err)
-		}
-	}
+	// Do not mutate the original sale's paid_amount for sale-return documents.
+	// Operationally this document behaves like a credit note: inventory comes
+	// back, revenue is reversed, and the ledger posts against receivables. Pushing
+	// the source sale's paid_amount down can violate the sales check constraint
+	// and inverts the receivable effect for fully-paid invoices.
 
 	// Audit log (must be present for returns).
 	{

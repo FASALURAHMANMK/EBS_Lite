@@ -23,6 +23,7 @@ class _QuotesPageState extends ConsumerState<QuotesPage> {
   Object? _error;
   List<Map<String, dynamic>> _quotes = const [];
   String _statusFilter = 'ALL';
+  String _transactionTypeFilter = 'ALL';
 
   @override
   void initState() {
@@ -39,6 +40,8 @@ class _QuotesPageState extends ConsumerState<QuotesPage> {
       final repo = ref.read(salesRepositoryProvider);
       final list = await repo.getQuotes(
         status: _statusFilter == 'ALL' ? null : _statusFilter,
+        transactionType:
+            _transactionTypeFilter == 'ALL' ? null : _transactionTypeFilter,
       );
       if (!mounted) return;
       setState(() => _quotes = list);
@@ -89,33 +92,70 @@ class _QuotesPageState extends ConsumerState<QuotesPage> {
             if (_loading) const LinearProgressIndicator(minHeight: 2),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Status:'),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: _statusFilter,
-                        items: const [
-                          DropdownMenuItem(value: 'ALL', child: Text('All')),
-                          DropdownMenuItem(
-                              value: 'DRAFT', child: Text('Draft')),
-                          DropdownMenuItem(value: 'SENT', child: Text('Sent')),
-                          DropdownMenuItem(
-                              value: 'ACCEPTED', child: Text('Accepted')),
-                          DropdownMenuItem(
-                              value: 'CONVERTED', child: Text('Converted')),
-                        ],
-                        onChanged: (value) {
-                          if (value == null || value == _statusFilter) return;
-                          setState(() => _statusFilter = value);
-                          WidgetsBinding.instance
-                              .addPostFrameCallback((_) => _load());
-                        },
+                  const Text('Quote Type'),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final option in const ['ALL', 'B2B', 'RETAIL'])
+                        ChoiceChip(
+                          label: Text(
+                            option == 'ALL'
+                                ? 'All'
+                                : option == 'B2B'
+                                    ? 'B2B'
+                                    : 'Retail',
+                          ),
+                          selected: _transactionTypeFilter == option,
+                          onSelected: (selected) {
+                            if (!selected || option == _transactionTypeFilter) {
+                              return;
+                            }
+                            setState(() => _transactionTypeFilter = option);
+                            WidgetsBinding.instance
+                                .addPostFrameCallback((_) => _load());
+                          },
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Text('Status:'),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            value: _statusFilter,
+                            items: const [
+                              DropdownMenuItem(
+                                  value: 'ALL', child: Text('All')),
+                              DropdownMenuItem(
+                                  value: 'DRAFT', child: Text('Draft')),
+                              DropdownMenuItem(
+                                  value: 'SENT', child: Text('Sent')),
+                              DropdownMenuItem(
+                                  value: 'ACCEPTED', child: Text('Accepted')),
+                              DropdownMenuItem(
+                                  value: 'CONVERTED', child: Text('Converted')),
+                            ],
+                            onChanged: (value) {
+                              if (value == null || value == _statusFilter) {
+                                return;
+                              }
+                              setState(() => _statusFilter = value);
+                              WidgetsBinding.instance
+                                  .addPostFrameCallback((_) => _load());
+                            },
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -142,6 +182,8 @@ class _QuotesPageState extends ConsumerState<QuotesPage> {
                             final total =
                                 ((q['total_amount'] as num?)?.toDouble() ?? 0.0)
                                     .toStringAsFixed(2);
+                            final transactionType =
+                                q['transaction_type']?.toString() ?? 'B2B';
                             final customerName =
                                 (q['customer'] is Map<String, dynamic>)
                                     ? (q['customer']['name']?.toString() ?? '')
@@ -160,6 +202,7 @@ class _QuotesPageState extends ConsumerState<QuotesPage> {
                                     const Icon(Icons.request_quote_rounded),
                                 title: Text(number.isEmpty ? 'Quote' : number),
                                 subtitle: Text([
+                                  transactionType,
                                   if (customerName.isNotEmpty) customerName,
                                   if (dateStr.isNotEmpty) dateStr,
                                   status,

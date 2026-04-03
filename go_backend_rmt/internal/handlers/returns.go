@@ -112,6 +112,9 @@ func (h *ReturnsHandler) GetSaleReturns(c *gin.Context) {
 	if status := c.Query("status"); status != "" {
 		filters["status"] = status
 	}
+	if transactionType := c.Query("transaction_type"); transactionType != "" {
+		filters["transaction_type"] = transactionType
+	}
 
 	returns, err := h.returnsService.GetSaleReturns(companyID, filters)
 	if err != nil {

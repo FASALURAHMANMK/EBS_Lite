@@ -79,16 +79,16 @@ func TestSalesService_CreateSale_IdempotencyUniqueViolationReturnsExisting(t *te
 		WillReturnRows(sqlmock.NewRows([]string{"sale_id"}).AddRow(99))
 
 	now := time.Now()
-	mock.ExpectQuery("(?s)SELECT s.sale_id, s.sale_number, s.location_id, s.source_channel, s.refund_source_sale_id, rs.sale_number AS refund_source_sale_number, s.customer_id, s.sale_date, s.sale_time.*COALESCE\\(s\\.is_training, FALSE\\) AS is_training.*FROM sales s.*WHERE s.sale_id = \\$1 AND l.company_id = \\$2 AND s.is_deleted = FALSE").
+	mock.ExpectQuery("(?s)SELECT s.sale_id, s.sale_number, s.location_id, s.source_channel, s.transaction_type, s.refund_source_sale_id, rs.sale_number AS refund_source_sale_number, s.customer_id, s.sale_date, s.sale_time.*COALESCE\\(s\\.is_training, FALSE\\) AS is_training.*FROM sales s.*WHERE s.sale_id = \\$1 AND l.company_id = \\$2 AND s.is_deleted = FALSE").
 		WithArgs(99, companyID).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"sale_id", "sale_number", "location_id", "source_channel", "refund_source_sale_id", "refund_source_sale_number", "customer_id", "sale_date", "sale_time",
+			"sale_id", "sale_number", "location_id", "source_channel", "transaction_type", "refund_source_sale_id", "refund_source_sale_number", "customer_id", "sale_date", "sale_time",
 			"subtotal", "tax_amount", "discount_amount", "total_amount", "paid_amount",
 			"payment_method_id", "status", "pos_status", "is_quick_sale", "is_training", "notes",
 			"created_by", "updated_by", "sync_status", "created_at", "updated_at",
 			"customer_name", "payment_method_name", "location_name", "created_by_name", "updated_by_name",
 		}).AddRow(
-			99, "INV-000013", locationID, "INVOICE", nil, nil, nil, now, now,
+			99, "INV-000013", locationID, "INVOICE", "RETAIL", nil, nil, nil, now, now,
 			10.0, 0.0, 0.0, 10.0, 10.0,
 			nil, "COMPLETED", "COMPLETED", false, false, nil,
 			userID, nil, "synced", now, now,

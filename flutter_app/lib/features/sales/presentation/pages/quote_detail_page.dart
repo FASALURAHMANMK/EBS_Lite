@@ -227,6 +227,7 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
     final items =
         (q?['items'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
     final status = q?['status']?.toString() ?? 'DRAFT';
+    final transactionType = q?['transaction_type']?.toString() ?? 'B2B';
     final convertedSaleId = q?['converted_sale_id'] as int?;
     final isConverted = convertedSaleId != null || status == 'CONVERTED';
     final number = q?['quote_number']?.toString() ?? '';
@@ -330,6 +331,7 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
                   leading: const Icon(Icons.request_quote_rounded),
                   title: Text(number.isEmpty ? 'Quote' : number),
                   subtitle: Text([
+                    'Type: $transactionType',
                     if (customerName.isNotEmpty) customerName,
                     'Status: $status',
                   ].join(' - ')),

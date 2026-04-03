@@ -7,6 +7,7 @@ type Quote struct {
 	QuoteNumber     string      `json:"quote_number" db:"quote_number"`
 	LocationID      int         `json:"location_id" db:"location_id"`
 	CustomerID      *int        `json:"customer_id,omitempty" db:"customer_id"`
+	TransactionType string      `json:"transaction_type" db:"transaction_type"`
 	QuoteDate       time.Time   `json:"quote_date" db:"quote_date"`
 	ValidUntil      *time.Time  `json:"valid_until,omitempty" db:"valid_until"`
 	Subtotal        float64     `json:"subtotal" db:"subtotal"`
@@ -57,11 +58,12 @@ type QuoteItem struct {
 }
 
 type CreateQuoteRequest struct {
-	CustomerID     *int                     `json:"customer_id,omitempty"`
-	Items          []CreateQuoteItemRequest `json:"items" validate:"required,min=1"`
-	DiscountAmount float64                  `json:"discount_amount"`
-	ValidUntil     FlexibleTime             `json:"valid_until"`
-	Notes          *string                  `json:"notes,omitempty"`
+	CustomerID      *int                     `json:"customer_id,omitempty"`
+	TransactionType *string                  `json:"transaction_type,omitempty"`
+	Items           []CreateQuoteItemRequest `json:"items" validate:"required,min=1"`
+	DiscountAmount  float64                  `json:"discount_amount"`
+	ValidUntil      FlexibleTime             `json:"valid_until"`
+	Notes           *string                  `json:"notes,omitempty"`
 }
 
 type CreateQuoteItemRequest struct {
@@ -77,11 +79,13 @@ type CreateQuoteItemRequest struct {
 }
 
 type UpdateQuoteRequest struct {
-	Status         *string                  `json:"status,omitempty"`
-	Notes          *string                  `json:"notes,omitempty"`
-	ValidUntil     *FlexibleTime            `json:"valid_until,omitempty"`
-	DiscountAmount *float64                 `json:"discount_amount,omitempty"`
-	Items          []CreateQuoteItemRequest `json:"items,omitempty" validate:"omitempty,min=1"`
+	CustomerID      *int                     `json:"customer_id"`
+	Status          *string                  `json:"status,omitempty"`
+	TransactionType *string                  `json:"transaction_type,omitempty"`
+	Notes           *string                  `json:"notes,omitempty"`
+	ValidUntil      *FlexibleTime            `json:"valid_until,omitempty"`
+	DiscountAmount  *float64                 `json:"discount_amount,omitempty"`
+	Items           []CreateQuoteItemRequest `json:"items,omitempty" validate:"omitempty,min=1"`
 }
 
 type ShareQuoteRequest struct {

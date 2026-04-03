@@ -38,10 +38,23 @@ func expectLedgerInsert(
 			transaction_type, transaction_id, description, reference,
 			created_by, updated_by
 		)
-		SELECT $1,$2,$3,$4,$5,$6,0,$7,$8,$9,$10,$11,$11
+		SELECT
+			$1::int,
+			$2::int,
+			$3::int,
+			$4::date,
+			$5::numeric,
+			$6::numeric,
+			0::numeric,
+			$7::varchar,
+			$8::int,
+			$9::text,
+			$10::varchar,
+			$11::int,
+			$11::int
 		WHERE NOT EXISTS (
 			SELECT 1 FROM ledger_entries
-			WHERE company_id = $1 AND reference = $10
+			WHERE company_id = $1::int AND reference = $10::varchar
 		)
 	`)).
 		WithArgs(companyID, accountID, nil, entryDate, debit, credit, transactionType, transactionID, nil, reference, userID).

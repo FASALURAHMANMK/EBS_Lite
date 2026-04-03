@@ -9,7 +9,7 @@ import '../../../../shared/widgets/app_empty_view.dart';
 import '../../data/sales_repository.dart';
 import '../../../pos/data/pos_repository.dart';
 import '../../../pos/data/models.dart';
-import '../../../pos/presentation/pages/pos_page.dart';
+import 'b2b_invoice_form_page.dart';
 import 'sale_detail_page.dart';
 import '../utils/invoice_actions.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
@@ -66,6 +66,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
         dateFrom: fromDate,
         dateTo: toDate,
         customerId: singleCustomerId,
+        transactionType: 'B2B',
       );
       List<Map<String, dynamic>> filtered = sales;
       if (selectedIds.isNotEmpty && singleCustomerId == null) {
@@ -140,7 +141,10 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
               loading = true;
               setStateDialog(() {});
               try {
-                final list = await repo.searchCustomers(q);
+                final list = await repo.searchCustomers(
+                  q,
+                  customerType: 'B2B',
+                );
                 results = list;
               } finally {
                 loading = false;
@@ -263,9 +267,18 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
       return db.compareTo(da);
     });
 
+    final b2bOnly = sorted
+        .where((e) => (e['transaction_type']?.toString() ?? 'RETAIL') == 'B2B')
+        .where(
+          (e) =>
+              (e['source_channel']?.toString().toUpperCase() ?? '') !=
+              'POS_REFUND',
+        )
+        .toList();
+
     final filtered = q.isEmpty
-        ? sorted
-        : sorted.where((e) {
+        ? b2bOnly
+        : b2bOnly.where((e) {
             final code = (e['sale_number'] ?? '').toString().toLowerCase();
             return code.contains(q);
           }).toList();
@@ -274,13 +287,14 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
       appBar: AppBar(
         leadingWidth: isWide ? 104 : null,
         leading: isWide ? const DesktopSidebarToggleLeading() : null,
-        title: const Text('Invoices'),
+        title: const Text('B2B Invoices'),
         actions: [
           IconButton(
-            tooltip: 'New Sale',
-            icon: const Icon(Icons.point_of_sale_rounded),
-            onPressed: () => Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => const PosPage())),
+            tooltip: 'New B2B Invoice',
+            icon: const Icon(Icons.add_circle_outline_rounded),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const B2BInvoiceFormPage()),
+            ),
           ),
           IconButton(
             tooltip: 'Refresh',
@@ -373,9 +387,9 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
                       children: const [
                         SizedBox(height: 64),
                         AppEmptyView(
-                          title: 'No invoices found',
+                          title: 'No B2B invoices found',
                           message:
-                              'Invoices matching the current filters will appear here.',
+                              'B2B invoices matching the current filters will appear here.',
                           icon: Icons.receipt_long_outlined,
                         ),
                       ],

@@ -264,7 +264,7 @@ func (s *SalesService) CalculateTotals(companyID int, req *models.CreateSaleRequ
 
 func (s *SalesService) GetSales(companyID, locationID int, filters map[string]string) ([]models.Sale, error) {
 	query := `
-		SELECT s.sale_id, s.sale_number, s.location_id, s.source_channel, s.refund_source_sale_id, rs.sale_number AS refund_source_sale_number,
+		SELECT s.sale_id, s.sale_number, s.location_id, s.source_channel, s.transaction_type, s.refund_source_sale_id, rs.sale_number AS refund_source_sale_number,
 			   s.customer_id, s.sale_date, s.sale_time,
 			   s.subtotal, s.tax_amount, s.discount_amount, s.total_amount, s.paid_amount,
 			   s.payment_method_id, s.status, s.pos_status, s.is_quick_sale, COALESCE(s.is_training, FALSE) AS is_training, s.notes,
@@ -312,6 +312,11 @@ func (s *SalesService) GetSales(companyID, locationID int, filters map[string]st
 		query += fmt.Sprintf(" AND s.pos_status = $%d", argCount)
 		args = append(args, posStatus)
 	}
+	if transactionType := filters["transaction_type"]; transactionType != "" {
+		argCount++
+		query += fmt.Sprintf(" AND s.transaction_type = $%d", argCount)
+		args = append(args, strings.ToUpper(strings.TrimSpace(transactionType)))
+	}
 
 	query += " ORDER BY s.created_at DESC"
 
@@ -329,7 +334,7 @@ func (s *SalesService) GetSales(companyID, locationID int, filters map[string]st
 		var refundSourceSaleID sql.NullInt64
 
 		err := rows.Scan(
-			&sale.SaleID, &sale.SaleNumber, &sale.LocationID, &sourceChannel, &refundSourceSaleID, &refundSourceSaleNumber, &sale.CustomerID,
+			&sale.SaleID, &sale.SaleNumber, &sale.LocationID, &sourceChannel, &sale.TransactionType, &refundSourceSaleID, &refundSourceSaleNumber, &sale.CustomerID,
 			&sale.SaleDate, &sale.SaleTime, &sale.Subtotal, &sale.TaxAmount,
 			&sale.DiscountAmount, &sale.TotalAmount, &sale.PaidAmount,
 			&sale.PaymentMethodID, &sale.Status, &sale.POSStatus, &sale.IsQuickSale,
@@ -375,7 +380,7 @@ func (s *SalesService) GetSales(companyID, locationID int, filters map[string]st
 func (s *SalesService) GetSaleByID(saleID, companyID int) (*models.Sale, error) {
 	// Get sale details
 	query := `
-		SELECT s.sale_id, s.sale_number, s.location_id, s.source_channel, s.refund_source_sale_id, rs.sale_number AS refund_source_sale_number,
+		SELECT s.sale_id, s.sale_number, s.location_id, s.source_channel, s.transaction_type, s.refund_source_sale_id, rs.sale_number AS refund_source_sale_number,
 			   s.customer_id, s.sale_date, s.sale_time,
 			   s.subtotal, s.tax_amount, s.discount_amount, s.total_amount, s.paid_amount,
 			   s.payment_method_id, s.status, s.pos_status, s.is_quick_sale, COALESCE(s.is_training, FALSE) AS is_training, s.notes,
@@ -400,7 +405,7 @@ func (s *SalesService) GetSaleByID(saleID, companyID int) (*models.Sale, error) 
 	var refundSourceSaleID sql.NullInt64
 
 	err := s.db.QueryRow(query, saleID, companyID).Scan(
-		&sale.SaleID, &sale.SaleNumber, &sale.LocationID, &sourceChannel, &refundSourceSaleID, &refundSourceSaleNumber, &sale.CustomerID,
+		&sale.SaleID, &sale.SaleNumber, &sale.LocationID, &sourceChannel, &sale.TransactionType, &refundSourceSaleID, &refundSourceSaleNumber, &sale.CustomerID,
 		&sale.SaleDate, &sale.SaleTime, &sale.Subtotal, &sale.TaxAmount,
 		&sale.DiscountAmount, &sale.TotalAmount, &sale.PaidAmount,
 		&sale.PaymentMethodID, &sale.Status, &sale.POSStatus, &sale.IsQuickSale,
@@ -792,6 +797,20 @@ type CreateSaleOptions struct {
 	CouponCode                 string
 	AutoFillRaffleCustomerData *bool
 	SourceChannel              string
+	TransactionType            string
+}
+
+func normalizeTransactionType(raw string) string {
+	switch strings.ToUpper(strings.TrimSpace(raw)) {
+	case "":
+		return ""
+	case "RETAIL":
+		return "RETAIL"
+	case "B2B":
+		return "B2B"
+	default:
+		return ""
+	}
 }
 
 func (s *SalesService) CreateSale(companyID, locationID, userID int, req *models.CreateSaleRequest, idempotencyKey *string) (*models.Sale, error) {
@@ -965,6 +984,19 @@ func (s *SalesService) CreateSaleWithOptions(
 	if sourceChannel == "" {
 		sourceChannel = "INVOICE"
 	}
+	transactionType := normalizeTransactionType(opts.TransactionType)
+	if req.TransactionType != nil {
+		transactionType = normalizeTransactionType(*req.TransactionType)
+		if transactionType == "" {
+			return nil, fmt.Errorf("invalid transaction_type")
+		}
+	}
+	if transactionType == "" {
+		transactionType = "RETAIL"
+	}
+	if transactionType == "B2B" && req.CustomerID == nil {
+		return nil, fmt.Errorf("b2b transactions require customer_id")
+	}
 	if saleNumber != "" {
 		if len(saleNumber) > 100 {
 			return nil, fmt.Errorf("sale number too long")
@@ -986,11 +1018,11 @@ func (s *SalesService) CreateSaleWithOptions(
 	err = tx.QueryRow(`
                INSERT INTO sales (sale_number, location_id, customer_id, sale_date, sale_time,
                                                   subtotal, tax_amount, discount_amount, total_amount, paid_amount,
-                                                  payment_method_id, status, pos_status, is_quick_sale, is_training, notes, source_channel, refund_source_sale_id, created_by, updated_by, idempotency_key)
-               VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIME, $4, $5, $6, $7, $8, $9, 'COMPLETED', 'COMPLETED', FALSE, $10, $11, $12, $13, $14, $14, $15)
+                                                  payment_method_id, status, pos_status, is_quick_sale, is_training, notes, source_channel, transaction_type, refund_source_sale_id, created_by, updated_by, idempotency_key)
+               VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIME, $4, $5, $6, $7, $8, $9, 'COMPLETED', 'COMPLETED', FALSE, $10, $11, $12, $13, $14, $15, $15, $16)
                RETURNING sale_id
        `, saleNumber, locationID, req.CustomerID, subtotal, totalTax, req.DiscountAmount,
-		totalAmount, req.PaidAmount, req.PaymentMethodID, opts.IsTraining, saleNotes, sourceChannel, refundSourceSaleID, userID, nullIfEmpty(idemKey)).Scan(&saleID)
+		totalAmount, req.PaidAmount, req.PaymentMethodID, opts.IsTraining, saleNotes, sourceChannel, transactionType, refundSourceSaleID, userID, nullIfEmpty(idemKey)).Scan(&saleID)
 
 	if err != nil {
 		if idemKey != "" && isUniqueViolation(err) {
@@ -1608,6 +1640,7 @@ func (s *SalesService) CreateRefundInvoice(companyID, sourceSaleID, userID int, 
 	var sourceSaleNumber string
 	var status string
 	var sourceChannel sql.NullString
+	var transactionType string
 	var sourcePaidAmount float64
 	var sourceSubtotal float64
 	var sourceTax float64
@@ -1622,6 +1655,7 @@ func (s *SalesService) CreateRefundInvoice(companyID, sourceSaleID, userID int, 
 			s.sale_number,
 			s.status,
 			s.source_channel,
+			s.transaction_type,
 			s.paid_amount,
 			s.subtotal,
 			s.tax_amount,
@@ -1640,6 +1674,7 @@ func (s *SalesService) CreateRefundInvoice(companyID, sourceSaleID, userID int, 
 		&sourceSaleNumber,
 		&status,
 		&sourceChannel,
+		&transactionType,
 		&sourcePaidAmount,
 		&sourceSubtotal,
 		&sourceTax,
@@ -1743,17 +1778,17 @@ func (s *SalesService) CreateRefundInvoice(companyID, sourceSaleID, userID int, 
 			sale_number, location_id, customer_id, sale_date, sale_time,
 			subtotal, tax_amount, discount_amount, total_amount, paid_amount,
 			payment_method_id, status, pos_status, is_quick_sale, is_training, notes,
-			source_channel, refund_source_sale_id, created_by, updated_by
+			source_channel, transaction_type, refund_source_sale_id, created_by, updated_by
 		)
 		VALUES (
 			$1, $2, $3, CURRENT_DATE, CURRENT_TIME,
 			$4, $5, $6, $7, $8,
 			$9, 'COMPLETED', 'COMPLETED', FALSE, $10, $11,
-			'POS_REFUND', $12, $13, $13
+			'POS_REFUND', $12, $13, $14, $14
 		)
 		RETURNING sale_id
 	`, refundSaleNumber, locationID, nullIntToPtr(customerID), refundSubtotal, refundTax, refundHeaderDiscount, refundTotal, refundPaidAmount,
-		nullIntToPtr(paymentMethodID), isTraining, req.Reason, sourceSaleID, userID).Scan(&refundSaleID)
+		nullIntToPtr(paymentMethodID), isTraining, req.Reason, transactionType, sourceSaleID, userID).Scan(&refundSaleID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create refund invoice: %w", err)
 	}
@@ -2199,7 +2234,7 @@ func (s *SalesService) verifySaleInCompany(saleID, companyID int) error {
 // history endpoint.
 func (s *SalesService) GetSalesHistory(companyID int, filters map[string]string) ([]models.Sale, error) {
 	query := `
-                SELECT s.sale_id, s.sale_number, s.location_id, s.source_channel, s.refund_source_sale_id, rs.sale_number AS refund_source_sale_number,
+                SELECT s.sale_id, s.sale_number, s.location_id, s.source_channel, s.transaction_type, s.refund_source_sale_id, rs.sale_number AS refund_source_sale_number,
                        s.customer_id, s.sale_date, s.sale_time,
                        s.subtotal, s.tax_amount, s.discount_amount, s.total_amount, s.paid_amount,
                        s.payment_method_id, s.status, s.pos_status, s.is_quick_sale, COALESCE(s.is_training, FALSE) AS is_training, s.notes,
@@ -2246,6 +2281,11 @@ func (s *SalesService) GetSalesHistory(companyID int, filters map[string]string)
 		query += fmt.Sprintf(" AND s.sale_number ILIKE '%%' || $%d || '%%'", argCount)
 		args = append(args, saleNumber)
 	}
+	if transactionType := filters["transaction_type"]; transactionType != "" {
+		argCount++
+		query += fmt.Sprintf(" AND s.transaction_type = $%d", argCount)
+		args = append(args, strings.ToUpper(strings.TrimSpace(transactionType)))
+	}
 
 	query += " ORDER BY s.created_at DESC"
 
@@ -2263,7 +2303,7 @@ func (s *SalesService) GetSalesHistory(companyID int, filters map[string]string)
 		var refundSourceSaleID sql.NullInt64
 
 		err := rows.Scan(
-			&sale.SaleID, &sale.SaleNumber, &sale.LocationID, &sourceChannel, &refundSourceSaleID, &refundSourceSaleNumber, &sale.CustomerID,
+			&sale.SaleID, &sale.SaleNumber, &sale.LocationID, &sourceChannel, &sale.TransactionType, &refundSourceSaleID, &refundSourceSaleNumber, &sale.CustomerID,
 			&sale.SaleDate, &sale.SaleTime, &sale.Subtotal, &sale.TaxAmount,
 			&sale.DiscountAmount, &sale.TotalAmount, &sale.PaidAmount,
 			&sale.PaymentMethodID, &sale.Status, &sale.POSStatus, &sale.IsQuickSale,
@@ -2316,7 +2356,7 @@ func (s *SalesService) ExportInvoices(companyID int, filters map[string]string) 
 // GetQuotes returns quotes for a company with optional filters.
 func (s *SalesService) GetQuotes(companyID int, filters map[string]string) ([]models.Quote, error) {
 	query := `
-		SELECT q.quote_id, q.quote_number, q.location_id, q.customer_id, q.quote_date, q.valid_until,
+		SELECT q.quote_id, q.quote_number, q.location_id, q.customer_id, q.transaction_type, q.quote_date, q.valid_until,
 			   q.subtotal, q.tax_amount, q.discount_amount, q.total_amount, q.status, q.notes,
 			   q.converted_sale_id, q.converted_at, q.converted_by,
 			   q.created_by, q.updated_by, q.sync_status, q.created_at, q.updated_at,
@@ -2351,6 +2391,11 @@ func (s *SalesService) GetQuotes(companyID int, filters map[string]string) ([]mo
 			query += fmt.Sprintf(" AND q.quote_date <= $%d", argCount)
 			args = append(args, dateTo)
 		}
+		if transactionType := filters["transaction_type"]; transactionType != "" {
+			argCount++
+			query += fmt.Sprintf(" AND q.transaction_type = $%d", argCount)
+			args = append(args, strings.ToUpper(strings.TrimSpace(transactionType)))
+		}
 	}
 
 	query += " ORDER BY q.quote_date DESC, q.quote_id DESC"
@@ -2366,7 +2411,7 @@ func (s *SalesService) GetQuotes(companyID int, filters map[string]string) ([]mo
 		var q models.Quote
 		var customerName sql.NullString
 		if err := rows.Scan(
-			&q.QuoteID, &q.QuoteNumber, &q.LocationID, &q.CustomerID, &q.QuoteDate, &q.ValidUntil,
+			&q.QuoteID, &q.QuoteNumber, &q.LocationID, &q.CustomerID, &q.TransactionType, &q.QuoteDate, &q.ValidUntil,
 			&q.Subtotal, &q.TaxAmount, &q.DiscountAmount, &q.TotalAmount, &q.Status, &q.Notes,
 			&q.ConvertedSaleID, &q.ConvertedAt, &q.ConvertedBy,
 			&q.CreatedBy, &q.UpdatedBy, &q.SyncStatus, &q.CreatedAt, &q.UpdatedAt,
@@ -2386,7 +2431,7 @@ func (s *SalesService) GetQuotes(companyID int, filters map[string]string) ([]mo
 // GetQuoteByID returns a single quote with its items.
 func (s *SalesService) GetQuoteByID(quoteID, companyID int) (*models.Quote, error) {
 	query := `
-		SELECT q.quote_id, q.quote_number, q.location_id, q.customer_id, q.quote_date, q.valid_until,
+		SELECT q.quote_id, q.quote_number, q.location_id, q.customer_id, q.transaction_type, q.quote_date, q.valid_until,
 			   q.subtotal, q.tax_amount, q.discount_amount, q.total_amount, q.status, q.notes,
 			   q.converted_sale_id, q.converted_at, q.converted_by,
 			   q.created_by, q.updated_by, q.sync_status, q.created_at, q.updated_at,
@@ -2400,7 +2445,7 @@ func (s *SalesService) GetQuoteByID(quoteID, companyID int) (*models.Quote, erro
 	var quote models.Quote
 	var customerName sql.NullString
 	if err := s.db.QueryRow(query, quoteID, companyID).Scan(
-		&quote.QuoteID, &quote.QuoteNumber, &quote.LocationID, &quote.CustomerID, &quote.QuoteDate, &quote.ValidUntil,
+		&quote.QuoteID, &quote.QuoteNumber, &quote.LocationID, &quote.CustomerID, &quote.TransactionType, &quote.QuoteDate, &quote.ValidUntil,
 		&quote.Subtotal, &quote.TaxAmount, &quote.DiscountAmount, &quote.TotalAmount, &quote.Status, &quote.Notes,
 		&quote.ConvertedSaleID, &quote.ConvertedAt, &quote.ConvertedBy,
 		&quote.CreatedBy, &quote.UpdatedBy, &quote.SyncStatus, &quote.CreatedAt, &quote.UpdatedAt,
@@ -2426,6 +2471,13 @@ func (s *SalesService) GetQuoteByID(quoteID, companyID int) (*models.Quote, erro
 
 // CreateQuote creates a new quote with items.
 func (s *SalesService) CreateQuote(companyID, locationID, userID int, req *models.CreateQuoteRequest) (*models.Quote, error) {
+	transactionType := normalizeTransactionType(ptrString(req.TransactionType))
+	if transactionType == "" {
+		transactionType = "B2B"
+	}
+	if transactionType == "B2B" && req.CustomerID == nil {
+		return nil, fmt.Errorf("b2b quotes require customer_id")
+	}
 	if req.CustomerID != nil {
 		if err := s.validateCustomerInCompany(*req.CustomerID, companyID); err != nil {
 			return nil, err
@@ -2558,11 +2610,11 @@ func (s *SalesService) CreateQuote(companyID, locationID, userID int, req *model
 		validUntilPtr = &validUntil
 	}
 	err = tx.QueryRow(`
-		INSERT INTO quotes (quote_number, location_id, customer_id, quote_date, valid_until,
+		INSERT INTO quotes (quote_number, location_id, customer_id, transaction_type, quote_date, valid_until,
 							subtotal, tax_amount, discount_amount, total_amount, status, notes, created_by, updated_by)
-		VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, $6, $7, $8, 'DRAFT', $9, $10, $10)
+		VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, $6, $7, $8, $9, 'DRAFT', $10, $11, $11)
 		RETURNING quote_id
-	`, quoteNumber, locationID, req.CustomerID, validUntilPtr, subtotal, totalTax, req.DiscountAmount, totalAmount, req.Notes, userID).Scan(&quoteID)
+	`, quoteNumber, locationID, req.CustomerID, transactionType, validUntilPtr, subtotal, totalTax, req.DiscountAmount, totalAmount, req.Notes, userID).Scan(&quoteID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert quote: %w", err)
 	}
@@ -2619,12 +2671,13 @@ func (s *SalesService) UpdateQuote(quoteID, companyID, userID int, req *models.U
 	defer tx.Rollback()
 
 	var existingDiscount float64
+	var existingCustomerID sql.NullInt64
 	err = tx.QueryRow(`
-		SELECT q.discount_amount
+		SELECT q.discount_amount, q.customer_id
 		FROM quotes q
 		JOIN locations l ON q.location_id = l.location_id
 		WHERE q.quote_id = $1 AND l.company_id = $2 AND q.is_deleted = FALSE
-	`, quoteID, companyID).Scan(&existingDiscount)
+	`, quoteID, companyID).Scan(&existingDiscount, &existingCustomerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return fmt.Errorf("quote not found")
@@ -2636,6 +2689,7 @@ func (s *SalesService) UpdateQuote(quoteID, companyID, userID int, req *models.U
 	if req.DiscountAmount != nil {
 		discountAmount = *req.DiscountAmount
 	}
+	effectiveCustomerID := existingCustomerID
 
 	subtotal := float64(0)
 	totalTax := float64(0)
@@ -2786,6 +2840,32 @@ func (s *SalesService) UpdateQuote(quoteID, companyID, userID int, req *models.U
 		setParts = append(setParts, fmt.Sprintf("valid_until = $%d", argCount))
 		args = append(args, req.ValidUntil.Time)
 	}
+	if req.CustomerID != nil || (req.CustomerID == nil && req.TransactionType != nil) {
+		if req.CustomerID != nil {
+			effectiveCustomerID = sql.NullInt64{Int64: int64(*req.CustomerID), Valid: *req.CustomerID > 0}
+		} else if req.TransactionType != nil && normalizeTransactionType(*req.TransactionType) == "RETAIL" {
+			effectiveCustomerID = sql.NullInt64{}
+		}
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("customer_id = $%d", argCount))
+		if effectiveCustomerID.Valid {
+			args = append(args, int(effectiveCustomerID.Int64))
+		} else {
+			args = append(args, nil)
+		}
+	}
+	if req.TransactionType != nil {
+		transactionType := normalizeTransactionType(*req.TransactionType)
+		if transactionType == "" {
+			return fmt.Errorf("invalid transaction_type")
+		}
+		if transactionType == "B2B" && !effectiveCustomerID.Valid {
+			return fmt.Errorf("b2b quotes require customer_id")
+		}
+		argCount++
+		setParts = append(setParts, fmt.Sprintf("transaction_type = $%d", argCount))
+		args = append(args, transactionType)
+	}
 	if recalcTotals {
 		totalAmount := subtotal + totalTax - discountAmount
 		if totalAmount < 0 {
@@ -2912,21 +2992,22 @@ func (s *SalesService) GetQuotePrintData(quoteID, companyID int) (*models.QuoteP
 
 func (s *SalesService) ConvertQuoteToSale(quoteID, companyID, userID int, overridePassword *string) (*models.Sale, error) {
 	var (
-		locationID     int
-		quoteNumber    string
-		customerID     *int
-		discountAmount float64
-		status         string
-		notes          sql.NullString
-		convertedSale  sql.NullInt64
+		locationID      int
+		quoteNumber     string
+		customerID      *int
+		transactionType string
+		discountAmount  float64
+		status          string
+		notes           sql.NullString
+		convertedSale   sql.NullInt64
 	)
 
 	err := s.db.QueryRow(`
-		SELECT q.location_id, q.quote_number, q.customer_id, q.discount_amount, q.status, q.notes, q.converted_sale_id
+		SELECT q.location_id, q.quote_number, q.customer_id, q.transaction_type, q.discount_amount, q.status, q.notes, q.converted_sale_id
 		FROM quotes q
 		JOIN locations l ON q.location_id = l.location_id
 		WHERE q.quote_id = $1 AND l.company_id = $2 AND q.is_deleted = FALSE
-	`, quoteID, companyID).Scan(&locationID, &quoteNumber, &customerID, &discountAmount, &status, &notes, &convertedSale)
+	`, quoteID, companyID).Scan(&locationID, &quoteNumber, &customerID, &transactionType, &discountAmount, &status, &notes, &convertedSale)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("quote not found")
 	}
@@ -2985,7 +3066,8 @@ func (s *SalesService) ConvertQuoteToSale(quoteID, companyID, userID int, overri
 
 	idemKey := fmt.Sprintf("quote:%d", quoteID)
 	sale, err := s.CreateSaleWithOptions(companyID, locationID, userID, req, &idemKey, CreateSaleOptions{
-		SourceChannel: "QUOTE",
+		SourceChannel:   "QUOTE",
+		TransactionType: transactionType,
 	})
 	if err != nil {
 		return nil, err

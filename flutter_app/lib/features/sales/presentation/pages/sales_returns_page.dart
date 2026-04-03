@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
 import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
+import 'package:ebs_lite/shared/widgets/app_selection_dialog.dart';
 import 'package:ebs_lite/shared/widgets/sales_action_password_dialog.dart';
 
 import '../../../../core/error_handler.dart';
@@ -12,7 +13,6 @@ import '../../../pos/controllers/pos_notifier.dart';
 import '../../../pos/data/models.dart';
 import '../../../pos/data/pos_repository.dart';
 import '../../../pos/presentation/pages/pos_page.dart';
-import '../../../pos/presentation/widgets/customer_selector_dialog.dart';
 import '../../data/sales_repository.dart';
 import 'sale_return_detail_page.dart';
 import 'sale_detail_page.dart';
@@ -152,9 +152,10 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
     if (code.isEmpty) return;
     setState(() => _linking = true);
     try {
-      final list = await ref
-          .read(salesRepositoryProvider)
-          .getSalesHistory(saleNumber: code);
+      final list = await ref.read(salesRepositoryProvider).getSalesHistory(
+            saleNumber: code,
+            transactionType: 'B2B',
+          );
       if (!mounted) return;
       if (list.isEmpty) {
         ScaffoldMessenger.of(context)
@@ -280,12 +281,14 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
       final customer = _customer;
       int returnId;
       if (customer == null) {
-        // Walk-in: invoice mandatory
+        // Without a selected party, the original invoice is mandatory.
         if (sale == null) {
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
             ..showSnackBar(const SnackBar(
-                content: Text('Invoice number required for walk-in returns')));
+              content: Text(
+                  'Invoice number is required when no B2B party is selected'),
+            ));
           return;
         }
         returnId = await ref.read(salesRepositoryProvider).createSaleReturn(
@@ -431,7 +434,7 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
         title: Text(
           widget.mode == SaleReturnDocumentMode.refundInvoice
               ? 'New Refund Invoice'
-              : 'New Sale Return',
+              : 'New B2B Return',
         ),
       ),
       body: SafeArea(
@@ -451,7 +454,7 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
               decoration: InputDecoration(
                 labelText: widget.mode == SaleReturnDocumentMode.refundInvoice
                     ? 'Invoice Number (required)'
-                    : 'Invoice Number ${_customer == null ? '(required for walk-in)' : '(optional)'}',
+                    : 'B2B Invoice Number ${_customer == null ? '(required when no party is selected)' : '(optional)'}',
                 prefixIcon: const Icon(Icons.receipt_long_outlined),
                 suffixIcon: widget.initialSaleId != null
                     ? const Icon(Icons.lock_outline_rounded)
@@ -571,7 +574,7 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
                   child: Text(
                     widget.mode == SaleReturnDocumentMode.refundInvoice
                         ? 'Create Refund Invoice'
-                        : 'Save Return',
+                        : 'Save B2B Return',
                   ),
                 ),
               ),
@@ -920,7 +923,7 @@ class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
   }
 }
 
-class _CustomerPicker extends StatelessWidget {
+class _CustomerPicker extends ConsumerWidget {
   const _CustomerPicker({
     required this.customer,
     required this.onPicked,
@@ -931,29 +934,105 @@ class _CustomerPicker extends StatelessWidget {
   final bool enabled;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return InkWell(
       onTap: !enabled
           ? null
           : () async {
               final picked = await showDialog<PosCustomerDto>(
                 context: context,
-                builder: (_) => const CustomerSelectorDialog(),
+                builder: (context) {
+                  final repo = ref.read(posRepositoryProvider);
+                  final controller = TextEditingController();
+                  List<PosCustomerDto> results = const [];
+                  bool loading = true;
+                  bool kickoff = true;
+
+                  return StatefulBuilder(
+                    builder: (context, setStateDialog) {
+                      Future<void> doSearch(String query) async {
+                        loading = true;
+                        setStateDialog(() {});
+                        try {
+                          results = await repo.searchCustomers(
+                            query,
+                            customerType: 'B2B',
+                          );
+                        } finally {
+                          loading = false;
+                          setStateDialog(() {});
+                        }
+                      }
+
+                      if (kickoff) {
+                        kickoff = false;
+                        Future.microtask(() => doSearch(''));
+                      }
+
+                      return AppSelectionDialog(
+                        title: 'Select B2B Party',
+                        maxWidth: 460,
+                        loading: loading,
+                        searchField: TextField(
+                          controller: controller,
+                          decoration: InputDecoration(
+                            hintText: 'Search parties',
+                            prefixIcon: const Icon(Icons.search_rounded),
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.search_rounded),
+                              onPressed: () => doSearch(controller.text.trim()),
+                            ),
+                          ),
+                          onChanged: (value) => doSearch(value.trim()),
+                          onSubmitted: (value) => doSearch(value.trim()),
+                        ),
+                        body: results.isEmpty && !loading
+                            ? const Center(child: Text('No B2B parties'))
+                            : ListView.builder(
+                                itemCount: results.length,
+                                itemBuilder: (context, index) {
+                                  final item = results[index];
+                                  return ListTile(
+                                    title: Text(item.name),
+                                    subtitle: Text(
+                                      [
+                                        if ((item.contactPerson ?? '')
+                                            .isNotEmpty)
+                                          item.contactPerson!,
+                                        if ((item.phone ?? '').isNotEmpty)
+                                          item.phone!,
+                                      ].join(' • '),
+                                    ),
+                                    onTap: () =>
+                                        Navigator.of(context).pop(item),
+                                  );
+                                },
+                              ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(null),
+                            child: const Text('Cancel'),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
               );
               if (picked != null) onPicked(picked);
             },
       borderRadius: BorderRadius.circular(8),
       child: InputDecorator(
         decoration: const InputDecoration(
-          labelText: 'Customer (optional)',
-          prefixIcon: Icon(Icons.person_search_rounded),
+          labelText: 'B2B Party (optional)',
+          prefixIcon: Icon(Icons.business_rounded),
           border: OutlineInputBorder(),
         ),
         child: Row(
           children: [
             Expanded(
               child: Text(
-                customer == null ? 'Walk in' : customer!.name,
+                customer == null ? 'No B2B party selected' : customer!.name,
                 overflow: TextOverflow.ellipsis,
               ),
             ),

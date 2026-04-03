@@ -23,6 +23,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
   final _discountCtrl = TextEditingController(text: '0');
   final _notesCtrl = TextEditingController();
   PosCustomerDto? _customer;
+  String _transactionType = 'B2B';
   DateTime? _validUntil;
   List<PosCartItem> _items = const [];
   bool _loading = false;
@@ -69,11 +70,15 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       final discount = (quote['discount_amount'] as num?)?.toDouble() ?? 0.0;
       _discountCtrl.text = discount.toStringAsFixed(2);
       _notesCtrl.text = quote['notes']?.toString() ?? '';
+      _transactionType = quote['transaction_type']?.toString() ?? 'B2B';
       final customer = quote['customer'] as Map<String, dynamic>?;
       if (customer != null) {
         _customer = PosCustomerDto(
           customerId: customer['customer_id'] as int? ?? 0,
           name: customer['name']?.toString() ?? '',
+          customerType:
+              customer['customer_type']?.toString() ?? _transactionType,
+          contactPerson: customer['contact_person']?.toString(),
           phone: customer['phone']?.toString(),
           email: customer['email']?.toString(),
         );
@@ -131,6 +136,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
   }
 
   Future<void> _pickCustomer() async {
+    final isB2B = _transactionType == 'B2B';
     final result = await showDialog<PosCustomerDto>(
       context: context,
       builder: (context) {
@@ -146,7 +152,10 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
               loading = true;
               setStateDialog(() {});
               try {
-                results = await repo.searchCustomers(q);
+                results = await repo.searchCustomers(
+                  q,
+                  customerType: isB2B ? 'B2B' : 'RETAIL',
+                );
               } finally {
                 loading = false;
                 setStateDialog(() {});
@@ -159,13 +168,13 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
             }
 
             return AppSelectionDialog(
-              title: 'Select Customer',
+              title: isB2B ? 'Select B2B Party' : 'Select Retail Customer',
               maxWidth: 460,
               loading: loading,
               searchField: TextField(
                 controller: controller,
                 decoration: InputDecoration(
-                  hintText: 'Search customers',
+                  hintText: isB2B ? 'Search B2B parties' : 'Search customers',
                   prefixIcon: const Icon(Icons.search_rounded),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.search_rounded),
@@ -176,7 +185,11 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                 onSubmitted: (v) => doSearch(v.trim()),
               ),
               body: results.isEmpty && !loading
-                  ? const Center(child: Text('No customers'))
+                  ? Center(
+                      child: Text(
+                        isB2B ? 'No B2B parties' : 'No retail customers',
+                      ),
+                    )
                   : ListView.builder(
                       itemCount: results.length,
                       itemBuilder: (context, i) {
@@ -184,6 +197,8 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                         return ListTile(
                           title: Text(c.name),
                           subtitle: Text([
+                            if ((c.contactPerson ?? '').isNotEmpty)
+                              c.contactPerson!,
                             if ((c.phone ?? '').isNotEmpty) c.phone!,
                             if ((c.email ?? '').isNotEmpty) c.email!,
                           ].where((e) => e.isNotEmpty).join(' - ')),
@@ -375,6 +390,10 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       setState(() => _error = 'Add at least one item');
       return;
     }
+    if (_transactionType == 'B2B' && _customer == null) {
+      setState(() => _error = 'Select a B2B party for B2B quotes');
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -394,7 +413,10 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       if (_isEdit) {
         await repo.updateQuote(
           widget.quoteId!,
+          customerId: _customer?.customerId,
+          clearCustomer: _customer == null,
           status: null,
+          transactionType: _transactionType,
           notes: _notesCtrl.text.trim(),
           validUntil: _validUntil,
           discountAmount: discount,
@@ -403,6 +425,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       } else {
         await repo.createQuote(
           customerId: _customer?.customerId,
+          transactionType: _transactionType,
           validUntil: _validUntil,
           discountAmount: discount,
           notes: _notesCtrl.text.trim(),
@@ -426,11 +449,12 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
     final subtotal = _items.fold<double>(0, (sum, i) => sum + _lineTotal(i));
     final discount = double.tryParse(_discountCtrl.text.trim()) ?? 0.0;
     final total = (subtotal - discount).clamp(0.0, double.infinity);
+    final isB2B = _transactionType == 'B2B';
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEdit
             ? (_readOnly ? 'Quote (Read-only)' : 'Edit Quote')
-            : 'New Quote'),
+            : 'New ${isB2B ? 'B2B' : 'Retail'} Quote'),
         actions: [
           IconButton(
             tooltip: 'Add Item',
@@ -482,12 +506,67 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
               elevation: 0,
               child: Column(
                 children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                    child: RadioGroup<String>(
+                      groupValue: _transactionType,
+                      onChanged: (_loading || _readOnly)
+                          ? (_) {}
+                          : (value) {
+                              if (value == null) return;
+                              setState(() {
+                                _transactionType = value;
+                                if (value == 'B2B' &&
+                                    _customer?.customerType == 'RETAIL') {
+                                  _customer = null;
+                                }
+                                if (value == 'RETAIL' &&
+                                    _customer?.customerType == 'B2B') {
+                                  _customer = null;
+                                }
+                              });
+                            },
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Quote Type',
+                            style: theme.textTheme.titleSmall,
+                          ),
+                          const RadioListTile<String>(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text('B2B'),
+                            subtitle: Text(
+                              'Party-based quotes that flow through receivables.',
+                            ),
+                            value: 'B2B',
+                          ),
+                          const RadioListTile<String>(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text('Retail'),
+                            subtitle: Text(
+                              'Standard retail quotes that can remain walk-in.',
+                            ),
+                            value: 'RETAIL',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 1),
                   ListTile(
-                    leading: const Icon(Icons.person_rounded),
-                    title: Text(_customer?.name ?? 'Walk in'),
+                    leading: Icon(
+                      isB2B ? Icons.business_rounded : Icons.person_rounded,
+                    ),
+                    title: Text(
+                      _customer?.name ??
+                          (isB2B ? 'Select B2B Party' : 'Walk in'),
+                    ),
                     subtitle: Text(_customer == null
-                        ? 'No customer selected'
-                        : 'Customer'),
+                        ? (isB2B
+                            ? 'B2B quotes require a party'
+                            : 'Retail quote without customer')
+                        : (isB2B ? 'B2B Party' : 'Retail Customer')),
                     trailing: TextButton(
                       onPressed: (_loading || _readOnly) ? null : _pickCustomer,
                       child: const Text('Select'),

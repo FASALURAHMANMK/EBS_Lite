@@ -34,6 +34,7 @@ class SalesRepository {
     int? paymentMethodId,
     int? productId,
     String? saleNumber,
+    String? transactionType,
   }) async {
     final loc = _locationId;
     final outbox = _ref.read(outboxNotifierProvider.notifier);
@@ -58,6 +59,9 @@ class SalesRepository {
     if (saleNumber != null && saleNumber.isNotEmpty) {
       qp['sale_number'] = saleNumber;
     }
+    if (transactionType != null && transactionType.isNotEmpty) {
+      qp['transaction_type'] = transactionType;
+    }
     final res = await _dio.get('/sales/history',
         queryParameters: qp.isEmpty ? null : qp);
     final data = _extractList(res).cast<Map<String, dynamic>>();
@@ -74,6 +78,7 @@ class SalesRepository {
     int? customerId,
     int? saleId,
     String? status,
+    String? transactionType,
   }) async {
     final qp = <String, dynamic>{};
     if (dateFrom != null && dateFrom.isNotEmpty) qp['date_from'] = dateFrom;
@@ -81,6 +86,9 @@ class SalesRepository {
     if (customerId != null) qp['customer_id'] = customerId;
     if (saleId != null) qp['sale_id'] = saleId;
     if (status != null && status.isNotEmpty) qp['status'] = status;
+    if (transactionType != null && transactionType.isNotEmpty) {
+      qp['transaction_type'] = transactionType;
+    }
     final res = await _dio.get('/sale-returns',
         queryParameters: qp.isEmpty ? null : qp);
     final data = _extractList(res);
@@ -191,12 +199,16 @@ class SalesRepository {
     String? dateFrom,
     String? dateTo,
     int? customerId,
+    String? transactionType,
   }) async {
     final qp = <String, dynamic>{};
     if (status != null && status.isNotEmpty) qp['status'] = status;
     if (dateFrom != null && dateFrom.isNotEmpty) qp['date_from'] = dateFrom;
     if (dateTo != null && dateTo.isNotEmpty) qp['date_to'] = dateTo;
     if (customerId != null) qp['customer_id'] = customerId;
+    if (transactionType != null && transactionType.isNotEmpty) {
+      qp['transaction_type'] = transactionType;
+    }
     final res = await _dio.get('/sales/quotes',
         queryParameters: qp.isEmpty ? null : qp);
     final data = _extractList(res);
@@ -213,6 +225,7 @@ class SalesRepository {
 
   Future<int> createQuote({
     int? customerId,
+    String? transactionType,
     DateTime? validUntil,
     double discountAmount = 0.0,
     String? notes,
@@ -224,6 +237,8 @@ class SalesRepository {
     }
     final payload = <String, dynamic>{
       if (customerId != null) 'customer_id': customerId,
+      if (transactionType != null && transactionType.isNotEmpty)
+        'transaction_type': transactionType,
       if (validUntil != null) 'valid_until': validUntil.toIso8601String(),
       if (notes != null && notes.isNotEmpty) 'notes': notes,
       'discount_amount': discountAmount,
@@ -242,14 +257,20 @@ class SalesRepository {
 
   Future<void> updateQuote(
     int id, {
+    int? customerId,
+    bool clearCustomer = false,
     String? status,
+    String? transactionType,
     String? notes,
     DateTime? validUntil,
     double? discountAmount,
     List<Map<String, dynamic>>? items,
   }) async {
     final payload = <String, dynamic>{
+      if (customerId != null || clearCustomer) 'customer_id': customerId,
       if (status != null && status.isNotEmpty) 'status': status,
+      if (transactionType != null && transactionType.isNotEmpty)
+        'transaction_type': transactionType,
       if (notes != null) 'notes': notes,
       if (validUntil != null) 'valid_until': validUntil.toIso8601String(),
       if (discountAmount != null) 'discount_amount': discountAmount,
@@ -318,6 +339,39 @@ class SalesRepository {
         'override_password': overridePassword.trim(),
     };
     await _dio.put('/sales/$id', data: payload);
+  }
+
+  Future<int> createInvoice({
+    required int customerId,
+    required List<Map<String, dynamic>> items,
+    int? paymentMethodId,
+    double paidAmount = 0,
+    double discountAmount = 0,
+    String? notes,
+    String transactionType = 'B2B',
+  }) async {
+    final loc = _locationId;
+    if (loc == null) {
+      throw Exception('Select a location first');
+    }
+    final payload = <String, dynamic>{
+      'customer_id': customerId,
+      'transaction_type': transactionType,
+      'items': items,
+      'paid_amount': paidAmount,
+      'discount_amount': discountAmount,
+      if (paymentMethodId != null) 'payment_method_id': paymentMethodId,
+      if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+    };
+    final res = await _dio.post(
+      '/sales',
+      queryParameters: {'location_id': loc},
+      data: payload,
+    );
+    final body = res.data is Map && (res.data['data'] != null)
+        ? res.data['data'] as Map<String, dynamic>
+        : res.data as Map<String, dynamic>;
+    return (body['sale_id'] as int?) ?? 0;
   }
 }
 

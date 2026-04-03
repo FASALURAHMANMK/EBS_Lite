@@ -245,6 +245,21 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   Future<void> _editSelectedSale() async {
     final sale = _selectedDetail?.sale;
     if (sale == null) return;
+    if (sale.isRefundInvoice ||
+        sale.isFullyRefunded ||
+        sale.isPartiallyRefunded) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Sales that already have refunds cannot be edited in place.',
+            ),
+          ),
+        );
+      return;
+    }
 
     setState(() => _actionBusy = true);
     try {
@@ -463,6 +478,7 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
     List<_HistoryDocument> documents,
   ) {
     final selectedDetail = _selectedDetail;
+    final selectedSale = selectedDetail?.sale;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
@@ -568,8 +584,10 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
               subtitle: selectedDetail == null
                   ? 'Select a document from the list'
                   : 'Selected document',
-              headerTrailing: selectedDetail?.sale != null &&
-                      !selectedDetail!.sale!.isRefundInvoice
+              headerTrailing: selectedSale != null &&
+                      !selectedSale.isRefundInvoice &&
+                      !selectedSale.isFullyRefunded &&
+                      !selectedSale.isPartiallyRefunded
                   ? IconButton(
                       tooltip: 'Edit sale',
                       onPressed: _actionBusy ? null : _editSelectedSale,

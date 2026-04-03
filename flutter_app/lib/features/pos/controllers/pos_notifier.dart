@@ -26,6 +26,7 @@ class PosState {
   final int? activeSaleId; // when resuming a held sale
   final String? sessionLabel;
   final String? sessionSourceSaleNumber;
+  final SaleDto? editBaselineSale;
 
   const PosState({
     this.receiptPreview,
@@ -43,11 +44,13 @@ class PosState {
     this.activeSaleId,
     this.sessionLabel,
     this.sessionSourceSaleNumber,
+    this.editBaselineSale,
   });
 
   double get subtotal => cart.fold(0.0, (s, i) => s + i.lineTotal);
   double get total => subtotal + tax - discount;
   bool get hasRefundLines => cart.any((item) => item.isRefundLine);
+  bool get isEditingSale => editBaselineSale != null;
 
   PosState copyWith({
     String? receiptPreview,
@@ -65,10 +68,12 @@ class PosState {
     int? activeSaleId,
     String? sessionLabel,
     String? sessionSourceSaleNumber,
+    SaleDto? editBaselineSale,
     bool clearCommittedReceipt = false,
     bool clearActiveSaleId = false,
     bool clearCustomer = false,
     bool clearSession = false,
+    bool clearEditBaselineSale = false,
   }) {
     return PosState(
       receiptPreview: receiptPreview ?? this.receiptPreview,
@@ -92,6 +97,9 @@ class PosState {
       sessionSourceSaleNumber: clearSession
           ? null
           : (sessionSourceSaleNumber ?? this.sessionSourceSaleNumber),
+      editBaselineSale: clearEditBaselineSale
+          ? null
+          : (editBaselineSale ?? this.editBaselineSale),
     );
   }
 }
@@ -280,29 +288,44 @@ class PosNotifier extends StateNotifier<PosState> {
   }) async {
     _checkoutIdemKey ??= const Uuid().v4();
     try {
-      final result = await _repo.checkout(
-        customerId: state.customer?.customerId,
-        items: state.cart,
-        paymentMethodId: paymentMethodId,
-        paidAmount: paidAmount,
-        discountAmount: state.discount,
-        saleId: state.activeSaleId,
-        payments: payments,
-        redeemPoints: redeemPoints,
-        couponCode: couponCode,
-        autoFillRaffleCustomerData: autoFillRaffleCustomerData,
-        idempotencyKey: _checkoutIdemKey,
-        managerOverrideToken: managerOverrideToken,
-        overrideReason: overrideReason,
-        salesActionPassword: salesActionPassword,
-        overridePassword: overridePassword,
-      );
+      final result = state.isEditingSale
+          ? await _repo.editSale(
+              baseline: state.editBaselineSale!,
+              customerId: state.customer?.customerId,
+              items: state.cart,
+              paymentMethodId: paymentMethodId,
+              paidAmount: paidAmount,
+              discountAmount: state.discount,
+              payments: payments,
+              salesActionPassword: salesActionPassword,
+              overridePassword: overridePassword,
+              managerOverrideToken: managerOverrideToken,
+              overrideReason: overrideReason,
+            )
+          : await _repo.checkout(
+              customerId: state.customer?.customerId,
+              items: state.cart,
+              paymentMethodId: paymentMethodId,
+              paidAmount: paidAmount,
+              discountAmount: state.discount,
+              saleId: state.activeSaleId,
+              payments: payments,
+              redeemPoints: redeemPoints,
+              couponCode: couponCode,
+              autoFillRaffleCustomerData: autoFillRaffleCustomerData,
+              idempotencyKey: _checkoutIdemKey,
+              managerOverrideToken: managerOverrideToken,
+              overrideReason: overrideReason,
+              salesActionPassword: salesActionPassword,
+              overridePassword: overridePassword,
+            );
       _checkoutIdemKey = null;
       final nextPreview = await _repo.getNextReceiptPreview();
       state = state.copyWith(
         clearCommittedReceipt: true,
         clearActiveSaleId: true,
         clearSession: true,
+        clearEditBaselineSale: true,
         clearCustomer: true,
         receiptPreview: nextPreview ?? state.receiptPreview,
         cart: const [],
@@ -318,6 +341,7 @@ class PosNotifier extends StateNotifier<PosState> {
         clearCommittedReceipt: true,
         clearActiveSaleId: true,
         clearSession: true,
+        clearEditBaselineSale: true,
         clearCustomer: true,
         receiptPreview: nextPreview ?? state.receiptPreview,
         cart: const [],
@@ -347,6 +371,7 @@ class PosNotifier extends StateNotifier<PosState> {
         clearCommittedReceipt: true,
         clearActiveSaleId: true,
         clearSession: true,
+        clearEditBaselineSale: true,
         cart: const [],
         suggestions: const [],
         discount: 0.0,
@@ -367,6 +392,7 @@ class PosNotifier extends StateNotifier<PosState> {
       clearCommittedReceipt: true,
       clearActiveSaleId: true,
       clearSession: true,
+      clearEditBaselineSale: true,
     );
   }
 
@@ -415,6 +441,7 @@ class PosNotifier extends StateNotifier<PosState> {
       activeSaleId: saleId,
       sessionLabel: 'Held sale resumed',
       sessionSourceSaleNumber: sale.saleNumber,
+      editBaselineSale: null,
     );
     // ignore: unawaited_futures
     _recalculateTotals();
@@ -426,7 +453,9 @@ class PosNotifier extends StateNotifier<PosState> {
     String label = 'Refund / exchange session',
   }) {
     final cartItems = items
-        .where((item) => (item.productId ?? 0) > 0 && item.quantity > 0)
+        .where((item) =>
+            ((item.productId ?? 0) > 0 || (item.comboProductId ?? 0) > 0) &&
+            item.quantity > 0)
         .map((item) => _refundCartItemFromSaleItem(sale, item, item.quantity))
         .toList(growable: false);
     state = state.copyWith(
@@ -445,6 +474,7 @@ class PosNotifier extends StateNotifier<PosState> {
           sale.customerId == null || (sale.customerName ?? '').trim().isEmpty,
       sessionLabel: label,
       sessionSourceSaleNumber: sale.saleNumber,
+      editBaselineSale: null,
       query: '',
       suggestions: const [],
       discount: 0.0,
@@ -454,14 +484,12 @@ class PosNotifier extends StateNotifier<PosState> {
   }
 
   void loadInvoiceEditSession(SaleDto sale) {
-    final cartItems = <PosCartItem>[];
-    for (final item in sale.items) {
-      if ((item.productId ?? 0) <= 0 || item.quantity <= 0) {
-        continue;
-      }
-      cartItems.add(_refundCartItemFromSaleItem(sale, item, item.quantity));
-      cartItems.add(_saleCartItemFromSaleItem(item));
-    }
+    final cartItems = sale.items
+        .where((item) =>
+            ((item.productId ?? 0) > 0 || (item.comboProductId ?? 0) > 0) &&
+            item.quantity > 0)
+        .map(_saleCartItemFromSaleItem)
+        .toList(growable: false);
     state = state.copyWith(
       cart: cartItems,
       customer:
@@ -472,15 +500,16 @@ class PosNotifier extends StateNotifier<PosState> {
                 )
               : null,
       customerLabel: sale.customerName ?? 'Walk in',
-      clearCommittedReceipt: true,
+      committedReceipt: sale.saleNumber,
       clearActiveSaleId: true,
       clearCustomer:
           sale.customerId == null || (sale.customerName ?? '').trim().isEmpty,
-      sessionLabel: 'Edit session',
+      sessionLabel: 'Editing existing sale',
       sessionSourceSaleNumber: sale.saleNumber,
+      editBaselineSale: sale,
       query: '',
       suggestions: const [],
-      discount: 0.0,
+      discount: sale.discountAmount,
     );
     // ignore: unawaited_futures
     _recalculateTotals();

@@ -37,7 +37,7 @@ class PosPage extends ConsumerWidget {
       appBar: AppBar(
         leadingWidth: isWide ? 104 : null,
         leading: isWide ? const DesktopSidebarToggleLeading() : null,
-        title: const Text('New Sale'),
+        title: Text(state.isEditingSale ? 'Edit Sale' : 'New Sale'),
         centerTitle: true,
         actions: [
           IconButton(
@@ -62,9 +62,11 @@ class PosPage extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Builder(builder: (context) {
-                        final display = state.activeSaleId != null
+                        final display = state.isEditingSale
                             ? (state.committedReceipt ?? '-')
-                            : (state.receiptPreview ?? '-');
+                            : state.activeSaleId != null
+                                ? (state.committedReceipt ?? '-')
+                                : (state.receiptPreview ?? '-');
                         return Text(
                           'Receipt # $display',
                           style: Theme.of(context).textTheme.titleMedium,
@@ -799,7 +801,9 @@ class _BottomBar extends ConsumerWidget {
               children: [
                 Row(children: [
                   OutlinedButton.icon(
-                    onPressed: state.cart.isEmpty || state.hasRefundLines
+                    onPressed: state.cart.isEmpty ||
+                            state.hasRefundLines ||
+                            state.isEditingSale
                         ? null
                         : () async {
                             await notifier.holdCurrent();
@@ -848,7 +852,13 @@ class _BottomBar extends ConsumerWidget {
                           );
                         },
                   icon: const Icon(Icons.arrow_forward_rounded),
-                  label: Text(state.hasRefundLines ? 'Settle' : 'Payment'),
+                  label: Text(
+                    state.hasRefundLines
+                        ? 'Settle'
+                        : state.isEditingSale
+                            ? 'Save'
+                            : 'Payment',
+                  ),
                   style:
                       FilledButton.styleFrom(minimumSize: const Size(180, 48)),
                 ),

@@ -131,15 +131,33 @@ func (s *POSService) GetPOSProducts(companyID, locationID int, includeCombos boo
 	return products, nil
 }
 
-func (s *POSService) GetPOSCustomers(companyID int) ([]models.POSCustomerResponse, error) {
+func normalizePOSCustomerType(raw string) string {
+	switch strings.ToUpper(strings.TrimSpace(raw)) {
+	case "":
+		return ""
+	case "RETAIL":
+		return "RETAIL"
+	case "B2B":
+		return "B2B"
+	default:
+		return ""
+	}
+}
+
+func (s *POSService) GetPOSCustomers(companyID int, customerType string) ([]models.POSCustomerResponse, error) {
 	query := `
-		SELECT customer_id, name, phone, email
+		SELECT customer_id, name, customer_type, contact_person, phone, email
 		FROM customers
 		WHERE company_id = $1 AND is_active = TRUE AND is_deleted = FALSE
-		ORDER BY name
 	`
+	args := []any{companyID}
+	if normalizedType := normalizePOSCustomerType(customerType); normalizedType != "" {
+		query += " AND customer_type = $2"
+		args = append(args, normalizedType)
+	}
+	query += " ORDER BY name"
 
-	rows, err := s.db.Query(query, companyID)
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get POS customers: %w", err)
 	}
@@ -149,7 +167,7 @@ func (s *POSService) GetPOSCustomers(companyID int) ([]models.POSCustomerRespons
 	for rows.Next() {
 		var customer models.POSCustomerResponse
 		err := rows.Scan(
-			&customer.CustomerID, &customer.Name, &customer.Phone, &customer.Email,
+			&customer.CustomerID, &customer.Name, &customer.CustomerType, &customer.ContactPerson, &customer.Phone, &customer.Email,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan POS customer: %w", err)
@@ -636,9 +654,9 @@ func (s *POSService) SearchProducts(companyID, locationID int, searchTerm string
 	return products, nil
 }
 
-func (s *POSService) SearchCustomers(companyID int, searchTerm string) ([]models.POSCustomerResponse, error) {
+func (s *POSService) SearchCustomers(companyID int, searchTerm, customerType string) ([]models.POSCustomerResponse, error) {
 	query := `
-		SELECT customer_id, name, phone, email
+		SELECT customer_id, name, customer_type, contact_person, phone, email
 		FROM customers
 		WHERE company_id = $1 AND is_active = TRUE AND is_deleted = FALSE
 		AND (
@@ -646,13 +664,17 @@ func (s *POSService) SearchCustomers(companyID int, searchTerm string) ([]models
 			phone LIKE $3 OR 
 			LOWER(email) LIKE LOWER($2)
 		)
-		ORDER BY name
-		LIMIT 20
 	`
 
 	searchPattern := "%" + searchTerm + "%"
+	args := []any{companyID, searchPattern, searchTerm}
+	if normalizedType := normalizePOSCustomerType(customerType); normalizedType != "" {
+		query += " AND customer_type = $4"
+		args = append(args, normalizedType)
+	}
+	query += " ORDER BY name LIMIT 20"
 
-	rows, err := s.db.Query(query, companyID, searchPattern, searchTerm)
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search customers: %w", err)
 	}
@@ -662,7 +684,7 @@ func (s *POSService) SearchCustomers(companyID int, searchTerm string) ([]models
 	for rows.Next() {
 		var customer models.POSCustomerResponse
 		err := rows.Scan(
-			&customer.CustomerID, &customer.Name, &customer.Phone, &customer.Email,
+			&customer.CustomerID, &customer.Name, &customer.CustomerType, &customer.ContactPerson, &customer.Phone, &customer.Email,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan customer search result: %w", err)
