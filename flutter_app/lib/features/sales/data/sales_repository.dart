@@ -349,6 +349,7 @@ class SalesRepository {
     double discountAmount = 0,
     String? notes,
     String transactionType = 'B2B',
+    String? overridePassword,
   }) async {
     final loc = _locationId;
     if (loc == null) {
@@ -362,6 +363,8 @@ class SalesRepository {
       'discount_amount': discountAmount,
       if (paymentMethodId != null) 'payment_method_id': paymentMethodId,
       if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      if (overridePassword != null && overridePassword.trim().isNotEmpty)
+        'override_password': overridePassword.trim(),
     };
     final res = await _dio.post(
       '/sales',

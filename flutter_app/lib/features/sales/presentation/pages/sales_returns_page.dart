@@ -14,6 +14,7 @@ import '../../../pos/data/models.dart';
 import '../../../pos/data/pos_repository.dart';
 import '../../../pos/presentation/pages/pos_page.dart';
 import '../../data/sales_repository.dart';
+import 'b2b_invoice_form_page.dart';
 import 'sale_return_detail_page.dart';
 import 'sale_detail_page.dart';
 
@@ -406,15 +407,26 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
         return;
       }
 
-      ref.read(posNotifierProvider.notifier).loadRefundExchangeSession(
-            sale,
-            refundItems,
-          );
-      if (!mounted) return;
-      await Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const PosPage()),
-        (route) => route.isFirst,
-      );
+      if (sale.isB2B) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => B2BInvoiceFormPage(
+              sale: sale,
+              exchangeItems: refundItems,
+            ),
+          ),
+        );
+      } else {
+        ref.read(posNotifierProvider.notifier).loadRefundExchangeSession(
+              sale,
+              refundItems,
+            );
+        if (!mounted) return;
+        await Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const PosPage()),
+          (route) => route.isFirst,
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)

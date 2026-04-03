@@ -7,7 +7,12 @@ import '../../data/models.dart';
 import '../../data/pos_repository.dart';
 
 class CustomerSelectorDialog extends ConsumerStatefulWidget {
-  const CustomerSelectorDialog({super.key});
+  const CustomerSelectorDialog({
+    super.key,
+    this.transactionType = 'RETAIL',
+  });
+
+  final String transactionType;
 
   @override
   ConsumerState<CustomerSelectorDialog> createState() =>
@@ -37,7 +42,13 @@ class _CustomerSelectorDialogState
     });
     try {
       final repo = ref.read(posRepositoryProvider);
-      final list = await repo.searchCustomers(q);
+      final list = await repo.searchCustomers(
+        q,
+        customerType:
+            normalizeSaleTransactionType(widget.transactionType) == 'B2B'
+                ? 'B2B'
+                : null,
+      );
       setState(() {
         _results = list;
         _loading = false;
@@ -81,16 +92,19 @@ class _CustomerSelectorDialogState
 
   @override
   Widget build(BuildContext context) {
+    final isB2B = normalizeSaleTransactionType(widget.transactionType) == 'B2B';
     return AppSelectionDialog(
-      title: 'Select Customer',
+      title: isB2B ? 'Select B2B Party' : 'Select Customer',
       maxWidth: 460,
       maxHeight: 580,
       loading: _loading,
       errorText: _error,
       searchField: TextField(
         controller: _controller,
-        decoration: const InputDecoration(
-          hintText: 'Search name / phone / email',
+        decoration: InputDecoration(
+          hintText: isB2B
+              ? 'Search party name / phone / email'
+              : 'Search name / phone / email',
           prefixIcon: Icon(Icons.search_rounded),
         ),
         onChanged: (value) => _search(value.trim()),
@@ -99,7 +113,9 @@ class _CustomerSelectorDialogState
         children: [
           Expanded(
             child: _results.isEmpty && !_loading
-                ? const Center(child: Text('No customers'))
+                ? Center(
+                    child: Text(isB2B ? 'No B2B parties' : 'No customers'),
+                  )
                 : ListView.builder(
                     itemCount: _results.length,
                     itemBuilder: (context, index) {
@@ -113,32 +129,44 @@ class _CustomerSelectorDialogState
                     },
                   ),
           ),
-          const Divider(height: 20),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Quick Add',
-              style: Theme.of(context).textTheme.titleSmall,
+          if (!isB2B) ...[
+            const Divider(height: 20),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Quick Add',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: 'Name',
-              prefixIcon: Icon(Icons.person_add_alt_1_rounded),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                prefixIcon: Icon(Icons.person_add_alt_1_rounded),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _phoneController,
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(
-              labelText: 'Phone (optional)',
-              prefixIcon: Icon(Icons.phone_rounded),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Phone (optional)',
+                prefixIcon: Icon(Icons.phone_rounded),
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
+          ] else ...[
+            const Divider(height: 20),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Use B2B Parties to create or edit parties for invoice workflows.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
         ],
       ),
       actions: [
@@ -146,16 +174,17 @@ class _CustomerSelectorDialogState
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton.icon(
-          onPressed: _adding ? null : _quickAdd,
-          icon: _adding
-              ? const SizedBox(
-                  height: 16,
-                  width: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2))
-              : const Icon(Icons.add_rounded),
-          label: const Text('Add'),
-        ),
+        if (!isB2B)
+          FilledButton.icon(
+            onPressed: _adding ? null : _quickAdd,
+            icon: _adding
+                ? const SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.add_rounded),
+            label: const Text('Add'),
+          ),
       ],
     );
   }

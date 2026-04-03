@@ -8791,6 +8791,9 @@ components:
         sale_number:
           type: string
           nullable: true
+        transaction_type:
+          type: string
+          nullable: true
         customer_id:
           type: integer
           nullable: true
@@ -8839,6 +8842,9 @@ components:
         baseline_updated_at:
           type: string
           format: date-time
+        transaction_type:
+          type: string
+          nullable: true
         customer_id:
           type: integer
           nullable: true

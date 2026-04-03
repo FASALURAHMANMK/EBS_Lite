@@ -13,6 +13,7 @@ import '../../dashboard/data/payment_methods_repository.dart';
 class PosState {
   final String? receiptPreview;
   final String? committedReceipt;
+  final String transactionType;
   final PosCustomerDto? customer;
   final String customerLabel;
   final String query;
@@ -31,6 +32,7 @@ class PosState {
   const PosState({
     this.receiptPreview,
     this.committedReceipt,
+    this.transactionType = 'RETAIL',
     this.customer,
     this.customerLabel = 'Walk in',
     this.query = '',
@@ -51,10 +53,12 @@ class PosState {
   double get total => subtotal + tax - discount;
   bool get hasRefundLines => cart.any((item) => item.isRefundLine);
   bool get isEditingSale => editBaselineSale != null;
+  bool get isB2B => transactionType == 'B2B';
 
   PosState copyWith({
     String? receiptPreview,
     String? committedReceipt,
+    String? transactionType,
     PosCustomerDto? customer,
     String? customerLabel,
     String? query,
@@ -75,14 +79,18 @@ class PosState {
     bool clearSession = false,
     bool clearEditBaselineSale = false,
   }) {
+    final nextTransactionType =
+        normalizeSaleTransactionType(transactionType ?? this.transactionType);
     return PosState(
       receiptPreview: receiptPreview ?? this.receiptPreview,
       committedReceipt: clearCommittedReceipt
           ? null
           : (committedReceipt ?? this.committedReceipt),
+      transactionType: nextTransactionType,
       customer: clearCustomer ? null : (customer ?? this.customer),
-      customerLabel:
-          clearCustomer ? 'Walk in' : (customerLabel ?? this.customerLabel),
+      customerLabel: clearCustomer
+          ? defaultCustomerLabelForTransactionType(nextTransactionType)
+          : (customerLabel ?? this.customerLabel),
       query: query ?? this.query,
       suggestions: suggestions ?? this.suggestions,
       cart: cart ?? this.cart,
@@ -128,9 +136,33 @@ class PosNotifier extends StateNotifier<PosState> {
   }
 
   void setCustomer(PosCustomerDto? c) {
+    if (c != null &&
+        state.isB2B &&
+        normalizeSaleTransactionType(c.customerType) != 'B2B') {
+      state = state.copyWith(error: 'Select a B2B party for B2B invoices.');
+      return;
+    }
     state = state.copyWith(
       customer: c,
-      customerLabel: c?.name ?? 'Walk in',
+      customerLabel: c?.name ??
+          defaultCustomerLabelForTransactionType(state.transactionType),
+    );
+  }
+
+  void startNewSaleSession({required String transactionType}) {
+    state = state.copyWith(
+      transactionType: transactionType,
+      cart: const [],
+      suggestions: const [],
+      discount: 0.0,
+      tax: 0.0,
+      query: '',
+      error: null,
+      clearCommittedReceipt: true,
+      clearActiveSaleId: true,
+      clearCustomer: true,
+      clearSession: true,
+      clearEditBaselineSale: true,
     );
   }
 
@@ -291,6 +323,7 @@ class PosNotifier extends StateNotifier<PosState> {
       final result = state.isEditingSale
           ? await _repo.editSale(
               baseline: state.editBaselineSale!,
+              transactionType: state.transactionType,
               customerId: state.customer?.customerId,
               items: state.cart,
               paymentMethodId: paymentMethodId,
@@ -303,6 +336,7 @@ class PosNotifier extends StateNotifier<PosState> {
               overrideReason: overrideReason,
             )
           : await _repo.checkout(
+              transactionType: state.transactionType,
               customerId: state.customer?.customerId,
               items: state.cart,
               paymentMethodId: paymentMethodId,
@@ -359,6 +393,7 @@ class PosNotifier extends StateNotifier<PosState> {
     _holdIdemKey ??= const Uuid().v4();
     try {
       await _repo.holdSale(
+        transactionType: state.transactionType,
         customerId: state.customer?.customerId,
         items: state.cart,
         discountAmount: state.discount,
@@ -436,9 +471,21 @@ class PosNotifier extends StateNotifier<PosState> {
         .toList();
     state = state.copyWith(
       cart: items,
-      customerLabel: sale.customerName ?? state.customerLabel,
+      customer:
+          sale.customerId != null && (sale.customerName ?? '').trim().isNotEmpty
+              ? PosCustomerDto(
+                  customerId: sale.customerId!,
+                  name: sale.customerName!,
+                  customerType: sale.transactionType,
+                )
+              : null,
+      customerLabel: sale.customerName ??
+          defaultCustomerLabelForTransactionType(sale.transactionType),
+      transactionType: sale.transactionType,
       committedReceipt: sale.saleNumber,
       activeSaleId: saleId,
+      clearCustomer:
+          sale.customerId == null || (sale.customerName ?? '').trim().isEmpty,
       sessionLabel: 'Held sale resumed',
       sessionSourceSaleNumber: sale.saleNumber,
       editBaselineSale: null,
@@ -465,9 +512,12 @@ class PosNotifier extends StateNotifier<PosState> {
               ? PosCustomerDto(
                   customerId: sale.customerId!,
                   name: sale.customerName!,
+                  customerType: sale.transactionType,
                 )
               : null,
-      customerLabel: sale.customerName ?? 'Walk in',
+      transactionType: sale.transactionType,
+      customerLabel: sale.customerName ??
+          defaultCustomerLabelForTransactionType(sale.transactionType),
       clearCommittedReceipt: true,
       clearActiveSaleId: true,
       clearCustomer:
@@ -497,9 +547,12 @@ class PosNotifier extends StateNotifier<PosState> {
               ? PosCustomerDto(
                   customerId: sale.customerId!,
                   name: sale.customerName!,
+                  customerType: sale.transactionType,
                 )
               : null,
-      customerLabel: sale.customerName ?? 'Walk in',
+      transactionType: sale.transactionType,
+      customerLabel: sale.customerName ??
+          defaultCustomerLabelForTransactionType(sale.transactionType),
       committedReceipt: sale.saleNumber,
       clearActiveSaleId: true,
       clearCustomer:

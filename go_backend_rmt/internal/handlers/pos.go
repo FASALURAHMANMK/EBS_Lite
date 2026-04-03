@@ -299,6 +299,9 @@ func (h *POSHandler) EditSale(c *gin.Context) {
 		case "sale not found":
 			utils.NotFoundResponse(c, "Sale not found")
 			return
+		case "invalid transaction_type", "transaction_type mismatch for sale edit":
+			utils.ErrorResponse(c, http.StatusBadRequest, "Failed to edit sale", err)
+			return
 		case "sales action password is not configured for this user", "sales action password is required":
 			utils.ErrorResponse(c, http.StatusForbidden, "Failed to edit sale", err)
 			return

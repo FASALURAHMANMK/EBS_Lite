@@ -7,6 +7,7 @@ import '../../customers/presentation/widgets/quick_collection_sheet.dart';
 import '../../customers/presentation/pages/customer_management_page.dart';
 import '../../expenses/presentation/widgets/quick_expense_sheet.dart';
 import '../../inventory/presentation/pages/inventory_management_page.dart';
+import '../../pos/controllers/pos_notifier.dart';
 import '../../pos/presentation/pages/pos_page.dart';
 import '../../purchases/presentation/pages/grn_form_page.dart';
 import '../../accounts/presentation/pages/cash_register_page.dart';
@@ -89,6 +90,9 @@ Future<void> runDashboardAction(
 
   switch (actionId) {
     case 'new_sale':
+      ref
+          .read(posNotifierProvider.notifier)
+          .startNewSaleSession(transactionType: 'RETAIL');
       await Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const PosPage()),
       );

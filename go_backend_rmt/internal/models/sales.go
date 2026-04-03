@@ -196,6 +196,7 @@ type POSCheckoutRequest struct {
 	// SaleNumber is optional. When provided (e.g. offline checkout), the server
 	// will persist it instead of allocating a new number.
 	SaleNumber                 *string                   `json:"sale_number,omitempty"`
+	TransactionType            *string                   `json:"transaction_type,omitempty"`
 	CustomerID                 *int                      `json:"customer_id,omitempty"`
 	Items                      []CreateSaleDetailRequest `json:"items" validate:"required,min=1"`
 	PaymentMethodID            *int                      `json:"payment_method_id,omitempty"`
@@ -213,6 +214,7 @@ type POSCheckoutRequest struct {
 
 type POSEditSaleRequest struct {
 	BaselineUpdatedAt    *time.Time                `json:"baseline_updated_at" validate:"required"`
+	TransactionType      *string                   `json:"transaction_type,omitempty"`
 	CustomerID           *int                      `json:"customer_id,omitempty"`
 	Items                []CreateSaleDetailRequest `json:"items" validate:"required,min=1"`
 	PaymentMethodID      *int                      `json:"payment_method_id,omitempty"`

@@ -1,5 +1,16 @@
 import '../../inventory/data/models.dart';
 
+String normalizeSaleTransactionType(String? raw) {
+  final normalized = (raw ?? 'RETAIL').trim().toUpperCase();
+  return normalized == 'B2B' ? 'B2B' : 'RETAIL';
+}
+
+String defaultCustomerLabelForTransactionType(String? raw) {
+  return normalizeSaleTransactionType(raw) == 'B2B'
+      ? 'Select B2B Party'
+      : 'Walk in';
+}
+
 class PosProductDto {
   final int productId;
   final int? comboProductId;
@@ -107,7 +118,8 @@ class PosCustomerDto {
   factory PosCustomerDto.fromJson(Map<String, dynamic> json) => PosCustomerDto(
         customerId: json['customer_id'] as int,
         name: json['name'] as String? ?? '',
-        customerType: json['customer_type'] as String? ?? 'RETAIL',
+        customerType:
+            normalizeSaleTransactionType(json['customer_type'] as String?),
         contactPerson: json['contact_person'] as String?,
         phone: json['phone'] as String?,
         email: json['email'] as String?,
@@ -620,7 +632,8 @@ class SaleDto {
       locationId: (json['location_id'] as num?)?.toInt() ?? 0,
       locationName: json['location_name'] as String?,
       sourceChannel: json['source_channel'] as String?,
-      transactionType: json['transaction_type'] as String? ?? 'RETAIL',
+      transactionType:
+          normalizeSaleTransactionType(json['transaction_type'] as String?),
       refundSourceSaleId: (json['refund_source_sale_id'] as num?)?.toInt(),
       refundSourceSaleNumber: json['refund_source_sale_number'] as String?,
       refundState: json['refund_state'] as String?,
@@ -656,6 +669,8 @@ class SaleDto {
 
   bool get isPartiallyRefunded =>
       (refundState ?? '').trim().toUpperCase() == 'PARTIAL';
+
+  bool get isB2B => transactionType == 'B2B';
 }
 
 class CustomerDetailDto {

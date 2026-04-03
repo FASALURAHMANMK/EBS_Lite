@@ -35,6 +35,17 @@ func NewPOSService() *POSService {
 	}
 }
 
+func normalizePOSTransactionType(raw *string) (string, error) {
+	if raw == nil {
+		return "RETAIL", nil
+	}
+	transactionType := normalizeTransactionType(*raw)
+	if transactionType == "" {
+		return "", fmt.Errorf("invalid transaction_type")
+	}
+	return transactionType, nil
+}
+
 func (s *POSService) GetPOSProducts(companyID, locationID int, includeCombos bool) ([]models.POSProductResponse, error) {
 	query := `
                 SELECT p.product_id, NULL::int AS combo_product_id, COALESCE(pb.barcode_id, 0) AS barcode_id, p.name,
@@ -182,6 +193,13 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 	if err := s.validateLocationInCompany(locationID, companyID); err != nil {
 		return nil, err
 	}
+	transactionType, err := normalizePOSTransactionType(req.TransactionType)
+	if err != nil {
+		return nil, err
+	}
+	if transactionType == "B2B" && req.CustomerID == nil {
+		return nil, fmt.Errorf("b2b transactions require customer_id")
+	}
 
 	trainingEnabled, err := s.isTrainingModeEnabled(companyID, locationID)
 	if err != nil {
@@ -212,9 +230,10 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 	// Loyalty redemption is not counted toward manual discount limits.
 	manualDiscount := req.DiscountAmount
 	_, _, preTotal, err := s.salesService.CalculateTotals(companyID, &models.CreateSaleRequest{
-		CustomerID:     req.CustomerID,
-		Items:          req.Items,
-		DiscountAmount: 0,
+		TransactionType: &transactionType,
+		CustomerID:      req.CustomerID,
+		Items:           req.Items,
+		DiscountAmount:  0,
 	})
 	if err != nil {
 		return nil, err
@@ -235,6 +254,7 @@ func (s *POSService) ProcessCheckout(companyID, locationID, userID int, req *mod
 	// Normal flow: create a fresh sale
 	saleReq := &models.CreateSaleRequest{
 		SaleNumber:       req.SaleNumber,
+		TransactionType:  &transactionType,
 		CustomerID:       req.CustomerID,
 		Items:            req.Items,
 		PaymentMethodID:  req.PaymentMethodID,
@@ -868,6 +888,13 @@ func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int,
 	}
 
 	isTraining := existingTraining || trainingOverride
+	transactionType, err := normalizePOSTransactionType(req.TransactionType)
+	if err != nil {
+		return nil, err
+	}
+	if transactionType == "B2B" && req.CustomerID == nil {
+		return nil, fmt.Errorf("b2b transactions require customer_id")
+	}
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -897,6 +924,7 @@ func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int,
 
 	// Recalculate totals (reusing SalesService for tax resolution)
 	saleReq := &models.CreateSaleRequest{
+		TransactionType:  &transactionType,
 		CustomerID:       req.CustomerID,
 		Items:            req.Items,
 		PaymentMethodID:  req.PaymentMethodID,
@@ -1016,10 +1044,10 @@ func (s *POSService) finalizeHeldSale(companyID, locationID, userID, saleID int,
         UPDATE sales s SET customer_id=$1, subtotal=$2, tax_amount=$3, discount_amount=$4, total_amount=$5,
                           paid_amount=$6, payment_method_id=$7, status='COMPLETED', pos_status='COMPLETED',
                           is_quick_sale=FALSE, is_training=$8, notes=COALESCE($9, s.notes),
-                          refund_source_sale_id=COALESCE($10, s.refund_source_sale_id), updated_by=$11, updated_at=CURRENT_TIMESTAMP
+                          transaction_type=$10, refund_source_sale_id=COALESCE($11, s.refund_source_sale_id), updated_by=$12, updated_at=CURRENT_TIMESTAMP
         FROM locations l
-        WHERE s.sale_id=$12 AND s.location_id = l.location_id AND l.company_id = $13
-    `, req.CustomerID, subtotal, tax, req.DiscountAmount, total, req.PaidAmount, req.PaymentMethodID, isTraining, saleNotes, refundSourceSaleID, userID, saleID, companyID); err != nil {
+        WHERE s.sale_id=$13 AND s.location_id = l.location_id AND l.company_id = $14
+    `, req.CustomerID, subtotal, tax, req.DiscountAmount, total, req.PaidAmount, req.PaymentMethodID, isTraining, saleNotes, transactionType, refundSourceSaleID, userID, saleID, companyID); err != nil {
 		return nil, fmt.Errorf("failed to update sale: %w", err)
 	}
 
@@ -1268,6 +1296,13 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 	if err != nil {
 		return nil, err
 	}
+	transactionType, err := normalizePOSTransactionType(req.TransactionType)
+	if err != nil {
+		return nil, err
+	}
+	if transactionType == "B2B" && req.CustomerID == nil {
+		return nil, fmt.Errorf("b2b transactions require customer_id")
+	}
 
 	idemKey := strings.TrimSpace(idempotencyKey)
 	if idemKey != "" {
@@ -1462,10 +1497,10 @@ func (s *POSService) CreateHeldSale(companyID, locationID, userID int, req *mode
 	err = tx.QueryRow(`
         INSERT INTO sales (sale_number, location_id, customer_id, sale_date, sale_time,
                            subtotal, tax_amount, discount_amount, total_amount, paid_amount,
-                           payment_method_id, status, pos_status, is_quick_sale, is_training, notes, source_channel, refund_source_sale_id, created_by, updated_by, idempotency_key)
-        VALUES ($1,$2,$3,CURRENT_DATE,CURRENT_TIME,$4,$5,$6,$7,$8,$9,'DRAFT','HOLD',FALSE,$10,$11,'POS',$12,$13,$13,$14)
+                           payment_method_id, status, pos_status, is_quick_sale, is_training, notes, source_channel, transaction_type, refund_source_sale_id, created_by, updated_by, idempotency_key)
+        VALUES ($1,$2,$3,CURRENT_DATE,CURRENT_TIME,$4,$5,$6,$7,$8,$9,'DRAFT','HOLD',FALSE,$10,$11,'POS',$12,$13,$14,$14,$15)
         RETURNING sale_id
-    `, saleNumber, locationID, req.CustomerID, subtotal, totalTax, req.DiscountAmount, totalAmount, 0.0, nil, isTraining, saleNotes, refundSourceSaleID, userID, nullIfEmpty(idemKey)).Scan(&saleID)
+    `, saleNumber, locationID, req.CustomerID, subtotal, totalTax, req.DiscountAmount, totalAmount, 0.0, nil, isTraining, saleNotes, transactionType, refundSourceSaleID, userID, nullIfEmpty(idemKey)).Scan(&saleID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create held sale: %w", err)
 	}

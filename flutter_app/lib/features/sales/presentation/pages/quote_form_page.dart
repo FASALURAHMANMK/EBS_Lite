@@ -7,8 +7,8 @@ import '../../../../core/locale_preferences.dart';
 import '../../../../shared/widgets/app_selection_dialog.dart';
 import '../../../pos/data/models.dart';
 import '../../../pos/data/pos_repository.dart';
-import '../../../dashboard/controllers/location_notifier.dart';
 import '../../data/sales_repository.dart';
+import '../widgets/professional_document_widgets.dart';
 import 'sale_detail_page.dart';
 
 class QuoteFormPage extends ConsumerStatefulWidget {
@@ -25,7 +25,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
   PosCustomerDto? _customer;
   String _transactionType = 'B2B';
   DateTime? _validUntil;
-  List<PosCartItem> _items = const [];
+  List<_QuoteLine> _lines = [_QuoteLine.empty()];
   bool _loading = false;
   String? _error;
   String? _info;
@@ -37,17 +37,22 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
   @override
   void initState() {
     super.initState();
-    if (_isEdit) {
-      _loadQuote();
-    }
+    if (_isEdit) _loadQuote();
   }
 
   @override
   void dispose() {
     _discountCtrl.dispose();
     _notesCtrl.dispose();
+    for (final line in _lines) {
+      line.dispose();
+    }
     super.dispose();
   }
+
+  List<_QuoteLine> get _activeLines => _lines
+      .where((e) => e.hasProduct && e.unitPrice > 0 && e.quantity > 0)
+      .toList(growable: false);
 
   Future<void> _loadQuote() async {
     setState(() {
@@ -56,70 +61,44 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       _info = null;
     });
     try {
-      final repo = ref.read(salesRepositoryProvider);
-      final quote = await repo.getQuote(widget.quoteId!);
+      final quote =
+          await ref.read(salesRepositoryProvider).getQuote(widget.quoteId!);
       final status = quote['status']?.toString() ?? 'DRAFT';
-      final convertedSaleId = quote['converted_sale_id'] as int?;
-      _readOnly = convertedSaleId != null || status == 'CONVERTED';
-      _convertedSaleId = convertedSaleId;
+      _convertedSaleId = quote['converted_sale_id'] as int?;
+      _readOnly = _convertedSaleId != null || status == 'CONVERTED';
       if (_readOnly) {
-        _info = convertedSaleId == null
-            ? 'This quote has been converted to a sale and is now read-only.'
-            : 'This quote has been converted to sale #$convertedSaleId and is now read-only.';
+        _info = _convertedSaleId == null
+            ? 'This quote is read-only because it has already been converted.'
+            : 'This quote is read-only because it has already been converted to sale #$_convertedSaleId.';
       }
-      final discount = (quote['discount_amount'] as num?)?.toDouble() ?? 0.0;
-      _discountCtrl.text = discount.toStringAsFixed(2);
+      _discountCtrl.text = ((quote['discount_amount'] as num?)?.toDouble() ?? 0)
+          .toStringAsFixed(2);
       _notesCtrl.text = quote['notes']?.toString() ?? '';
-      _transactionType = quote['transaction_type']?.toString() ?? 'B2B';
+      _transactionType =
+          normalizeSaleTransactionType(quote['transaction_type']?.toString());
       final customer = quote['customer'] as Map<String, dynamic>?;
       if (customer != null) {
         _customer = PosCustomerDto(
           customerId: customer['customer_id'] as int? ?? 0,
           name: customer['name']?.toString() ?? '',
-          customerType:
-              customer['customer_type']?.toString() ?? _transactionType,
+          customerType: normalizeSaleTransactionType(
+              customer['customer_type']?.toString() ?? _transactionType),
           contactPerson: customer['contact_person']?.toString(),
           phone: customer['phone']?.toString(),
           email: customer['email']?.toString(),
         );
       }
-      final validUntilStr = quote['valid_until']?.toString();
-      if (validUntilStr != null && validUntilStr.isNotEmpty) {
-        _validUntil = DateTime.tryParse(validUntilStr);
-      }
-      final items = (quote['items'] as List<dynamic>? ?? []).map((raw) {
-        final i = raw as Map<String, dynamic>;
-        final productId = i['product_id'] as int? ?? 0;
-        final name =
-            (i['product_name'] ?? i['product']?['name'] ?? 'Item').toString();
-        return PosCartItem(
-          product: PosProductDto(
-            productId: productId,
-            comboProductId: i['combo_product_id'] as int?,
-            name: name,
-            price: (i['unit_price'] as num?)?.toDouble() ?? 0.0,
-            stock: 0,
-            barcode: i['barcode'] as String?,
-            isVirtualCombo: (i['combo_product_id'] as int?) != null,
-          ),
-          quantity: (i['quantity'] as num?)?.toDouble() ?? 0.0,
-          unitPrice: (i['unit_price'] as num?)?.toDouble() ?? 0.0,
-          discountPercent:
-              (i['discount_percentage'] as num?)?.toDouble() ?? 0.0,
-        );
-      }).toList();
-      _items = items;
+      final validUntil = quote['valid_until']?.toString();
+      _validUntil = validUntil == null ? null : DateTime.tryParse(validUntil);
+      _lines = (quote['items'] as List<dynamic>? ?? [])
+          .map((e) => _QuoteLine.fromJson(e as Map<String, dynamic>))
+          .toList();
+      if (_lines.isEmpty) _lines = [_QuoteLine.empty()];
     } catch (e) {
       _error = ErrorHandler.message(e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
-  }
-
-  double _lineTotal(PosCartItem item) {
-    final raw = item.quantity * item.unitPrice;
-    final discount = raw * (item.discountPercent / 100);
-    return raw - discount;
   }
 
   Future<void> _pickValidUntil() async {
@@ -130,13 +109,10 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       firstDate: now.subtract(const Duration(days: 1)),
       lastDate: now.add(const Duration(days: 365)),
     );
-    if (picked != null) {
-      setState(() => _validUntil = picked);
-    }
+    if (picked != null && mounted) setState(() => _validUntil = picked);
   }
 
   Future<void> _pickCustomer() async {
-    final isB2B = _transactionType == 'B2B';
     final result = await showDialog<PosCustomerDto>(
       context: context,
       builder: (context) {
@@ -145,7 +121,6 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
         List<PosCustomerDto> results = const [];
         bool loading = true;
         bool kickoff = true;
-
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             Future<void> doSearch(String q) async {
@@ -154,7 +129,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
               try {
                 results = await repo.searchCustomers(
                   q,
-                  customerType: isB2B ? 'B2B' : 'RETAIL',
+                  customerType: _transactionType == 'B2B' ? 'B2B' : 'RETAIL',
                 );
               } finally {
                 loading = false;
@@ -168,28 +143,27 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
             }
 
             return AppSelectionDialog(
-              title: isB2B ? 'Select B2B Party' : 'Select Retail Customer',
-              maxWidth: 460,
+              title: _transactionType == 'B2B'
+                  ? 'Select B2B Party'
+                  : 'Select Retail Customer',
+              maxWidth: 520,
               loading: loading,
               searchField: TextField(
                 controller: controller,
                 decoration: InputDecoration(
-                  hintText: isB2B ? 'Search B2B parties' : 'Search customers',
+                  hintText: _transactionType == 'B2B'
+                      ? 'Search B2B parties'
+                      : 'Search customers',
                   prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.search_rounded),
-                    onPressed: () => doSearch(controller.text.trim()),
-                  ),
                 ),
                 onChanged: (v) => doSearch(v.trim()),
                 onSubmitted: (v) => doSearch(v.trim()),
               ),
               body: results.isEmpty && !loading
                   ? Center(
-                      child: Text(
-                        isB2B ? 'No B2B parties' : 'No retail customers',
-                      ),
-                    )
+                      child: Text(_transactionType == 'B2B'
+                          ? 'No B2B parties'
+                          : 'No customers'))
                   : ListView.builder(
                       itemCount: results.length,
                       itemBuilder: (context, i) {
@@ -201,30 +175,26 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                               c.contactPerson!,
                             if ((c.phone ?? '').isNotEmpty) c.phone!,
                             if ((c.email ?? '').isNotEmpty) c.email!,
-                          ].where((e) => e.isNotEmpty).join(' - ')),
+                          ].join(' • ')),
                           onTap: () => Navigator.of(context).pop(c),
                         );
                       },
                     ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(null),
-                  child: const Text('Cancel'),
-                ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel')),
               ],
             );
           },
         );
       },
     );
-
-    if (result != null) {
-      setState(() => _customer = result);
-    }
+    if (result != null && mounted) setState(() => _customer = result);
   }
 
-  Future<void> _pickProduct() async {
-    final picked = await showDialog<PosProductDto>(
+  Future<PosProductDto?> _pickProduct() async {
+    return showDialog<PosProductDto>(
       context: context,
       builder: (context) {
         final repo = ref.read(posRepositoryProvider);
@@ -232,7 +202,6 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
         List<PosProductDto> results = const [];
         bool loading = true;
         bool kickoff = true;
-
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             Future<void> doSearch(String q) async {
@@ -253,145 +222,76 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
 
             return AppSelectionDialog(
               title: 'Add Item',
-              maxWidth: 560,
+              maxWidth: 620,
               loading: loading,
               searchField: TextField(
                 controller: controller,
-                decoration: InputDecoration(
-                  hintText: 'Search products',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.search_rounded),
-                    onPressed: () => doSearch(controller.text.trim()),
-                  ),
+                decoration: const InputDecoration(
+                  hintText: 'Search products / variants / barcode',
+                  prefixIcon: Icon(Icons.search_rounded),
                 ),
                 onChanged: (v) => doSearch(v.trim()),
                 onSubmitted: (v) => doSearch(v.trim()),
               ),
               body: results.isEmpty && !loading
-                  ? const Center(child: Text('No products'))
+                  ? const Center(child: Text('No products found'))
                   : ListView.builder(
                       itemCount: results.length,
                       itemBuilder: (context, i) {
                         final p = results[i];
                         return ListTile(
                           title: Text(p.name),
-                          subtitle: Text(
-                            [
-                              'Price ${p.price.toStringAsFixed(2)}',
-                              if ((p.barcode ?? '').trim().isNotEmpty)
-                                p.barcode!,
-                              if ((p.primaryStorage ?? '').trim().isNotEmpty)
-                                p.primaryStorage!,
-                              if (p.isVirtualCombo) 'Combo',
-                            ].join(' • '),
-                          ),
+                          subtitle: Text([
+                            if ((p.variantName ?? '').trim().isNotEmpty)
+                              p.variantName!,
+                            'Price ${p.price.toStringAsFixed(2)}',
+                            if ((p.barcode ?? '').trim().isNotEmpty) p.barcode!,
+                          ].join(' • ')),
                           onTap: () => Navigator.of(context).pop(p),
                         );
                       },
                     ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(null),
-                  child: const Text('Cancel'),
-                ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel')),
               ],
             );
           },
         );
       },
     );
-
-    if (picked != null) {
-      final items = [..._items];
-      final idx =
-          items.indexWhere((i) => i.product.identityKey == picked.identityKey);
-      if (idx >= 0) {
-        items[idx] = items[idx].copyWith(quantity: items[idx].quantity + 1);
-      } else {
-        items.add(PosCartItem(
-          product: picked,
-          quantity: 1,
-          unitPrice: picked.price,
-        ));
-      }
-      setState(() => _items = items);
-    }
   }
 
-  Future<void> _editItem(PosCartItem item) async {
-    final qtyCtrl = TextEditingController(text: item.quantity.toString());
-    final priceCtrl = TextEditingController(text: item.unitPrice.toString());
-    final discCtrl =
-        TextEditingController(text: item.discountPercent.toString());
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(item.product.name),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: qtyCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Quantity'),
-            ),
-            TextField(
-              controller: priceCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Unit Price'),
-            ),
-            TextField(
-              controller: discCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Discount %'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Update'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) {
-      final qty = double.tryParse(qtyCtrl.text.trim()) ?? item.quantity;
-      final price = double.tryParse(priceCtrl.text.trim()) ?? item.unitPrice;
-      final disc =
-          double.tryParse(discCtrl.text.trim()) ?? item.discountPercent;
-      final updated = item.copyWith(
-        quantity: qty,
-        unitPrice: price,
-        discountPercent: disc,
-      );
-      final items = _items.map((i) => i == item ? updated : i).toList();
-      setState(() => _items = items);
-    }
+  Future<void> _addOrReplaceProduct([_QuoteLine? target]) async {
+    final picked = await _pickProduct();
+    if (picked == null || !mounted) return;
+    setState(() {
+      if (target != null) {
+        target.applyProduct(picked);
+        return;
+      }
+      final blank = _lines.indexWhere((e) => !e.hasProduct && !e.hasValues);
+      if (blank >= 0) {
+        _lines[blank].applyProduct(picked);
+      } else {
+        _lines = [..._lines, _QuoteLine.fromProduct(picked)];
+      }
+    });
   }
 
   Future<void> _submit() async {
     if (_readOnly) {
-      setState(() => _error = 'This quote is read-only (already converted).');
+      setState(() => _error = 'This quote is read-only.');
       return;
     }
-    final loc = ref.read(locationNotifierProvider).selected;
-    if (!_isEdit && loc == null) {
-      setState(() => _error = 'Select a location first');
-      return;
-    }
-    final discount = double.tryParse(_discountCtrl.text.trim()) ?? 0.0;
-    if (_items.isEmpty) {
-      setState(() => _error = 'Add at least one item');
+    final items = _activeLines;
+    if (items.isEmpty) {
+      setState(() => _error = 'Add at least one quote line.');
       return;
     }
     if (_transactionType == 'B2B' && _customer == null) {
-      setState(() => _error = 'Select a B2B party for B2B quotes');
+      setState(() => _error = 'Select a B2B party for this quote.');
       return;
     }
     setState(() {
@@ -399,27 +299,17 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       _error = null;
     });
     try {
+      final payloadItems = items.map((e) => e.toJson()).toList(growable: false);
       final repo = ref.read(salesRepositoryProvider);
-      final payloadItems = _items
-          .map((i) => {
-                if (i.product.productId > 0) 'product_id': i.product.productId,
-                if ((i.product.comboProductId ?? 0) > 0)
-                  'combo_product_id': i.product.comboProductId,
-                'quantity': i.quantity,
-                'unit_price': i.unitPrice,
-                'discount_percentage': i.discountPercent,
-              })
-          .toList();
       if (_isEdit) {
         await repo.updateQuote(
           widget.quoteId!,
           customerId: _customer?.customerId,
           clearCustomer: _customer == null,
-          status: null,
           transactionType: _transactionType,
           notes: _notesCtrl.text.trim(),
           validUntil: _validUntil,
-          discountAmount: discount,
+          discountAmount: double.tryParse(_discountCtrl.text.trim()) ?? 0,
           items: payloadItems,
         );
       } else {
@@ -427,7 +317,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
           customerId: _customer?.customerId,
           transactionType: _transactionType,
           validUntil: _validUntil,
-          discountAmount: discount,
+          discountAmount: double.tryParse(_discountCtrl.text.trim()) ?? 0,
           notes: _notesCtrl.text.trim(),
           items: payloadItems,
         );
@@ -435,8 +325,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _error = ErrorHandler.message(e));
+      if (mounted) setState(() => _error = ErrorHandler.message(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -444,234 +333,493 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final localePrefs = ref.watch(localePreferencesProvider);
-    final subtotal = _items.fold<double>(0, (sum, i) => sum + _lineTotal(i));
-    final discount = double.tryParse(_discountCtrl.text.trim()) ?? 0.0;
-    final total = (subtotal - discount).clamp(0.0, double.infinity);
-    final isB2B = _transactionType == 'B2B';
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEdit
-            ? (_readOnly ? 'Quote (Read-only)' : 'Edit Quote')
-            : 'New ${isB2B ? 'B2B' : 'Retail'} Quote'),
-        actions: [
-          IconButton(
-            tooltip: 'Add Item',
-            icon: const Icon(Icons.add_circle_outline_rounded),
-            onPressed: (_loading || _readOnly) ? null : _pickProduct,
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (_loading) const LinearProgressIndicator(minHeight: 2),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(_error!,
-                    style: TextStyle(color: theme.colorScheme.error)),
-              ),
-            if (_info != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Card(
-                  elevation: 0,
-                  color: theme.colorScheme.secondaryContainer,
-                  child: ListTile(
-                    leading: const Icon(Icons.lock_rounded),
-                    title: const Text('Converted to Sale'),
-                    subtitle: Text(_info!),
-                    trailing: _convertedSaleId == null
-                        ? null
-                        : TextButton(
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => SaleDetailPage(
-                                    saleId: _convertedSaleId!,
-                                  ),
-                                ),
-                              );
-                            },
-                            child: const Text('Open sale'),
-                          ),
-                  ),
-                ),
-              ),
-            const SizedBox(height: 8),
-            Card(
-              elevation: 0,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-                    child: RadioGroup<String>(
-                      groupValue: _transactionType,
-                      onChanged: (_loading || _readOnly)
-                          ? (_) {}
-                          : (value) {
-                              if (value == null) return;
-                              setState(() {
-                                _transactionType = value;
-                                if (value == 'B2B' &&
-                                    _customer?.customerType == 'RETAIL') {
-                                  _customer = null;
-                                }
-                                if (value == 'RETAIL' &&
-                                    _customer?.customerType == 'B2B') {
-                                  _customer = null;
-                                }
-                              });
-                            },
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Quote Type',
-                            style: theme.textTheme.titleSmall,
-                          ),
-                          const RadioListTile<String>(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text('B2B'),
-                            subtitle: Text(
-                              'Party-based quotes that flow through receivables.',
-                            ),
-                            value: 'B2B',
-                          ),
-                          const RadioListTile<String>(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text('Retail'),
-                            subtitle: Text(
-                              'Standard retail quotes that can remain walk-in.',
-                            ),
-                            value: 'RETAIL',
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: Icon(
-                      isB2B ? Icons.business_rounded : Icons.person_rounded,
-                    ),
-                    title: Text(
-                      _customer?.name ??
-                          (isB2B ? 'Select B2B Party' : 'Walk in'),
-                    ),
-                    subtitle: Text(_customer == null
-                        ? (isB2B
-                            ? 'B2B quotes require a party'
-                            : 'Retail quote without customer')
-                        : (isB2B ? 'B2B Party' : 'Retail Customer')),
-                    trailing: TextButton(
-                      onPressed: (_loading || _readOnly) ? null : _pickCustomer,
-                      child: const Text('Select'),
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.event_rounded),
-                    title: Text(_validUntil == null
-                        ? 'Valid until: not set'
-                        : 'Valid until: ${AppDateTime.formatDate(context, localePrefs, _validUntil)}'),
-                    trailing: TextButton(
-                      onPressed:
-                          (_loading || _readOnly) ? null : _pickValidUntil,
-                      child: const Text('Pick'),
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: TextField(
-                      controller: _discountCtrl,
-                      keyboardType: TextInputType.number,
-                      enabled: !_readOnly,
-                      decoration: const InputDecoration(
-                        labelText: 'Discount amount',
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                    child: TextField(
-                      controller: _notesCtrl,
-                      maxLines: 2,
-                      enabled: !_readOnly,
-                      decoration: const InputDecoration(labelText: 'Notes'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Card(
-              elevation: 0,
-              child: Column(
-                children: [
-                  ListTile(
-                    title: const Text('Items'),
-                    trailing: TextButton(
-                      onPressed: (_loading || _readOnly) ? null : _pickProduct,
-                      child: const Text('Add'),
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  if (_items.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: Text('No items added'),
-                    )
-                  else
-                    for (final item in _items)
-                      ListTile(
-                        leading: const Icon(Icons.inventory_2_rounded),
-                        title: Text(item.product.name),
-                        subtitle: Text(
-                          'Qty: ${item.quantity} - Price: ${item.unitPrice.toStringAsFixed(2)} - Disc: ${item.discountPercent.toStringAsFixed(1)}%',
-                        ),
-                        trailing: Text(
-                          _lineTotal(item).toStringAsFixed(2),
-                          style: theme.textTheme.bodyLarge,
-                        ),
-                        onTap: (_loading || _readOnly)
-                            ? null
-                            : () => _editItem(item),
-                        onLongPress: (_loading || _readOnly)
-                            ? null
-                            : () {
-                                setState(() {
-                                  _items = [..._items]..remove(item);
-                                });
-                              },
-                      ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Card(
-              elevation: 0,
-              child: ListTile(
-                title: const Text('Total'),
-                subtitle: Text('Subtotal: ${subtotal.toStringAsFixed(2)}'),
-                trailing: Text(total.toStringAsFixed(2),
-                    style: theme.textTheme.titleMedium),
-              ),
-            ),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: (_loading || _readOnly) ? null : _submit,
-              child: Text(_readOnly
-                  ? 'Read-only'
-                  : (_isEdit ? 'Update Quote' : 'Create Quote')),
-            ),
-          ],
+    final wide = MediaQuery.of(context).size.width >= 1080;
+    final subtotal =
+        _activeLines.fold<double>(0, (sum, line) => sum + line.lineTotal);
+    final discount = double.tryParse(_discountCtrl.text.trim()) ?? 0;
+    final total = subtotal - discount;
+    final summary = ProfessionalSummaryCard(
+      title: 'Quote Summary',
+      rows: [
+        (label: 'Lines', value: '${_activeLines.length}', emphasize: false),
+        (
+          label: 'Line Net',
+          value: subtotal.toStringAsFixed(2),
+          emphasize: false
+        ),
+        (
+          label: 'Header Discount',
+          value: discount.toStringAsFixed(2),
+          emphasize: false
+        ),
+        (
+          label: 'Quoted Total',
+          value: total.toStringAsFixed(2),
+          emphasize: true
+        ),
+      ],
+      footer: SizedBox(
+        width: double.infinity,
+        child: FilledButton.icon(
+          onPressed: (_loading || _readOnly) ? null : _submit,
+          icon: const Icon(Icons.request_quote_rounded),
+          label: Text(_readOnly
+              ? 'Read-only'
+              : (_isEdit ? 'Update Quote' : 'Create Quote')),
         ),
       ),
     );
+
+    final content = ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        ProfessionalDocumentHeader(
+          title: _isEdit
+              ? (_readOnly ? 'Quote (Read-only)' : 'Edit Quote')
+              : 'New Quote',
+          subtitle:
+              'A cleaner ERP-style quote form with structured header details, a denser line grid, and a persistent summary panel.',
+          badges: [
+            ProfessionalBadge(
+                label:
+                    _transactionType == 'B2B' ? 'B2B Quote' : 'Retail Quote'),
+            if (_readOnly)
+              const ProfessionalBadge(
+                label: 'Read-only',
+                backgroundColor: Color(0xFFF8EEDC),
+                foregroundColor: Color(0xFF7B5416),
+              ),
+          ],
+        ),
+        if ((_error ?? '').isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _QuoteBanner(
+              message: _error!,
+              color: Theme.of(context).colorScheme.errorContainer),
+        ],
+        if ((_info ?? '').isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _QuoteBanner(message: _info!, color: const Color(0xFFE7F0FA)),
+        ],
+        const SizedBox(height: 16),
+        ProfessionalSectionCard(
+          title: 'Quote Header',
+          subtitle:
+              'Keep party, validity, discount, and commercial notes in a standard business form layout.',
+          child: Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children: [
+              SizedBox(
+                width: wide ? 220 : double.infinity,
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey(_transactionType),
+                  initialValue: _transactionType,
+                  decoration: const InputDecoration(labelText: 'Quote Type'),
+                  items: const [
+                    DropdownMenuItem(value: 'B2B', child: Text('B2B')),
+                    DropdownMenuItem(value: 'RETAIL', child: Text('Retail')),
+                  ],
+                  onChanged: (_loading || _readOnly)
+                      ? null
+                      : (value) {
+                          if (value == null) return;
+                          setState(() {
+                            _transactionType = value;
+                            if (_customer != null &&
+                                normalizeSaleTransactionType(
+                                        _customer!.customerType) !=
+                                    value) {
+                              _customer = null;
+                            }
+                          });
+                        },
+                ),
+              ),
+              SizedBox(
+                width: wide ? 360 : double.infinity,
+                child: _QuotePartyBox(
+                  customer: _customer,
+                  label: _transactionType == 'B2B'
+                      ? 'B2B Party'
+                      : 'Retail Customer',
+                  onSelect: (_loading || _readOnly) ? null : _pickCustomer,
+                ),
+              ),
+              SizedBox(
+                width: wide ? 240 : double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: (_loading || _readOnly) ? null : _pickValidUntil,
+                  icon: const Icon(Icons.event_rounded),
+                  label: Text(
+                    _validUntil == null
+                        ? 'Set Valid Until'
+                        : AppDateTime.formatDate(
+                            context, localePrefs, _validUntil),
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: wide ? 220 : double.infinity,
+                child: TextField(
+                  controller: _discountCtrl,
+                  enabled: !_readOnly,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                      labelText: 'Header Discount',
+                      prefixIcon: Icon(Icons.percent_rounded)),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              SizedBox(
+                width: wide ? 480 : double.infinity,
+                child: TextField(
+                  controller: _notesCtrl,
+                  enabled: !_readOnly,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                      labelText: 'Notes / Terms', alignLabelWithHint: true),
+                ),
+              ),
+              if (_convertedSaleId != null)
+                TextButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) =>
+                            SaleDetailPage(saleId: _convertedSaleId!)),
+                  ),
+                  child: const Text('Open Converted Sale'),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        ProfessionalSectionCard(
+          title: 'Quote Lines',
+          subtitle:
+              'Use the same structured line-entry pattern as B2B invoice forms.',
+          action: FilledButton.tonalIcon(
+            onPressed: (_loading || _readOnly) ? null : _addOrReplaceProduct,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Add Item'),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Column(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4F7FB),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: const [
+                      _QuoteHead(label: 'Item', width: 320),
+                      _QuoteHead(label: 'Qty', width: 90),
+                      _QuoteHead(label: 'Price', width: 110),
+                      _QuoteHead(label: 'Disc %', width: 90),
+                      _QuoteHead(label: 'Net', width: 110),
+                      _QuoteHead(label: 'Action', width: 70),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                for (final line in _lines) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: Theme.of(context).colorScheme.outlineVariant),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 320,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(line.displayName,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 8),
+                              OutlinedButton(
+                                onPressed: (_loading || _readOnly)
+                                    ? null
+                                    : () => _addOrReplaceProduct(line),
+                                child:
+                                    Text(line.hasProduct ? 'Change' : 'Select'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        _QuoteNumCell(
+                            controller: line.quantityCtrl,
+                            width: 90,
+                            enabled: !_readOnly,
+                            onChanged: (_) => setState(() {})),
+                        _QuoteNumCell(
+                            controller: line.priceCtrl,
+                            width: 110,
+                            enabled: !_readOnly,
+                            onChanged: (_) => setState(() {})),
+                        _QuoteNumCell(
+                            controller: line.discountCtrl,
+                            width: 90,
+                            enabled: !_readOnly,
+                            onChanged: (_) => setState(() {})),
+                        SizedBox(
+                          width: 110,
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 14),
+                            child: Text(line.lineTotal.toStringAsFixed(2),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w700)),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 70,
+                          child: IconButton(
+                            onPressed: (_loading || _readOnly)
+                                ? null
+                                : () {
+                                    setState(() {
+                                      line.dispose();
+                                      _lines = [..._lines]..remove(line);
+                                      if (_lines.isEmpty) {
+                                        _lines = [_QuoteLine.empty()];
+                                      }
+                                    });
+                                  },
+                            icon: const Icon(Icons.delete_outline_rounded),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+              ],
+            ),
+          ),
+        ),
+        if (!wide) ...[
+          const SizedBox(height: 16),
+          summary,
+        ],
+      ],
+    );
+
+    return Scaffold(
+      appBar: AppBar(title: Text(_isEdit ? 'Quote' : 'New Quote')),
+      body: SafeArea(
+        child: wide
+            ? Row(
+                children: [
+                  Expanded(child: content),
+                  SizedBox(
+                    width: 340,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(0, 16, 16, 16),
+                      child: ListView(children: [summary]),
+                    ),
+                  ),
+                ],
+              )
+            : content,
+      ),
+    );
   }
+}
+
+class _QuoteLine {
+  _QuoteLine({
+    this.productId,
+    this.comboProductId,
+    this.productName,
+    this.variantName,
+    String quantity = '',
+    String price = '',
+    String discount = '0',
+  })  : quantityCtrl = TextEditingController(text: quantity),
+        priceCtrl = TextEditingController(text: price),
+        discountCtrl = TextEditingController(text: discount);
+
+  factory _QuoteLine.empty() => _QuoteLine();
+
+  factory _QuoteLine.fromProduct(PosProductDto product) => _QuoteLine(
+        productId: product.productId > 0 ? product.productId : null,
+        comboProductId: product.comboProductId,
+        productName: product.name,
+        variantName: product.variantName,
+        quantity: '1',
+        price: product.price.toStringAsFixed(2),
+      );
+
+  factory _QuoteLine.fromJson(Map<String, dynamic> json) => _QuoteLine(
+        productId: json['product_id'] as int?,
+        comboProductId: json['combo_product_id'] as int?,
+        productName:
+            (json['product_name'] ?? json['product']?['name'] ?? 'Item')
+                .toString(),
+        variantName: json['variant_name']?.toString(),
+        quantity:
+            ((json['quantity'] as num?)?.toDouble() ?? 0).toStringAsFixed(2),
+        price:
+            ((json['unit_price'] as num?)?.toDouble() ?? 0).toStringAsFixed(2),
+        discount: ((json['discount_percentage'] as num?)?.toDouble() ?? 0)
+            .toStringAsFixed(2),
+      );
+
+  int? productId;
+  int? comboProductId;
+  String? productName;
+  String? variantName;
+  final TextEditingController quantityCtrl;
+  final TextEditingController priceCtrl;
+  final TextEditingController discountCtrl;
+
+  bool get hasProduct => (productId ?? 0) > 0 || (comboProductId ?? 0) > 0;
+  bool get hasValues =>
+      quantityCtrl.text.trim().isNotEmpty ||
+      priceCtrl.text.trim().isNotEmpty ||
+      (productName ?? '').trim().isNotEmpty;
+  double get quantity => double.tryParse(quantityCtrl.text.trim()) ?? 0;
+  double get unitPrice => double.tryParse(priceCtrl.text.trim()) ?? 0;
+  double get discount => double.tryParse(discountCtrl.text.trim()) ?? 0;
+  double get lineTotal =>
+      (quantity * unitPrice) -
+      ((quantity * unitPrice) * (discount.clamp(0.0, 100.0) / 100.0));
+  String get displayName => [
+        (productName ?? '').trim().isEmpty ? null : productName!.trim(),
+        (variantName ?? '').trim().isEmpty ? null : variantName!.trim(),
+      ].whereType<String>().join(' • ').isEmpty
+          ? 'Select product'
+          : [
+              (productName ?? '').trim().isEmpty ? null : productName!.trim(),
+              (variantName ?? '').trim().isEmpty ? null : variantName!.trim(),
+            ].whereType<String>().join(' • ');
+
+  void applyProduct(PosProductDto product) {
+    productId = product.productId > 0 ? product.productId : null;
+    comboProductId = product.comboProductId;
+    productName = product.name;
+    variantName = product.variantName;
+    quantityCtrl.text = '1';
+    priceCtrl.text = product.price.toStringAsFixed(2);
+    discountCtrl.text = '0';
+  }
+
+  Map<String, dynamic> toJson() => {
+        if ((productId ?? 0) > 0) 'product_id': productId,
+        if ((comboProductId ?? 0) > 0) 'combo_product_id': comboProductId,
+        'quantity': quantity,
+        'unit_price': unitPrice,
+        'discount_percentage': discount,
+      };
+
+  void dispose() {
+    quantityCtrl.dispose();
+    priceCtrl.dispose();
+    discountCtrl.dispose();
+  }
+}
+
+class _QuotePartyBox extends StatelessWidget {
+  const _QuotePartyBox(
+      {required this.customer, required this.label, required this.onSelect});
+  final PosCustomerDto? customer;
+  final String label;
+  final VoidCallback? onSelect;
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7FAFD),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFD7E3EF)),
+        ),
+        child: Row(
+          children: [
+            Icon(label == 'B2B Party'
+                ? Icons.business_rounded
+                : Icons.person_rounded),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                customer?.name ?? label,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            FilledButton.tonal(
+                onPressed: onSelect, child: const Text('Select')),
+          ],
+        ),
+      );
+}
+
+class _QuoteHead extends StatelessWidget {
+  const _QuoteHead({required this.label, required this.width});
+  final String label;
+  final double width;
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: width,
+        child: Text(label,
+            style: Theme.of(context)
+                .textTheme
+                .labelLarge
+                ?.copyWith(fontWeight: FontWeight.w800)),
+      );
+}
+
+class _QuoteNumCell extends StatelessWidget {
+  const _QuoteNumCell(
+      {required this.controller,
+      required this.width,
+      required this.enabled,
+      required this.onChanged});
+  final TextEditingController controller;
+  final double width;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: width,
+        child: Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: TextField(
+            controller: controller,
+            enabled: enabled,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: onChanged,
+          ),
+        ),
+      );
+}
+
+class _QuoteBanner extends StatelessWidget {
+  const _QuoteBanner({required this.message, required this.color});
+  final String message;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+            color: color, borderRadius: BorderRadius.circular(16)),
+        child: Text(message, style: Theme.of(context).textTheme.bodyMedium),
+      );
 }

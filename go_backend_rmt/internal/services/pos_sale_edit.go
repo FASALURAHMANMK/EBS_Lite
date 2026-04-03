@@ -17,6 +17,7 @@ type editableSaleHeader struct {
 	LocationID       int
 	Status           string
 	SourceChannel    sql.NullString
+	TransactionType  string
 	RefundSourceSale sql.NullInt64
 	IsTraining       bool
 	CustomerID       sql.NullInt64
@@ -63,6 +64,18 @@ func (s *POSService) EditCompletedSale(companyID, locationID, userID, saleID int
 	if header.LocationID != locationID {
 		return nil, fmt.Errorf("invalid location for sale")
 	}
+	if req.TransactionType != nil {
+		requestedType := normalizeTransactionType(*req.TransactionType)
+		if requestedType == "" {
+			return nil, fmt.Errorf("invalid transaction_type")
+		}
+		if requestedType != normalizeTransactionType(header.TransactionType) {
+			return nil, fmt.Errorf("transaction_type mismatch for sale edit")
+		}
+	}
+	if normalizeTransactionType(header.TransactionType) == "B2B" && req.CustomerID == nil {
+		return nil, fmt.Errorf("b2b transactions require customer_id")
+	}
 	if !strings.EqualFold(header.Status, "COMPLETED") {
 		return nil, fmt.Errorf("only completed sales can be edited")
 	}
@@ -83,6 +96,7 @@ func (s *POSService) EditCompletedSale(companyID, locationID, userID, saleID int
 	}
 
 	saleReq := &models.CreateSaleRequest{
+		TransactionType:  &header.TransactionType,
 		CustomerID:       req.CustomerID,
 		Items:            req.Items,
 		PaymentMethodID:  req.PaymentMethodID,
@@ -295,7 +309,7 @@ func (s *POSService) EditCompletedSale(companyID, locationID, userID, saleID int
 func (s *POSService) loadEditableSaleHeaderTx(tx *sql.Tx, companyID, saleID int) (*editableSaleHeader, error) {
 	var header editableSaleHeader
 	err := tx.QueryRow(`
-		SELECT s.sale_number, s.location_id, s.status, s.source_channel, s.refund_source_sale_id,
+		SELECT s.sale_number, s.location_id, s.status, s.source_channel, COALESCE(s.transaction_type, 'RETAIL'), s.refund_source_sale_id,
 		       COALESCE(s.is_training, FALSE), s.customer_id, s.total_amount, s.paid_amount,
 		       s.payment_method_id, s.notes, s.updated_at
 		FROM sales s
@@ -307,6 +321,7 @@ func (s *POSService) loadEditableSaleHeaderTx(tx *sql.Tx, companyID, saleID int)
 		&header.LocationID,
 		&header.Status,
 		&header.SourceChannel,
+		&header.TransactionType,
 		&header.RefundSourceSale,
 		&header.IsTraining,
 		&header.CustomerID,

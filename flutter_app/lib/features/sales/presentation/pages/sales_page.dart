@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ebs_lite/shared/widgets/feature_menu.dart';
 import 'package:ebs_lite/features/pos/presentation/pages/pos_page.dart';
+import 'package:ebs_lite/features/pos/controllers/pos_notifier.dart';
 import 'package:ebs_lite/features/promotions/presentation/pages/promotions_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/sales_history_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/sales_returns_page.dart';
@@ -8,18 +10,23 @@ import 'package:ebs_lite/features/sales/presentation/pages/invoices_page.dart';
 import 'b2b_party_management_page.dart';
 import 'quotes_page.dart';
 
-class SalesPage extends StatelessWidget {
+class SalesPage extends ConsumerWidget {
   const SalesPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final items = [
       FeatureItem(
         icon: Icons.point_of_sale_rounded,
         label: 'New Sale',
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const PosPage()),
-        ),
+        onTap: () {
+          ref
+              .read(posNotifierProvider.notifier)
+              .startNewSaleSession(transactionType: 'RETAIL');
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const PosPage()),
+          );
+        },
       ),
       FeatureItem(
         icon: Icons.receipt_long_rounded,

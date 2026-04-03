@@ -13,6 +13,7 @@ import '../../../pos/data/models.dart';
 import '../../../pos/data/pos_repository.dart';
 import '../../../pos/presentation/pages/pos_page.dart';
 import '../../data/sales_repository.dart';
+import 'b2b_invoice_form_page.dart';
 import 'sale_detail_page.dart';
 import 'sales_returns_page.dart';
 import '../utils/invoice_actions.dart';
@@ -283,11 +284,17 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
 
     setState(() => _actionBusy = true);
     try {
-      ref.read(posNotifierProvider.notifier).loadInvoiceEditSession(sale);
-      if (!mounted) return;
-      await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const PosPage()),
-      );
+      if (sale.isB2B) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => B2BInvoiceFormPage(sale: sale)),
+        );
+      } else {
+        ref.read(posNotifierProvider.notifier).loadInvoiceEditSession(sale);
+        if (!mounted) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const PosPage()),
+        );
+      }
       if (!mounted) return;
       await _reloadSelection();
     } catch (error) {
@@ -946,8 +953,13 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
           IconButton(
             tooltip: 'New Sale',
             icon: const Icon(Icons.point_of_sale_rounded),
-            onPressed: () => Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => const PosPage())),
+            onPressed: () {
+              ref
+                  .read(posNotifierProvider.notifier)
+                  .startNewSaleSession(transactionType: 'RETAIL');
+              Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => const PosPage()));
+            },
           ),
           IconButton(
             tooltip: 'Refresh',
@@ -977,25 +989,11 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      if (isDesktop)
-                        SizedBox(
-                          width: 320,
-                          child: TextField(
-                            controller: _search,
-                            decoration: const InputDecoration(
-                              hintText: 'Search invoice # or customer',
-                              prefixIcon: Icon(Icons.search_rounded),
-                            ),
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        )
-                      else
-                        Expanded(
+              child: isDesktop
+                  ? Row(
+                      children: [
+                        Flexible(
+                          fit: FlexFit.tight,
                           child: TextField(
                             controller: _search,
                             decoration: const InputDecoration(
@@ -1005,97 +1003,210 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                             onChanged: (_) => setState(() {}),
                           ),
                         ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        tooltip: _dateRange == null
-                            ? 'Filter by date range'
-                            : 'Date: ${AppDateTime.formatDate(context, localePrefs, _dateRange!.start)} → ${AppDateTime.formatDate(context, localePrefs, _dateRange!.end)}',
-                        icon: Icon(
-                          Icons.calendar_month_rounded,
-                          color: _dateRange != null
-                              ? theme.colorScheme.primary
-                              : null,
+                        const SizedBox(width: 8),
+                        IconButton(
+                          tooltip: _dateRange == null
+                              ? 'Filter by date range'
+                              : 'Date: ${AppDateTime.formatDate(context, localePrefs, _dateRange!.start)} → ${AppDateTime.formatDate(context, localePrefs, _dateRange!.end)}',
+                          icon: Icon(
+                            Icons.calendar_month_rounded,
+                            color: _dateRange != null
+                                ? theme.colorScheme.primary
+                                : null,
+                          ),
+                          onPressed: _pickDateRange,
+                          onLongPress: () async {
+                            if (_dateRange != null) {
+                              setState(() => _dateRange = null);
+                              await _load();
+                            }
+                          },
                         ),
-                        onPressed: _pickDateRange,
-                        onLongPress: () async {
-                          if (_dateRange != null) {
-                            setState(() => _dateRange = null);
-                            await _load();
-                          }
-                        },
-                      ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        tooltip: _selectedCustomers.isEmpty
-                            ? 'Filter by customers'
-                            : 'Customers: ${_selectedCustomers.length}',
-                        icon: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Icon(
-                              Icons.group_rounded,
-                              color: _selectedCustomers.isNotEmpty
+                        const SizedBox(width: 4),
+                        IconButton(
+                          tooltip: _selectedCustomers.isEmpty
+                              ? 'Filter by customers'
+                              : 'Customers: ${_selectedCustomers.length}',
+                          icon: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Icon(
+                                Icons.group_rounded,
+                                color: _selectedCustomers.isNotEmpty
+                                    ? theme.colorScheme.primary
+                                    : null,
+                              ),
+                              if (_selectedCustomers.isNotEmpty)
+                                Positioned(
+                                  right: -2,
+                                  top: -2,
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          onPressed: _pickCustomers,
+                          onLongPress: () async {
+                            if (_selectedCustomers.isNotEmpty) {
+                              setState(() => _selectedCustomers = const []);
+                              await _load();
+                            }
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          fit: FlexFit.loose,
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _HistoryFilterCheckbox(
+                                    label: 'B2B Sales',
+                                    value: _showB2BSales,
+                                    onChanged: (value) =>
+                                        setState(() => _showB2BSales = value),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _HistoryFilterCheckbox(
+                                    label: 'B2B Returns',
+                                    value: _showB2BReturns,
+                                    onChanged: (value) => setState(
+                                      () => _showB2BReturns = value,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _HistoryFilterCheckbox(
+                                    label: 'B2C Sales',
+                                    value: _showB2CSales,
+                                    onChanged: (value) =>
+                                        setState(() => _showB2CSales = value),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _HistoryFilterCheckbox(
+                                    label: 'B2C Returns',
+                                    value: _showB2CReturns,
+                                    onChanged: (value) => setState(
+                                      () => _showB2CReturns = value,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 280,
+                            child: TextField(
+                              controller: _search,
+                              decoration: const InputDecoration(
+                                hintText: 'Search invoice # or customer',
+                                prefixIcon: Icon(Icons.search_rounded),
+                              ),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            tooltip: _dateRange == null
+                                ? 'Filter by date range'
+                                : 'Date: ${AppDateTime.formatDate(context, localePrefs, _dateRange!.start)} → ${AppDateTime.formatDate(context, localePrefs, _dateRange!.end)}',
+                            icon: Icon(
+                              Icons.calendar_month_rounded,
+                              color: _dateRange != null
                                   ? theme.colorScheme.primary
                                   : null,
                             ),
-                            if (_selectedCustomers.isNotEmpty)
-                              Positioned(
-                                right: -2,
-                                top: -2,
-                                child: Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.primary,
-                                    shape: BoxShape.circle,
-                                  ),
+                            onPressed: _pickDateRange,
+                            onLongPress: () async {
+                              if (_dateRange != null) {
+                                setState(() => _dateRange = null);
+                                await _load();
+                              }
+                            },
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            tooltip: _selectedCustomers.isEmpty
+                                ? 'Filter by customers'
+                                : 'Customers: ${_selectedCustomers.length}',
+                            icon: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Icon(
+                                  Icons.group_rounded,
+                                  color: _selectedCustomers.isNotEmpty
+                                      ? theme.colorScheme.primary
+                                      : null,
                                 ),
-                              ),
-                          ],
-                        ),
-                        onPressed: _pickCustomers,
-                        onLongPress: () async {
-                          if (_selectedCustomers.isNotEmpty) {
-                            setState(() => _selectedCustomers = const []);
-                            await _load();
-                          }
-                        },
+                                if (_selectedCustomers.isNotEmpty)
+                                  Positioned(
+                                    right: -2,
+                                    top: -2,
+                                    child: Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: theme.colorScheme.primary,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            onPressed: _pickCustomers,
+                            onLongPress: () async {
+                              if (_selectedCustomers.isNotEmpty) {
+                                setState(() => _selectedCustomers = const []);
+                                await _load();
+                              }
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          _HistoryFilterCheckbox(
+                            label: 'B2B Sales',
+                            value: _showB2BSales,
+                            onChanged: (value) =>
+                                setState(() => _showB2BSales = value),
+                          ),
+                          const SizedBox(width: 8),
+                          _HistoryFilterCheckbox(
+                            label: 'B2B Returns',
+                            value: _showB2BReturns,
+                            onChanged: (value) =>
+                                setState(() => _showB2BReturns = value),
+                          ),
+                          const SizedBox(width: 8),
+                          _HistoryFilterCheckbox(
+                            label: 'B2C Sales',
+                            value: _showB2CSales,
+                            onChanged: (value) =>
+                                setState(() => _showB2CSales = value),
+                          ),
+                          const SizedBox(width: 8),
+                          _HistoryFilterCheckbox(
+                            label: 'B2C Returns',
+                            value: _showB2CReturns,
+                            onChanged: (value) =>
+                                setState(() => _showB2CReturns = value),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _HistoryFilterCheckbox(
-                        label: 'B2B Sales',
-                        value: _showB2BSales,
-                        onChanged: (value) =>
-                            setState(() => _showB2BSales = value),
-                      ),
-                      _HistoryFilterCheckbox(
-                        label: 'B2B Returns',
-                        value: _showB2BReturns,
-                        onChanged: (value) =>
-                            setState(() => _showB2BReturns = value),
-                      ),
-                      _HistoryFilterCheckbox(
-                        label: 'B2C Sales',
-                        value: _showB2CSales,
-                        onChanged: (value) =>
-                            setState(() => _showB2CSales = value),
-                      ),
-                      _HistoryFilterCheckbox(
-                        label: 'B2C Returns',
-                        value: _showB2CReturns,
-                        onChanged: (value) =>
-                            setState(() => _showB2CReturns = value),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
             ),
             Expanded(
               child: documents.isEmpty

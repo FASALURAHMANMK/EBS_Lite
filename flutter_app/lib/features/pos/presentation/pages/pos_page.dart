@@ -32,12 +32,18 @@ class PosPage extends ConsumerWidget {
     final state = ref.watch(posNotifierProvider);
     final notifier = ref.read(posNotifierProvider.notifier);
     final loc = ref.watch(locationNotifierProvider).selected;
+    final documentLabel = state.isB2B ? 'Invoice' : 'Receipt';
+    final customerLabel = state.isB2B ? 'B2B Party' : 'Customer';
 
     return Scaffold(
       appBar: AppBar(
         leadingWidth: isWide ? 104 : null,
         leading: isWide ? const DesktopSidebarToggleLeading() : null,
-        title: Text(state.isEditingSale ? 'Edit Sale' : 'New Sale'),
+        title: Text(
+          state.isEditingSale
+              ? (state.isB2B ? 'Edit B2B Invoice' : 'Edit Sale')
+              : (state.isB2B ? 'New B2B Invoice' : 'New Sale'),
+        ),
         centerTitle: true,
         actions: [
           IconButton(
@@ -68,7 +74,7 @@ class PosPage extends ConsumerWidget {
                                 ? (state.committedReceipt ?? '-')
                                 : (state.receiptPreview ?? '-');
                         return Text(
-                          'Receipt # $display',
+                          '$documentLabel # $display',
                           style: Theme.of(context).textTheme.titleMedium,
                         );
                       }),
@@ -82,12 +88,14 @@ class PosPage extends ConsumerWidget {
                   onPressed: () async {
                     final picked = await showDialog<PosCustomerDto>(
                       context: context,
-                      builder: (_) => const CustomerSelectorDialog(),
+                      builder: (_) => CustomerSelectorDialog(
+                        transactionType: state.transactionType,
+                      ),
                     );
                     if (picked != null) notifier.setCustomer(picked);
                   },
                   icon: const Icon(Icons.person_search_rounded),
-                  label: const Text('Customer'),
+                  label: Text(customerLabel),
                 )
               ],
             ),
@@ -97,7 +105,7 @@ class PosPage extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12.0),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text('Customer: ${state.customerLabel}'),
+              child: Text('$customerLabel: ${state.customerLabel}'),
             ),
           ),
           if ((state.sessionSourceSaleNumber ?? '').isNotEmpty)
@@ -834,6 +842,18 @@ class _BottomBar extends ConsumerWidget {
                   onPressed: state.cart.isEmpty
                       ? null
                       : () async {
+                          if (state.isB2B && state.customer == null) {
+                            ScaffoldMessenger.of(context)
+                              ..hideCurrentSnackBar()
+                              ..showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Select a B2B party before payment.',
+                                  ),
+                                ),
+                              );
+                            return;
+                          }
                           if (state.cart.any((e) => !e.hasTrackingConfigured)) {
                             ScaffoldMessenger.of(context)
                               ..hideCurrentSnackBar()

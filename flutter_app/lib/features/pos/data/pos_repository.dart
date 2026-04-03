@@ -363,6 +363,7 @@ class PosRepository {
   }
 
   Future<PosCheckoutResult> checkout({
+    String transactionType = 'RETAIL',
     int? customerId,
     required List<PosCartItem> items,
     int? paymentMethodId,
@@ -403,6 +404,7 @@ class PosRepository {
       if (saleId != null) 'sale_id': saleId,
       if (saleNumber != null && saleNumber.isNotEmpty)
         'sale_number': saleNumber,
+      'transaction_type': normalizeSaleTransactionType(transactionType),
       if (customerId != null) 'customer_id': customerId,
       'items': items.map(_saleItemPayload).toList(),
       if (paymentMethodId != null) 'payment_method_id': paymentMethodId,
@@ -491,12 +493,14 @@ class PosRepository {
 
   Future<PosCheckoutResult> editSale({
     required SaleDto baseline,
+    String? transactionType,
     int? customerId,
     required List<PosCartItem> items,
     int? paymentMethodId,
     required double paidAmount,
     double discountAmount = 0.0,
     List<PosPaymentLineDto>? payments,
+    String? notes,
     String? salesActionPassword,
     String? overridePassword,
     String? managerOverrideToken,
@@ -539,6 +543,8 @@ class PosRepository {
 
     final payload = {
       'baseline_updated_at': baselineUpdatedAt.toUtc().toIso8601String(),
+      'transaction_type': normalizeSaleTransactionType(
+          transactionType ?? baseline.transactionType),
       if (customerId != null) 'customer_id': customerId,
       'items': items.map(_saleItemPayload).toList(),
       if (paymentMethodId != null) 'payment_method_id': paymentMethodId,
@@ -546,6 +552,7 @@ class PosRepository {
       'discount_amount': discountAmount,
       if (payments != null && payments.isNotEmpty)
         'payments': payments.map((p) => p.toJson()).toList(),
+      if (notes != null) 'notes': notes,
       if (managerOverrideToken != null &&
           managerOverrideToken.trim().isNotEmpty)
         'manager_override_token': managerOverrideToken.trim(),
@@ -611,6 +618,7 @@ class PosRepository {
   }
 
   Future<PosCheckoutResult> holdSale({
+    String transactionType = 'RETAIL',
     int? customerId,
     required List<PosCartItem> items,
     double discountAmount = 0.0,
@@ -621,6 +629,7 @@ class PosRepository {
       throw Exception('Select a location first');
     }
     final payload = {
+      'transaction_type': normalizeSaleTransactionType(transactionType),
       if (customerId != null) 'customer_id': customerId,
       'items': items.map(_saleItemPayload).toList(),
       'paid_amount': 0,

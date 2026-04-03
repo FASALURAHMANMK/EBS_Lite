@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../../../shared/widgets/app_selection_dialog.dart';
+import '../../../../shared/widgets/sales_action_password_dialog.dart';
+import '../../../dashboard/controllers/location_notifier.dart';
 import '../../../dashboard/data/payment_methods_repository.dart';
 import '../../../inventory/data/inventory_repository.dart';
 import '../../../inventory/data/models.dart';
@@ -10,35 +12,100 @@ import '../../../inventory/presentation/widgets/inventory_tracking_selector.dart
 import '../../../pos/data/models.dart';
 import '../../../pos/data/pos_repository.dart';
 import '../../data/sales_repository.dart';
+import '../widgets/professional_document_widgets.dart';
 import 'sale_detail_page.dart';
 
 class B2BInvoiceFormPage extends ConsumerStatefulWidget {
-  const B2BInvoiceFormPage({super.key});
+  const B2BInvoiceFormPage(
+      {super.key, this.sale, this.exchangeItems = const []});
+
+  final SaleDto? sale;
+  final List<SaleItemDto> exchangeItems;
+
+  bool get isEdit => sale != null && exchangeItems.isEmpty;
+  bool get isExchange => sale != null && exchangeItems.isNotEmpty;
 
   @override
   ConsumerState<B2BInvoiceFormPage> createState() => _B2BInvoiceFormPageState();
 }
 
 class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
-  final _discount = TextEditingController(text: '0');
-  final _paid = TextEditingController(text: '0');
-  final _notes = TextEditingController();
+  final _discountCtrl = TextEditingController(text: '0');
+  final _paidCtrl = TextEditingController(text: '0');
+  final _notesCtrl = TextEditingController();
 
   PosCustomerDto? _customer;
   PaymentMethodDto? _paymentMethod;
-  final List<_InvoiceLine> _lines = [_InvoiceLine()];
+  List<_InvoiceLine> _lines = [_InvoiceLine.empty()];
   bool _saving = false;
+  String? _error;
+  String? _info;
+
+  @override
+  void initState() {
+    super.initState();
+    final sale = widget.sale;
+    if (sale != null) {
+      _customer =
+          sale.customerId != null && (sale.customerName ?? '').trim().isNotEmpty
+              ? PosCustomerDto(
+                  customerId: sale.customerId!,
+                  name: sale.customerName!,
+                  customerType: 'B2B')
+              : null;
+      if (sale.paymentMethodId != null &&
+          (sale.paymentMethodName ?? '').trim().isNotEmpty) {
+        _paymentMethod = PaymentMethodDto(
+          methodId: sale.paymentMethodId!,
+          name: sale.paymentMethodName!,
+          type: 'OTHER',
+          isActive: true,
+        );
+      }
+      _discountCtrl.text = sale.discountAmount.toStringAsFixed(2);
+      _paidCtrl.text = sale.paidAmount.toStringAsFixed(2);
+      _notesCtrl.text = sale.notes ?? '';
+      if (widget.isEdit) {
+        _lines = sale.items
+            .where((e) =>
+                ((e.productId ?? 0) > 0 || (e.comboProductId ?? 0) > 0) &&
+                e.quantity > 0)
+            .map(_InvoiceLine.fromSaleItem)
+            .toList();
+        if (_lines.isEmpty) _lines = [_InvoiceLine.empty()];
+        _info = 'Editing ${sale.saleNumber} in a document-style B2B form.';
+      } else if (widget.isExchange) {
+        _lines = widget.exchangeItems
+            .map((e) => _InvoiceLine.fromExchangeItem(sale, e))
+            .toList();
+        _lines.add(_InvoiceLine.empty());
+        _paidCtrl.text = '0';
+        _info =
+            'Exchange draft for ${sale.saleNumber}. Refund and replacement lines stay in one business document.';
+      }
+    }
+  }
 
   @override
   void dispose() {
-    _discount.dispose();
-    _paid.dispose();
-    _notes.dispose();
+    _discountCtrl.dispose();
+    _paidCtrl.dispose();
+    _notesCtrl.dispose();
     for (final line in _lines) {
       line.dispose();
     }
     super.dispose();
   }
+
+  String get _title => widget.isEdit
+      ? 'Edit B2B Invoice'
+      : widget.isExchange
+          ? 'B2B Exchange Invoice'
+          : 'New B2B Invoice';
+
+  List<_InvoiceLine> get _activeLines => _lines
+      .where((e) => e.hasProduct && e.unitPrice > 0 && e.quantity != 0)
+      .toList(growable: false);
 
   Future<void> _pickCustomer() async {
     final result = await showDialog<PosCustomerDto>(
@@ -49,17 +116,13 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
         List<PosCustomerDto> results = const [];
         bool loading = true;
         bool kickoff = true;
-
         return StatefulBuilder(
           builder: (context, setStateDialog) {
-            Future<void> doSearch(String query) async {
+            Future<void> doSearch(String q) async {
               loading = true;
               setStateDialog(() {});
               try {
-                results = await repo.searchCustomers(
-                  query,
-                  customerType: 'B2B',
-                );
+                results = await repo.searchCustomers(q, customerType: 'B2B');
               } finally {
                 loading = false;
                 setStateDialog(() {});
@@ -73,27 +136,23 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
 
             return AppSelectionDialog(
               title: 'Select B2B Party',
-              maxWidth: 480,
+              maxWidth: 520,
               loading: loading,
               searchField: TextField(
                 controller: controller,
-                decoration: InputDecoration(
-                  hintText: 'Search parties',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.search_rounded),
-                    onPressed: () => doSearch(controller.text.trim()),
-                  ),
+                decoration: const InputDecoration(
+                  hintText: 'Search B2B parties',
+                  prefixIcon: Icon(Icons.search_rounded),
                 ),
-                onChanged: (value) => doSearch(value.trim()),
-                onSubmitted: (value) => doSearch(value.trim()),
+                onChanged: (v) => doSearch(v.trim()),
+                onSubmitted: (v) => doSearch(v.trim()),
               ),
               body: results.isEmpty && !loading
                   ? const Center(child: Text('No B2B parties found'))
                   : ListView.builder(
                       itemCount: results.length,
-                      itemBuilder: (context, index) {
-                        final item = results[index];
+                      itemBuilder: (context, i) {
+                        final item = results[i];
                         return ListTile(
                           title: Text(item.name),
                           subtitle: Text(
@@ -110,19 +169,15 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
                     ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(null),
-                  child: const Text('Cancel'),
-                ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel')),
               ],
             );
           },
         );
       },
     );
-
-    if (result != null) {
-      setState(() => _customer = result);
-    }
+    if (result != null && mounted) setState(() => _customer = result);
   }
 
   Future<void> _pickPaymentMethod() async {
@@ -141,112 +196,202 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
         ],
       ),
     );
-    if (result != null) {
-      setState(() => _paymentMethod = result);
-    }
+    if (result != null && mounted) setState(() => _paymentMethod = result);
+  }
+
+  Future<InventoryListItem?> _pickProduct() async {
+    return showDialog<InventoryListItem>(
+      context: context,
+      builder: (context) {
+        final repo = ref.read(inventoryRepositoryProvider);
+        final controller = TextEditingController();
+        List<InventoryListItem> results = const [];
+        bool loading = true;
+        bool kickoff = true;
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            Future<void> doSearch(String q) async {
+              loading = true;
+              setStateDialog(() {});
+              try {
+                results = await repo.searchProducts(q);
+              } finally {
+                loading = false;
+                setStateDialog(() {});
+              }
+            }
+
+            if (kickoff) {
+              kickoff = false;
+              Future.microtask(() => doSearch(''));
+            }
+
+            return AppSelectionDialog(
+              title: 'Add Product',
+              maxWidth: 640,
+              loading: loading,
+              searchField: TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  hintText: 'Search products / variants / barcode',
+                  prefixIcon: Icon(Icons.search_rounded),
+                ),
+                onChanged: (v) => doSearch(v.trim()),
+                onSubmitted: (v) => doSearch(v.trim()),
+              ),
+              body: results.isEmpty && !loading
+                  ? const Center(child: Text('No products found'))
+                  : ListView.builder(
+                      itemCount: results.length,
+                      itemBuilder: (context, i) {
+                        final item = results[i];
+                        return ListTile(
+                          title: Text(item.name),
+                          subtitle: Text([
+                            if ((item.variantName ?? '').trim().isNotEmpty)
+                              item.variantName!,
+                            'Stock ${item.stock.toStringAsFixed(2)}',
+                            'Price ${(item.price ?? 0).toStringAsFixed(2)}',
+                          ].join(' • ')),
+                          onTap: () => Navigator.of(context).pop(item),
+                        );
+                      },
+                    ),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel')),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _addOrReplaceProduct([_InvoiceLine? target]) async {
+    final picked = await _pickProduct();
+    if (picked == null || !mounted) return;
+    setState(() {
+      if (target != null) {
+        target.applyProduct(picked);
+        return;
+      }
+      final blankIndex =
+          _lines.indexWhere((e) => !e.hasProduct && !e.hasValues);
+      if (blankIndex >= 0) {
+        _lines[blankIndex].applyProduct(picked);
+      } else {
+        _lines = [..._lines, _InvoiceLine.fromInventory(picked)];
+      }
+    });
   }
 
   Future<void> _configureTracking(_InvoiceLine line) async {
-    final product = line.product;
-    if (product == null) return;
-    final qty = double.tryParse(line.quantity.text.trim()) ?? 0;
+    if (!line.requiresTracking || (line.productId ?? 0) <= 0) return;
+    final qty = line.quantity.abs();
     if (qty <= 0) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('Enter quantity first')),
-        );
+      setState(() => _error = 'Enter quantity first for ${line.displayName}.');
       return;
     }
     final selection = await showInventoryTrackingSelector(
       context: context,
       ref: ref,
-      productId: product.productId,
-      productName: product.name,
+      productId: line.productId!,
+      productName: line.displayName,
       quantity: qty,
       mode: InventoryTrackingMode.issue,
       initialSelection: line.tracking,
     );
-    if (selection != null && mounted) {
-      setState(() => line.tracking = selection);
-    }
+    if (selection != null && mounted) setState(() => line.tracking = selection);
   }
 
-  Future<void> _save() async {
+  Future<void> _submit() async {
     final customer = _customer;
     if (customer == null) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('Select a B2B party')),
-        );
+      setState(() => _error = 'Select a B2B party before saving.');
       return;
     }
-
-    final items = <Map<String, dynamic>>[];
-    for (final line in _lines) {
-      final product = line.product;
-      if (product == null) continue;
-      final quantity = double.tryParse(line.quantity.text.trim()) ?? 0;
-      final unitPrice = double.tryParse(line.unitPrice.text.trim()) ?? 0;
-      if (quantity <= 0 || unitPrice <= 0) continue;
-      final requiresTracking =
-          product.trackingType == 'BATCH' || product.trackingType == 'SERIAL';
-      if (requiresTracking && line.tracking == null) {
-        throw StateError(
-          'Configure inventory tracking for ${product.name}',
-        );
+    final lines = _activeLines;
+    if (lines.isEmpty) {
+      setState(() => _error = 'Add at least one invoice line.');
+      return;
+    }
+    for (final line in lines) {
+      if (line.requiresTracking && line.tracking == null) {
+        setState(() => _error = 'Configure tracking for ${line.displayName}.');
+        return;
       }
-      items.add({
-        'product_id': product.productId,
-        if (product.barcodeId != null) 'barcode_id': product.barcodeId,
-        'quantity': quantity,
-        'unit_price': unitPrice,
-        if (line.tracking != null) ...line.tracking!.toIssueJson(),
-      });
     }
-
-    if (items.isEmpty) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('Add at least one invoice item')),
-        );
-      return;
-    }
-
-    final paidAmount = double.tryParse(_paid.text.trim()) ?? 0;
+    final paidAmount = double.tryParse(_paidCtrl.text.trim()) ?? 0;
     if (paidAmount > 0 && _paymentMethod == null) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Select a payment method for paid amount'),
-          ),
-        );
+      setState(() =>
+          _error = 'Select a payment method when paid amount is entered.');
       return;
     }
 
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
+      if (widget.isEdit) {
+        final salesActionPassword = await showSalesActionPasswordDialog(
+          context,
+          title: 'Authorize Invoice Edit',
+          message:
+              'Enter the separate edit/refund PIN or password configured for your user.',
+          actionLabel: 'Authorize',
+        );
+        if (!mounted || salesActionPassword == null) return;
+        final result = await ref.read(posRepositoryProvider).editSale(
+              baseline: widget.sale!,
+              transactionType: 'B2B',
+              customerId: customer.customerId,
+              items:
+                  lines.map((e) => e.toPosCartItem()).toList(growable: false),
+              paymentMethodId: _paymentMethod?.methodId,
+              paidAmount: paidAmount,
+              discountAmount: double.tryParse(_discountCtrl.text.trim()) ?? 0,
+              notes: _notesCtrl.text.trim(),
+              salesActionPassword: salesActionPassword,
+            );
+        if (!mounted) return;
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+              builder: (_) => SaleDetailPage(saleId: result.saleId)),
+        );
+        return;
+      }
+
+      String? overridePassword;
+      if (lines.any((e) => e.quantity < 0)) {
+        overridePassword = await showSalesActionPasswordDialog(
+          context,
+          title: 'Authorize Refund Lines',
+          message:
+              'Enter the separate edit/refund PIN or password configured for your user.',
+          actionLabel: 'Authorize',
+        );
+        if (!mounted || overridePassword == null) return;
+      }
+
       final saleId = await ref.read(salesRepositoryProvider).createInvoice(
             customerId: customer.customerId,
-            items: items,
+            items: lines.map((e) => e.toCreateJson()).toList(growable: false),
             paymentMethodId: _paymentMethod?.methodId,
             paidAmount: paidAmount,
-            discountAmount: double.tryParse(_discount.text.trim()) ?? 0,
-            notes: _notes.text.trim(),
+            discountAmount: double.tryParse(_discountCtrl.text.trim()) ?? 0,
+            notes: _notesCtrl.text.trim(),
             transactionType: 'B2B',
+            overridePassword: overridePassword,
           );
       if (!mounted) return;
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => SaleDetailPage(saleId: saleId)),
       );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(error))));
+    } catch (e) {
+      if (mounted) setState(() => _error = ErrorHandler.message(e));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -254,277 +399,592 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('New B2B Invoice')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.business_rounded),
-              title: Text(_customer?.name ?? 'Select B2B Party'),
-              subtitle: Text(
-                [
-                  if ((_customer?.contactPerson ?? '').isNotEmpty)
-                    _customer!.contactPerson!,
-                  if ((_customer?.phone ?? '').isNotEmpty) _customer!.phone!,
-                ].join(' • '),
+    final wide = MediaQuery.of(context).size.width >= 1080;
+    final location = ref.watch(locationNotifierProvider).selected;
+    final lines = _activeLines;
+    final lineNet = lines.fold<double>(0, (sum, line) => sum + line.lineTotal);
+    final discount = double.tryParse(_discountCtrl.text.trim()) ?? 0;
+    final paid = double.tryParse(_paidCtrl.text.trim()) ?? 0;
+    final total = lineNet - discount;
+    final summary = ProfessionalSummaryCard(
+      title: 'Document Summary',
+      rows: [
+        (label: 'Active Lines', value: '${lines.length}', emphasize: false),
+        (
+          label: 'Line Net',
+          value: lineNet.toStringAsFixed(2),
+          emphasize: false
+        ),
+        (
+          label: 'Header Discount',
+          value: discount.toStringAsFixed(2),
+          emphasize: false
+        ),
+        (
+          label: 'Paid Amount',
+          value: paid.toStringAsFixed(2),
+          emphasize: false
+        ),
+        (
+          label: 'Estimated Total',
+          value: total.toStringAsFixed(2),
+          emphasize: true
+        ),
+        (
+          label: 'Balance',
+          value: (total - paid).toStringAsFixed(2),
+          emphasize: true
+        ),
+      ],
+      footer: SizedBox(
+        width: double.infinity,
+        child: FilledButton.icon(
+          onPressed: _saving ? null : _submit,
+          icon: Icon(widget.isEdit
+              ? Icons.save_as_rounded
+              : Icons.receipt_long_rounded),
+          label: Text(
+            _saving
+                ? 'Saving...'
+                : widget.isEdit
+                    ? 'Save Invoice Changes'
+                    : widget.isExchange
+                        ? 'Create Exchange Invoice'
+                        : 'Create B2B Invoice',
+          ),
+        ),
+      ),
+    );
+
+    final content = ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        ProfessionalDocumentHeader(
+          title: _title,
+          subtitle: widget.isExchange
+              ? 'Use a proper business document for B2B refund and replacement work instead of the POS checkout surface.'
+              : 'Structured B2B invoice entry with party selection, commercial terms, dense line rows, and a business-document summary.',
+          badges: [
+            const ProfessionalBadge(label: 'B2B Document'),
+            if (widget.isEdit)
+              const ProfessionalBadge(
+                label: 'Edit Mode',
+                backgroundColor: Color(0xFFF8EEDC),
+                foregroundColor: Color(0xFF7B5416),
               ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: _pickCustomer,
-            ),
-            const SizedBox(height: 12),
-            ..._lines.asMap().entries.map((entry) {
-              final index = entry.key;
-              final line = entry.value;
-              final requiresTracking = line.product != null &&
-                  (line.product!.trackingType == 'BATCH' ||
-                      line.product!.trackingType == 'SERIAL');
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Card(
-                  elevation: 0,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
+            if (widget.isExchange)
+              const ProfessionalBadge(
+                label: 'Exchange Draft',
+                backgroundColor: Color(0xFFFDE8E4),
+                foregroundColor: Color(0xFF8A3E31),
+              ),
+            if (location != null)
+              ProfessionalBadge(
+                label: 'Location: ${location.name}',
+                backgroundColor: const Color(0xFFE8F3EC),
+                foregroundColor: const Color(0xFF255C35),
+              ),
+          ],
+        ),
+        if ((_error ?? '').isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _Banner(
+              message: _error!,
+              color: Theme.of(context).colorScheme.errorContainer),
+        ],
+        if ((_info ?? '').isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _Banner(message: _info!, color: const Color(0xFFE7F0FA)),
+        ],
+        const SizedBox(height: 16),
+        ProfessionalSectionCard(
+          title: 'Party & Terms',
+          subtitle:
+              'Keep party identity, payment collection, and document notes in one structured section.',
+          child: Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children: [
+              SizedBox(
+                width: wide ? 360 : double.infinity,
+                child: _PartyBox(
+                    customer: _customer,
+                    onSelect: _saving ? null : _pickCustomer),
+              ),
+              SizedBox(
+                width: wide ? 220 : double.infinity,
+                child: TextField(
+                  controller: _discountCtrl,
+                  enabled: !_saving,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                      labelText: 'Header Discount',
+                      prefixIcon: Icon(Icons.percent_rounded)),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              SizedBox(
+                width: wide ? 220 : double.infinity,
+                child: TextField(
+                  controller: _paidCtrl,
+                  enabled: !_saving,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                      labelText: 'Paid Amount',
+                      prefixIcon: Icon(Icons.payments_outlined)),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              SizedBox(
+                width: wide ? 260 : double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _saving ? null : _pickPaymentMethod,
+                  icon: const Icon(Icons.account_balance_wallet_outlined),
+                  label: Text(
+                    _paymentMethod == null
+                        ? 'Select Payment Method'
+                        : 'Payment: ${_paymentMethod!.name}',
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: wide ? 480 : double.infinity,
+                child: TextField(
+                  controller: _notesCtrl,
+                  enabled: !_saving,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: widget.sale == null
+                        ? 'Notes / Internal Remarks'
+                        : 'Notes / Internal Remarks ${widget.sale!.saleNumber.isNotEmpty ? "for ${widget.sale!.saleNumber}" : ""}',
+                    alignLabelWithHint: true,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        ProfessionalSectionCard(
+          title: 'Invoice Lines',
+          subtitle:
+              'A denser, professional line-entry grid for B2B operations.',
+          action: FilledButton.tonalIcon(
+            onPressed: _saving ? null : _addOrReplaceProduct,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Add Item'),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Column(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4F7FB),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: const [
+                      _Head(label: 'Item', width: 320),
+                      _Head(label: 'Qty', width: 90),
+                      _Head(label: 'Price', width: 110),
+                      _Head(label: 'Disc %', width: 90),
+                      _Head(label: 'Net', width: 110),
+                      _Head(label: 'Tracking', width: 110),
+                      _Head(label: 'Action', width: 70),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                for (final line in _lines) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: Theme.of(context).colorScheme.outlineVariant),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _InvoiceProductPicker(line: line),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: line.quantity,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                ),
-                                decoration: const InputDecoration(
-                                  labelText: 'Quantity',
-                                ),
+                        SizedBox(
+                          width: 320,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(line.displayName,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  OutlinedButton(
+                                    onPressed: _saving
+                                        ? null
+                                        : () => _addOrReplaceProduct(line),
+                                    child: Text(
+                                        line.hasProduct ? 'Change' : 'Select'),
+                                  ),
+                                  if (line.quantity < 0)
+                                    const ProfessionalBadge(
+                                      label: 'Refund',
+                                      backgroundColor: Color(0xFFFDE8E4),
+                                      foregroundColor: Color(0xFF8A3E31),
+                                    ),
+                                ],
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextField(
-                                controller: line.unitPrice,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                ),
-                                decoration: const InputDecoration(
-                                  labelText: 'Unit Price',
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: _lines.length == 1
-                                  ? null
-                                  : () => setState(() {
-                                        line.dispose();
-                                        _lines.removeAt(index);
-                                      }),
-                              icon: const Icon(Icons.delete_outline_rounded),
-                            ),
-                          ],
-                        ),
-                        if (requiresTracking) ...[
-                          const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: OutlinedButton.icon(
-                              onPressed: () => _configureTracking(line),
-                              icon: const Icon(Icons.qr_code_2_rounded),
-                              label: Text(
-                                line.tracking == null
-                                    ? 'Configure Tracking'
-                                    : line.tracking!.summary(
-                                        double.tryParse(
-                                              line.quantity.text.trim(),
-                                            ) ??
-                                            0,
-                                      ),
-                              ),
-                            ),
+                            ],
                           ),
-                        ],
+                        ),
+                        _NumCell(
+                            controller: line.quantityCtrl,
+                            width: 90,
+                            enabled: !line.lockedQuantity,
+                            onChanged: (_) => setState(() {})),
+                        _NumCell(
+                            controller: line.priceCtrl,
+                            width: 110,
+                            onChanged: (_) => setState(() {})),
+                        _NumCell(
+                            controller: line.discountCtrl,
+                            width: 90,
+                            onChanged: (_) => setState(() {})),
+                        SizedBox(
+                          width: 110,
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 14),
+                            child: Text(line.lineTotal.toStringAsFixed(2),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w700)),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 110,
+                          child: line.requiresTracking
+                              ? OutlinedButton(
+                                  onPressed: _saving
+                                      ? null
+                                      : () => _configureTracking(line),
+                                  child: Text(
+                                      line.tracking == null ? 'Set' : 'Ready'),
+                                )
+                              : const Padding(
+                                  padding: EdgeInsets.only(top: 14),
+                                  child: Text('N/A'),
+                                ),
+                        ),
+                        SizedBox(
+                          width: 70,
+                          child: IconButton(
+                            onPressed: _saving
+                                ? null
+                                : () {
+                                    setState(() {
+                                      line.dispose();
+                                      _lines = [..._lines]..remove(line);
+                                      if (_lines.isEmpty) {
+                                        _lines = [_InvoiceLine.empty()];
+                                      }
+                                    });
+                                  },
+                            icon: const Icon(Icons.delete_outline_rounded),
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                ),
-              );
-            }),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                onPressed: () => setState(() => _lines.add(_InvoiceLine())),
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Add Item'),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _discount,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    decoration:
-                        const InputDecoration(labelText: 'Header Discount'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _paid,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Paid Amount'),
-                  ),
-                ),
+                  const SizedBox(height: 10),
+                ],
               ],
             ),
-            const SizedBox(height: 12),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.payments_outlined),
-              title: Text(_paymentMethod?.name ?? 'Select Payment Method'),
-              subtitle: const Text('Optional unless paid amount is entered'),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: _pickPaymentMethod,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _notes,
-              maxLines: 3,
-              decoration: const InputDecoration(labelText: 'Notes'),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: _saving ? null : _save,
-              icon: const Icon(Icons.save_rounded),
-              label: Text(_saving ? 'Saving...' : 'Create B2B Invoice'),
-            ),
-          ],
+          ),
         ),
+        if (!wide) ...[
+          const SizedBox(height: 16),
+          summary,
+        ],
+      ],
+    );
+
+    return Scaffold(
+      appBar: AppBar(title: Text(_title)),
+      body: SafeArea(
+        child: wide
+            ? Row(
+                children: [
+                  Expanded(child: content),
+                  SizedBox(
+                    width: 340,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(0, 16, 16, 16),
+                      child: ListView(children: [summary]),
+                    ),
+                  ),
+                ],
+              )
+            : content,
       ),
     );
   }
 }
 
 class _InvoiceLine {
-  InventoryListItem? product;
+  _InvoiceLine({
+    this.productId,
+    this.comboProductId,
+    this.barcodeId,
+    this.productName,
+    this.variantName,
+    this.trackingType = 'VARIANT',
+    this.sourceSaleDetailId,
+    this.tracking,
+    this.comboTracking = const [],
+    String quantity = '',
+    String price = '',
+    String discount = '0',
+  })  : quantityCtrl = TextEditingController(text: quantity),
+        priceCtrl = TextEditingController(text: price),
+        discountCtrl = TextEditingController(text: discount);
+
+  factory _InvoiceLine.empty() => _InvoiceLine();
+
+  factory _InvoiceLine.fromInventory(InventoryListItem item) => _InvoiceLine(
+        productId: item.productId > 0 ? item.productId : null,
+        comboProductId: item.comboProductId,
+        barcodeId: item.barcodeId,
+        productName: item.name,
+        variantName: item.variantName,
+        trackingType: item.trackingType,
+        quantity: '1',
+        price: (item.price ?? 0).toStringAsFixed(2),
+      );
+
+  factory _InvoiceLine.fromSaleItem(SaleItemDto item) => _InvoiceLine(
+        productId: item.productId,
+        comboProductId: item.comboProductId,
+        barcodeId: item.barcodeId,
+        productName: item.productName,
+        variantName: item.variantName,
+        trackingType: item.trackingType,
+        sourceSaleDetailId: item.sourceSaleDetailId,
+        comboTracking: item.comboComponentTracking,
+        tracking: item.isSerialized || item.trackingType == 'BATCH'
+            ? InventoryTrackingSelection(
+                barcodeId: item.barcodeId,
+                trackingType: item.trackingType,
+                isSerialized: item.isSerialized,
+                barcode: item.barcode,
+                variantName: item.variantName,
+                serialNumbers: item.serialNumbers,
+              )
+            : null,
+        quantity: item.quantity.toStringAsFixed(2),
+        price: item.unitPrice.toStringAsFixed(2),
+        discount: item.discountPercent.toStringAsFixed(2),
+      );
+
+  factory _InvoiceLine.fromExchangeItem(SaleDto sale, SaleItemDto item) {
+    final line = _InvoiceLine.fromSaleItem(item);
+    line.sourceSaleDetailId ??= item.saleDetailId;
+    line.lockedQuantity = true;
+    line.quantityCtrl.text = (-item.quantity.abs()).toStringAsFixed(2);
+    line.productName ??= 'Refund from ${sale.saleNumber}';
+    return line;
+  }
+
+  int? productId;
+  int? comboProductId;
+  int? barcodeId;
+  String? productName;
+  String? variantName;
+  String trackingType;
+  int? sourceSaleDetailId;
+  bool lockedQuantity = false;
   InventoryTrackingSelection? tracking;
-  final quantity = TextEditingController();
-  final unitPrice = TextEditingController();
+  List<PosComboComponentTracking> comboTracking;
+  final TextEditingController quantityCtrl;
+  final TextEditingController priceCtrl;
+  final TextEditingController discountCtrl;
+
+  bool get hasProduct => (productId ?? 0) > 0 || (comboProductId ?? 0) > 0;
+  bool get hasValues =>
+      quantityCtrl.text.trim().isNotEmpty ||
+      priceCtrl.text.trim().isNotEmpty ||
+      (productName ?? '').trim().isNotEmpty;
+  double get quantity => double.tryParse(quantityCtrl.text.trim()) ?? 0;
+  double get unitPrice => double.tryParse(priceCtrl.text.trim()) ?? 0;
+  double get discount => double.tryParse(discountCtrl.text.trim()) ?? 0;
+  bool get requiresTracking =>
+      trackingType == 'BATCH' || trackingType == 'SERIAL';
+  double get lineTotal =>
+      (quantity * unitPrice) -
+      ((quantity * unitPrice) * (discount.clamp(0.0, 100.0) / 100.0));
+  String get displayName => [
+        (productName ?? '').trim().isEmpty ? null : productName!.trim(),
+        (variantName ?? '').trim().isEmpty ? null : variantName!.trim(),
+      ].whereType<String>().join(' • ').isEmpty
+          ? 'Select product'
+          : [
+              (productName ?? '').trim().isEmpty ? null : productName!.trim(),
+              (variantName ?? '').trim().isEmpty ? null : variantName!.trim(),
+            ].whereType<String>().join(' • ');
+
+  void applyProduct(InventoryListItem item) {
+    productId = item.productId > 0 ? item.productId : null;
+    comboProductId = item.comboProductId;
+    barcodeId = item.barcodeId;
+    productName = item.name;
+    variantName = item.variantName;
+    trackingType = item.trackingType;
+    sourceSaleDetailId = null;
+    tracking = null;
+    comboTracking = const [];
+    lockedQuantity = false;
+    quantityCtrl.text = '1';
+    priceCtrl.text = (item.price ?? 0).toStringAsFixed(2);
+    discountCtrl.text = '0';
+  }
+
+  PosCartItem toPosCartItem() => PosCartItem(
+        product: PosProductDto(
+          productId: productId ?? 0,
+          comboProductId: comboProductId,
+          barcodeId: barcodeId ?? 0,
+          name: productName ?? 'Item',
+          price: unitPrice,
+          stock: 0,
+          variantName: variantName,
+          isVirtualCombo: (comboProductId ?? 0) > 0,
+          trackingType: trackingType,
+          isSerialized: trackingType == 'SERIAL',
+        ),
+        quantity: quantity,
+        unitPrice: unitPrice,
+        discountPercent: discount,
+        sourceSaleDetailId: sourceSaleDetailId,
+        tracking: tracking,
+        comboTracking: comboTracking,
+        lockedQuantity: lockedQuantity,
+      );
+
+  Map<String, dynamic> toCreateJson() => {
+        if ((productId ?? 0) > 0) 'product_id': productId,
+        if ((comboProductId ?? 0) > 0) 'combo_product_id': comboProductId,
+        if ((barcodeId ?? 0) > 0) 'barcode_id': barcodeId,
+        if ((sourceSaleDetailId ?? 0) > 0)
+          'source_sale_detail_id': sourceSaleDetailId,
+        'quantity': quantity,
+        'unit_price': unitPrice,
+        'discount_percentage': discount,
+        if (tracking != null) ...tracking!.toIssueJson(),
+        if (comboTracking.isNotEmpty)
+          'combo_component_tracking':
+              comboTracking.map((e) => e.toJson()).toList(),
+      };
 
   void dispose() {
-    quantity.dispose();
-    unitPrice.dispose();
+    quantityCtrl.dispose();
+    priceCtrl.dispose();
+    discountCtrl.dispose();
   }
 }
 
-class _InvoiceProductPicker extends ConsumerStatefulWidget {
-  const _InvoiceProductPicker({required this.line});
+class _PartyBox extends StatelessWidget {
+  const _PartyBox({required this.customer, required this.onSelect});
 
-  final _InvoiceLine line;
-
-  @override
-  ConsumerState<_InvoiceProductPicker> createState() =>
-      _InvoiceProductPickerState();
-}
-
-class _InvoiceProductPickerState extends ConsumerState<_InvoiceProductPicker> {
-  final _controller = TextEditingController();
-  List<InventoryListItem> _suggestions = const [];
-  bool _loading = false;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _search(String value) async {
-    setState(() => _loading = true);
-    try {
-      final items = await ref.read(inventoryRepositoryProvider).searchProducts(
-            value,
-          );
-      if (!mounted) return;
-      setState(() => _suggestions = items.take(8).toList());
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
+  final PosCustomerDto? customer;
+  final VoidCallback? onSelect;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
-          controller: _controller,
-          decoration: InputDecoration(
-            labelText: 'Product',
-            prefixIcon: const Icon(Icons.search_rounded),
-            suffixIcon: _loading
-                ? const Padding(
-                    padding: EdgeInsets.all(10),
-                    child: SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                : null,
-          ),
-          onChanged: (value) => _search(value.trim()),
-        ),
-        if (widget.line.product != null) ...[
-          const SizedBox(height: 6),
-          Text(
-            widget.line.product!.name,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ],
-        if (_suggestions.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              children: _suggestions
-                  .map(
-                    (item) => ListTile(
-                      dense: true,
-                      title: Text(item.name),
-                      subtitle: Text(
-                        [
-                          'Stock ${item.stock.toStringAsFixed(2)}',
-                          'Price ${(item.price ?? 0).toStringAsFixed(2)}',
-                        ].join(' • '),
-                      ),
-                      onTap: () {
-                        setState(() {
-                          widget.line.product = item;
-                          widget.line.unitPrice.text =
-                              (item.price ?? 0).toStringAsFixed(2);
-                          _controller.text = item.name;
-                          _suggestions = const [];
-                        });
-                      },
-                    ),
-                  )
-                  .toList(),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FAFD),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFD7E3EF)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.business_rounded),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              customer?.name ?? 'Select B2B Party',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
+          FilledButton.tonal(onPressed: onSelect, child: const Text('Select')),
         ],
-      ],
+      ),
     );
   }
+}
+
+class _Head extends StatelessWidget {
+  const _Head({required this.label, required this.width});
+  final String label;
+  final double width;
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: width,
+        child: Text(label,
+            style: Theme.of(context)
+                .textTheme
+                .labelLarge
+                ?.copyWith(fontWeight: FontWeight.w800)),
+      );
+}
+
+class _NumCell extends StatelessWidget {
+  const _NumCell(
+      {required this.controller,
+      required this.width,
+      this.enabled = true,
+      required this.onChanged});
+  final TextEditingController controller;
+  final double width;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: width,
+        child: Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: TextField(
+            controller: controller,
+            enabled: enabled,
+            keyboardType: const TextInputType.numberWithOptions(
+                decimal: true, signed: true),
+            onChanged: onChanged,
+          ),
+        ),
+      );
+}
+
+class _Banner extends StatelessWidget {
+  const _Banner({required this.message, required this.color});
+  final String message;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+            color: color, borderRadius: BorderRadius.circular(16)),
+        child: Text(message, style: Theme.of(context).textTheme.bodyMedium),
+      );
 }

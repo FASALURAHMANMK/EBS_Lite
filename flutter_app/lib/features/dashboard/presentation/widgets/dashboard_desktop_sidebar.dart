@@ -16,6 +16,7 @@ import 'package:ebs_lite/features/inventory/presentation/pages/inventory_managem
 import 'package:ebs_lite/features/inventory/presentation/pages/inventory_view_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/stock_adjustments_page.dart';
 import 'package:ebs_lite/features/inventory/presentation/pages/stock_transfers_page.dart';
+import 'package:ebs_lite/features/pos/controllers/pos_notifier.dart';
 import 'package:ebs_lite/features/pos/presentation/pages/pos_page.dart';
 import 'package:ebs_lite/features/promotions/presentation/pages/promotions_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/goods_receipts_page.dart';
@@ -148,7 +149,12 @@ class DashboardDesktopSidebar extends ConsumerWidget {
                   context,
                   icon: Icons.point_of_sale_rounded,
                   label: 'New Sale',
-                  onTap: () => onOpen(const PosPage()),
+                  onTap: () {
+                    ref
+                        .read(posNotifierProvider.notifier)
+                        .startNewSaleSession(transactionType: 'RETAIL');
+                    onOpen(const PosPage());
+                  },
                 ),
                 _child(
                   context,
