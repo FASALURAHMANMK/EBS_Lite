@@ -1693,8 +1693,6 @@ func (s *SalesService) CreateRefundInvoice(companyID, sourceSaleID, userID int, 
 
 	channel := strings.ToUpper(strings.TrimSpace(sourceChannel.String))
 	switch channel {
-	case "INVOICE", "QUOTE":
-		return nil, fmt.Errorf("invoice returns must use sale return documents")
 	case "POS_REFUND":
 		return nil, fmt.Errorf("refund invoices cannot be refunded again")
 	}

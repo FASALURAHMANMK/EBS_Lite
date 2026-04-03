@@ -33,6 +33,10 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
   final _search = TextEditingController();
   DateTimeRange? _dateRange;
   List<PosCustomerDto> _selectedCustomers = const [];
+  bool _showB2BSales = true;
+  bool _showB2BReturns = true;
+  bool _showB2CSales = true;
+  bool _showB2CReturns = true;
   String? _selectedDocumentKey;
   _HistoryDocumentDetail? _selectedDetail;
   Object? _detailError;
@@ -55,7 +59,10 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   List<_HistoryDocument> _buildVisibleDocuments(String query) {
-    final merged = _sales.map((row) => _HistoryDocument.sale(row)).toList();
+    final merged = _sales
+        .map((row) => _HistoryDocument.sale(row))
+        .where(_matchesDocumentFilter)
+        .toList();
 
     merged.sort((a, b) => b.sortDate.compareTo(a.sortDate));
 
@@ -67,6 +74,19 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
       return doc.number.toLowerCase().contains(normalizedQuery) ||
           doc.customerLabel.toLowerCase().contains(normalizedQuery);
     }).toList();
+  }
+
+  bool _matchesDocumentFilter(_HistoryDocument document) {
+    if (document.isB2B && document.isRefund) {
+      return _showB2BReturns;
+    }
+    if (document.isB2B && !document.isRefund) {
+      return _showB2BSales;
+    }
+    if (!document.isB2B && document.isRefund) {
+      return _showB2CReturns;
+    }
+    return _showB2CSales;
   }
 
   Future<void> _load() async {
@@ -458,7 +478,15 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
           elevation: 0,
           child: ListTile(
             leading: Icon(document.icon),
-            title: Text(document.number),
+            title: Row(
+              children: [
+                Expanded(child: Text(document.number)),
+                const SizedBox(width: 8),
+                _TransactionTypeChip(
+                  transactionType: document.transactionTypeLabel,
+                ),
+              ],
+            ),
             subtitle: Text(document.mobileSubtitle(context, localePrefs)),
             trailing: Text(
               document.amountLabel,
@@ -539,6 +567,11 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                                   ),
                                 ),
                                 _DocumentTypeBadge(type: document.type),
+                                const SizedBox(width: 6),
+                                _TransactionTypeChip(
+                                  transactionType:
+                                      document.transactionTypeLabel,
+                                ),
                               ],
                             ),
                             const SizedBox(height: 8),
@@ -717,6 +750,9 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
                 runSpacing: 8,
                 children: [
                   _DocumentTypeBadge(type: detail.document.type),
+                  _TransactionTypeChip(
+                    transactionType: detail.document.transactionTypeLabel,
+                  ),
                   _StatusChip(status: detail.document.statusLabel),
                   if (detail.sale?.isFullyRefunded == true)
                     const _RefundStateChip(label: 'Fully refunded'),
@@ -941,72 +977,122 @@ class _SalesHistoryPageState extends ConsumerState<SalesHistoryPage> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _search,
-                      decoration: const InputDecoration(
-                        hintText: 'Search by Sale/Return # or customer',
-                        prefixIcon: Icon(Icons.search_rounded),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: _dateRange == null
-                        ? 'Filter by date range'
-                        : 'Date: ${AppDateTime.formatDate(context, localePrefs, _dateRange!.start)} → ${AppDateTime.formatDate(context, localePrefs, _dateRange!.end)}',
-                    icon: Icon(
-                      Icons.calendar_month_rounded,
-                      color:
-                          _dateRange != null ? theme.colorScheme.primary : null,
-                    ),
-                    onPressed: _pickDateRange,
-                    onLongPress: () async {
-                      if (_dateRange != null) {
-                        setState(() => _dateRange = null);
-                        await _load();
-                      }
-                    },
-                  ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    tooltip: _selectedCustomers.isEmpty
-                        ? 'Filter by customers'
-                        : 'Customers: ${_selectedCustomers.length}',
-                    icon: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Icon(
-                          Icons.group_rounded,
-                          color: _selectedCustomers.isNotEmpty
+                  Row(
+                    children: [
+                      if (isDesktop)
+                        SizedBox(
+                          width: 320,
+                          child: TextField(
+                            controller: _search,
+                            decoration: const InputDecoration(
+                              hintText: 'Search invoice # or customer',
+                              prefixIcon: Icon(Icons.search_rounded),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        )
+                      else
+                        Expanded(
+                          child: TextField(
+                            controller: _search,
+                            decoration: const InputDecoration(
+                              hintText: 'Search invoice # or customer',
+                              prefixIcon: Icon(Icons.search_rounded),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: _dateRange == null
+                            ? 'Filter by date range'
+                            : 'Date: ${AppDateTime.formatDate(context, localePrefs, _dateRange!.start)} → ${AppDateTime.formatDate(context, localePrefs, _dateRange!.end)}',
+                        icon: Icon(
+                          Icons.calendar_month_rounded,
+                          color: _dateRange != null
                               ? theme.colorScheme.primary
                               : null,
                         ),
-                        if (_selectedCustomers.isNotEmpty)
-                          Positioned(
-                            right: -2,
-                            top: -2,
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primary,
-                                shape: BoxShape.circle,
-                              ),
+                        onPressed: _pickDateRange,
+                        onLongPress: () async {
+                          if (_dateRange != null) {
+                            setState(() => _dateRange = null);
+                            await _load();
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        tooltip: _selectedCustomers.isEmpty
+                            ? 'Filter by customers'
+                            : 'Customers: ${_selectedCustomers.length}',
+                        icon: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Icon(
+                              Icons.group_rounded,
+                              color: _selectedCustomers.isNotEmpty
+                                  ? theme.colorScheme.primary
+                                  : null,
                             ),
-                          ),
-                      ],
-                    ),
-                    onPressed: _pickCustomers,
-                    onLongPress: () async {
-                      if (_selectedCustomers.isNotEmpty) {
-                        setState(() => _selectedCustomers = const []);
-                        await _load();
-                      }
-                    },
+                            if (_selectedCustomers.isNotEmpty)
+                              Positioned(
+                                right: -2,
+                                top: -2,
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        onPressed: _pickCustomers,
+                        onLongPress: () async {
+                          if (_selectedCustomers.isNotEmpty) {
+                            setState(() => _selectedCustomers = const []);
+                            await _load();
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _HistoryFilterCheckbox(
+                        label: 'B2B Sales',
+                        value: _showB2BSales,
+                        onChanged: (value) =>
+                            setState(() => _showB2BSales = value),
+                      ),
+                      _HistoryFilterCheckbox(
+                        label: 'B2B Returns',
+                        value: _showB2BReturns,
+                        onChanged: (value) =>
+                            setState(() => _showB2BReturns = value),
+                      ),
+                      _HistoryFilterCheckbox(
+                        label: 'B2C Sales',
+                        value: _showB2CSales,
+                        onChanged: (value) =>
+                            setState(() => _showB2CSales = value),
+                      ),
+                      _HistoryFilterCheckbox(
+                        label: 'B2C Returns',
+                        value: _showB2CReturns,
+                        onChanged: (value) =>
+                            setState(() => _showB2CReturns = value),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1064,6 +1150,18 @@ class _HistoryDocument {
   int get id => ((raw['sale_id'] as num?)?.toInt() ?? 0);
 
   String get key => '${type.name}:$id';
+
+  bool get isRefund => type == _HistoryDocumentType.refund;
+
+  String get transactionType {
+    final normalized =
+        (raw['transaction_type']?.toString() ?? 'RETAIL').trim().toUpperCase();
+    return normalized == 'B2B' ? 'B2B' : 'B2C';
+  }
+
+  bool get isB2B => transactionType == 'B2B';
+
+  String get transactionTypeLabel => transactionType;
 
   String get number => raw['sale_number']?.toString() ?? 'Document #$id';
 
@@ -1382,6 +1480,84 @@ class _DocumentTypeBadge extends StatelessWidget {
         style: theme.textTheme.labelSmall?.copyWith(
           fontWeight: FontWeight.w700,
           color: isSale ? const Color(0xFF8EE6B0) : const Color(0xFFF1C87A),
+        ),
+      ),
+    );
+  }
+}
+
+class _TransactionTypeChip extends StatelessWidget {
+  const _TransactionTypeChip({required this.transactionType});
+
+  final String transactionType;
+
+  @override
+  Widget build(BuildContext context) {
+    final isB2B = transactionType.trim().toUpperCase() == 'B2B';
+    final bg = isB2B ? const Color(0xFF183657) : const Color(0xFF2A3622);
+    final fg = isB2B ? const Color(0xFFA9D5FF) : const Color(0xFFBDE7A3);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        transactionType,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
+  }
+}
+
+class _HistoryFilterCheckbox extends StatelessWidget {
+  const _HistoryFilterCheckbox({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: () => onChanged(!value),
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: value
+              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.55)
+              : theme.colorScheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: value
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outlineVariant,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Checkbox(
+              value: value,
+              onChanged: (next) => onChanged(next ?? false),
+              visualDensity: VisualDensity.compact,
+            ),
+            Text(
+              label,
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );

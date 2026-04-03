@@ -37,9 +37,13 @@ class SalesPage extends StatelessWidget {
       ),
       FeatureItem(
         icon: Icons.assignment_return_rounded,
-        label: 'B2B Returns',
+        label: 'Refund Invoice',
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const SaleReturnFormPage()),
+          MaterialPageRoute(
+            builder: (_) => const SaleReturnFormPage(
+              mode: SaleReturnDocumentMode.refundInvoice,
+            ),
+          ),
         ),
       ),
       FeatureItem(
