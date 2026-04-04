@@ -10,6 +10,7 @@ import '../../accounts/presentation/pages/finance_integrity_page.dart';
 import '../../accounts/presentation/pages/ledgers_page.dart';
 import '../../accounts/presentation/pages/period_close_page.dart';
 import '../../accounts/presentation/pages/vouchers_page.dart';
+import '../../sales/presentation/pages/b2b_party_management_page.dart';
 import '../../customers/presentation/pages/customer_care_hub_page.dart';
 import '../../customers/presentation/pages/collections_workbench_page.dart';
 import '../../expenses/presentation/pages/expense_categories_page.dart';
@@ -148,6 +149,9 @@ class DashboardNavigation {
       case 'Help & support':
       case 'Help & Support':
         return HelpSupportPage(fromMenu: fromMenu, onMenuSelect: onMenuSelect);
+      case 'B2B Party Management':
+      case 'B2B Parties':
+        return const B2BPartyManagementPage();
       case 'Customer Care Hub':
         return const CustomerCareHubPage();
       case 'Collections Workbench':

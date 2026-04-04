@@ -7,7 +7,6 @@ import 'package:ebs_lite/features/promotions/presentation/pages/promotions_page.
 import 'package:ebs_lite/features/sales/presentation/pages/sales_history_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/sales_returns_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/invoices_page.dart';
-import 'b2b_party_management_page.dart';
 import 'quotes_page.dart';
 
 class SalesPage extends ConsumerWidget {
@@ -50,15 +49,6 @@ class SalesPage extends ConsumerWidget {
             builder: (_) => const SaleReturnFormPage(
               mode: SaleReturnDocumentMode.refundInvoice,
             ),
-          ),
-        ),
-      ),
-      FeatureItem(
-        icon: Icons.business_rounded,
-        label: 'B2B Parties',
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const B2BPartyManagementPage(),
           ),
         ),
       ),

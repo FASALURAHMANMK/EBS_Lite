@@ -2,7 +2,6 @@ import 'package:ebs_lite/features/auth/controllers/auth_notifier.dart';
 import 'package:ebs_lite/features/auth/controllers/auth_permissions_provider.dart';
 import 'package:ebs_lite/features/customers/presentation/pages/customer_management_page.dart';
 import 'package:ebs_lite/features/customers/presentation/pages/customer_warranty_page.dart';
-import 'package:ebs_lite/features/customers/presentation/pages/customer_care_hub_page.dart';
 import 'package:ebs_lite/features/customers/presentation/pages/collections_workbench_page.dart';
 import 'package:ebs_lite/features/customers/presentation/pages/loyalty_management_page.dart';
 import 'package:ebs_lite/features/customers/presentation/pages/loyalty_gift_redeem_page.dart';
@@ -26,6 +25,7 @@ import 'package:ebs_lite/features/purchases/presentation/pages/supplier_debit_no
 import 'package:ebs_lite/features/reports/presentation/pages/report_category_page.dart';
 import 'package:ebs_lite/features/reports/presentation/report_categories.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/invoices_page.dart';
+import 'package:ebs_lite/features/sales/presentation/pages/b2b_party_management_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/quotes_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/sales_history_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/sales_returns_page.dart';
@@ -305,21 +305,21 @@ class DashboardDesktopSidebar extends ConsumerWidget {
               children: [
                 _child(
                   context,
-                  icon: Icons.support_agent_rounded,
-                  label: 'Customer Care Hub',
-                  onTap: () => onOpen(const CustomerCareHubPage()),
+                  icon: Icons.manage_accounts_rounded,
+                  label: 'Customer Management',
+                  onTap: () => onOpen(const CustomerManagementPage()),
+                ),
+                _child(
+                  context,
+                  icon: Icons.business_rounded,
+                  label: 'B2B Parties',
+                  onTap: () => onOpen(const B2BPartyManagementPage()),
                 ),
                 _child(
                   context,
                   icon: Icons.payments_rounded,
                   label: 'Collections Workbench',
                   onTap: () => onOpen(const CollectionsWorkbenchPage()),
-                ),
-                _child(
-                  context,
-                  icon: Icons.manage_accounts_rounded,
-                  label: 'Customer Management',
-                  onTap: () => onOpen(const CustomerManagementPage()),
                 ),
                 _child(
                   context,
