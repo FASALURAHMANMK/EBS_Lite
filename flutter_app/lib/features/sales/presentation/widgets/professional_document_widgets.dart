@@ -17,9 +17,9 @@ class ProfessionalDocumentHeader extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         gradient: const LinearGradient(
           colors: [
             Color(0xFFF4F7FB),
@@ -41,17 +41,17 @@ class ProfessionalDocumentHeader extends StatelessWidget {
           if (badges.isNotEmpty) const SizedBox(height: 12),
           Text(
             title,
-            style: theme.textTheme.headlineSmall?.copyWith(
+            style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w800,
               color: const Color(0xFF19324D),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             subtitle,
-            style: theme.textTheme.bodyMedium?.copyWith(
+            style: theme.textTheme.bodySmall?.copyWith(
               color: const Color(0xFF4A6178),
-              height: 1.4,
+              height: 1.35,
             ),
           ),
         ],
@@ -75,14 +75,14 @@ class ProfessionalBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: foregroundColor,
               fontWeight: FontWeight.w700,
             ),
@@ -97,12 +97,14 @@ class ProfessionalSectionCard extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.action,
+    this.expandChild = false,
     required this.child,
   });
 
   final String title;
   final String? subtitle;
   final Widget? action;
+  final bool expandChild;
   final Widget child;
 
   @override
@@ -112,11 +114,11 @@ class ProfessionalSectionCard extends StatelessWidget {
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(18),
         side: BorderSide(color: theme.colorScheme.outlineVariant),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -129,17 +131,17 @@ class ProfessionalSectionCard extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: theme.textTheme.titleMedium?.copyWith(
+                        style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                       if ((subtitle ?? '').trim().isNotEmpty) ...[
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         Text(
                           subtitle!,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
-                            height: 1.35,
+                            height: 1.3,
                           ),
                         ),
                       ],
@@ -152,8 +154,8 @@ class ProfessionalSectionCard extends StatelessWidget {
                 ],
               ],
             ),
-            const SizedBox(height: 18),
-            child,
+            const SizedBox(height: 14),
+            if (expandChild) Expanded(child: child) else child,
           ],
         ),
       ),
@@ -187,28 +189,28 @@ class ProfessionalSummaryCard extends StatelessWidget {
                   child: Text(
                     row.label,
                     style: row.emphasize
-                        ? theme.textTheme.titleSmall?.copyWith(
+                        ? theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w700,
                           )
-                        : theme.textTheme.bodyMedium,
+                        : theme.textTheme.bodySmall,
                   ),
                 ),
                 Text(
                   row.value,
                   style: row.emphasize
-                      ? theme.textTheme.titleMedium?.copyWith(
+                      ? theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w800,
                         )
-                      : theme.textTheme.bodyMedium?.copyWith(
+                      : theme.textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
                 ),
               ],
             ),
-            if (row != rows.last) const SizedBox(height: 12),
+            if (row != rows.last) const SizedBox(height: 10),
           ],
           if (footer != null) ...[
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
             footer!,
           ],
         ],

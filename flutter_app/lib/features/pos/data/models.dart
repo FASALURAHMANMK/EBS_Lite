@@ -492,6 +492,7 @@ class SaleItemDto {
   final int? productId;
   final int? comboProductId;
   final int? barcodeId;
+  final int? taxId;
   final String? productName;
   final String? barcode;
   final String? variantName;
@@ -502,6 +503,7 @@ class SaleItemDto {
   final double unitPrice;
   final double discountPercent;
   final double discountAmount;
+  final double taxAmount;
   final double lineTotal;
   final int? sourceSaleDetailId;
   final List<String> serialNumbers;
@@ -512,6 +514,7 @@ class SaleItemDto {
       this.productId,
       this.comboProductId,
       this.barcodeId,
+      this.taxId,
       this.productName,
       this.barcode,
       this.variantName,
@@ -522,6 +525,7 @@ class SaleItemDto {
       required this.unitPrice,
       this.discountPercent = 0.0,
       this.discountAmount = 0.0,
+      this.taxAmount = 0.0,
       this.lineTotal = 0.0,
       this.sourceSaleDetailId,
       this.serialNumbers = const [],
@@ -532,6 +536,7 @@ class SaleItemDto {
         productId: json['product_id'] as int?,
         comboProductId: json['combo_product_id'] as int?,
         barcodeId: json['barcode_id'] as int?,
+        taxId: (json['tax_id'] as num?)?.toInt(),
         productName: json['product_name'] as String?,
         barcode: json['barcode'] as String?,
         variantName: json['variant_name'] as String?,
@@ -543,6 +548,7 @@ class SaleItemDto {
         discountPercent:
             (json['discount_percentage'] as num?)?.toDouble() ?? 0.0,
         discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0.0,
+        taxAmount: (json['tax_amount'] as num?)?.toDouble() ?? 0.0,
         lineTotal: (json['line_total'] as num?)?.toDouble() ?? 0.0,
         sourceSaleDetailId: (json['source_sale_detail_id'] as num?)?.toInt(),
         serialNumbers: (json['serial_numbers'] as List<dynamic>? ?? const [])

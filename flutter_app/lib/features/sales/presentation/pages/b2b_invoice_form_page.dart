@@ -1,23 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/layout/app_breakpoints.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../../shared/widgets/app_selection_dialog.dart';
+import '../../../../shared/widgets/desktop_sidebar_toggle_action.dart';
 import '../../../../shared/widgets/sales_action_password_dialog.dart';
+import '../../../auth/controllers/auth_notifier.dart';
+import '../../../customers/data/customer_repository.dart';
+import '../../../customers/data/models.dart';
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../../dashboard/data/payment_methods_repository.dart';
+import '../../../dashboard/data/taxes_repository.dart';
 import '../../../inventory/data/inventory_repository.dart';
 import '../../../inventory/data/models.dart';
 import '../../../inventory/presentation/widgets/inventory_tracking_selector.dart';
 import '../../../pos/data/models.dart';
 import '../../../pos/data/pos_repository.dart';
 import '../../data/sales_repository.dart';
+import '../widgets/document_line_editor_dialog.dart';
 import '../widgets/professional_document_widgets.dart';
 import 'sale_detail_page.dart';
 
 class B2BInvoiceFormPage extends ConsumerStatefulWidget {
-  const B2BInvoiceFormPage(
-      {super.key, this.sale, this.exchangeItems = const []});
+  const B2BInvoiceFormPage({
+    super.key,
+    this.sale,
+    this.exchangeItems = const [],
+  });
 
   final SaleDto? sale;
   final List<SaleItemDto> exchangeItems;
@@ -34,55 +46,32 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
   final _paidCtrl = TextEditingController(text: '0');
   final _notesCtrl = TextEditingController();
 
-  PosCustomerDto? _customer;
+  DocumentCustomerSnapshot? _customer;
   PaymentMethodDto? _paymentMethod;
-  List<_InvoiceLine> _lines = [_InvoiceLine.empty()];
+  List<DocumentLineDraft> _lines = const [];
   bool _saving = false;
   String? _error;
   String? _info;
+  String? _receiptPreview;
+  final Map<int, DocumentTaxProfile> _taxProfilesById = {};
+
+  String get _title => widget.isEdit
+      ? 'Edit B2B Invoice'
+      : widget.isExchange
+          ? 'B2B Exchange Invoice'
+          : 'New B2B Invoice';
+
+  List<DocumentLineDraft> get _activeLines => _lines
+      .where(
+          (line) => line.hasProduct && line.unitPrice > 0 && line.quantity != 0)
+      .toList(growable: false);
 
   @override
   void initState() {
     super.initState();
-    final sale = widget.sale;
-    if (sale != null) {
-      _customer =
-          sale.customerId != null && (sale.customerName ?? '').trim().isNotEmpty
-              ? PosCustomerDto(
-                  customerId: sale.customerId!,
-                  name: sale.customerName!,
-                  customerType: 'B2B')
-              : null;
-      if (sale.paymentMethodId != null &&
-          (sale.paymentMethodName ?? '').trim().isNotEmpty) {
-        _paymentMethod = PaymentMethodDto(
-          methodId: sale.paymentMethodId!,
-          name: sale.paymentMethodName!,
-          type: 'OTHER',
-          isActive: true,
-        );
-      }
-      _discountCtrl.text = sale.discountAmount.toStringAsFixed(2);
-      _paidCtrl.text = sale.paidAmount.toStringAsFixed(2);
-      _notesCtrl.text = sale.notes ?? '';
-      if (widget.isEdit) {
-        _lines = sale.items
-            .where((e) =>
-                ((e.productId ?? 0) > 0 || (e.comboProductId ?? 0) > 0) &&
-                e.quantity > 0)
-            .map(_InvoiceLine.fromSaleItem)
-            .toList();
-        if (_lines.isEmpty) _lines = [_InvoiceLine.empty()];
-        _info = 'Editing ${sale.saleNumber} in a document-style B2B form.';
-      } else if (widget.isExchange) {
-        _lines = widget.exchangeItems
-            .map((e) => _InvoiceLine.fromExchangeItem(sale, e))
-            .toList();
-        _lines.add(_InvoiceLine.empty());
-        _paidCtrl.text = '0';
-        _info =
-            'Exchange draft for ${sale.saleNumber}. Refund and replacement lines stay in one business document.';
-      }
+    _hydrateFromSale();
+    if (!widget.isEdit) {
+      Future.microtask(_loadReceiptPreview);
     }
   }
 
@@ -91,38 +80,98 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
     _discountCtrl.dispose();
     _paidCtrl.dispose();
     _notesCtrl.dispose();
-    for (final line in _lines) {
-      line.dispose();
-    }
     super.dispose();
   }
 
-  String get _title => widget.isEdit
-      ? 'Edit B2B Invoice'
-      : widget.isExchange
-          ? 'B2B Exchange Invoice'
-          : 'New B2B Invoice';
+  void _hydrateFromSale() {
+    final sale = widget.sale;
+    if (sale == null) return;
+    _discountCtrl.text = sale.discountAmount.toStringAsFixed(2);
+    _paidCtrl.text = sale.paidAmount.toStringAsFixed(2);
+    _notesCtrl.text = sale.notes ?? '';
+    if (sale.paymentMethodId != null &&
+        (sale.paymentMethodName ?? '').trim().isNotEmpty) {
+      _paymentMethod = PaymentMethodDto(
+        methodId: sale.paymentMethodId!,
+        name: sale.paymentMethodName!,
+        type: 'OTHER',
+        isActive: true,
+      );
+    }
+    if (widget.isEdit) {
+      _lines = sale.items
+          .where(
+            (item) =>
+                ((item.productId ?? 0) > 0 || (item.comboProductId ?? 0) > 0) &&
+                item.quantity != 0,
+          )
+          .map(DocumentLineDraft.fromSaleItem)
+          .toList(growable: false);
+      Future.microtask(_applyTaxProfilesToLines);
+      _info =
+          'Editing ${sale.saleNumber} in the refreshed B2B document layout.';
+    } else if (widget.isExchange) {
+      _lines = widget.exchangeItems
+          .map((item) => DocumentLineDraft.fromExchangeItem(sale, item))
+          .toList(growable: false);
+      Future.microtask(_applyTaxProfilesToLines);
+      _paidCtrl.text = '0';
+      _info =
+          'Exchange draft for ${sale.saleNumber}. Refund and replacement lines stay in one business document.';
+    }
+    if (sale.customerId != null && sale.customerId! > 0) {
+      Future.microtask(() async {
+        try {
+          final customer = await ref
+              .read(customerRepositoryProvider)
+              .getCustomer(sale.customerId!);
+          if (!mounted) return;
+          setState(() =>
+              _customer = DocumentCustomerSnapshot.fromCustomer(customer));
+        } catch (_) {
+          if (!mounted) return;
+          setState(
+            () => _customer = DocumentCustomerSnapshot(
+              customerId: sale.customerId,
+              name: sale.customerName ?? 'B2B Customer',
+              customerType: 'B2B',
+            ),
+          );
+        }
+      });
+    }
+  }
 
-  List<_InvoiceLine> get _activeLines => _lines
-      .where((e) => e.hasProduct && e.unitPrice > 0 && e.quantity != 0)
-      .toList(growable: false);
+  Future<void> _loadReceiptPreview() async {
+    try {
+      final preview =
+          await ref.read(posRepositoryProvider).getNextReceiptPreview();
+      if (!mounted) return;
+      setState(() => _receiptPreview = preview);
+    } catch (_) {
+      // Best-effort preview only.
+    }
+  }
 
-  Future<void> _pickCustomer() async {
-    final result = await showDialog<PosCustomerDto>(
+  Future<CustomerDto?> _showCustomerDialog() async {
+    return showDialog<CustomerDto>(
       context: context,
       builder: (context) {
-        final repo = ref.read(posRepositoryProvider);
+        final repo = ref.read(customerRepositoryProvider);
         final controller = TextEditingController();
-        List<PosCustomerDto> results = const [];
+        List<CustomerDto> results = const [];
         bool loading = true;
         bool kickoff = true;
         return StatefulBuilder(
           builder: (context, setStateDialog) {
-            Future<void> doSearch(String q) async {
+            Future<void> runSearch(String query) async {
               loading = true;
               setStateDialog(() {});
               try {
-                results = await repo.searchCustomers(q, customerType: 'B2B');
+                results = await repo.getCustomers(
+                  search: query,
+                  customerType: 'B2B',
+                );
               } finally {
                 loading = false;
                 setStateDialog(() {});
@@ -131,53 +180,86 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
 
             if (kickoff) {
               kickoff = false;
-              Future.microtask(() => doSearch(''));
+              Future.microtask(() => runSearch(''));
             }
 
             return AppSelectionDialog(
               title: 'Select B2B Party',
-              maxWidth: 520,
+              maxWidth: 640,
               loading: loading,
               searchField: TextField(
                 controller: controller,
                 decoration: const InputDecoration(
-                  hintText: 'Search B2B parties',
+                  hintText: 'Search parties by name, phone, or email',
                   prefixIcon: Icon(Icons.search_rounded),
                 ),
-                onChanged: (v) => doSearch(v.trim()),
-                onSubmitted: (v) => doSearch(v.trim()),
+                onChanged: (value) => runSearch(value.trim()),
+                onSubmitted: (value) => runSearch(value.trim()),
               ),
               body: results.isEmpty && !loading
                   ? const Center(child: Text('No B2B parties found'))
-                  : ListView.builder(
+                  : ListView.separated(
                       itemCount: results.length,
-                      itemBuilder: (context, i) {
-                        final item = results[i];
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final customer = results[index];
+                        final details = [
+                          if ((customer.contactPerson ?? '').trim().isNotEmpty)
+                            customer.contactPerson!.trim(),
+                          if ((customer.phone ?? '').trim().isNotEmpty)
+                            customer.phone!.trim(),
+                          if ((customer.email ?? '').trim().isNotEmpty)
+                            customer.email!.trim(),
+                        ].join(' • ');
                         return ListTile(
-                          title: Text(item.name),
-                          subtitle: Text(
-                            [
-                              if ((item.contactPerson ?? '').isNotEmpty)
-                                item.contactPerson!,
-                              if ((item.phone ?? '').isNotEmpty) item.phone!,
-                              if ((item.email ?? '').isNotEmpty) item.email!,
-                            ].join(' • '),
+                          title: Text(customer.name),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (details.isNotEmpty) Text(details),
+                              Text(
+                                (customer.shippingAddress ??
+                                            customer.address ??
+                                            'No address on profile')
+                                        .trim()
+                                        .isEmpty
+                                    ? 'No address on profile'
+                                    : (customer.shippingAddress ??
+                                            customer.address ??
+                                            'No address on profile')
+                                        .trim(),
+                              ),
+                            ],
                           ),
-                          onTap: () => Navigator.of(context).pop(item),
+                          trailing: Text(
+                            customer.creditBalance.toStringAsFixed(2),
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          onTap: () => Navigator.of(context).pop(customer),
                         );
                       },
                     ),
               actions: [
                 TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel')),
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
               ],
             );
           },
         );
       },
     );
-    if (result != null && mounted) setState(() => _customer = result);
+  }
+
+  Future<void> _pickCustomer() async {
+    final result = await _showCustomerDialog();
+    if (result == null || !mounted) return;
+    setState(() {
+      _customer = DocumentCustomerSnapshot.fromCustomer(result);
+      _error = null;
+    });
   }
 
   Future<void> _pickPaymentMethod() async {
@@ -185,130 +267,210 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
     if (!mounted) return;
     final result = await showDialog<PaymentMethodDto>(
       context: context,
-      builder: (dialogContext) => SimpleDialog(
-        title: const Text('Payment Method'),
-        children: [
-          for (final method in methods)
-            SimpleDialogOption(
-              onPressed: () => Navigator.of(dialogContext).pop(method),
-              child: Text(method.name),
+      builder: (context) {
+        final controller = TextEditingController();
+        var filtered = methods;
+        return StatefulBuilder(
+          builder: (context, setStateDialog) => AppSelectionDialog(
+            title: 'Payment Method',
+            maxWidth: 520,
+            loading: false,
+            searchField: TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                hintText: 'Search payment methods',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+              onChanged: (value) {
+                setStateDialog(() {
+                  final query = value.trim().toLowerCase();
+                  filtered = query.isEmpty
+                      ? methods
+                      : methods
+                          .where((method) =>
+                              method.name.toLowerCase().contains(query) ||
+                              method.type.toLowerCase().contains(query))
+                          .toList();
+                });
+              },
             ),
-        ],
-      ),
+            body: ListView.separated(
+              itemCount: filtered.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final method = filtered[index];
+                return ListTile(
+                  title: Text(method.name),
+                  subtitle: Text(method.type),
+                  onTap: () => Navigator.of(context).pop(method),
+                );
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+        );
+      },
     );
     if (result != null && mounted) setState(() => _paymentMethod = result);
   }
 
-  Future<InventoryListItem?> _pickProduct() async {
-    return showDialog<InventoryListItem>(
+  Future<List<DocumentProductOption>> _searchProducts(String query) async {
+    final items = await ref
+        .read(inventoryRepositoryProvider)
+        .searchProducts(query, includeComboProducts: true);
+    return items.map(DocumentProductOption.fromInventory).toList();
+  }
+
+  Future<Map<int, DocumentTaxProfile>> _loadTaxProfiles() async {
+    if (_taxProfilesById.isNotEmpty) return _taxProfilesById;
+    final taxes = await ref.read(taxesRepositoryProvider).getTaxes();
+    _taxProfilesById.addEntries(
+      taxes.map(
+        (tax) => MapEntry(
+          tax.taxId,
+          DocumentTaxProfile(
+            taxId: tax.taxId,
+            name: tax.name,
+            rate: tax.percentage,
+          ),
+        ),
+      ),
+    );
+    return _taxProfilesById;
+  }
+
+  Future<DocumentTaxProfile?> _resolveTaxProfile(
+    DocumentProductOption option,
+  ) async {
+    final inventoryRepo = ref.read(inventoryRepositoryProvider);
+    int taxId = 0;
+    if ((option.comboProductId ?? 0) > 0) {
+      final combo = await inventoryRepo.getComboProduct(option.comboProductId!);
+      taxId = combo.taxId;
+    } else if ((option.productId ?? 0) > 0) {
+      final product = await inventoryRepo.getProduct(option.productId!);
+      taxId = product.taxId;
+    }
+    if (taxId <= 0) return null;
+    final profiles = await _loadTaxProfiles();
+    return profiles[taxId] ??
+        DocumentTaxProfile(taxId: taxId, name: 'Tax', rate: 0);
+  }
+
+  Future<void> _applyTaxProfilesToLines() async {
+    final linesToHydrate =
+        _lines.where((line) => (line.taxId ?? 0) > 0).toList();
+    if (linesToHydrate.isEmpty) return;
+    final profiles = await _loadTaxProfiles();
+    if (!mounted) return;
+    setState(() {
+      _lines = _lines.map((line) {
+        final taxId = line.taxId;
+        if ((taxId ?? 0) <= 0) return line;
+        final profile = profiles[taxId!];
+        if (profile == null) return line;
+        final next = line.copy();
+        final persistedAmount = next.persistedTaxAmount;
+        next.applyTaxProfile(profile);
+        next.persistedTaxAmount = persistedAmount;
+        return next;
+      }).toList(growable: false);
+    });
+  }
+
+  Future<InventoryTrackingSelection?> _configureTrackingForLine(
+    DocumentLineDraft draft,
+  ) {
+    if ((draft.productId ?? 0) <= 0) {
+      return Future.value(null);
+    }
+    return showInventoryTrackingSelector(
       context: context,
-      builder: (context) {
-        final repo = ref.read(inventoryRepositoryProvider);
-        final controller = TextEditingController();
-        List<InventoryListItem> results = const [];
-        bool loading = true;
-        bool kickoff = true;
-        return StatefulBuilder(
-          builder: (context, setStateDialog) {
-            Future<void> doSearch(String q) async {
-              loading = true;
-              setStateDialog(() {});
-              try {
-                results = await repo.searchProducts(q);
-              } finally {
-                loading = false;
-                setStateDialog(() {});
-              }
-            }
-
-            if (kickoff) {
-              kickoff = false;
-              Future.microtask(() => doSearch(''));
-            }
-
-            return AppSelectionDialog(
-              title: 'Add Product',
-              maxWidth: 640,
-              loading: loading,
-              searchField: TextField(
-                controller: controller,
-                decoration: const InputDecoration(
-                  hintText: 'Search products / variants / barcode',
-                  prefixIcon: Icon(Icons.search_rounded),
-                ),
-                onChanged: (v) => doSearch(v.trim()),
-                onSubmitted: (v) => doSearch(v.trim()),
-              ),
-              body: results.isEmpty && !loading
-                  ? const Center(child: Text('No products found'))
-                  : ListView.builder(
-                      itemCount: results.length,
-                      itemBuilder: (context, i) {
-                        final item = results[i];
-                        return ListTile(
-                          title: Text(item.name),
-                          subtitle: Text([
-                            if ((item.variantName ?? '').trim().isNotEmpty)
-                              item.variantName!,
-                            'Stock ${item.stock.toStringAsFixed(2)}',
-                            'Price ${(item.price ?? 0).toStringAsFixed(2)}',
-                          ].join(' • ')),
-                          onTap: () => Navigator.of(context).pop(item),
-                        );
-                      },
-                    ),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel')),
-              ],
-            );
-          },
-        );
-      },
+      ref: ref,
+      productId: draft.productId!,
+      productName: draft.displayName,
+      quantity: draft.quantity.abs(),
+      mode: InventoryTrackingMode.issue,
+      initialSelection: draft.tracking,
     );
   }
 
-  Future<void> _addOrReplaceProduct([_InvoiceLine? target]) async {
-    final picked = await _pickProduct();
-    if (picked == null || !mounted) return;
+  Future<void> _editLine({DocumentLineDraft? line, int? index}) async {
+    final result = await showDocumentLineEditorDialog(
+      context: context,
+      ref: ref,
+      title: line == null ? 'Add Invoice Item' : 'Edit Invoice Item',
+      initialLine: line?.copy() ?? DocumentLineDraft.empty(),
+      searchProducts: _searchProducts,
+      allowNegativeQuantity: true,
+      allowDelete: line != null,
+      configureTracking: _configureTrackingForLine,
+      resolveTaxProfile: _resolveTaxProfile,
+    );
+    if (result == null || !mounted) return;
     setState(() {
-      if (target != null) {
-        target.applyProduct(picked);
+      _error = null;
+      if (result.remove) {
+        if (index != null) {
+          _lines = [..._lines]..removeAt(index);
+        }
         return;
       }
-      final blankIndex =
-          _lines.indexWhere((e) => !e.hasProduct && !e.hasValues);
-      if (blankIndex >= 0) {
-        _lines[blankIndex].applyProduct(picked);
+      final saved = result.line!;
+      final mergeIndex = _findMergeTarget(saved, excludeIndex: index);
+      if (mergeIndex != null) {
+        final next = [..._lines];
+        final target = next[mergeIndex].copy();
+        target.quantity += saved.quantity;
+        target.persistedTaxAmount = (next[mergeIndex].persistedTaxAmount ??
+                next[mergeIndex].taxAmount) +
+            saved.taxAmount;
+        next[mergeIndex] = target;
+        if (index != null && index != mergeIndex) {
+          next.removeAt(index);
+        }
+        _lines = next;
+      } else if (index == null) {
+        _lines = [..._lines, saved];
       } else {
-        _lines = [..._lines, _InvoiceLine.fromInventory(picked)];
+        final next = [..._lines];
+        next[index] = saved;
+        _lines = next;
       }
     });
   }
 
-  Future<void> _configureTracking(_InvoiceLine line) async {
-    if (!line.requiresTracking || (line.productId ?? 0) <= 0) return;
-    final qty = line.quantity.abs();
-    if (qty <= 0) {
-      setState(() => _error = 'Enter quantity first for ${line.displayName}.');
-      return;
+  int? _findMergeTarget(DocumentLineDraft line, {int? excludeIndex}) {
+    if (line.requiresTracking || line.tracking != null) return null;
+    for (var i = 0; i < _lines.length; i++) {
+      if (i == excludeIndex) continue;
+      final current = _lines[i];
+      if (current.requiresTracking || current.tracking != null) continue;
+      final sameIdentity = (((current.barcodeId ?? 0) > 0) &&
+              current.barcodeId == line.barcodeId) ||
+          (((current.barcode ?? '').trim().isNotEmpty) &&
+              current.barcode == line.barcode) ||
+          (((current.productId ?? 0) > 0) &&
+              current.productId == line.productId) ||
+          (((current.comboProductId ?? 0) > 0) &&
+              current.comboProductId == line.comboProductId);
+      final sameCommercials = current.unitPrice == line.unitPrice &&
+          current.discountPercent == line.discountPercent &&
+          (current.taxId ?? 0) == (line.taxId ?? 0) &&
+          current.quantity.sign == line.quantity.sign;
+      if (sameIdentity && sameCommercials) return i;
     }
-    final selection = await showInventoryTrackingSelector(
-      context: context,
-      ref: ref,
-      productId: line.productId!,
-      productName: line.displayName,
-      quantity: qty,
-      mode: InventoryTrackingMode.issue,
-      initialSelection: line.tracking,
-    );
-    if (selection != null && mounted) setState(() => line.tracking = selection);
+    return null;
   }
 
   Future<void> _submit() async {
     final customer = _customer;
-    if (customer == null) {
+    if (customer == null || (customer.customerId ?? 0) <= 0) {
       setState(() => _error = 'Select a B2B party before saving.');
       return;
     }
@@ -317,16 +479,15 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
       setState(() => _error = 'Add at least one invoice line.');
       return;
     }
-    for (final line in lines) {
-      if (line.requiresTracking && line.tracking == null) {
-        setState(() => _error = 'Configure tracking for ${line.displayName}.');
-        return;
-      }
+    if (lines.any((line) => line.requiresTracking && line.tracking == null)) {
+      setState(() => _error = 'Configure tracking for all tracked items.');
+      return;
     }
     final paidAmount = double.tryParse(_paidCtrl.text.trim()) ?? 0;
     if (paidAmount > 0 && _paymentMethod == null) {
-      setState(() =>
-          _error = 'Select a payment method when paid amount is entered.');
+      setState(
+        () => _error = 'Select a payment method when a paid amount is entered.',
+      );
       return;
     }
 
@@ -348,8 +509,7 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
               baseline: widget.sale!,
               transactionType: 'B2B',
               customerId: customer.customerId,
-              items:
-                  lines.map((e) => e.toPosCartItem()).toList(growable: false),
+              items: lines.map((line) => line.toPosCartItem()).toList(),
               paymentMethodId: _paymentMethod?.methodId,
               paidAmount: paidAmount,
               discountAmount: double.tryParse(_discountCtrl.text.trim()) ?? 0,
@@ -359,13 +519,14 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
         if (!mounted) return;
         await Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-              builder: (_) => SaleDetailPage(saleId: result.saleId)),
+            builder: (_) => SaleDetailPage(saleId: result.saleId),
+          ),
         );
         return;
       }
 
       String? overridePassword;
-      if (lines.any((e) => e.quantity < 0)) {
+      if (lines.any((line) => line.quantity < 0)) {
         overridePassword = await showSalesActionPasswordDialog(
           context,
           title: 'Authorize Refund Lines',
@@ -377,8 +538,8 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
       }
 
       final saleId = await ref.read(salesRepositoryProvider).createInvoice(
-            customerId: customer.customerId,
-            items: lines.map((e) => e.toCreateJson()).toList(growable: false),
+            customerId: customer.customerId!,
+            items: lines.map((line) => line.toInvoiceJson()).toList(),
             paymentMethodId: _paymentMethod?.methodId,
             paidAmount: paidAmount,
             discountAmount: double.tryParse(_discountCtrl.text.trim()) ?? 0,
@@ -399,592 +560,1073 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
 
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.of(context).size.width >= 1080;
+    final localePrefs = ref.watch(localePreferencesProvider);
     final location = ref.watch(locationNotifierProvider).selected;
+    final user = ref.watch(authNotifierProvider).user;
+    final showSidebarToggle = AppBreakpoints.isTabletOrDesktop(context);
+    final wide = MediaQuery.of(context).size.width >= 1200;
+    const gap = 12.0;
+    final sale = widget.sale;
     final lines = _activeLines;
     final lineNet = lines.fold<double>(0, (sum, line) => sum + line.lineTotal);
+    final computedTax =
+        lines.fold<double>(0, (sum, line) => sum + line.taxAmount);
+    final taxTotal = computedTax == 0 && (sale?.taxAmount ?? 0) > 0
+        ? sale!.taxAmount
+        : computedTax;
+    final totalQty = lines.fold<double>(0, (sum, line) => sum + line.quantity);
     final discount = double.tryParse(_discountCtrl.text.trim()) ?? 0;
     final paid = double.tryParse(_paidCtrl.text.trim()) ?? 0;
-    final total = lineNet - discount;
-    final summary = ProfessionalSummaryCard(
-      title: 'Document Summary',
-      rows: [
-        (label: 'Active Lines', value: '${lines.length}', emphasize: false),
-        (
-          label: 'Line Net',
-          value: lineNet.toStringAsFixed(2),
-          emphasize: false
+    final total = lineNet + taxTotal - discount;
+    final balance = total - paid;
+    final statusBanners = _buildStatusBanners();
+
+    final mainColumn = Column(
+      children: [
+        if (statusBanners != null) ...[
+          statusBanners,
+          const SizedBox(height: gap),
+        ],
+        _buildMetadataCard(
+          localePrefs,
+          location?.name,
+          user?.username,
+          sale?.saleDate,
+          sale?.saleNumber,
         ),
-        (
-          label: 'Header Discount',
-          value: discount.toStringAsFixed(2),
-          emphasize: false
-        ),
-        (
-          label: 'Paid Amount',
-          value: paid.toStringAsFixed(2),
-          emphasize: false
-        ),
-        (
-          label: 'Estimated Total',
-          value: total.toStringAsFixed(2),
-          emphasize: true
-        ),
-        (
-          label: 'Balance',
-          value: (total - paid).toStringAsFixed(2),
-          emphasize: true
+        const SizedBox(height: gap),
+        if (wide)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 6, child: _buildCustomerCard()),
+              const SizedBox(width: gap),
+              Expanded(flex: 5, child: _buildShippingCard()),
+            ],
+          )
+        else ...[
+          _buildCustomerCard(),
+          const SizedBox(height: gap),
+          _buildShippingCard(),
+        ],
+        const SizedBox(height: gap),
+        _buildLinesCard(lines, totalQty),
+      ],
+    );
+
+    final sideColumn = Column(
+      children: [
+        _buildAccountCard(),
+        const SizedBox(height: gap),
+        _buildCommercialCard(),
+        const SizedBox(height: gap),
+        _buildSummaryCard(
+          lines.length,
+          totalQty,
+          lineNet,
+          taxTotal,
+          discount,
+          paid,
+          total,
+          balance,
         ),
       ],
-      footer: SizedBox(
-        width: double.infinity,
-        child: FilledButton.icon(
-          onPressed: _saving ? null : _submit,
-          icon: Icon(widget.isEdit
-              ? Icons.save_as_rounded
-              : Icons.receipt_long_rounded),
-          label: Text(
-            _saving
-                ? 'Saving...'
-                : widget.isEdit
-                    ? 'Save Invoice Changes'
-                    : widget.isExchange
-                        ? 'Create Exchange Invoice'
-                        : 'Create B2B Invoice',
-          ),
+    );
+
+    return Scaffold(
+      appBar: AppBar(
+        leadingWidth: showSidebarToggle ? 104 : null,
+        leading: showSidebarToggle ? const DesktopSidebarToggleLeading() : null,
+        title: Text(_title),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(12),
+          children: [
+            if (wide)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: mainColumn),
+                  const SizedBox(width: gap),
+                  SizedBox(width: 312, child: sideColumn),
+                ],
+              )
+            else ...[
+              mainColumn,
+              const SizedBox(height: gap),
+              sideColumn,
+            ],
+          ],
         ),
       ),
     );
+  }
 
-    final content = ListView(
-      padding: const EdgeInsets.all(16),
+  Widget? _buildStatusBanners() {
+    if ((_error ?? '').isEmpty && (_info ?? '').isEmpty) return null;
+    return Column(
       children: [
-        ProfessionalDocumentHeader(
-          title: _title,
-          subtitle: widget.isExchange
-              ? 'Use a proper business document for B2B refund and replacement work instead of the POS checkout surface.'
-              : 'Structured B2B invoice entry with party selection, commercial terms, dense line rows, and a business-document summary.',
-          badges: [
-            const ProfessionalBadge(label: 'B2B Document'),
-            if (widget.isEdit)
-              const ProfessionalBadge(
-                label: 'Edit Mode',
-                backgroundColor: Color(0xFFF8EEDC),
-                foregroundColor: Color(0xFF7B5416),
-              ),
-            if (widget.isExchange)
-              const ProfessionalBadge(
-                label: 'Exchange Draft',
-                backgroundColor: Color(0xFFFDE8E4),
-                foregroundColor: Color(0xFF8A3E31),
-              ),
-            if (location != null)
-              ProfessionalBadge(
-                label: 'Location: ${location.name}',
-                backgroundColor: const Color(0xFFE8F3EC),
-                foregroundColor: const Color(0xFF255C35),
-              ),
-          ],
-        ),
-        if ((_error ?? '').isNotEmpty) ...[
-          const SizedBox(height: 12),
+        if ((_error ?? '').isNotEmpty)
           _Banner(
-              message: _error!,
-              color: Theme.of(context).colorScheme.errorContainer),
-        ],
-        if ((_info ?? '').isNotEmpty) ...[
-          const SizedBox(height: 12),
+            message: _error!,
+            color: Theme.of(context).colorScheme.errorContainer,
+          ),
+        if ((_error ?? '').isNotEmpty && (_info ?? '').isNotEmpty)
+          const SizedBox(height: 10),
+        if ((_info ?? '').isNotEmpty)
           _Banner(message: _info!, color: const Color(0xFFE7F0FA)),
-        ],
-        const SizedBox(height: 16),
-        ProfessionalSectionCard(
-          title: 'Party & Terms',
-          subtitle:
-              'Keep party identity, payment collection, and document notes in one structured section.',
-          child: Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: [
-              SizedBox(
-                width: wide ? 360 : double.infinity,
-                child: _PartyBox(
-                    customer: _customer,
-                    onSelect: _saving ? null : _pickCustomer),
+      ],
+    );
+  }
+
+  Widget _buildCustomerCard() {
+    final customer = _customer;
+    return _InvoiceOverviewCard(
+      title: 'Customer Information',
+      icon: Icons.business_rounded,
+      action: FilledButton.tonalIcon(
+        onPressed: _saving ? null : _pickCustomer,
+        icon: const Icon(Icons.search_rounded),
+        label: Text(customer == null ? 'Select' : 'Change'),
+        style: _compactButtonStyle(context),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildFieldGrid(
+            [
+              (
+                label: 'Company / Customer',
+                value: customer?.name ?? '',
+                maxLines: 1,
               ),
+              (
+                label: 'Tax ID',
+                value: customer?.taxNumber ?? '',
+                maxLines: 1,
+              ),
+              (
+                label: 'Phone',
+                value: customer?.phone ?? '',
+                maxLines: 1,
+              ),
+              (
+                label: 'Email',
+                value: customer?.email ?? '',
+                maxLines: 1,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFieldGrid(
+    List<({String label, String value, int maxLines})> fields,
+  ) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = 14.0;
+        final columns = constraints.maxWidth >= 360 ? 2 : 1;
+        final itemWidth = columns == 1
+            ? constraints.maxWidth
+            : (constraints.maxWidth - gap) / 2;
+        return Wrap(
+          spacing: gap,
+          runSpacing: 2,
+          children: [
+            for (final field in fields)
               SizedBox(
-                width: wide ? 220 : double.infinity,
-                child: TextField(
-                  controller: _discountCtrl,
-                  enabled: !_saving,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                      labelText: 'Header Discount',
-                      prefixIcon: Icon(Icons.percent_rounded)),
-                  onChanged: (_) => setState(() {}),
+                width: itemWidth,
+                child: _InvoiceFieldPair(
+                  label: field.label,
+                  value: field.value,
+                  maxLines: field.maxLines,
                 ),
               ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildShippingCard() {
+    final customer = _customer;
+    return _InvoiceOverviewCard(
+      title: 'Shipping Details',
+      icon: Icons.local_shipping_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildFieldGrid(
+            [
+              (
+                label: 'Shipping Address',
+                value: customer == null
+                    ? ''
+                    : ((customer.shippingAddress ?? '').trim().isNotEmpty
+                        ? customer.shippingAddress!.trim()
+                        : customer.primaryAddress),
+                maxLines: 2,
+              ),
+              (
+                label: 'Billing Address',
+                value: customer == null
+                    ? ''
+                    : ((customer.address ?? '').trim().isEmpty
+                        ? 'No billing address on file'
+                        : customer.address!.trim()),
+                maxLines: 2,
+              ),
+              (
+                label: 'Contact Person',
+                value: customer?.contactPerson ?? '',
+                maxLines: 1,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetadataCard(
+    LocalePreferencesState localePrefs,
+    String? locationName,
+    String? username,
+    DateTime? saleDate,
+    String? saleNumber,
+  ) {
+    final invoiceDate = saleDate ?? DateTime.now();
+    final dueDate = (_customer?.paymentTerms ?? 0) > 0
+        ? invoiceDate.add(Duration(days: _customer!.paymentTerms))
+        : null;
+    return _InvoiceOverviewCard(
+      showHeader: false,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 18,
+            runSpacing: 12,
+            children: [
+              _InvoiceMetaCell(
+                label: 'Invoice Number',
+                value: (saleNumber ?? '').trim().isEmpty
+                    ? ((_receiptPreview ?? '').trim().isEmpty
+                        ? 'Auto-generated on save'
+                        : _receiptPreview!)
+                    : saleNumber!,
+              ),
+              _InvoiceMetaCell(
+                label: 'Invoice Date',
+                value: AppDateTime.formatDate(
+                  context,
+                  localePrefs,
+                  saleDate ?? DateTime.now(),
+                ),
+              ),
+              _InvoiceMetaCell(
+                label: 'Location',
+                value: (locationName ?? '').trim().isEmpty
+                    ? 'No location selected'
+                    : locationName!,
+              ),
+              _InvoiceMetaCell(
+                label: 'Prepared By',
+                value: (username ?? '').trim().isEmpty
+                    ? 'Current user'
+                    : username!,
+              ),
+              _InvoiceMetaCell(
+                label: 'Due Date',
+                value: dueDate == null
+                    ? 'Not set'
+                    : AppDateTime.formatDate(
+                        context,
+                        localePrefs,
+                        dueDate,
+                      ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _notesCtrl,
+            enabled: !_saving,
+            minLines: 2,
+            maxLines: 3,
+            style: Theme.of(context).textTheme.bodySmall,
+            decoration: const InputDecoration(
+              labelText: 'Document Notes / Internal Remarks',
+              alignLabelWithHint: true,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLinesCard(List<DocumentLineDraft> lines, double totalQty) {
+    return ProfessionalSectionCard(
+      title: 'Invoice Items',
+      action: FilledButton.tonalIcon(
+        onPressed: _saving ? null : () => _editLine(),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Add Item'),
+        style: _compactButtonStyle(context),
+      ),
+      child: lines.isEmpty
+          ? _InvoiceEmptyLines(
+              onAdd: _saving ? null : () => _editLine(),
+            )
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                return Column(
+                  children: [
+                    const _InvoiceTableHeader(),
+                    const SizedBox(height: 10),
+                    for (var index = 0; index < lines.length; index++) ...[
+                      _InvoiceTableRow(
+                        index: index + 1,
+                        line: lines[index],
+                        enabled: !_saving,
+                        onTap: () =>
+                            _editLine(line: lines[index], index: index),
+                        onDelete: _saving
+                            ? null
+                            : () => setState(
+                                  () => _lines = [..._lines]..removeAt(index),
+                                ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        'Items: ${lines.length}    Total Qty: ${formatDocumentQuantity(totalQty)}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+    );
+  }
+
+  Widget _buildAccountCard() {
+    final customer = _customer;
+    return ProfessionalSectionCard(
+      title: 'Credit Balance',
+      child: customer == null
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                _AccountAmount(value: '0.00'),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _AccountAmount(
+                  value: customer.creditBalance.toStringAsFixed(2),
+                ),
+                const SizedBox(height: 12),
+                _PreviewRow(
+                  label: 'Credit Limit',
+                  value: customer.creditLimit.toStringAsFixed(2),
+                ),
+                const SizedBox(height: 10),
+                _PreviewRow(
+                  label: 'Payment Terms',
+                  value: customer.paymentTerms > 0
+                      ? '${customer.paymentTerms} days'
+                      : 'Not set',
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildCommercialCard() {
+    return ProfessionalSectionCard(
+      title: 'Payment & Discount',
+      action: OutlinedButton.icon(
+        onPressed: _saving ? null : _pickPaymentMethod,
+        icon: const Icon(Icons.account_balance_wallet_outlined, size: 16),
+        label: Text(_paymentMethod == null ? 'Select' : 'Change'),
+        style: _compactButtonStyle(context, outlined: true),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _InvoiceFieldPair(
+            label: 'Payment Method',
+            value: _paymentMethod?.name ?? '',
+          ),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
               SizedBox(
-                width: wide ? 220 : double.infinity,
+                width: 132,
                 child: TextField(
                   controller: _paidCtrl,
                   enabled: !_saving,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(
-                      labelText: 'Paid Amount',
-                      prefixIcon: Icon(Icons.payments_outlined)),
+                    labelText: 'Paid',
+                    hintText: '0.00',
+                    isDense: true,
+                  ),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                   onChanged: (_) => setState(() {}),
                 ),
               ),
               SizedBox(
-                width: wide ? 260 : double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _saving ? null : _pickPaymentMethod,
-                  icon: const Icon(Icons.account_balance_wallet_outlined),
-                  label: Text(
-                    _paymentMethod == null
-                        ? 'Select Payment Method'
-                        : 'Payment: ${_paymentMethod!.name}',
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: wide ? 480 : double.infinity,
+                width: 132,
                 child: TextField(
-                  controller: _notesCtrl,
+                  controller: _discountCtrl,
                   enabled: !_saving,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: widget.sale == null
-                        ? 'Notes / Internal Remarks'
-                        : 'Notes / Internal Remarks ${widget.sale!.saleNumber.isNotEmpty ? "for ${widget.sale!.saleNumber}" : ""}',
-                    alignLabelWithHint: true,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Discount',
+                    isDense: true,
                   ),
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 16),
-        ProfessionalSectionCard(
-          title: 'Invoice Lines',
-          subtitle:
-              'A denser, professional line-entry grid for B2B operations.',
-          action: FilledButton.tonalIcon(
-            onPressed: _saving ? null : _addOrReplaceProduct,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Add Item'),
-          ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Column(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF4F7FB),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    children: const [
-                      _Head(label: 'Item', width: 320),
-                      _Head(label: 'Qty', width: 90),
-                      _Head(label: 'Price', width: 110),
-                      _Head(label: 'Disc %', width: 90),
-                      _Head(label: 'Net', width: 110),
-                      _Head(label: 'Tracking', width: 110),
-                      _Head(label: 'Action', width: 70),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                for (final line in _lines) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 12),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                          color: Theme.of(context).colorScheme.outlineVariant),
+          if (_paymentMethod == null &&
+              (double.tryParse(_paidCtrl.text) ?? 0) > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(
+                'Select a payment method when a paid amount is entered.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.error,
                     ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard(
+    int itemCount,
+    double totalQty,
+    double lineNet,
+    double taxTotal,
+    double discount,
+    double paid,
+    double total,
+    double balance,
+  ) {
+    return ProfessionalSummaryCard(
+      title: 'Document Summary',
+      rows: [
+        (label: 'Items', value: '$itemCount', emphasize: false),
+        (
+          label: 'Total Qty',
+          value: formatDocumentQuantity(totalQty),
+          emphasize: false,
+        ),
+        (
+          label: 'Line Net',
+          value: lineNet.toStringAsFixed(2),
+          emphasize: false
+        ),
+        (
+          label: 'Tax',
+          value: taxTotal.toStringAsFixed(2),
+          emphasize: false,
+        ),
+        (
+          label: 'Discount',
+          value: discount.toStringAsFixed(2),
+          emphasize: false,
+        ),
+        (
+          label: 'Paid Amount',
+          value: paid.toStringAsFixed(2),
+          emphasize: false
+        ),
+        (label: 'Balance', value: balance.toStringAsFixed(2), emphasize: true),
+      ],
+      footer: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFDE8E4),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Estimated Total',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  total.toStringAsFixed(2),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFFBA1A1A),
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _saving ? null : _submit,
+            icon: Icon(
+              widget.isEdit
+                  ? Icons.save_as_rounded
+                  : Icons.receipt_long_rounded,
+            ),
+            label: Text(
+              _saving
+                  ? 'Saving...'
+                  : widget.isEdit
+                      ? 'Save Invoice Changes'
+                      : widget.isExchange
+                          ? 'Create Exchange Invoice'
+                          : 'Create B2B Invoice',
+            ),
+            style: _compactButtonStyle(context),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+ButtonStyle _compactButtonStyle(
+  BuildContext context, {
+  bool outlined = false,
+}) {
+  final base = outlined
+      ? OutlinedButton.styleFrom(
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          minimumSize: const Size(0, 34),
+          textStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+        )
+      : FilledButton.styleFrom(
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          minimumSize: const Size(0, 34),
+          textStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+        );
+  return base;
+}
+
+class _InvoiceOverviewCard extends StatelessWidget {
+  const _InvoiceOverviewCard({
+    this.title,
+    this.icon,
+    this.action,
+    required this.child,
+    this.showHeader = true,
+  });
+
+  final String? title;
+  final IconData? icon;
+  final Widget? action;
+  final Widget child;
+  final bool showHeader;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (showHeader) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(
-                          width: 320,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(line.displayName,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleSmall
-                                      ?.copyWith(fontWeight: FontWeight.w700)),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  OutlinedButton(
-                                    onPressed: _saving
-                                        ? null
-                                        : () => _addOrReplaceProduct(line),
-                                    child: Text(
-                                        line.hasProduct ? 'Change' : 'Select'),
-                                  ),
-                                  if (line.quantity < 0)
-                                    const ProfessionalBadge(
-                                      label: 'Refund',
-                                      backgroundColor: Color(0xFFFDE8E4),
-                                      foregroundColor: Color(0xFF8A3E31),
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        _NumCell(
-                            controller: line.quantityCtrl,
-                            width: 90,
-                            enabled: !line.lockedQuantity,
-                            onChanged: (_) => setState(() {})),
-                        _NumCell(
-                            controller: line.priceCtrl,
-                            width: 110,
-                            onChanged: (_) => setState(() {})),
-                        _NumCell(
-                            controller: line.discountCtrl,
-                            width: 90,
-                            onChanged: (_) => setState(() {})),
-                        SizedBox(
-                          width: 110,
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 14),
-                            child: Text(line.lineTotal.toStringAsFixed(2),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleSmall
-                                    ?.copyWith(fontWeight: FontWeight.w700)),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 110,
-                          child: line.requiresTracking
-                              ? OutlinedButton(
-                                  onPressed: _saving
-                                      ? null
-                                      : () => _configureTracking(line),
-                                  child: Text(
-                                      line.tracking == null ? 'Set' : 'Ready'),
-                                )
-                              : const Padding(
-                                  padding: EdgeInsets.only(top: 14),
-                                  child: Text('N/A'),
-                                ),
-                        ),
-                        SizedBox(
-                          width: 70,
-                          child: IconButton(
-                            onPressed: _saving
-                                ? null
-                                : () {
-                                    setState(() {
-                                      line.dispose();
-                                      _lines = [..._lines]..remove(line);
-                                      if (_lines.isEmpty) {
-                                        _lines = [_InvoiceLine.empty()];
-                                      }
-                                    });
-                                  },
-                            icon: const Icon(Icons.delete_outline_rounded),
+                        if (icon != null) ...[
+                          Icon(icon, size: 16),
+                          const SizedBox(width: 8),
+                        ],
+                        Expanded(
+                          child: Text(
+                            title ?? '',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  if (action != null) ...[
+                    const SizedBox(width: 10),
+                    action!,
+                  ],
                 ],
-              ],
-            ),
-          ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            child,
+          ],
         ),
-        if (!wide) ...[
-          const SizedBox(height: 16),
-          summary,
-        ],
-      ],
-    );
-
-    return Scaffold(
-      appBar: AppBar(title: Text(_title)),
-      body: SafeArea(
-        child: wide
-            ? Row(
-                children: [
-                  Expanded(child: content),
-                  SizedBox(
-                    width: 340,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(0, 16, 16, 16),
-                      child: ListView(children: [summary]),
-                    ),
-                  ),
-                ],
-              )
-            : content,
       ),
     );
   }
 }
 
-class _InvoiceLine {
-  _InvoiceLine({
-    this.productId,
-    this.comboProductId,
-    this.barcodeId,
-    this.productName,
-    this.variantName,
-    this.trackingType = 'VARIANT',
-    this.sourceSaleDetailId,
-    this.tracking,
-    this.comboTracking = const [],
-    String quantity = '',
-    String price = '',
-    String discount = '0',
-  })  : quantityCtrl = TextEditingController(text: quantity),
-        priceCtrl = TextEditingController(text: price),
-        discountCtrl = TextEditingController(text: discount);
+class _InvoiceFieldPair extends StatelessWidget {
+  const _InvoiceFieldPair({
+    required this.label,
+    required this.value,
+    this.maxLines = 1,
+  });
 
-  factory _InvoiceLine.empty() => _InvoiceLine();
+  final String label;
+  final String value;
+  final int maxLines;
 
-  factory _InvoiceLine.fromInventory(InventoryListItem item) => _InvoiceLine(
-        productId: item.productId > 0 ? item.productId : null,
-        comboProductId: item.comboProductId,
-        barcodeId: item.barcodeId,
-        productName: item.name,
-        variantName: item.variantName,
-        trackingType: item.trackingType,
-        quantity: '1',
-        price: (item.price ?? 0).toStringAsFixed(2),
-      );
-
-  factory _InvoiceLine.fromSaleItem(SaleItemDto item) => _InvoiceLine(
-        productId: item.productId,
-        comboProductId: item.comboProductId,
-        barcodeId: item.barcodeId,
-        productName: item.productName,
-        variantName: item.variantName,
-        trackingType: item.trackingType,
-        sourceSaleDetailId: item.sourceSaleDetailId,
-        comboTracking: item.comboComponentTracking,
-        tracking: item.isSerialized || item.trackingType == 'BATCH'
-            ? InventoryTrackingSelection(
-                barcodeId: item.barcodeId,
-                trackingType: item.trackingType,
-                isSerialized: item.isSerialized,
-                barcode: item.barcode,
-                variantName: item.variantName,
-                serialNumbers: item.serialNumbers,
-              )
-            : null,
-        quantity: item.quantity.toStringAsFixed(2),
-        price: item.unitPrice.toStringAsFixed(2),
-        discount: item.discountPercent.toStringAsFixed(2),
-      );
-
-  factory _InvoiceLine.fromExchangeItem(SaleDto sale, SaleItemDto item) {
-    final line = _InvoiceLine.fromSaleItem(item);
-    line.sourceSaleDetailId ??= item.saleDetailId;
-    line.lockedQuantity = true;
-    line.quantityCtrl.text = (-item.quantity.abs()).toStringAsFixed(2);
-    line.productName ??= 'Refund from ${sale.saleNumber}';
-    return line;
-  }
-
-  int? productId;
-  int? comboProductId;
-  int? barcodeId;
-  String? productName;
-  String? variantName;
-  String trackingType;
-  int? sourceSaleDetailId;
-  bool lockedQuantity = false;
-  InventoryTrackingSelection? tracking;
-  List<PosComboComponentTracking> comboTracking;
-  final TextEditingController quantityCtrl;
-  final TextEditingController priceCtrl;
-  final TextEditingController discountCtrl;
-
-  bool get hasProduct => (productId ?? 0) > 0 || (comboProductId ?? 0) > 0;
-  bool get hasValues =>
-      quantityCtrl.text.trim().isNotEmpty ||
-      priceCtrl.text.trim().isNotEmpty ||
-      (productName ?? '').trim().isNotEmpty;
-  double get quantity => double.tryParse(quantityCtrl.text.trim()) ?? 0;
-  double get unitPrice => double.tryParse(priceCtrl.text.trim()) ?? 0;
-  double get discount => double.tryParse(discountCtrl.text.trim()) ?? 0;
-  bool get requiresTracking =>
-      trackingType == 'BATCH' || trackingType == 'SERIAL';
-  double get lineTotal =>
-      (quantity * unitPrice) -
-      ((quantity * unitPrice) * (discount.clamp(0.0, 100.0) / 100.0));
-  String get displayName => [
-        (productName ?? '').trim().isEmpty ? null : productName!.trim(),
-        (variantName ?? '').trim().isEmpty ? null : variantName!.trim(),
-      ].whereType<String>().join(' • ').isEmpty
-          ? 'Select product'
-          : [
-              (productName ?? '').trim().isEmpty ? null : productName!.trim(),
-              (variantName ?? '').trim().isEmpty ? null : variantName!.trim(),
-            ].whereType<String>().join(' • ');
-
-  void applyProduct(InventoryListItem item) {
-    productId = item.productId > 0 ? item.productId : null;
-    comboProductId = item.comboProductId;
-    barcodeId = item.barcodeId;
-    productName = item.name;
-    variantName = item.variantName;
-    trackingType = item.trackingType;
-    sourceSaleDetailId = null;
-    tracking = null;
-    comboTracking = const [];
-    lockedQuantity = false;
-    quantityCtrl.text = '1';
-    priceCtrl.text = (item.price ?? 0).toStringAsFixed(2);
-    discountCtrl.text = '0';
-  }
-
-  PosCartItem toPosCartItem() => PosCartItem(
-        product: PosProductDto(
-          productId: productId ?? 0,
-          comboProductId: comboProductId,
-          barcodeId: barcodeId ?? 0,
-          name: productName ?? 'Item',
-          price: unitPrice,
-          stock: 0,
-          variantName: variantName,
-          isVirtualCombo: (comboProductId ?? 0) > 0,
-          trackingType: trackingType,
-          isSerialized: trackingType == 'SERIAL',
-        ),
-        quantity: quantity,
-        unitPrice: unitPrice,
-        discountPercent: discount,
-        sourceSaleDetailId: sourceSaleDetailId,
-        tracking: tracking,
-        comboTracking: comboTracking,
-        lockedQuantity: lockedQuantity,
-      );
-
-  Map<String, dynamic> toCreateJson() => {
-        if ((productId ?? 0) > 0) 'product_id': productId,
-        if ((comboProductId ?? 0) > 0) 'combo_product_id': comboProductId,
-        if ((barcodeId ?? 0) > 0) 'barcode_id': barcodeId,
-        if ((sourceSaleDetailId ?? 0) > 0)
-          'source_sale_detail_id': sourceSaleDetailId,
-        'quantity': quantity,
-        'unit_price': unitPrice,
-        'discount_percentage': discount,
-        if (tracking != null) ...tracking!.toIssueJson(),
-        if (comboTracking.isNotEmpty)
-          'combo_component_tracking':
-              comboTracking.map((e) => e.toJson()).toList(),
-      };
-
-  void dispose() {
-    quantityCtrl.dispose();
-    priceCtrl.dispose();
-    discountCtrl.dispose();
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value.trim().isEmpty ? 'Not set' : value,
+                  maxLines: maxLines,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: value.trim().isEmpty
+                            ? Theme.of(context).colorScheme.onSurfaceVariant
+                            : null,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
-class _PartyBox extends StatelessWidget {
-  const _PartyBox({required this.customer, required this.onSelect});
+class _InvoiceMetaCell extends StatelessWidget {
+  const _InvoiceMetaCell({
+    required this.label,
+    required this.value,
+  });
 
-  final PosCustomerDto? customer;
-  final VoidCallback? onSelect;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 150,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InvoiceTableHeader extends StatelessWidget {
+  const _InvoiceTableHeader();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7FAFD),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFD7E3EF)),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(14),
       ),
-      child: Row(
+      child: const Row(
         children: [
-          const Icon(Icons.business_rounded),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              customer?.name ?? 'Select B2B Party',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
-          FilledButton.tonal(onPressed: onSelect, child: const Text('Select')),
+          _InvoiceHeaderCell(label: '#', flex: 4, textAlign: TextAlign.center),
+          _InvoiceHeaderCell(label: 'Barcode', flex: 7),
+          _InvoiceHeaderCell(label: 'Item / Description', flex: 28),
+          _InvoiceHeaderCell(
+              label: 'Qty', flex: 5, textAlign: TextAlign.center),
+          _InvoiceHeaderCell(
+              label: 'Price', flex: 8, textAlign: TextAlign.right),
+          _InvoiceHeaderCell(
+              label: 'Disc %', flex: 7, textAlign: TextAlign.right),
+          _InvoiceHeaderCell(label: 'Tax', flex: 9, textAlign: TextAlign.right),
+          _InvoiceHeaderCell(
+              label: 'Total', flex: 9, textAlign: TextAlign.right),
+          _InvoiceHeaderCell(
+              label: 'Action', flex: 7, textAlign: TextAlign.center),
         ],
       ),
     );
   }
 }
 
-class _Head extends StatelessWidget {
-  const _Head({required this.label, required this.width});
-  final String label;
-  final double width;
-  @override
-  Widget build(BuildContext context) => SizedBox(
-        width: width,
-        child: Text(label,
-            style: Theme.of(context)
-                .textTheme
-                .labelLarge
-                ?.copyWith(fontWeight: FontWeight.w800)),
-      );
-}
+class _InvoiceTableRow extends StatelessWidget {
+  const _InvoiceTableRow({
+    required this.index,
+    required this.line,
+    required this.enabled,
+    required this.onTap,
+    this.onDelete,
+  });
 
-class _NumCell extends StatelessWidget {
-  const _NumCell(
-      {required this.controller,
-      required this.width,
-      this.enabled = true,
-      required this.onChanged});
-  final TextEditingController controller;
-  final double width;
+  final int index;
+  final DocumentLineDraft line;
   final bool enabled;
-  final ValueChanged<String> onChanged;
+  final VoidCallback onTap;
+  final VoidCallback? onDelete;
+
   @override
-  Widget build(BuildContext context) => SizedBox(
-        width: width,
-        child: Padding(
-          padding: const EdgeInsets.only(right: 12),
-          child: TextField(
-            controller: controller,
-            enabled: enabled,
-            keyboardType: const TextInputType.numberWithOptions(
-                decimal: true, signed: true),
-            onChanged: onChanged,
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border:
+                Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+          ),
+          child: Row(
+            children: [
+              _InvoiceBodyCell(
+                label: '$index',
+                flex: 4,
+                textAlign: TextAlign.center,
+              ),
+              _InvoiceBodyCell(
+                label:
+                    (line.barcode ?? '').trim().isEmpty ? '-' : line.barcode!,
+                flex: 7,
+              ),
+              _InvoiceBodyCell(
+                label: line.displayName,
+                secondary: _itemSecondaryText(line),
+                flex: 28,
+              ),
+              _InvoiceBodyCell(
+                label: formatDocumentQuantity(line.quantity),
+                flex: 5,
+                textAlign: TextAlign.center,
+              ),
+              _InvoiceBodyCell(
+                label: line.unitPrice.toStringAsFixed(2),
+                flex: 8,
+                textAlign: TextAlign.right,
+              ),
+              _InvoiceBodyCell(
+                label: line.discountPercent.toStringAsFixed(2),
+                flex: 7,
+                textAlign: TextAlign.right,
+              ),
+              _InvoiceBodyCell(
+                label: line.taxAmount.toStringAsFixed(2),
+                secondary: line.taxLabel,
+                flex: 9,
+                textAlign: TextAlign.right,
+              ),
+              _InvoiceBodyCell(
+                label: line.lineGrandTotal.toStringAsFixed(2),
+                flex: 9,
+                emphasize: true,
+                textAlign: TextAlign.right,
+              ),
+              Expanded(
+                flex: 7,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      tooltip: 'Edit',
+                      onPressed: enabled ? onTap : null,
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      visualDensity: VisualDensity.compact,
+                      splashRadius: 18,
+                    ),
+                    IconButton(
+                      tooltip: 'Delete',
+                      onPressed: onDelete,
+                      icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                      visualDensity: VisualDensity.compact,
+                      splashRadius: 18,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-      );
+      ),
+    );
+  }
+}
+
+class _InvoiceHeaderCell extends StatelessWidget {
+  const _InvoiceHeaderCell({
+    required this.label,
+    required this.flex,
+    this.textAlign = TextAlign.left,
+  });
+
+  final String label;
+  final int flex;
+  final TextAlign textAlign;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      flex: flex,
+      child: Text(
+        label,
+        textAlign: textAlign,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+            ),
+      ),
+    );
+  }
+}
+
+class _InvoiceBodyCell extends StatelessWidget {
+  const _InvoiceBodyCell({
+    required this.label,
+    required this.flex,
+    this.secondary,
+    this.emphasize = false,
+    this.textAlign = TextAlign.left,
+  });
+
+  final String label;
+  final int flex;
+  final String? secondary;
+  final bool emphasize;
+  final TextAlign textAlign;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      flex: flex,
+      child: Column(
+        crossAxisAlignment: textAlign == TextAlign.right
+            ? CrossAxisAlignment.end
+            : textAlign == TextAlign.center
+                ? CrossAxisAlignment.center
+                : CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            textAlign: textAlign,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: (emphasize
+                    ? Theme.of(context).textTheme.bodyMedium
+                    : Theme.of(context).textTheme.bodySmall)
+                ?.copyWith(
+              fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600,
+              fontSize: 12,
+            ),
+          ),
+          if ((secondary ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text(
+              secondary!,
+              textAlign: textAlign,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 10.5,
+                  ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _InvoiceEmptyLines extends StatelessWidget {
+  const _InvoiceEmptyLines({required this.onAdd});
+
+  final VoidCallback? onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.receipt_long_rounded, size: 28),
+          const SizedBox(height: 10),
+          Text(
+            'No invoice items added yet.',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: onAdd,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Add First Item'),
+            style: _compactButtonStyle(context),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewRow extends StatelessWidget {
+  const _PreviewRow({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+      ],
+    );
+  }
+}
+
+String _itemSecondaryText(DocumentLineDraft line) {
+  final parts = <String>[
+    if ((line.variantName ?? '').trim().isNotEmpty) line.variantName!.trim(),
+    if ((line.primaryStorage ?? '').trim().isNotEmpty)
+      line.primaryStorage!.trim(),
+    if (line.requiresTracking)
+      line.tracking == null ? 'Tracking required' : 'Tracking set',
+  ];
+  return parts.join(' • ');
+}
+
+class _AccountAmount extends StatelessWidget {
+  const _AccountAmount({required this.value});
+
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      value,
+      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: const Color(0xFFBA1A1A),
+          ),
+    );
+  }
 }
 
 class _Banner extends StatelessWidget {
   const _Banner({required this.message, required this.color});
+
   final String message;
   final Color color;
+
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-            color: color, borderRadius: BorderRadius.circular(16)),
-        child: Text(message, style: Theme.of(context).textTheme.bodyMedium),
-      );
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration:
+          BoxDecoration(color: color, borderRadius: BorderRadius.circular(14)),
+      child: Text(message, style: Theme.of(context).textTheme.bodySmall),
+    );
+  }
 }
