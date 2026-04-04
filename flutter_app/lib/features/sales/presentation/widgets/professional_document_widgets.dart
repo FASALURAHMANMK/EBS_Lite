@@ -169,18 +169,22 @@ class ProfessionalSummaryCard extends StatelessWidget {
     required this.title,
     required this.rows,
     this.footer,
+    this.expandContent = false,
   });
 
   final String title;
   final List<({String label, String value, bool emphasize})> rows;
   final Widget? footer;
+  final bool expandContent;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return ProfessionalSectionCard(
       title: title,
+      expandChild: expandContent,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (final row in rows) ...[
             Row(
@@ -210,6 +214,7 @@ class ProfessionalSummaryCard extends StatelessWidget {
             if (row != rows.last) const SizedBox(height: 10),
           ],
           if (footer != null) ...[
+            if (expandContent) const Spacer(),
             const SizedBox(height: 14),
             footer!,
           ],

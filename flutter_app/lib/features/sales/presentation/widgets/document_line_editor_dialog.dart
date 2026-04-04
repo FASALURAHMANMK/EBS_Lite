@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -465,17 +467,19 @@ class _DocumentLineEditorDialogState
   late final TextEditingController _qtyCtrl;
   late final TextEditingController _priceCtrl;
   late final TextEditingController _discountCtrl;
+  Timer? _searchDebounce;
 
   List<DocumentProductOption> _results = const [];
   bool _searching = false;
   bool _resolvingTax = false;
   String? _error;
+  int _searchSequence = 0;
 
   @override
   void initState() {
     super.initState();
     _draft = widget.initialLine.copy();
-    _searchCtrl = TextEditingController(text: _draft.barcode ?? '');
+    _searchCtrl = TextEditingController();
     _qtyCtrl = TextEditingController(
       text: _draft.quantity == 0 ? '' : _draft.quantity.toStringAsFixed(2),
     );
@@ -485,11 +489,11 @@ class _DocumentLineEditorDialogState
     _discountCtrl = TextEditingController(
       text: _draft.discountPercent.toStringAsFixed(2),
     );
-    Future.microtask(() => _runSearch(_searchCtrl.text.trim()));
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchCtrl.dispose();
     _qtyCtrl.dispose();
     _priceCtrl.dispose();
@@ -497,20 +501,50 @@ class _DocumentLineEditorDialogState
     super.dispose();
   }
 
+  void _scheduleSearch(String query) {
+    _searchDebounce?.cancel();
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _searching = false;
+        _results = const [];
+        _error = null;
+      });
+      return;
+    }
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 250),
+      () => _runSearch(trimmed),
+    );
+  }
+
   Future<void> _runSearch(String query) async {
+    _searchDebounce?.cancel();
+    final trimmed = query.trim();
+    final requestId = ++_searchSequence;
+    if (trimmed.isEmpty) {
+      setState(() {
+        _searching = false;
+        _results = const [];
+        _error = null;
+      });
+      return;
+    }
     setState(() {
       _searching = true;
       _error = null;
     });
     try {
-      final results = await widget.searchProducts(query);
-      if (!mounted) return;
+      final results = await widget.searchProducts(trimmed);
+      if (!mounted || requestId != _searchSequence) return;
       setState(() => _results = results);
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestId != _searchSequence) return;
       setState(() => _error = ErrorHandler.message(e));
     } finally {
-      if (mounted) setState(() => _searching = false);
+      if (mounted && requestId == _searchSequence) {
+        setState(() => _searching = false);
+      }
     }
   }
 
@@ -524,6 +558,8 @@ class _DocumentLineEditorDialogState
   Future<void> _selectProduct(DocumentProductOption option) async {
     setState(() {
       _draft.applyProductOption(option);
+      _searchCtrl.clear();
+      _results = const [];
       _qtyCtrl.text = _draft.quantity.toStringAsFixed(2);
       _priceCtrl.text = _draft.unitPrice.toStringAsFixed(2);
       _discountCtrl.text = _draft.discountPercent.toStringAsFixed(2);
@@ -553,17 +589,48 @@ class _DocumentLineEditorDialogState
       setState(() => _error = 'Select an item before configuring tracking.');
       return;
     }
-    if (!_draft.requiresTracking || widget.configureTracking == null) {
+    if (widget.configureTracking == null || (_draft.productId ?? 0) <= 0) {
       return;
     }
     if (_draft.quantity == 0) {
       setState(() => _error = 'Enter quantity before configuring tracking.');
       return;
     }
+    final previousBarcodeId = _draft.barcodeId;
     final selection = await widget.configureTracking!(_draft.copy());
     if (selection == null || !mounted) return;
+    DocumentProductOption? matchedOption;
+    for (final option in _results) {
+      if (option.productId == _draft.productId &&
+          option.barcodeId == selection.barcodeId) {
+        matchedOption = option;
+        break;
+      }
+    }
     setState(() {
       _draft.tracking = selection;
+      if ((selection.barcodeId ?? 0) > 0) {
+        _draft.barcodeId = selection.barcodeId;
+      }
+      if ((selection.barcode ?? '').trim().isNotEmpty) {
+        _draft.barcode = selection.barcode!.trim();
+      }
+      if (selection.variantName != null) {
+        _draft.variantName = selection.variantName;
+      }
+      if (matchedOption != null) {
+        final option = matchedOption;
+        _draft.primaryStorage = option.primaryStorage;
+        _draft.barcode = option.barcode ?? _draft.barcode;
+        _draft.variantName = option.variantName ?? _draft.variantName;
+        if (option.barcodeId != null) {
+          _draft.barcodeId = option.barcodeId;
+        }
+        if (option.barcodeId != previousBarcodeId && option.unitPrice > 0) {
+          _draft.unitPrice = option.unitPrice;
+          _priceCtrl.text = _draft.unitPrice.toStringAsFixed(2);
+        }
+      }
       _error = null;
     });
   }
@@ -594,13 +661,47 @@ class _DocumentLineEditorDialogState
     Navigator.of(context).pop(DocumentLineDialogResult.saved(_draft.copy()));
   }
 
+  bool get _canConfigureItemOptions =>
+      widget.configureTracking != null && (_draft.productId ?? 0) > 0;
+
+  String get _variationValue {
+    final variant =
+        (_draft.tracking?.variantName ?? _draft.variantName ?? '').trim();
+    return variant.isEmpty ? 'Default item' : variant;
+  }
+
+  String get _barcodeValue {
+    final barcode = (_draft.tracking?.barcode ?? _draft.barcode ?? '').trim();
+    return barcode.isEmpty ? 'Not assigned' : barcode;
+  }
+
+  String get _trackingValue {
+    if (_draft.tracking != null) return _draft.trackingSummary;
+    final capabilities = <String>[
+      if (_draft.trackingType == 'BATCH') 'Batch',
+      if (_draft.isSerialized) 'Serial',
+    ];
+    if (capabilities.isEmpty) return 'No tracking required';
+    return '${capabilities.join(' + ')} required before save';
+  }
+
+  bool get _showSearchResults =>
+      !_draft.hasProduct || _searchCtrl.text.trim().isNotEmpty;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final viewport = MediaQuery.sizeOf(context);
     final wide = viewport.width >= 1040;
+    final selectedStateHeight =
+        _draft.hasProduct && !_showSearchResults ? 600.0 : 700.0;
+    final narrowStateHeight =
+        _draft.hasProduct && !_showSearchResults ? 760.0 : 860.0;
+    final targetHeight = wide ? selectedStateHeight : narrowStateHeight;
     final dialogHeight =
-        (viewport.height * 0.88).clamp(540.0, wide ? 680.0 : 760.0).toDouble();
+        targetHeight.clamp(540.0, viewport.height * 0.9).toDouble();
+    final primaryActionLabel =
+        widget.initialLine.hasProduct ? 'Update Item' : 'Add Item';
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
@@ -628,7 +729,7 @@ class _DocumentLineEditorDialogState
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Search by barcode or product name, then set quantity, price, and discount before saving the line.',
+                            'Search by barcode or product name, then confirm item options, quantity, price, and discount before saving.',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -636,18 +737,6 @@ class _DocumentLineEditorDialogState
                         ],
                       ),
                     ),
-                    if (_draft.hasProduct)
-                      ProfessionalBadge(
-                        label:
-                            _draft.isRefundLine ? 'Refund Line' : 'Sale Line',
-                        backgroundColor: _draft.isRefundLine
-                            ? const Color(0xFFFDE8E4)
-                            : const Color(0xFFEAF1F8),
-                        foregroundColor: _draft.isRefundLine
-                            ? const Color(0xFF8A3E31)
-                            : const Color(0xFF23415F),
-                      ),
-                    const SizedBox(width: 12),
                     IconButton(
                       tooltip: 'Close',
                       onPressed: () => Navigator.of(context).pop(),
@@ -730,7 +819,7 @@ class _DocumentLineEditorDialogState
                     FilledButton.icon(
                       onPressed: _save,
                       icon: const Icon(Icons.check_rounded),
-                      label: const Text('Save Line'),
+                      label: Text(primaryActionLabel),
                     ),
                   ],
                 ),
@@ -759,7 +848,9 @@ class _DocumentLineEditorDialogState
             : _results.isEmpty
                 ? Center(
                     child: Text(
-                      'No matching items found.',
+                      _searchCtrl.text.trim().isEmpty
+                          ? 'Scan a barcode or start typing to search items.'
+                          : 'No matching items found.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   )
@@ -797,11 +888,22 @@ class _DocumentLineEditorDialogState
       ),
     );
 
+    final selectedItemView = SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSelectedItemCard(context),
+          const SizedBox(height: 12),
+          _buildItemOptionsCard(context),
+        ],
+      ),
+    );
+
     return ProfessionalSectionCard(
       title: 'Item Search',
       subtitle: _draft.productSelectionLocked
           ? 'This line is tied to an original source item, so product selection is locked.'
-          : 'Scan or type a barcode, SKU, or product name.',
+          : 'Scan or type a barcode, SKU, or product name to search live.',
       expandChild: expandContent,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -810,18 +912,23 @@ class _DocumentLineEditorDialogState
             controller: _searchCtrl,
             enabled: !_draft.productSelectionLocked,
             decoration: const InputDecoration(
-              hintText: 'Search by barcode or product name',
+              hintText: 'Type or scan to search',
               labelText: 'Search / Barcode',
               prefixIcon: Icon(Icons.qr_code_scanner_rounded),
             ),
-            onChanged: (value) => _runSearch(value.trim()),
-            onSubmitted: (value) => _runSearch(value.trim()),
+            onChanged: _scheduleSearch,
+            onSubmitted: _runSearch,
           ),
           const SizedBox(height: 12),
           if (expandContent)
-            Expanded(child: resultsView)
+            Expanded(
+              child: _showSearchResults ? resultsView : selectedItemView,
+            )
           else
-            SizedBox(height: 260, child: resultsView),
+            SizedBox(
+              height: 260,
+              child: _showSearchResults ? resultsView : selectedItemView,
+            ),
         ],
       ),
     );
@@ -843,94 +950,199 @@ class _DocumentLineEditorDialogState
         _draft.persistedTaxAmount ?? (previewNet * (_draft.taxRate / 100));
     final previewGrand = previewNet + previewTax;
     return ProfessionalSectionCard(
-      title: 'Line Details',
-      subtitle:
-          'Review the selected item and confirm commercial values before saving.',
+      title: 'Item Details',
+      subtitle: 'Review the selected item and commercial values before saving.',
       expandChild: expandContent,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF7FAFD),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFD7E3EF)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
               children: [
-                Text(
-                  _draft.hasProduct ? _draft.displayName : 'Select item',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
+                SizedBox(
+                  width: 168,
+                  child: TextField(
+                    controller: _qtyCtrl,
+                    enabled: !_draft.lockedQuantity,
+                    keyboardType: TextInputType.numberWithOptions(
+                      decimal: true,
+                      signed: widget.allowNegativeQuantity,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: widget.allowNegativeQuantity
+                          ? 'Quantity (+/-)'
+                          : 'Quantity',
+                      prefixIcon:
+                          const Icon(Icons.format_list_numbered_rounded),
+                    ),
+                    onChanged: (_) => setState(() {}),
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  _draft.hasProduct
-                      ? (_draft.supportingText.isEmpty
-                          ? 'Ready for quantity and price entry.'
-                          : _draft.supportingText)
-                      : 'Select an item from the catalog to begin.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                SizedBox(
+                  width: 168,
+                  child: TextField(
+                    controller: _priceCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Unit Price',
+                      prefixIcon: Icon(Icons.sell_outlined),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+                SizedBox(
+                  width: 168,
+                  child: TextField(
+                    controller: _discountCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Discount %',
+                      prefixIcon: Icon(Icons.percent_rounded),
+                    ),
+                    onChanged: (_) => setState(() {}),
                   ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              SizedBox(
-                width: 168,
-                child: TextField(
-                  controller: _qtyCtrl,
-                  enabled: !_draft.lockedQuantity,
-                  keyboardType: TextInputType.numberWithOptions(
-                    decimal: true,
-                    signed: widget.allowNegativeQuantity,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: widget.allowNegativeQuantity
-                        ? 'Quantity (+/-)'
-                        : 'Quantity',
-                    prefixIcon: const Icon(Icons.format_list_numbered_rounded),
-                  ),
-                  onChanged: (_) => setState(() {}),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                _DialogReadOnlyField(
+                  label: 'Tax',
+                  value: _resolvingTax ? 'Loading...' : _draft.taxLabel,
+                  width: 168,
                 ),
-              ),
-              SizedBox(
-                width: 168,
-                child: TextField(
-                  controller: _priceCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Unit Price',
-                    prefixIcon: Icon(Icons.sell_outlined),
-                  ),
-                  onChanged: (_) => setState(() {}),
+                _DialogReadOnlyField(
+                  label: 'Tax Amount',
+                  value: formatDocumentMoney(previewTax),
+                  width: 168,
                 ),
-              ),
-              SizedBox(
-                width: 168,
-                child: TextField(
-                  controller: _discountCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Discount %',
-                    prefixIcon: Icon(Icons.percent_rounded),
-                  ),
-                  onChanged: (_) => setState(() {}),
+              ],
+            ),
+            if (_draft.lockedQuantity) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Quantity is locked for this source-linked line.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
+            if (widget.allowNegativeQuantity) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Use a negative quantity to create a refund line.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Line Summary',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _PreviewRow(
+                    label: 'Subtotal',
+                    value: formatDocumentMoney(previewSubtotal),
+                  ),
+                  const SizedBox(height: 8),
+                  _PreviewRow(
+                    label: 'Discount',
+                    value: '${formatDocumentMoney(previewDiscount)}%',
+                  ),
+                  const SizedBox(height: 8),
+                  _PreviewRow(
+                    label: 'Tax',
+                    value: formatDocumentMoney(previewTax),
+                  ),
+                  const SizedBox(height: 8),
+                  _PreviewRow(
+                    label: 'Net Total',
+                    emphasize: true,
+                    value: formatDocumentMoney(previewGrand),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectedItemCard(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FAFD),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFD7E3EF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _draft.hasProduct ? _draft.displayName : 'Select item',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _draft.hasProduct
+                ? (_draft.supportingText.isEmpty
+                    ? 'Ready for quantity and price entry.'
+                    : _draft.supportingText)
+                : 'Search for an item to begin.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemOptionsCard(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Item Options',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -938,88 +1150,41 @@ class _DocumentLineEditorDialogState
             runSpacing: 8,
             children: [
               _DialogReadOnlyField(
-                label: 'Tax',
-                value: _resolvingTax ? 'Loading...' : _draft.taxLabel,
+                label: 'Variation',
+                value: _variationValue,
                 width: 168,
               ),
               _DialogReadOnlyField(
-                label: 'Tax Amount',
-                value: formatDocumentMoney(previewTax),
+                label: 'Barcode',
+                value: _barcodeValue,
                 width: 168,
               ),
+              _DialogReadOnlyField(
+                label: 'Tracking',
+                value: _trackingValue,
+                width: 168,
+                maxLines: 2,
+              ),
+              if ((_draft.primaryStorage ?? '').trim().isNotEmpty)
+                _DialogReadOnlyField(
+                  label: 'Storage',
+                  value: _draft.primaryStorage!.trim(),
+                  width: 168,
+                ),
             ],
           ),
-          if (_draft.requiresTracking && widget.configureTracking != null) ...[
-            const SizedBox(height: 14),
+          if (_canConfigureItemOptions) ...[
+            const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: _configureTracking,
-              icon: const Icon(Icons.qr_code_2_rounded),
+              icon: const Icon(Icons.tune_rounded),
               label: Text(
                 _draft.tracking == null
-                    ? 'Configure Tracking'
-                    : 'Tracking: ${_draft.trackingSummary}',
+                    ? 'Select Variation / Batch / Serial'
+                    : 'Update Item Options',
               ),
             ),
           ],
-          if (_draft.lockedQuantity) ...[
-            const SizedBox(height: 12),
-            Text(
-              'Quantity is locked for this source-linked line.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-          if (widget.allowNegativeQuantity) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Use a negative quantity to create a refund line.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-          if (expandContent) const Spacer() else const SizedBox(height: 14),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Line Preview',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                _PreviewRow(
-                  label: 'Subtotal',
-                  value: formatDocumentMoney(previewSubtotal),
-                ),
-                const SizedBox(height: 8),
-                _PreviewRow(
-                  label: 'Discount',
-                  value: '${formatDocumentMoney(previewDiscount)}%',
-                ),
-                const SizedBox(height: 8),
-                _PreviewRow(
-                  label: 'Tax',
-                  value: formatDocumentMoney(previewTax),
-                ),
-                const SizedBox(height: 8),
-                _PreviewRow(
-                  label: 'Net Total',
-                  emphasize: true,
-                  value: formatDocumentMoney(previewGrand),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -1072,11 +1237,13 @@ class _DialogReadOnlyField extends StatelessWidget {
     required this.label,
     required this.value,
     required this.width,
+    this.maxLines = 1,
   });
 
   final String label;
   final String value;
   final double width;
+  final int maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -1094,7 +1261,7 @@ class _DialogReadOnlyField extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             value,
-            maxLines: 1,
+            maxLines: maxLines,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w600,

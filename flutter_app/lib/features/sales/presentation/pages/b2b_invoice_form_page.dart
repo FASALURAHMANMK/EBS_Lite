@@ -45,6 +45,7 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
   final _discountCtrl = TextEditingController(text: '0');
   final _paidCtrl = TextEditingController(text: '0');
   final _notesCtrl = TextEditingController();
+  final _itemsScrollController = ScrollController();
 
   DocumentCustomerSnapshot? _customer;
   PaymentMethodDto? _paymentMethod;
@@ -80,6 +81,7 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
     _discountCtrl.dispose();
     _paidCtrl.dispose();
     _notesCtrl.dispose();
+    _itemsScrollController.dispose();
     super.dispose();
   }
 
@@ -580,58 +582,10 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
     final total = lineNet + taxTotal - discount;
     final balance = total - paid;
     final statusBanners = _buildStatusBanners();
-
-    final mainColumn = Column(
-      children: [
-        if (statusBanners != null) ...[
-          statusBanners,
-          const SizedBox(height: gap),
-        ],
-        _buildMetadataCard(
-          localePrefs,
-          location?.name,
-          user?.username,
-          sale?.saleDate,
-          sale?.saleNumber,
-        ),
-        const SizedBox(height: gap),
-        if (wide)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(flex: 6, child: _buildCustomerCard()),
-              const SizedBox(width: gap),
-              Expanded(flex: 5, child: _buildShippingCard()),
-            ],
-          )
-        else ...[
-          _buildCustomerCard(),
-          const SizedBox(height: gap),
-          _buildShippingCard(),
-        ],
-        const SizedBox(height: gap),
-        _buildLinesCard(lines, totalQty),
-      ],
-    );
-
-    final sideColumn = Column(
-      children: [
-        _buildAccountCard(),
-        const SizedBox(height: gap),
-        _buildCommercialCard(),
-        const SizedBox(height: gap),
-        _buildSummaryCard(
-          lines.length,
-          totalQty,
-          lineNet,
-          taxTotal,
-          discount,
-          paid,
-          total,
-          balance,
-        ),
-      ],
-    );
+    final hasPaymentWarning = _paymentMethod == null && paid > 0;
+    const desktopSummaryWidth = 312.0;
+    const desktopTopRowHeight = 146.0;
+    final desktopInfoRowHeight = hasPaymentWarning ? 176.0 : 156.0;
 
     return Scaffold(
       appBar: AppBar(
@@ -640,24 +594,121 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
         title: Text(_title),
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(12),
-          children: [
-            if (wide)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: LayoutBuilder(
+          builder: (context, _) {
+            final summaryCard = _buildSummaryCard(
+              lines.length,
+              totalQty,
+              lineNet,
+              taxTotal,
+              discount,
+              paid,
+              total,
+              balance,
+              expandContent: wide,
+            );
+
+            if (!wide) {
+              return ListView(
+                padding: const EdgeInsets.all(12),
                 children: [
-                  Expanded(child: mainColumn),
-                  const SizedBox(width: gap),
-                  SizedBox(width: 312, child: sideColumn),
+                  if (statusBanners != null) ...[
+                    statusBanners,
+                    const SizedBox(height: gap),
+                  ],
+                  _buildMetadataCard(
+                    localePrefs,
+                    location?.name,
+                    user?.username,
+                    sale?.saleDate,
+                    sale?.saleNumber,
+                  ),
+                  const SizedBox(height: gap),
+                  _buildCustomerCard(),
+                  const SizedBox(height: gap),
+                  _buildShippingCard(),
+                  const SizedBox(height: gap),
+                  _buildAccountCard(),
+                  const SizedBox(height: gap),
+                  _buildCommercialCard(),
+                  const SizedBox(height: gap),
+                  _buildLinesCard(lines, totalQty),
+                  const SizedBox(height: gap),
+                  summaryCard,
                 ],
-              )
-            else ...[
-              mainColumn,
-              const SizedBox(height: gap),
-              sideColumn,
-            ],
-          ],
+              );
+            }
+
+            return Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  if (statusBanners != null) ...[
+                    statusBanners,
+                    const SizedBox(height: gap),
+                  ],
+                  SizedBox(
+                    height: desktopTopRowHeight,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _buildMetadataCard(
+                            localePrefs,
+                            location?.name,
+                            user?.username,
+                            sale?.saleDate,
+                            sale?.saleNumber,
+                            compactLayout: true,
+                          ),
+                        ),
+                        const SizedBox(width: gap),
+                        SizedBox(
+                          width: desktopSummaryWidth,
+                          child: _buildAccountCard(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: gap),
+                  SizedBox(
+                    height: desktopInfoRowHeight,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(flex: 6, child: _buildCustomerCard()),
+                        const SizedBox(width: gap),
+                        Expanded(flex: 5, child: _buildShippingCard()),
+                        const SizedBox(width: gap),
+                        SizedBox(
+                          width: desktopSummaryWidth,
+                          child: _buildCommercialCard(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: gap),
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _buildLinesCard(
+                            lines,
+                            totalQty,
+                            fillHeight: true,
+                          ),
+                        ),
+                        const SizedBox(width: gap),
+                        SizedBox(
+                            width: desktopSummaryWidth, child: summaryCard),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
@@ -797,14 +848,16 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
     String? locationName,
     String? username,
     DateTime? saleDate,
-    String? saleNumber,
-  ) {
+    String? saleNumber, {
+    bool compactLayout = false,
+  }) {
     final invoiceDate = saleDate ?? DateTime.now();
     final dueDate = (_customer?.paymentTerms ?? 0) > 0
         ? invoiceDate.add(Duration(days: _customer!.paymentTerms))
         : null;
     return _InvoiceOverviewCard(
       showHeader: false,
+      expandChild: compactLayout,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -853,23 +906,59 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
             ],
           ),
           const SizedBox(height: 14),
-          TextField(
-            controller: _notesCtrl,
-            enabled: !_saving,
-            minLines: 2,
-            maxLines: 3,
-            style: Theme.of(context).textTheme.bodySmall,
-            decoration: const InputDecoration(
-              labelText: 'Document Notes / Internal Remarks',
-              alignLabelWithHint: true,
+          if (compactLayout)
+            Expanded(
+              child: TextField(
+                controller: _notesCtrl,
+                enabled: !_saving,
+                expands: true,
+                minLines: null,
+                maxLines: null,
+                textAlignVertical: TextAlignVertical.top,
+                style: Theme.of(context).textTheme.bodySmall,
+                decoration: InputDecoration(
+                  hintText: 'Document Notes / Internal Remarks',
+                  hintStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
+                ),
+              ),
+            )
+          else
+            TextField(
+              controller: _notesCtrl,
+              enabled: !_saving,
+              minLines: 2,
+              maxLines: 3,
+              style: Theme.of(context).textTheme.bodySmall,
+              decoration: InputDecoration(
+                hintText: 'Document Notes / Internal Remarks',
+                hintStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildLinesCard(List<DocumentLineDraft> lines, double totalQty) {
+  Widget _buildLinesCard(
+    List<DocumentLineDraft> lines,
+    double totalQty, {
+    bool fillHeight = false,
+  }) {
     return ProfessionalSectionCard(
       title: 'Invoice Items',
       action: FilledButton.tonalIcon(
@@ -878,42 +967,67 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
         label: const Text('Add Item'),
         style: _compactButtonStyle(context),
       ),
+      expandChild: fillHeight,
       child: lines.isEmpty
-          ? _InvoiceEmptyLines(
-              onAdd: _saving ? null : () => _editLine(),
+          ? Center(
+              child: _InvoiceEmptyLines(
+                onAdd: _saving ? null : () => _editLine(),
+              ),
             )
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                return Column(
-                  children: [
-                    const _InvoiceTableHeader(),
-                    const SizedBox(height: 10),
-                    for (var index = 0; index < lines.length; index++) ...[
-                      _InvoiceTableRow(
-                        index: index + 1,
-                        line: lines[index],
-                        enabled: !_saving,
-                        onTap: () =>
-                            _editLine(line: lines[index], index: index),
-                        onDelete: _saving
-                            ? null
-                            : () => setState(
-                                  () => _lines = [..._lines]..removeAt(index),
-                                ),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        'Items: ${lines.length}    Total Qty: ${formatDocumentQuantity(totalQty)}',
-                        style: Theme.of(context).textTheme.bodySmall,
+          : Column(
+              children: [
+                const _InvoiceTableHeader(),
+                const SizedBox(height: 10),
+                if (fillHeight)
+                  Expanded(
+                    child: Scrollbar(
+                      controller: _itemsScrollController,
+                      thumbVisibility: true,
+                      child: ListView.separated(
+                        controller: _itemsScrollController,
+                        padding: EdgeInsets.zero,
+                        itemCount: lines.length,
+                        itemBuilder: (context, index) => _InvoiceTableRow(
+                          index: index + 1,
+                          line: lines[index],
+                          enabled: !_saving,
+                          onTap: () =>
+                              _editLine(line: lines[index], index: index),
+                          onDelete: _saving
+                              ? null
+                              : () => setState(
+                                    () => _lines = [..._lines]..removeAt(index),
+                                  ),
+                        ),
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
                       ),
                     ),
+                  )
+                else ...[
+                  for (var index = 0; index < lines.length; index++) ...[
+                    _InvoiceTableRow(
+                      index: index + 1,
+                      line: lines[index],
+                      enabled: !_saving,
+                      onTap: () => _editLine(line: lines[index], index: index),
+                      onDelete: _saving
+                          ? null
+                          : () => setState(
+                                () => _lines = [..._lines]..removeAt(index),
+                              ),
+                    ),
+                    if (index != lines.length - 1) const SizedBox(height: 10),
                   ],
-                );
-              },
+                ],
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Items: ${lines.length}    Total Qty: ${formatDocumentQuantity(totalQty)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
             ),
     );
   }
@@ -935,12 +1049,12 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
                 _AccountAmount(
                   value: customer.creditBalance.toStringAsFixed(2),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 _PreviewRow(
                   label: 'Credit Limit',
                   value: customer.creditLimit.toStringAsFixed(2),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 _PreviewRow(
                   label: 'Payment Terms',
                   value: customer.paymentTerms > 0
@@ -972,37 +1086,17 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
             spacing: 10,
             runSpacing: 10,
             children: [
-              SizedBox(
-                width: 132,
-                child: TextField(
-                  controller: _paidCtrl,
-                  enabled: !_saving,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Paid',
-                    hintText: '0.00',
-                    isDense: true,
-                  ),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                  onChanged: (_) => setState(() {}),
-                ),
+              _AmountInputField(
+                label: 'Paid',
+                controller: _paidCtrl,
+                enabled: !_saving,
+                onChanged: (_) => setState(() {}),
               ),
-              SizedBox(
-                width: 132,
-                child: TextField(
-                  controller: _discountCtrl,
-                  enabled: !_saving,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Discount',
-                    isDense: true,
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
+              _AmountInputField(
+                label: 'Discount',
+                controller: _discountCtrl,
+                enabled: !_saving,
+                onChanged: (_) => setState(() {}),
               ),
             ],
           ),
@@ -1030,10 +1124,12 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
     double discount,
     double paid,
     double total,
-    double balance,
-  ) {
+    double balance, {
+    bool expandContent = false,
+  }) {
     return ProfessionalSummaryCard(
       title: 'Document Summary',
+      expandContent: expandContent,
       rows: [
         (label: 'Items', value: '$itemCount', emphasize: false),
         (
@@ -1148,6 +1244,7 @@ class _InvoiceOverviewCard extends StatelessWidget {
     this.action,
     required this.child,
     this.showHeader = true,
+    this.expandChild = false,
   });
 
   final String? title;
@@ -1155,6 +1252,7 @@ class _InvoiceOverviewCard extends StatelessWidget {
   final Widget? action;
   final Widget child;
   final bool showHeader;
+  final bool expandChild;
 
   @override
   Widget build(BuildContext context) {
@@ -1201,7 +1299,7 @@ class _InvoiceOverviewCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
             ],
-            child,
+            if (expandChild) Expanded(child: child) else child,
           ],
         ),
       ),
@@ -1309,19 +1407,19 @@ class _InvoiceTableHeader extends StatelessWidget {
       child: const Row(
         children: [
           _InvoiceHeaderCell(label: '#', flex: 4, textAlign: TextAlign.center),
-          _InvoiceHeaderCell(label: 'Barcode', flex: 7),
-          _InvoiceHeaderCell(label: 'Item / Description', flex: 28),
+          _InvoiceHeaderCell(label: 'Barcode', flex: 9),
+          _InvoiceHeaderCell(label: 'Item Details', flex: 28),
           _InvoiceHeaderCell(
-              label: 'Qty', flex: 5, textAlign: TextAlign.center),
+              label: 'Qty', flex: 6, textAlign: TextAlign.center),
           _InvoiceHeaderCell(
               label: 'Price', flex: 8, textAlign: TextAlign.right),
           _InvoiceHeaderCell(
-              label: 'Disc %', flex: 7, textAlign: TextAlign.right),
-          _InvoiceHeaderCell(label: 'Tax', flex: 9, textAlign: TextAlign.right),
+              label: 'Disc %', flex: 6, textAlign: TextAlign.right),
+          _InvoiceHeaderCell(label: 'Tax', flex: 8, textAlign: TextAlign.right),
           _InvoiceHeaderCell(
               label: 'Total', flex: 9, textAlign: TextAlign.right),
           _InvoiceHeaderCell(
-              label: 'Action', flex: 7, textAlign: TextAlign.center),
+              label: 'Action', flex: 6, textAlign: TextAlign.center),
         ],
       ),
     );
@@ -1351,7 +1449,7 @@ class _InvoiceTableRow extends StatelessWidget {
         onTap: enabled ? onTap : null,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border:
@@ -1367,16 +1465,17 @@ class _InvoiceTableRow extends StatelessWidget {
               _InvoiceBodyCell(
                 label:
                     (line.barcode ?? '').trim().isEmpty ? '-' : line.barcode!,
-                flex: 7,
+                flex: 9,
               ),
               _InvoiceBodyCell(
-                label: line.displayName,
+                label: _itemPrimaryText(line),
                 secondary: _itemSecondaryText(line),
+                secondaryMaxLines: 2,
                 flex: 28,
               ),
               _InvoiceBodyCell(
                 label: formatDocumentQuantity(line.quantity),
-                flex: 5,
+                flex: 6,
                 textAlign: TextAlign.center,
               ),
               _InvoiceBodyCell(
@@ -1386,13 +1485,13 @@ class _InvoiceTableRow extends StatelessWidget {
               ),
               _InvoiceBodyCell(
                 label: line.discountPercent.toStringAsFixed(2),
-                flex: 7,
+                flex: 6,
                 textAlign: TextAlign.right,
               ),
               _InvoiceBodyCell(
                 label: line.taxAmount.toStringAsFixed(2),
                 secondary: line.taxLabel,
-                flex: 9,
+                flex: 8,
                 textAlign: TextAlign.right,
               ),
               _InvoiceBodyCell(
@@ -1402,7 +1501,7 @@ class _InvoiceTableRow extends StatelessWidget {
                 textAlign: TextAlign.right,
               ),
               Expanded(
-                flex: 7,
+                flex: 6,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -1465,6 +1564,7 @@ class _InvoiceBodyCell extends StatelessWidget {
     required this.label,
     required this.flex,
     this.secondary,
+    this.secondaryMaxLines = 1,
     this.emphasize = false,
     this.textAlign = TextAlign.left,
   });
@@ -1472,6 +1572,7 @@ class _InvoiceBodyCell extends StatelessWidget {
   final String label;
   final int flex;
   final String? secondary;
+  final int secondaryMaxLines;
   final bool emphasize;
   final TextAlign textAlign;
 
@@ -1504,7 +1605,7 @@ class _InvoiceBodyCell extends StatelessWidget {
             Text(
               secondary!,
               textAlign: textAlign,
-              maxLines: 1,
+              maxLines: secondaryMaxLines,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1585,15 +1686,71 @@ class _PreviewRow extends StatelessWidget {
   }
 }
 
+class _AmountInputField extends StatelessWidget {
+  const _AmountInputField({
+    required this.label,
+    required this.controller,
+    required this.enabled,
+    this.onChanged,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final bool enabled;
+  final ValueChanged<String>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 132,
+      child: TextField(
+        controller: controller,
+        enabled: enabled,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        textAlignVertical: TextAlignVertical.center,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: '0.00',
+          isDense: true,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        ),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+        onChanged: onChanged,
+      ),
+    );
+  }
+}
+
 String _itemSecondaryText(DocumentLineDraft line) {
   final parts = <String>[
-    if ((line.variantName ?? '').trim().isNotEmpty) line.variantName!.trim(),
     if ((line.primaryStorage ?? '').trim().isNotEmpty)
       line.primaryStorage!.trim(),
-    if (line.requiresTracking)
-      line.tracking == null ? 'Tracking required' : 'Tracking set',
+    if ((line.variantName ?? '').trim().isNotEmpty)
+      'Variation ${line.variantName!.trim()}',
+    if (line.isSerialized)
+      line.tracking == null
+          ? 'Serials pending'
+          : 'Serials ${line.tracking!.serialNumbers.length}/${line.quantity.abs().round()}',
+    if (line.trackingType == 'BATCH')
+      line.tracking == null ? 'Batch pending' : _batchSummary(line.tracking!),
   ];
   return parts.join(' • ');
+}
+
+String _itemPrimaryText(DocumentLineDraft line) {
+  final name = (line.productName ?? '').trim();
+  return name.isEmpty ? line.displayName : name;
+}
+
+String _batchSummary(InventoryTrackingSelection selection) {
+  final batchNumber = (selection.batchNumber ?? '').trim();
+  if (batchNumber.isNotEmpty) return 'Batch $batchNumber';
+  final allocations = selection.batchAllocations.length;
+  if (allocations > 0) return '$allocations batch(es)';
+  return 'Batch set';
 }
 
 class _AccountAmount extends StatelessWidget {
