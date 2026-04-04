@@ -43,6 +43,15 @@ class SalesPage extends ConsumerWidget {
       ),
       FeatureItem(
         icon: Icons.assignment_return_rounded,
+        label: 'B2B Return',
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const SaleReturnFormPage(),
+          ),
+        ),
+      ),
+      FeatureItem(
+        icon: Icons.undo_rounded,
         label: 'Refund Invoice',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(

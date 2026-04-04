@@ -3,12 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/app_date_time.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/layout/app_breakpoints.dart';
 import '../../../../core/locale_preferences.dart';
 import '../../../../shared/widgets/app_selection_dialog.dart';
+import '../../../../shared/widgets/desktop_sidebar_toggle_action.dart';
 import '../../../auth/controllers/auth_notifier.dart';
 import '../../../customers/data/customer_repository.dart';
 import '../../../customers/data/models.dart';
 import '../../../dashboard/controllers/location_notifier.dart';
+import '../../../dashboard/data/taxes_repository.dart';
+import '../../../inventory/data/inventory_repository.dart';
 import '../../../pos/data/models.dart';
 import '../../../pos/data/pos_repository.dart';
 import '../../data/sales_repository.dart';
@@ -28,6 +32,7 @@ class QuoteFormPage extends ConsumerStatefulWidget {
 class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
   final _discountCtrl = TextEditingController(text: '0');
   final _notesCtrl = TextEditingController();
+  final _linesScrollController = ScrollController();
 
   DocumentCustomerSnapshot? _customer;
   String _transactionType = 'B2B';
@@ -39,14 +44,16 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
   bool _readOnly = false;
   int? _convertedSaleId;
   String? _quoteNumber;
+  String? _quoteNumberPreview;
   DateTime? _quoteDate;
-  String? _status;
+  final Map<int, DocumentTaxProfile> _taxProfilesById = {};
 
   bool get _isEdit => widget.quoteId != null;
 
   List<DocumentLineDraft> get _activeLines => _lines
       .where(
-          (line) => line.hasProduct && line.unitPrice > 0 && line.quantity > 0)
+        (line) => line.hasProduct && line.unitPrice > 0 && line.quantity > 0,
+      )
       .toList(growable: false);
 
   @override
@@ -56,6 +63,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       _loadQuote();
     } else {
       _quoteDate = DateTime.now();
+      Future.microtask(_loadQuoteNumberPreview);
     }
   }
 
@@ -63,6 +71,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
   void dispose() {
     _discountCtrl.dispose();
     _notesCtrl.dispose();
+    _linesScrollController.dispose();
     super.dispose();
   }
 
@@ -104,7 +113,6 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       setState(() {
         _convertedSaleId = convertedSaleId;
         _readOnly = readOnly;
-        _status = status;
         _quoteNumber = quote['quote_number']?.toString();
         _quoteDate = DateTime.tryParse(quote['quote_date']?.toString() ?? '');
         _transactionType =
@@ -126,10 +134,22 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                 ? 'This quote is read-only because it has already been converted.'
                 : 'This quote is read-only because it has already been converted to sale #$_convertedSaleId.');
       });
+      Future.microtask(_applyTaxProfilesToLines);
     } catch (e) {
       if (mounted) setState(() => _error = ErrorHandler.message(e));
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadQuoteNumberPreview() async {
+    try {
+      final preview =
+          await ref.read(salesRepositoryProvider).getNextQuoteNumberPreview();
+      if (!mounted) return;
+      setState(() => _quoteNumberPreview = preview);
+    } catch (_) {
+      // Best-effort preview only.
     }
   }
 
@@ -141,7 +161,9 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       firstDate: now.subtract(const Duration(days: 1)),
       lastDate: now.add(const Duration(days: 365)),
     );
-    if (picked != null && mounted) setState(() => _validUntil = picked);
+    if (picked != null && mounted) {
+      setState(() => _validUntil = picked);
+    }
   }
 
   Future<CustomerDto?> _showCustomerDialog() async {
@@ -271,6 +293,63 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
     return products.map(DocumentProductOption.fromPosProduct).toList();
   }
 
+  Future<Map<int, DocumentTaxProfile>> _loadTaxProfiles() async {
+    if (_taxProfilesById.isNotEmpty) return _taxProfilesById;
+    final taxes = await ref.read(taxesRepositoryProvider).getTaxes();
+    _taxProfilesById.addEntries(
+      taxes.map(
+        (tax) => MapEntry(
+          tax.taxId,
+          DocumentTaxProfile(
+            taxId: tax.taxId,
+            name: tax.name,
+            rate: tax.percentage,
+          ),
+        ),
+      ),
+    );
+    return _taxProfilesById;
+  }
+
+  Future<DocumentTaxProfile?> _resolveTaxProfile(
+    DocumentProductOption option,
+  ) async {
+    final inventoryRepo = ref.read(inventoryRepositoryProvider);
+    int taxId = 0;
+    if ((option.comboProductId ?? 0) > 0) {
+      final combo = await inventoryRepo.getComboProduct(option.comboProductId!);
+      taxId = combo.taxId;
+    } else if ((option.productId ?? 0) > 0) {
+      final product = await inventoryRepo.getProduct(option.productId!);
+      taxId = product.taxId;
+    }
+    if (taxId <= 0) return null;
+    final profiles = await _loadTaxProfiles();
+    return profiles[taxId] ??
+        DocumentTaxProfile(taxId: taxId, name: 'Tax', rate: 0);
+  }
+
+  Future<void> _applyTaxProfilesToLines() async {
+    final linesToHydrate =
+        _lines.where((line) => (line.taxId ?? 0) > 0).toList(growable: false);
+    if (linesToHydrate.isEmpty) return;
+    final profiles = await _loadTaxProfiles();
+    if (!mounted) return;
+    setState(() {
+      _lines = _lines.map((line) {
+        final taxId = line.taxId;
+        if ((taxId ?? 0) <= 0) return line;
+        final profile = profiles[taxId!];
+        if (profile == null) return line;
+        final next = line.copy();
+        final persistedAmount = next.persistedTaxAmount;
+        next.applyTaxProfile(profile);
+        next.persistedTaxAmount = persistedAmount;
+        return next;
+      }).toList(growable: false);
+    });
+  }
+
   Future<void> _editLine({DocumentLineDraft? line, int? index}) async {
     if (_readOnly) return;
     final result = await showDocumentLineEditorDialog(
@@ -280,6 +359,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       initialLine: line?.copy() ?? DocumentLineDraft.empty(),
       searchProducts: _searchProducts,
       allowDelete: line != null,
+      resolveTaxProfile: _resolveTaxProfile,
     );
     if (result == null || !mounted) return;
     setState(() {
@@ -359,176 +439,261 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
     final localePrefs = ref.watch(localePreferencesProvider);
     final location = ref.watch(locationNotifierProvider).selected;
     final user = ref.watch(authNotifierProvider).user;
-    final wide = MediaQuery.of(context).size.width >= 1200;
+    final showSidebarToggle = AppBreakpoints.isTabletOrDesktop(context);
+    final isDesktop = AppBreakpoints.isDesktop(context);
     final lines = _activeLines;
     final subtotal = lines.fold<double>(0, (sum, line) => sum + line.lineTotal);
+    final taxTotal = lines.fold<double>(0, (sum, line) => sum + line.taxAmount);
     final totalQty = lines.fold<double>(0, (sum, line) => sum + line.quantity);
     final discount = double.tryParse(_discountCtrl.text.trim()) ?? 0;
-    final total = subtotal - discount;
-
-    final mainColumn = Column(
-      children: [
-        _buildHeader(localePrefs),
-        const SizedBox(height: 16),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final cardWidth =
-                wide ? (constraints.maxWidth - 32) / 3 : constraints.maxWidth;
-            return Wrap(
-              spacing: 16,
-              runSpacing: 16,
-              children: [
-                SizedBox(width: cardWidth, child: _buildCustomerCard()),
-                SizedBox(width: cardWidth, child: _buildShippingCard()),
-                SizedBox(
-                  width: cardWidth,
-                  child: _buildMetadataCard(
-                      localePrefs, location?.name, user?.username),
-                ),
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: 16),
-        _buildLinesCard(lines, totalQty),
-      ],
-    );
-
-    final sideColumn = Column(
-      children: [
-        _buildAccountCard(),
-        const SizedBox(height: 16),
-        _buildNotesCard(),
-        const SizedBox(height: 16),
-        _buildSummaryCard(lines.length, totalQty, subtotal, discount, total),
-      ],
-    );
+    final total = subtotal + taxTotal - discount;
 
     return Scaffold(
-      appBar: AppBar(title: Text(_isEdit ? 'Quote' : 'New Quote')),
+      appBar: AppBar(
+        leadingWidth: showSidebarToggle ? 104 : null,
+        leading: showSidebarToggle ? const DesktopSidebarToggleLeading() : null,
+        title: Text(_isEdit ? 'Quote' : 'New Quote'),
+      ),
       body: SafeArea(
         child: _loading && _isEdit
             ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  if (wide)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: mainColumn),
-                        const SizedBox(width: 16),
-                        SizedBox(width: 340, child: sideColumn),
-                      ],
-                    )
-                  else ...[
-                    mainColumn,
-                    const SizedBox(height: 16),
-                    sideColumn,
-                  ],
-                ],
-              ),
+            : (isDesktop
+                ? _buildDesktopBody(
+                    localePrefs,
+                    location?.name,
+                    user?.username,
+                    lines,
+                    subtotal,
+                    taxTotal,
+                    totalQty,
+                    discount,
+                    total,
+                  )
+                : _buildMobileBody(
+                    localePrefs,
+                    location?.name,
+                    user?.username,
+                    lines,
+                    subtotal,
+                    taxTotal,
+                    totalQty,
+                    discount,
+                    total,
+                  )),
       ),
     );
   }
 
-  Widget _buildHeader(LocalePreferencesState localePrefs) {
+  Widget _buildDesktopBody(
+    LocalePreferencesState localePrefs,
+    String? locationName,
+    String? username,
+    List<DocumentLineDraft> lines,
+    double subtotal,
+    double taxTotal,
+    double totalQty,
+    double discount,
+    double total,
+  ) {
+    const gap = 12.0;
+    const summaryWidth = 312.0;
+    const topRowHeight = 186.0;
+    const infoRowHeight = 216.0;
+    final statusBanners = _buildStatusBanners();
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          if (_loading) ...[
+            const LinearProgressIndicator(minHeight: 2),
+          ],
+          if (statusBanners != null) ...[
+            if (_loading) const SizedBox(height: gap),
+            statusBanners,
+            const SizedBox(height: gap),
+          ],
+          SizedBox(
+            height: topRowHeight,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _buildMetadataCard(
+                    localePrefs,
+                    locationName,
+                    username,
+                    compactLayout: true,
+                  ),
+                ),
+                const SizedBox(width: gap),
+                SizedBox(width: summaryWidth, child: _buildAccountCard()),
+              ],
+            ),
+          ),
+          const SizedBox(height: gap),
+          SizedBox(
+            height: infoRowHeight,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(flex: 6, child: _buildCustomerCard()),
+                const SizedBox(width: gap),
+                Expanded(flex: 5, child: _buildShippingCard()),
+                const SizedBox(width: gap),
+                SizedBox(
+                  width: summaryWidth,
+                  child: _buildCommercialCard(localePrefs, compactLayout: true),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: gap),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _buildLinesCard(
+                    lines,
+                    totalQty,
+                    desktopLayout: true,
+                  ),
+                ),
+                const SizedBox(width: gap),
+                SizedBox(
+                  width: summaryWidth,
+                  child: _buildSummaryCard(
+                    lines.length,
+                    totalQty,
+                    subtotal,
+                    taxTotal,
+                    discount,
+                    total,
+                    expandContent: true,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileBody(
+    LocalePreferencesState localePrefs,
+    String? locationName,
+    String? username,
+    List<DocumentLineDraft> lines,
+    double subtotal,
+    double taxTotal,
+    double totalQty,
+    double discount,
+    double total,
+  ) {
+    final statusBanners = _buildStatusBanners();
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (_loading) ...[
+          const LinearProgressIndicator(minHeight: 2),
+        ],
+        if (statusBanners != null) ...[
+          if (_loading) const SizedBox(height: 12),
+          statusBanners,
+          const SizedBox(height: 12),
+        ],
+        _buildMetadataCard(localePrefs, locationName, username),
+        const SizedBox(height: 12),
+        _buildCustomerCard(),
+        const SizedBox(height: 12),
+        _buildShippingCard(),
+        const SizedBox(height: 12),
+        _buildCommercialCard(localePrefs),
+        const SizedBox(height: 12),
+        _buildLinesCard(lines, totalQty),
+        const SizedBox(height: 12),
+        _buildNotesCard(),
+        const SizedBox(height: 12),
+        _buildAccountCard(),
+        const SizedBox(height: 12),
+        _buildSummaryCard(
+          lines.length,
+          totalQty,
+          subtotal,
+          taxTotal,
+          discount,
+          total,
+        ),
+      ],
+    );
+  }
+
+  Widget? _buildStatusBanners() {
+    if ((_error ?? '').isEmpty && (_info ?? '').isEmpty) return null;
     return Column(
       children: [
-        ProfessionalDocumentHeader(
-          title: _isEdit
-              ? (_readOnly ? 'Quote (Read-only)' : 'Edit Quote')
-              : 'New Quote',
-          subtitle:
-              'Structure the quote like a business document: customer and shipping context at the top, a click-to-edit item table in the middle, and a persistent decision rail on the right.',
-          badges: [
-            ProfessionalBadge(
-              label: _transactionType == 'B2B' ? 'B2B Quote' : 'Retail Quote',
-            ),
-            if ((_status ?? '').trim().isNotEmpty)
-              ProfessionalBadge(
-                label: 'Status: ${_status!}',
-                backgroundColor: const Color(0xFFE8F3EC),
-                foregroundColor: const Color(0xFF255C35),
-              ),
-            if (_validUntil != null)
-              ProfessionalBadge(
-                label:
-                    'Valid ${AppDateTime.formatDate(context, localePrefs, _validUntil)}',
-                backgroundColor: const Color(0xFFF8EEDC),
-                foregroundColor: const Color(0xFF7B5416),
-              ),
-            if (_readOnly)
-              const ProfessionalBadge(
-                label: 'Read-only',
-                backgroundColor: Color(0xFFFDE8E4),
-                foregroundColor: Color(0xFF8A3E31),
-              ),
-          ],
-        ),
-        if ((_error ?? '').isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _Banner(
+        if ((_error ?? '').isNotEmpty)
+          ProfessionalBanner(
             message: _error!,
             color: Theme.of(context).colorScheme.errorContainer,
           ),
-        ],
-        if ((_info ?? '').isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _Banner(message: _info!, color: const Color(0xFFE7F0FA)),
-        ],
+        if ((_error ?? '').isNotEmpty && (_info ?? '').isNotEmpty)
+          const SizedBox(height: 10),
+        if ((_info ?? '').isNotEmpty)
+          ProfessionalBanner(
+            message: _info!,
+            color: const Color(0xFFE7F0FA),
+          ),
       ],
     );
   }
 
   Widget _buildCustomerCard() {
     final customer = _customer;
-    return _OverviewCard(
+    return ProfessionalOverviewCard(
       title: 'Customer Information',
-      icon: Icons.person_outline_rounded,
+      icon: Icons.business_rounded,
       action: FilledButton.tonalIcon(
         onPressed: (_loading || _readOnly) ? null : _pickCustomer,
         icon: const Icon(Icons.search_rounded),
         label: Text(customer == null ? 'Select' : 'Change'),
+        style: professionalCompactButtonStyle(context),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _HighlightPanel(
-            title: customer?.name ??
-                (_transactionType == 'B2B'
-                    ? 'Select a B2B party'
-                    : 'Optional retail customer'),
-            subtitle: customer == null
-                ? 'Attach the party for billing, contact, and terms context.'
-                : [
-                    if (customer.identityChips.isNotEmpty)
-                      customer.identityChips.join(' • '),
-                    if ((customer.taxNumber ?? '').trim().isNotEmpty)
-                      'Tax ${customer.taxNumber!.trim()}',
-                  ].join(' • '),
-          ),
-          if (customer != null) ...[
-            const SizedBox(height: 14),
-            _FieldPair(label: 'Customer Type', value: customer.customerType),
-            _FieldPair(
-              label: 'Credit Balance',
-              value: customer.creditBalance.toStringAsFixed(2),
-            ),
-            if (customer.paymentTerms > 0)
-              _FieldPair(
-                label: 'Payment Terms',
-                value: '${customer.paymentTerms} days',
+          ProfessionalFieldGrid(
+            fields: [
+              ProfessionalFieldGridItem(
+                label: 'Company / Customer',
+                value: customer?.name ??
+                    (_transactionType == 'B2B'
+                        ? 'Select a B2B party'
+                        : 'Optional retail customer'),
               ),
-          ],
-          if (customer != null && !_readOnly) ...[
-            const SizedBox(height: 12),
-            TextButton.icon(
-              onPressed: () => setState(() => _customer = null),
-              icon: const Icon(Icons.close_rounded),
-              label: const Text('Clear Customer'),
-            ),
-          ],
+              ProfessionalFieldGridItem(
+                label: 'Customer Type',
+                value: customer?.customerType ?? _transactionType,
+              ),
+              ProfessionalFieldGridItem(
+                label: 'Tax ID',
+                value: customer?.taxNumber ?? '',
+              ),
+              ProfessionalFieldGridItem(
+                label: 'Contact',
+                value: [
+                  if ((customer?.contactPerson ?? '').trim().isNotEmpty)
+                    customer!.contactPerson!.trim(),
+                  if ((customer?.phone ?? '').trim().isNotEmpty)
+                    customer!.phone!.trim(),
+                  if ((customer?.email ?? '').trim().isNotEmpty)
+                    customer!.email!.trim(),
+                ].join(' • '),
+                maxLines: 2,
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -536,20 +701,32 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
 
   Widget _buildShippingCard() {
     final customer = _customer;
-    return _OverviewCard(
+    return ProfessionalOverviewCard(
       title: 'Shipping Details',
       icon: Icons.local_shipping_outlined,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _HighlightPanel(
-            title: customer?.primaryAddress ??
-                'Shipping address appears after customer selection',
-            subtitle: customer == null
-                ? 'Use the selected customer profile to populate the delivery or billing address context.'
+      child: ProfessionalFieldGrid(
+        fields: [
+          ProfessionalFieldGridItem(
+            label: 'Shipping Address',
+            value: customer == null
+                ? ''
                 : ((customer.shippingAddress ?? '').trim().isNotEmpty
-                    ? 'Pulled from the customer shipping address.'
-                    : 'Using the customer billing address because no separate shipping address is set.'),
+                    ? customer.shippingAddress!.trim()
+                    : customer.primaryAddress),
+            maxLines: 2,
+          ),
+          ProfessionalFieldGridItem(
+            label: 'Billing Address',
+            value: customer == null
+                ? ''
+                : ((customer.address ?? '').trim().isEmpty
+                    ? 'No billing address on file'
+                    : customer.address!.trim()),
+            maxLines: 2,
+          ),
+          ProfessionalFieldGridItem(
+            label: 'Contact Person',
+            value: customer?.contactPerson ?? '',
           ),
         ],
       ),
@@ -559,75 +736,161 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
   Widget _buildMetadataCard(
     LocalePreferencesState localePrefs,
     String? locationName,
-    String? username,
-  ) {
-    return _OverviewCard(
-      title: 'Document Metadata',
-      icon: Icons.description_outlined,
+    String? username, {
+    bool compactLayout = false,
+  }) {
+    final quoteDate = _quoteDate ?? DateTime.now();
+    return ProfessionalOverviewCard(
+      showHeader: false,
+      expandChild: compactLayout,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _FieldPair(
-            label: 'Quote Number',
-            value: (_quoteNumber ?? '').trim().isEmpty
-                ? 'Auto-generated on save'
-                : _quoteNumber!,
+          Wrap(
+            spacing: 18,
+            runSpacing: 12,
+            children: [
+              ProfessionalMetaCell(
+                label: 'Quote Number',
+                value: (_quoteNumber ?? '').trim().isEmpty
+                    ? ((_quoteNumberPreview ?? '').trim().isEmpty
+                        ? 'Auto-generated on save'
+                        : _quoteNumberPreview!)
+                    : _quoteNumber!,
+              ),
+              ProfessionalMetaCell(
+                label: 'Quote Date',
+                value: AppDateTime.formatDate(context, localePrefs, quoteDate),
+              ),
+              ProfessionalMetaCell(
+                label: 'Location',
+                value: (locationName ?? '').trim().isEmpty
+                    ? 'No location selected'
+                    : locationName!,
+              ),
+              ProfessionalMetaCell(
+                label: 'Prepared By',
+                value: (username ?? '').trim().isEmpty
+                    ? 'Current user'
+                    : username!,
+              ),
+              ProfessionalMetaCell(
+                label: 'Valid Until',
+                value: _validUntil == null
+                    ? 'Not set'
+                    : AppDateTime.formatDate(context, localePrefs, _validUntil),
+              ),
+            ],
           ),
-          _FieldPair(
-            label: 'Quote Date',
-            value: AppDateTime.formatDate(context, localePrefs, _quoteDate),
-          ),
-          _FieldPair(
-            label: 'Quote Type',
-            value: _transactionType,
-            trailing: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _transactionType,
-                onChanged: (_loading || _readOnly)
-                    ? null
-                    : (value) {
-                        if (value == null) return;
-                        setState(() {
-                          _transactionType = value;
-                          if (_customer != null &&
-                              normalizeSaleTransactionType(
-                                      _customer!.customerType) !=
-                                  value) {
-                            _customer = null;
-                          }
-                        });
-                      },
-                items: const [
-                  DropdownMenuItem(value: 'B2B', child: Text('B2B')),
-                  DropdownMenuItem(value: 'RETAIL', child: Text('Retail')),
-                ],
+          if (compactLayout) ...[
+            const SizedBox(height: 14),
+            Expanded(
+              child: TextField(
+                controller: _notesCtrl,
+                enabled: !_readOnly,
+                expands: true,
+                minLines: null,
+                maxLines: null,
+                textAlignVertical: TextAlignVertical.top,
+                style: Theme.of(context).textTheme.bodySmall,
+                decoration: InputDecoration(
+                  hintText: 'Quote terms / internal notes',
+                  hintStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
+                ),
               ),
             ),
-          ),
-          _FieldPair(
-            label: 'Valid Until',
-            value: _validUntil == null
-                ? 'Not set'
-                : AppDateTime.formatDate(context, localePrefs, _validUntil),
-            trailing: TextButton.icon(
-              onPressed: (_loading || _readOnly) ? null : _pickValidUntil,
-              icon: const Icon(Icons.event_rounded),
-              label: Text(_validUntil == null ? 'Set' : 'Change'),
+          ] else if (_convertedSaleId != null) ...[
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SaleDetailPage(saleId: _convertedSaleId!),
+                ),
+              ),
+              icon: const Icon(Icons.open_in_new_rounded),
+              label: const Text('Open Converted Sale'),
             ),
-          ),
-          _FieldPair(
-            label: 'Location',
-            value: (locationName ?? '').trim().isEmpty
-                ? 'No location selected'
-                : locationName!,
-          ),
-          _FieldPair(
-            label: 'Prepared By',
-            value: (username ?? '').trim().isEmpty ? 'Current user' : username!,
-          ),
-          if (_convertedSaleId != null)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCommercialCard(
+    LocalePreferencesState localePrefs, {
+    bool compactLayout = false,
+  }) {
+    return ProfessionalSectionCard(
+      title: 'Quote Controls',
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DropdownButtonFormField<String>(
+              initialValue: _transactionType,
+              decoration: const InputDecoration(
+                labelText: 'Quote Type',
+                prefixIcon: Icon(Icons.swap_horiz_rounded),
+              ),
+              onChanged: (_loading || _readOnly)
+                  ? null
+                  : (value) {
+                      if (value == null) return;
+                      setState(() {
+                        _transactionType = value;
+                        if (_customer != null &&
+                            normalizeSaleTransactionType(
+                                  _customer!.customerType,
+                                ) !=
+                                value) {
+                          _customer = null;
+                        }
+                      });
+                    },
+              items: const [
+                DropdownMenuItem(value: 'B2B', child: Text('B2B')),
+                DropdownMenuItem(value: 'RETAIL', child: Text('Retail')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ProfessionalFieldPair(
+              label: 'Valid Until',
+              value: _validUntil == null
+                  ? 'Not set'
+                  : AppDateTime.formatDate(context, localePrefs, _validUntil),
+              trailing: TextButton.icon(
+                onPressed: (_loading || _readOnly) ? null : _pickValidUntil,
+                icon: const Icon(Icons.event_rounded),
+                label: Text(_validUntil == null ? 'Set' : 'Change'),
+              ),
+            ),
+            const SizedBox(height: 6),
+            SizedBox(
+              width: compactLayout ? double.infinity : 168,
+              child: TextField(
+                controller: _discountCtrl,
+                enabled: !_readOnly,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Header Discount',
+                  hintText: '0.00',
+                  prefixIcon: Icon(Icons.percent_rounded),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+            if (_convertedSaleId != null) ...[
+              const SizedBox(height: 12),
+              TextButton.icon(
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => SaleDetailPage(saleId: _convertedSaleId!),
@@ -636,120 +899,201 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                 icon: const Icon(Icons.open_in_new_rounded),
                 label: const Text('Open Converted Sale'),
               ),
-            ),
-        ],
+            ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildLinesCard(List<DocumentLineDraft> lines, double totalQty) {
+  Widget _buildLinesCard(
+    List<DocumentLineDraft> lines,
+    double totalQty, {
+    bool desktopLayout = false,
+  }) {
     return ProfessionalSectionCard(
       title: 'Quote Items',
       subtitle:
-          'Add items through the dedicated dialog. Tap any row to update quantity, price, or discount.',
+          'Tap a line to revise quantity, unit price, or discount with the shared document editor.',
       action: FilledButton.tonalIcon(
         onPressed: (_loading || _readOnly) ? null : () => _editLine(),
         icon: const Icon(Icons.add_rounded),
         label: const Text('Add Item'),
+        style: professionalCompactButtonStyle(context),
       ),
+      expandChild: desktopLayout,
       child: lines.isEmpty
-          ? _EmptyLines(
-              readOnly: _readOnly,
-              onAdd: (_loading || _readOnly) ? null : () => _editLine(),
+          ? Center(
+              child: ProfessionalDocumentEmptyState(
+                title: _readOnly
+                    ? 'No quote items available.'
+                    : 'No items added yet.',
+                message: _readOnly
+                    ? 'This quote does not contain any active lines.'
+                    : 'Use the shared item editor to search by barcode or product name and build the quote one line at a time.',
+                actionLabel: (_loading || _readOnly) ? null : 'Add First Item',
+                onAction: (_loading || _readOnly) ? null : () => _editLine(),
+              ),
             )
-          : Column(
-              children: [
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const _QuoteTableHeader(),
-                      const SizedBox(height: 10),
-                      for (var index = 0; index < lines.length; index++) ...[
-                        _QuoteTableRow(
-                          index: index + 1,
-                          line: lines[index],
-                          enabled: !_readOnly,
-                          onTap: () =>
-                              _editLine(line: lines[index], index: index),
-                          onDelete: _readOnly
-                              ? null
-                              : () => setState(
-                                    () => _lines = [..._lines]..removeAt(index),
-                                  ),
+          : desktopLayout
+              ? Column(
+                  children: [
+                    const _QuoteTableHeader(),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: Scrollbar(
+                        controller: _linesScrollController,
+                        thumbVisibility: true,
+                        child: ListView.separated(
+                          controller: _linesScrollController,
+                          padding: EdgeInsets.zero,
+                          itemCount: lines.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, index) => _QuoteTableRow(
+                            index: index + 1,
+                            line: lines[index],
+                            enabled: !_readOnly,
+                            onTap: () =>
+                                _editLine(line: lines[index], index: index),
+                            onDelete: _readOnly
+                                ? null
+                                : () => setState(
+                                      () =>
+                                          _lines = [..._lines]..removeAt(index),
+                                    ),
+                          ),
                         ),
-                        const SizedBox(height: 10),
-                      ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        'Items: ${lines.length}    Total Qty: ${formatDocumentQuantity(totalQty)}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                )
+              : Column(
+                  children: [
+                    for (var index = 0; index < lines.length; index++) ...[
+                      _buildMobileLineCard(lines[index], index),
+                      if (index != lines.length - 1) const SizedBox(height: 10),
                     ],
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        TextButton.icon(
+                          onPressed: (_loading || _readOnly)
+                              ? null
+                              : () => _editLine(),
+                          icon: const Icon(Icons.add_circle_outline_rounded),
+                          label: const Text('Add New Item'),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Items: ${lines.length}    Total Qty: ${formatDocumentQuantity(totalQty)}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+    );
+  }
+
+  Widget _buildMobileLineCard(DocumentLineDraft line, int index) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _readOnly ? null : () => _editLine(line: line, index: index),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      line.displayName,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    line.lineGrandTotal.toStringAsFixed(2),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              if (line.supportingText.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  line.supportingText,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(height: 12),
+              ],
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                children: [
+                  _MobileMetricChip(
+                    label: 'Qty',
+                    value: formatDocumentQuantity(line.quantity),
+                  ),
+                  _MobileMetricChip(
+                    label: 'Price',
+                    value: line.unitPrice.toStringAsFixed(2),
+                  ),
+                  _MobileMetricChip(
+                    label: 'Disc %',
+                    value: line.discountPercent.toStringAsFixed(2),
+                  ),
+                  _MobileMetricChip(
+                    label: 'Tax',
+                    value: line.taxAmount.toStringAsFixed(2),
+                  ),
+                ],
+              ),
+              if (!_readOnly) ...[
+                const SizedBox(height: 10),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton.icon(
-                      onPressed:
-                          (_loading || _readOnly) ? null : () => _editLine(),
-                      icon: const Icon(Icons.add_circle_outline_rounded),
-                      label: const Text('Add New Item'),
+                      onPressed: () => _editLine(line: line, index: index),
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Edit'),
                     ),
-                    const Spacer(),
-                    Text(
-                      'Items: ${lines.length}    Total Qty: ${formatDocumentQuantity(totalQty)}',
-                      style: Theme.of(context).textTheme.bodySmall,
+                    TextButton.icon(
+                      onPressed: () => setState(
+                        () => _lines = [..._lines]..removeAt(index),
+                      ),
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      label: const Text('Delete'),
                     ),
                   ],
                 ),
               ],
-            ),
-    );
-  }
-
-  Widget _buildAccountCard() {
-    final customer = _customer;
-    return ProfessionalSectionCard(
-      title: 'Customer Exposure',
-      child: customer == null
-          ? Text(
-              'Select a customer to review credit balance, credit limit, and payment terms before finalizing the quote.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  customer.creditBalance.toStringAsFixed(2),
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFFBA1A1A),
-                      ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Current outstanding balance',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
-                const SizedBox(height: 14),
-                _PreviewRow(
-                  label: 'Credit Limit',
-                  value: customer.creditLimit.toStringAsFixed(2),
-                ),
-                const SizedBox(height: 10),
-                _PreviewRow(
-                  label: 'Payment Terms',
-                  value: customer.paymentTerms > 0
-                      ? '${customer.paymentTerms} days'
-                      : 'Not set',
-                ),
-                const SizedBox(height: 10),
-                _PreviewRow(
-                  label: 'Address',
-                  value: customer.primaryAddress,
-                ),
-              ],
-            ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -757,11 +1101,11 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
     return ProfessionalSectionCard(
       title: 'Quote Notes',
       subtitle:
-          'Use this area for commercial terms, delivery notes, or any wording that should travel with the quote.',
+          'Use this space for commercial terms, delivery notes, or wording that should travel with the quote.',
       child: TextField(
         controller: _notesCtrl,
         enabled: !_readOnly,
-        maxLines: 6,
+        maxLines: 5,
         decoration: const InputDecoration(
           labelText: 'Terms / Notes',
           alignLabelWithHint: true,
@@ -770,15 +1114,59 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
     );
   }
 
+  Widget _buildAccountCard() {
+    final customer = _customer;
+    return ProfessionalSectionCard(
+      title: 'Customer Exposure',
+      child: customer == null
+          ? const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ProfessionalAmountHighlight(value: '0.00'),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ProfessionalAmountHighlight(
+                  value: customer.creditBalance.toStringAsFixed(2),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Current outstanding balance',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 14),
+                ProfessionalPreviewRow(
+                  label: 'Credit Limit',
+                  value: customer.creditLimit.toStringAsFixed(2),
+                ),
+                const SizedBox(height: 10),
+                ProfessionalPreviewRow(
+                  label: 'Payment Terms',
+                  value: customer.paymentTerms > 0
+                      ? '${customer.paymentTerms} days'
+                      : 'Not set',
+                ),
+              ],
+            ),
+    );
+  }
+
   Widget _buildSummaryCard(
     int itemCount,
     double totalQty,
     double subtotal,
+    double taxTotal,
     double discount,
-    double total,
-  ) {
+    double total, {
+    bool expandContent = false,
+  }) {
     return ProfessionalSummaryCard(
       title: 'Quote Summary',
+      expandContent: expandContent,
       rows: [
         (label: 'Items', value: '$itemCount', emphasize: false),
         (
@@ -789,6 +1177,11 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
         (
           label: 'Line Net',
           value: subtotal.toStringAsFixed(2),
+          emphasize: false,
+        ),
+        (
+          label: 'Tax',
+          value: taxTotal.toStringAsFixed(2),
           emphasize: false,
         ),
         (
@@ -823,11 +1216,6 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                         color: const Color(0xFFBA1A1A),
                       ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  'The backend will finalize taxes and totals from product pricing rules when the quote is saved.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
               ],
             ),
           ),
@@ -847,181 +1235,56 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
   }
 }
 
-class _OverviewCard extends StatelessWidget {
-  const _OverviewCard({
-    required this.title,
-    required this.icon,
-    this.action,
-    required this.child,
-  });
-
-  final String title;
-  final IconData icon;
-  final Widget? action;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Container(
-        decoration: const BoxDecoration(
-          border: Border(
-            left: BorderSide(color: Color(0xFFBA1A1A), width: 3),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Icon(icon, size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            title,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (action != null) ...[
-                    const SizedBox(width: 12),
-                    action!,
-                  ],
-                ],
-              ),
-              const SizedBox(height: 18),
-              child,
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HighlightPanel extends StatelessWidget {
-  const _HighlightPanel({required this.title, required this.subtitle});
-
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2F4F8),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          if (subtitle.trim().isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _FieldPair extends StatelessWidget {
-  const _FieldPair({
-    required this.label,
-    required this.value,
-    this.trailing,
-  });
-
-  final String label;
-  final String value;
-  final Widget? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-              ],
-            ),
-          ),
-          if (trailing != null) ...[
-            const SizedBox(width: 12),
-            trailing!,
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 class _QuoteTableHeader extends StatelessWidget {
   const _QuoteTableHeader();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: const Row(
         children: [
-          _HeaderCell(label: '#', width: 50),
-          _HeaderCell(label: 'Barcode', width: 140),
-          _HeaderCell(label: 'Item / Description', width: 320),
-          _HeaderCell(label: 'Qty', width: 90),
-          _HeaderCell(label: 'Price', width: 110),
-          _HeaderCell(label: 'Disc %', width: 90),
-          _HeaderCell(label: 'Total', width: 120),
-          _HeaderCell(label: 'Action', width: 80),
+          ProfessionalHeaderCell(
+            label: '#',
+            flex: 4,
+            textAlign: TextAlign.center,
+          ),
+          ProfessionalHeaderCell(label: 'Barcode', flex: 9),
+          ProfessionalHeaderCell(label: 'Item Details', flex: 28),
+          ProfessionalHeaderCell(
+            label: 'Qty',
+            flex: 6,
+            textAlign: TextAlign.center,
+          ),
+          ProfessionalHeaderCell(
+            label: 'Price',
+            flex: 8,
+            textAlign: TextAlign.right,
+          ),
+          ProfessionalHeaderCell(
+            label: 'Disc %',
+            flex: 6,
+            textAlign: TextAlign.right,
+          ),
+          ProfessionalHeaderCell(
+            label: 'Tax',
+            flex: 8,
+            textAlign: TextAlign.right,
+          ),
+          ProfessionalHeaderCell(
+            label: 'Total',
+            flex: 9,
+            textAlign: TextAlign.right,
+          ),
+          ProfessionalHeaderCell(
+            label: 'Action',
+            flex: 6,
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
@@ -1049,57 +1312,77 @@ class _QuoteTableRow extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             border:
                 Border.all(color: Theme.of(context).colorScheme.outlineVariant),
           ),
           child: Row(
             children: [
-              _BodyCell(label: '$index', width: 50),
-              _BodyCell(
+              ProfessionalBodyCell(
+                label: '$index',
+                flex: 4,
+                textAlign: TextAlign.center,
+              ),
+              ProfessionalBodyCell(
                 label:
                     (line.barcode ?? '').trim().isEmpty ? '-' : line.barcode!,
-                width: 140,
+                flex: 9,
               ),
-              _BodyCell(
+              ProfessionalBodyCell(
                 label: line.displayName,
                 secondary: line.supportingText,
-                width: 320,
+                secondaryMaxLines: 2,
+                flex: 28,
               ),
-              _BodyCell(
+              ProfessionalBodyCell(
                 label: formatDocumentQuantity(line.quantity),
-                width: 90,
+                flex: 6,
+                textAlign: TextAlign.center,
               ),
-              _BodyCell(
+              ProfessionalBodyCell(
                 label: line.unitPrice.toStringAsFixed(2),
-                width: 110,
+                flex: 8,
+                textAlign: TextAlign.right,
               ),
-              _BodyCell(
+              ProfessionalBodyCell(
                 label: line.discountPercent.toStringAsFixed(2),
-                width: 90,
+                flex: 6,
+                textAlign: TextAlign.right,
               ),
-              _BodyCell(
-                label: line.lineTotal.toStringAsFixed(2),
-                width: 120,
+              ProfessionalBodyCell(
+                label: line.taxAmount.toStringAsFixed(2),
+                secondary: line.taxLabel,
+                flex: 8,
+                textAlign: TextAlign.right,
+              ),
+              ProfessionalBodyCell(
+                label: line.lineGrandTotal.toStringAsFixed(2),
+                flex: 9,
                 emphasize: true,
+                textAlign: TextAlign.right,
               ),
-              SizedBox(
-                width: 80,
+              Expanded(
+                flex: 6,
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     IconButton(
                       tooltip: 'Edit',
                       onPressed: enabled ? onTap : null,
-                      icon: const Icon(Icons.edit_outlined),
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      visualDensity: VisualDensity.compact,
+                      splashRadius: 18,
                     ),
                     IconButton(
                       tooltip: 'Delete',
                       onPressed: onDelete,
-                      icon: const Icon(Icons.delete_outline_rounded),
+                      icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                      visualDensity: VisualDensity.compact,
+                      splashRadius: 18,
                     ),
                   ],
                 ),
@@ -1112,121 +1395,8 @@ class _QuoteTableRow extends StatelessWidget {
   }
 }
 
-class _HeaderCell extends StatelessWidget {
-  const _HeaderCell({required this.label, required this.width});
-
-  final String label;
-  final double width;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-      ),
-    );
-  }
-}
-
-class _BodyCell extends StatelessWidget {
-  const _BodyCell({
-    required this.label,
-    required this.width,
-    this.secondary,
-    this.emphasize = false,
-  });
-
-  final String label;
-  final double width;
-  final String? secondary;
-  final bool emphasize;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: emphasize
-                ? Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    )
-                : Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-          ),
-          if ((secondary ?? '').trim().isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              secondary!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyLines extends StatelessWidget {
-  const _EmptyLines({required this.readOnly, required this.onAdd});
-
-  final bool readOnly;
-  final VoidCallback? onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      child: Column(
-        children: [
-          const Icon(Icons.receipt_long_rounded, size: 36),
-          const SizedBox(height: 12),
-          Text(
-            readOnly ? 'No quote items available.' : 'No items added yet.',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            readOnly
-                ? 'This quote does not contain any active lines.'
-                : 'Use the item dialog to search by barcode or product name and build the quote one line at a time.',
-            textAlign: TextAlign.center,
-          ),
-          if (!readOnly) ...[
-            const SizedBox(height: 16),
-            FilledButton.tonalIcon(
-              onPressed: onAdd,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('Add First Item'),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _PreviewRow extends StatelessWidget {
-  const _PreviewRow({
+class _MobileMetricChip extends StatelessWidget {
+  const _MobileMetricChip({
     required this.label,
     required this.value,
   });
@@ -1236,34 +1406,31 @@ class _PreviewRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: Text(label)),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-        ),
-      ],
-    );
-  }
-}
-
-class _Banner extends StatelessWidget {
-  const _Banner({required this.message, required this.color});
-
-  final String message;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration:
-          BoxDecoration(color: color, borderRadius: BorderRadius.circular(16)),
-      child: Text(message, style: Theme.of(context).textTheme.bodyMedium),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
+      ),
     );
   }
 }

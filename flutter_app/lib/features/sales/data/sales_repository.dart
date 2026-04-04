@@ -27,6 +27,62 @@ class SalesRepository {
     return const [];
   }
 
+  Future<String?> getNextDocumentNumberPreview(
+    String sequenceName, {
+    int? locationId,
+  }) async {
+    final loc = locationId ?? _locationId;
+    if (loc == null) return null;
+
+    final outbox = _ref.read(outboxNotifierProvider.notifier);
+    if (!outbox.isOnline) return null;
+
+    final normalized = sequenceName.trim().toLowerCase();
+    if (normalized.isEmpty) return null;
+
+    Response res;
+    try {
+      res = await _dio.get(
+        '/numbering-sequences',
+        queryParameters: {'location_id': loc},
+      );
+    } on DioException catch (e) {
+      if (outbox.isNetworkError(e)) return null;
+      rethrow;
+    }
+
+    final list = _extractList(res).cast<Map<String, dynamic>>();
+    Map<String, dynamic>? chosen;
+    for (final item in list) {
+      if ((item['name'] as String?)?.toLowerCase() == normalized &&
+          (item['location_id'] as int?) == loc) {
+        chosen = item;
+        break;
+      }
+    }
+    chosen ??= list.firstWhere(
+      (item) =>
+          (item['name'] as String?)?.toLowerCase() == normalized &&
+          item['location_id'] == null,
+      orElse: () => <String, dynamic>{},
+    );
+    if (chosen.isEmpty) return null;
+
+    final prefix = chosen['prefix'] as String? ?? '';
+    final len = (chosen['sequence_length'] as num?)?.toInt() ?? 6;
+    final curr = (chosen['current_number'] as num?)?.toInt() ?? 0;
+    final next = curr + 1;
+    return '$prefix${next.toString().padLeft(len, '0')}';
+  }
+
+  Future<String?> getNextQuoteNumberPreview({int? locationId}) {
+    return getNextDocumentNumberPreview('quote', locationId: locationId);
+  }
+
+  Future<String?> getNextSaleReturnNumberPreview({int? locationId}) {
+    return getNextDocumentNumberPreview('sale_return', locationId: locationId);
+  }
+
   Future<List<Map<String, dynamic>>> getSalesHistory({
     String? dateFrom,
     String? dateTo,

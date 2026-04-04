@@ -349,6 +349,7 @@ class DocumentLineDraft {
   Map<String, dynamic> toQuoteJson() => {
         if ((productId ?? 0) > 0) 'product_id': productId,
         if ((comboProductId ?? 0) > 0) 'combo_product_id': comboProductId,
+        if ((taxId ?? 0) > 0) 'tax_id': taxId,
         'quantity': quantity,
         'unit_price': unitPrice,
         'discount_percentage': discountPercent,

@@ -158,23 +158,26 @@ class PosRepository {
   }
 
   // Receipt number preview using numbering sequences
-  Future<String?> getNextReceiptPreview() async {
-    final loc = _ref.read(locationNotifierProvider).selected;
+  Future<String?> getNextReceiptPreview({int? locationId}) async {
+    final selectedLocation = _ref.read(locationNotifierProvider).selected;
+    final loc = locationId ?? selectedLocation?.locationId;
     if (loc == null) return null;
 
     final outbox = _ref.read(outboxNotifierProvider.notifier);
 
     // Prefer local reserved block preview so the UI matches what this device will use.
-    final offlineNum = _ref.read(offlineNumberingServiceProvider);
-    final localPreview = offlineNum.peekNextSaleNumber(training: false);
-    if (localPreview != null && localPreview.isNotEmpty) return localPreview;
+    if (locationId == null || locationId == selectedLocation?.locationId) {
+      final offlineNum = _ref.read(offlineNumberingServiceProvider);
+      final localPreview = offlineNum.peekNextSaleNumber(training: false);
+      if (localPreview != null && localPreview.isNotEmpty) return localPreview;
+    }
 
     // Receipt previews are a convenience; don't block offline operation.
     if (!outbox.isOnline) return null;
     Response res;
     try {
-      res = await _dio.get('/numbering-sequences',
-          queryParameters: {'location_id': loc.locationId});
+      res = await _dio
+          .get('/numbering-sequences', queryParameters: {'location_id': loc});
     } on DioException catch (e) {
       if (outbox.isNetworkError(e)) return null;
       rethrow;
@@ -184,7 +187,7 @@ class PosRepository {
     // Prefer location-specific sequence over global fallback
     for (final m in list) {
       if ((m['name'] as String?)?.toLowerCase() == 'sale' &&
-          (m['location_id'] as int?) == loc.locationId) {
+          (m['location_id'] as int?) == loc) {
         chosen = m;
         break;
       }

@@ -5,7 +5,9 @@ import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 import 'package:ebs_lite/shared/widgets/app_selection_dialog.dart';
 import 'package:ebs_lite/shared/widgets/sales_action_password_dialog.dart';
 
+import '../../../../core/app_date_time.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../inventory/data/inventory_repository.dart';
 import '../../../inventory/data/models.dart';
 import '../../../inventory/presentation/widgets/inventory_tracking_selector.dart';
@@ -14,6 +16,8 @@ import '../../../pos/data/models.dart';
 import '../../../pos/data/pos_repository.dart';
 import '../../../pos/presentation/pages/pos_page.dart';
 import '../../data/sales_repository.dart';
+import '../widgets/document_line_editor_dialog.dart';
+import '../widgets/professional_document_widgets.dart';
 import 'b2b_invoice_form_page.dart';
 import 'sale_return_detail_page.dart';
 import 'sale_detail_page.dart';
@@ -50,12 +54,14 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
   final List<_RetLine> _lines = [
     _RetLine(),
   ];
+  String? _documentNumberPreview;
 
   bool get _hasLinkedReturnableLines => _returnableLines.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
+    Future.microtask(_loadDocumentNumberPreview);
     final initialSaleId = widget.initialSaleId;
     if (initialSaleId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -91,6 +97,14 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
       if (!line.selected) return false;
       final qty = double.tryParse(line.quantity.text.trim()) ?? 0;
       return qty > 0;
+    }).toList(growable: false);
+  }
+
+  List<_RetLine> _activeManualLines() {
+    return _lines.where((line) {
+      final qty = double.tryParse(line.qty.text.trim()) ?? 0;
+      final price = double.tryParse(line.price.text.trim()) ?? 0;
+      return line.product != null && qty > 0 && price > 0;
     }).toList(growable: false);
   }
 
@@ -134,6 +148,9 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
         }
         _replaceReturnableLines(items);
       });
+      Future.microtask(
+        () => _loadDocumentNumberPreview(locationId: sale.locationId),
+      );
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -141,10 +158,27 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
         _replaceReturnableLines(const []);
         _linkError = error;
       });
+      Future.microtask(_loadDocumentNumberPreview);
     } finally {
       if (mounted) {
         setState(() => _linking = false);
       }
+    }
+  }
+
+  Future<void> _loadDocumentNumberPreview({int? locationId}) async {
+    try {
+      final preview = widget.mode == SaleReturnDocumentMode.refundInvoice
+          ? await ref
+              .read(salesRepositoryProvider)
+              .getNextDocumentNumberPreview('sale', locationId: locationId)
+          : await ref
+              .read(salesRepositoryProvider)
+              .getNextSaleReturnNumberPreview(locationId: locationId);
+      if (!mounted) return;
+      setState(() => _documentNumberPreview = preview);
+    } catch (_) {
+      // Best-effort preview only.
     }
   }
 
@@ -438,11 +472,41 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
   @override
   Widget build(BuildContext context) {
     final sale = _linkedSale;
-    final isWide = AppBreakpoints.isTabletOrDesktop(context);
+    final showSidebarToggle = AppBreakpoints.isTabletOrDesktop(context);
+    final isDesktop = AppBreakpoints.isDesktop(context);
+    final selectedLines = _selectedReturnableLines();
+    final manualLines = _activeManualLines();
+    final itemCount =
+        _hasLinkedReturnableLines ? selectedLines.length : manualLines.length;
+    final totalQty = _hasLinkedReturnableLines
+        ? selectedLines.fold<double>(
+            0,
+            (sum, line) =>
+                sum + (double.tryParse(line.quantity.text.trim()) ?? 0),
+          )
+        : manualLines.fold<double>(
+            0,
+            (sum, line) => sum + (double.tryParse(line.qty.text.trim()) ?? 0),
+          );
+    final totalAmount = _hasLinkedReturnableLines
+        ? selectedLines.fold<double>(
+            0,
+            (sum, line) =>
+                sum +
+                ((double.tryParse(line.quantity.text.trim()) ?? 0) *
+                    line.unitPrice),
+          )
+        : manualLines.fold<double>(
+            0,
+            (sum, line) =>
+                sum +
+                ((double.tryParse(line.qty.text.trim()) ?? 0) *
+                    (double.tryParse(line.price.text.trim()) ?? 0)),
+          );
     return Scaffold(
       appBar: AppBar(
-        leadingWidth: isWide ? 104 : null,
-        leading: isWide ? const DesktopSidebarToggleLeading() : null,
+        leadingWidth: showSidebarToggle ? 104 : null,
+        leading: showSidebarToggle ? const DesktopSidebarToggleLeading() : null,
         title: Text(
           widget.mode == SaleReturnDocumentMode.refundInvoice
               ? 'New Refund Invoice'
@@ -450,148 +514,638 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
         ),
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (widget.mode == SaleReturnDocumentMode.saleReturn) ...[
-              _CustomerPicker(
-                  enabled: sale == null,
-                  customer: _customer,
-                  onPicked: (c) => setState(() => _customer = c)),
-              const SizedBox(height: 12),
-            ],
-            TextField(
-              controller: _invoiceCtrl,
-              readOnly: widget.initialSaleId != null,
-              decoration: InputDecoration(
-                labelText: widget.mode == SaleReturnDocumentMode.refundInvoice
-                    ? 'Invoice Number (required)'
-                    : 'B2B Invoice Number ${_customer == null ? '(required when no party is selected)' : '(optional)'}',
-                prefixIcon: const Icon(Icons.receipt_long_outlined),
-                suffixIcon: widget.initialSaleId != null
-                    ? const Icon(Icons.lock_outline_rounded)
-                    : IconButton(
-                        icon: const Icon(Icons.search_rounded),
-                        onPressed: _findInvoice,
-                      ),
+        child: isDesktop
+            ? _buildDesktopBody(
+                context,
+                sale,
+                itemCount,
+                totalQty,
+                totalAmount,
+              )
+            : _buildMobileBody(context, sale),
+      ),
+    );
+  }
+
+  Widget _buildMobileBody(BuildContext context, SaleDto? sale) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildMobileDocumentCard(sale),
+        const SizedBox(height: 12),
+        if (widget.mode == SaleReturnDocumentMode.saleReturn) ...[
+          _CustomerPicker(
+            enabled: sale == null,
+            customer: _customer,
+            onPicked: (c) => setState(() => _customer = c),
+          ),
+          const SizedBox(height: 12),
+        ],
+        _buildInvoiceLookupField(),
+        if (_linking) const LinearProgressIndicator(minHeight: 2),
+        const SizedBox(height: 12),
+        if (_linkError != null) ...[
+          Card(
+            elevation: 0,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                ErrorHandler.message(_linkError!),
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
-              onSubmitted:
-                  widget.initialSaleId != null ? null : (_) => _findInvoice(),
             ),
-            if (_linking) const LinearProgressIndicator(minHeight: 2),
-            const SizedBox(height: 12),
-            if (_linkError != null) ...[
-              Card(
-                elevation: 0,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    ErrorHandler.message(_linkError!),
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (sale != null) ...[
+          _buildLinkedSaleListTile(sale),
+          const SizedBox(height: 12),
+        ],
+        _buildReasonField(),
+        const SizedBox(height: 12),
+        Text(
+          _hasLinkedReturnableLines
+              ? (widget.mode == SaleReturnDocumentMode.refundInvoice
+                  ? 'Refundable Items'
+                  : 'Returnable Items')
+              : 'Items',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        if (_hasLinkedReturnableLines) ...[
+          ..._buildReturnableLines(context),
+        ] else if (widget.mode == SaleReturnDocumentMode.refundInvoice) ...[
+          Card(
+            elevation: 0,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Refund invoices are created from the selected sale. Load an invoice to continue.',
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
-              const SizedBox(height: 12),
-            ],
-            if (sale != null)
-              Card(
-                elevation: 0,
-                child: ListTile(
-                  leading: const Icon(Icons.receipt_long_rounded),
-                  title: Text(sale.saleNumber),
-                  subtitle: Text([
-                    if ((sale.customerName ?? '').isNotEmpty)
-                      sale.customerName!,
-                  ].where((e) => e.isNotEmpty).join(' · ')),
-                  trailing: Text(sale.totalAmount.toStringAsFixed(2),
-                      style: Theme.of(context).textTheme.titleMedium),
-                ),
-              ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _reasonCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Reason (required)',
-                prefixIcon: Icon(Icons.description_outlined),
-              ),
+            ),
+          ),
+        ] else ...[
+          ..._buildLines(context),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: () => setState(() => _lines.add(_RetLine())),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add Item'),
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+        _buildPrimaryActions(),
+      ],
+    );
+  }
+
+  Widget _buildMobileDocumentCard(SaleDto? sale) {
+    final documentLabel = widget.mode == SaleReturnDocumentMode.refundInvoice
+        ? 'Refund Invoice Number'
+        : 'Return Number';
+    final documentNumber = (_documentNumberPreview ?? '').trim().isEmpty
+        ? 'Auto-generated on save'
+        : _documentNumberPreview!;
+    return Card(
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.mode == SaleReturnDocumentMode.refundInvoice
+                  ? 'Refund Invoice'
+                  : 'B2B Return',
+              style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
             Text(
-              _hasLinkedReturnableLines
-                  ? (widget.mode == SaleReturnDocumentMode.refundInvoice
-                      ? 'Refundable Items'
-                      : 'Returnable Items')
-                  : 'Items',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            if (_hasLinkedReturnableLines) ...[
-              ..._buildReturnableLines(context),
-            ] else if (widget.mode == SaleReturnDocumentMode.refundInvoice) ...[
-              Card(
-                elevation: 0,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'Refund invoices are created from the selected sale. Load an invoice to continue.',
-                    style: Theme.of(context).textTheme.bodyMedium,
+              documentLabel,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              documentNumber,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            if (sale != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Reference Invoice',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
               ),
-            ] else ...[
-              ..._buildLines(context),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  onPressed: () => setState(() => _lines.add(_RetLine())),
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Add Item'),
-                ),
+              const SizedBox(height: 4),
+              Text(
+                sale.saleNumber,
+                style: Theme.of(context).textTheme.bodyLarge,
               ),
             ],
-            const SizedBox(height: 16),
-            if (widget.mode == SaleReturnDocumentMode.refundInvoice &&
-                _hasLinkedReturnableLines) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 48,
-                      child: FilledButton.tonalIcon(
-                        onPressed: _openInSellScreen,
-                        icon: const Icon(Icons.point_of_sale_rounded),
-                        label: const Text('Open in Sell Screen'),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: SizedBox(
-                      height: 48,
-                      child: FilledButton.icon(
-                        onPressed: _save,
-                        icon: const Icon(Icons.undo_rounded),
-                        label: const Text('Create Refund Invoice'),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ] else
-              SizedBox(
-                height: 48,
-                child: FilledButton(
-                  onPressed: _save,
-                  child: Text(
-                    widget.mode == SaleReturnDocumentMode.refundInvoice
-                        ? 'Create Refund Invoice'
-                        : 'Save B2B Return',
-                  ),
-                ),
-              ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopBody(
+    BuildContext context,
+    SaleDto? sale,
+    int itemCount,
+    double totalQty,
+    double totalAmount,
+  ) {
+    const gap = 12.0;
+    const summaryWidth = 320.0;
+    const topRowHeight = 154.0;
+    const infoRowHeight = 170.0;
+
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          _buildDesktopHeader(),
+          if (_linking) ...[
+            const SizedBox(height: 10),
+            const LinearProgressIndicator(minHeight: 2),
+          ],
+          if (_linkError != null) ...[
+            const SizedBox(height: gap),
+            ProfessionalBanner(
+              message: ErrorHandler.message(_linkError!),
+              color: Theme.of(context).colorScheme.errorContainer,
+            ),
+          ],
+          const SizedBox(height: gap),
+          SizedBox(
+            height: topRowHeight,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _buildReferenceCard(sale)),
+                const SizedBox(width: gap),
+                SizedBox(
+                    width: summaryWidth,
+                    child: _buildSummaryRail(
+                      itemCount: itemCount,
+                      totalQty: totalQty,
+                      totalAmount: totalAmount,
+                      compact: true,
+                    )),
+              ],
+            ),
+          ),
+          const SizedBox(height: gap),
+          SizedBox(
+            height: infoRowHeight,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(flex: 6, child: _buildCustomerCardDesktop(sale)),
+                const SizedBox(width: gap),
+                Expanded(flex: 5, child: _buildReasonCard()),
+                const SizedBox(width: gap),
+                SizedBox(
+                    width: summaryWidth, child: _buildSourceControlsCard()),
+              ],
+            ),
+          ),
+          const SizedBox(height: gap),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _buildDesktopItemsSection()),
+                const SizedBox(width: gap),
+                SizedBox(
+                  width: summaryWidth,
+                  child: _buildSummaryRail(
+                    itemCount: itemCount,
+                    totalQty: totalQty,
+                    totalAmount: totalAmount,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopHeader() {
+    return ProfessionalDocumentHeader(
+      title: widget.mode == SaleReturnDocumentMode.refundInvoice
+          ? 'Refund Invoice Workspace'
+          : 'B2B Return Workspace',
+      subtitle:
+          'Desktop users get a document-style return console: source document controls at the top, reason capture in the middle, and a structured item workspace for precise refunds.',
+      badges: [
+        ProfessionalBadge(
+          label: widget.mode == SaleReturnDocumentMode.refundInvoice
+              ? 'Refund Invoice'
+              : 'B2B Return',
+        ),
+        if (_linkedSale != null)
+          const ProfessionalBadge(
+            label: 'Linked Invoice',
+            backgroundColor: Color(0xFFE8F3EC),
+            foregroundColor: Color(0xFF255C35),
+          ),
+        if (_customer != null)
+          ProfessionalBadge(
+            label: _customer!.name,
+            backgroundColor: const Color(0xFFEAF1F8),
+            foregroundColor: const Color(0xFF23415F),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildInvoiceLookupField() {
+    return TextField(
+      controller: _invoiceCtrl,
+      readOnly: widget.initialSaleId != null,
+      decoration: InputDecoration(
+        labelText: widget.mode == SaleReturnDocumentMode.refundInvoice
+            ? 'Invoice Number (required)'
+            : 'B2B Invoice Number ${_customer == null ? '(required when no party is selected)' : '(optional)'}',
+        prefixIcon: const Icon(Icons.receipt_long_outlined),
+        suffixIcon: widget.initialSaleId != null
+            ? const Icon(Icons.lock_outline_rounded)
+            : IconButton(
+                icon: const Icon(Icons.search_rounded),
+                onPressed: _findInvoice,
+              ),
+      ),
+      onSubmitted: widget.initialSaleId != null ? null : (_) => _findInvoice(),
+    );
+  }
+
+  Widget _buildReasonField() {
+    return TextField(
+      controller: _reasonCtrl,
+      decoration: const InputDecoration(
+        labelText: 'Reason (required)',
+        prefixIcon: Icon(Icons.description_outlined),
+      ),
+    );
+  }
+
+  Widget _buildLinkedSaleListTile(SaleDto sale) {
+    return Card(
+      elevation: 0,
+      child: ListTile(
+        leading: const Icon(Icons.receipt_long_rounded),
+        title: Text(sale.saleNumber),
+        subtitle: Text([
+          if ((sale.customerName ?? '').isNotEmpty) sale.customerName!,
+        ].where((e) => e.isNotEmpty).join(' · ')),
+        trailing: Text(
+          sale.totalAmount.toStringAsFixed(2),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReferenceCard(SaleDto? sale) {
+    return ProfessionalOverviewCard(
+      showHeader: false,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 18,
+            runSpacing: 12,
+            children: [
+              ProfessionalMetaCell(
+                label: widget.mode == SaleReturnDocumentMode.refundInvoice
+                    ? 'Refund Invoice Number'
+                    : 'Return Number',
+                value: (_documentNumberPreview ?? '').trim().isEmpty
+                    ? 'Auto-generated on save'
+                    : _documentNumberPreview!,
+              ),
+              ProfessionalMetaCell(
+                label: 'Reference Invoice',
+                value: sale?.saleNumber ?? 'Not linked',
+              ),
+              ProfessionalMetaCell(
+                label: 'Invoice Date',
+                value: sale?.saleDate == null
+                    ? 'Pending'
+                    : AppDateTime.formatFlexibleDate(
+                        context,
+                        ref.watch(localePreferencesProvider),
+                        sale!.saleDate!.toIso8601String(),
+                        fallback: sale.saleDate!.toString(),
+                      ),
+              ),
+              ProfessionalMetaCell(
+                label: 'Party',
+                value: (sale?.customerName ?? '').trim().isEmpty
+                    ? (_customer?.name ?? 'Not selected')
+                    : sale!.customerName ?? 'Not selected',
+              ),
+              ProfessionalMetaCell(
+                label: 'Invoice Total',
+                value:
+                    sale == null ? '0.00' : sale.totalAmount.toStringAsFixed(2),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            sale == null
+                ? 'Link an invoice to load returnable lines. For B2B returns, you can also work by party when a single source invoice can be inferred by the backend.'
+                : 'The linked invoice controls which quantities remain refundable and keeps the document tied to the original commercial reference.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomerCardDesktop(SaleDto? sale) {
+    return ProfessionalOverviewCard(
+      title: 'Customer Information',
+      icon: Icons.business_rounded,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (widget.mode == SaleReturnDocumentMode.saleReturn) ...[
+            _CustomerPicker(
+              enabled: sale == null,
+              customer: _customer,
+              onPicked: (c) => setState(() => _customer = c),
+            ),
+            const SizedBox(height: 12),
+          ],
+          ProfessionalFieldGrid(
+            fields: [
+              ProfessionalFieldGridItem(
+                label: 'Selected Party',
+                value: _customer?.name ?? sale?.customerName ?? '',
+              ),
+              ProfessionalFieldGridItem(
+                label: 'Invoice Status',
+                value: sale == null
+                    ? 'Awaiting source invoice'
+                    : (sale.status ?? 'Pending'),
+              ),
+              ProfessionalFieldGridItem(
+                label: 'Workflow Rule',
+                value: widget.mode == SaleReturnDocumentMode.refundInvoice
+                    ? 'Refund invoices always require a linked invoice.'
+                    : (_customer == null
+                        ? 'Invoice is required when no party is selected.'
+                        : 'Party-selected returns can defer invoice selection to the backend.'),
+                maxLines: 2,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReasonCard() {
+    return ProfessionalSectionCard(
+      title: 'Return Reason',
+      subtitle:
+          'Capture the operational reason clearly. The authorization step still happens on save.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _reasonCtrl,
+              expands: true,
+              minLines: null,
+              maxLines: null,
+              textAlignVertical: TextAlignVertical.top,
+              decoration: const InputDecoration(
+                labelText: 'Reason (required)',
+                alignLabelWithHint: true,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Refunds and returns require the separate edit/refund password before submission.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSourceControlsCard() {
+    return ProfessionalSectionCard(
+      title: 'Source Controls',
+      subtitle:
+          'Load the invoice, then refine quantities or switch to the sell screen for exchange flows.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildInvoiceLookupField(),
+          if (_linkedSale != null) ...[
+            const SizedBox(height: 12),
+            _buildLinkedSaleListTile(_linkedSale!),
+          ],
+          if (widget.mode == SaleReturnDocumentMode.refundInvoice &&
+              _hasLinkedReturnableLines) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _openInSellScreen,
+              icon: const Icon(Icons.point_of_sale_rounded),
+              label: const Text('Open in Sell Screen'),
+              style: professionalCompactButtonStyle(context, outlined: true),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopItemsSection() {
+    final title = _hasLinkedReturnableLines
+        ? (widget.mode == SaleReturnDocumentMode.refundInvoice
+            ? 'Refundable Items'
+            : 'Returnable Items')
+        : 'Items';
+    return ProfessionalSectionCard(
+      title: title,
+      subtitle: _hasLinkedReturnableLines
+          ? 'Use the quantity column to control how much of each source line is being returned.'
+          : (widget.mode == SaleReturnDocumentMode.refundInvoice
+              ? 'Refund invoices can only be created from a linked sale.'
+              : 'Add products manually when you are processing a return by party without first loading an invoice.'),
+      action: !_hasLinkedReturnableLines &&
+              widget.mode == SaleReturnDocumentMode.saleReturn
+          ? FilledButton.tonalIcon(
+              onPressed: () => setState(() => _lines.add(_RetLine())),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add Item'),
+              style: professionalCompactButtonStyle(context),
+            )
+          : null,
+      expandChild: true,
+      child: _hasLinkedReturnableLines
+          ? Column(
+              children: [
+                const _ReturnableTableHeader(),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: ListView.separated(
+                    padding: EdgeInsets.zero,
+                    itemCount: _returnableLines.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) => _ReturnableTableRow(
+                      line: _returnableLines[index],
+                      onChanged: () => setState(() {}),
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : widget.mode == SaleReturnDocumentMode.refundInvoice
+              ? const Center(
+                  child: ProfessionalDocumentEmptyState(
+                    title: 'Invoice Required',
+                    message:
+                        'Refund invoices are created from a linked sale. Load an invoice to continue.',
+                    icon: Icons.receipt_long_outlined,
+                  ),
+                )
+              : ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    ..._buildLines(context),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Manual return lines are used only when the backend can resolve a matching customer source document.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+    );
+  }
+
+  Widget _buildSummaryRail({
+    required int itemCount,
+    required double totalQty,
+    required double totalAmount,
+    bool compact = false,
+  }) {
+    return ProfessionalSummaryCard(
+      title: compact ? 'Selection Snapshot' : 'Return Summary',
+      expandContent: !compact,
+      rows: [
+        (label: 'Items', value: '$itemCount', emphasize: false),
+        (
+          label: 'Total Qty',
+          value: formatDocumentQuantity(totalQty),
+          emphasize: false,
+        ),
+        (
+          label: 'Mode',
+          value: widget.mode == SaleReturnDocumentMode.refundInvoice
+              ? 'Refund Invoice'
+              : 'B2B Return',
+          emphasize: false,
+        ),
+      ],
+      footer: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFDE8E4),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Estimated Value',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  totalAmount.toStringAsFixed(2),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFFBA1A1A),
+                      ),
+                ),
+              ],
+            ),
+          ),
+          if (!compact) ...[
+            const SizedBox(height: 12),
+            _buildPrimaryActions(compact: true),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrimaryActions({bool compact = false}) {
+    final primaryLabel = widget.mode == SaleReturnDocumentMode.refundInvoice
+        ? 'Create Refund Invoice'
+        : 'Save B2B Return';
+    if (widget.mode == SaleReturnDocumentMode.refundInvoice &&
+        _hasLinkedReturnableLines) {
+      return Row(
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: compact ? 40 : 48,
+              child: FilledButton.tonalIcon(
+                onPressed: _openInSellScreen,
+                icon: const Icon(Icons.point_of_sale_rounded),
+                label: const Text('Open in Sell Screen'),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: SizedBox(
+              height: compact ? 40 : 48,
+              child: FilledButton.icon(
+                onPressed: _save,
+                icon: const Icon(Icons.undo_rounded),
+                label: Text(primaryLabel),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return SizedBox(
+      height: compact ? 40 : 48,
+      child: FilledButton(
+        onPressed: _save,
+        child: Text(primaryLabel),
       ),
     );
   }
@@ -775,6 +1329,142 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
     if (selection != null && mounted) {
       setState(() => line.tracking = selection);
     }
+  }
+}
+
+class _ReturnableTableHeader extends StatelessWidget {
+  const _ReturnableTableHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: const Row(
+        children: [
+          ProfessionalHeaderCell(
+            label: 'Pick',
+            flex: 5,
+            textAlign: TextAlign.center,
+          ),
+          ProfessionalHeaderCell(label: 'Item', flex: 26),
+          ProfessionalHeaderCell(
+            label: 'Original',
+            flex: 8,
+            textAlign: TextAlign.right,
+          ),
+          ProfessionalHeaderCell(
+            label: 'Available',
+            flex: 8,
+            textAlign: TextAlign.right,
+          ),
+          ProfessionalHeaderCell(
+            label: 'Price',
+            flex: 9,
+            textAlign: TextAlign.right,
+          ),
+          ProfessionalHeaderCell(
+            label: 'Value',
+            flex: 9,
+            textAlign: TextAlign.right,
+          ),
+          ProfessionalHeaderCell(
+            label: 'Return Qty',
+            flex: 11,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReturnableTableRow extends StatelessWidget {
+  const _ReturnableTableRow({
+    required this.line,
+    required this.onChanged,
+  });
+
+  final _ReturnableLine line;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedQty = double.tryParse(line.quantity.text.trim()) ?? 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 5,
+            child: Checkbox(
+              value: line.selected,
+              onChanged: (value) {
+                line.selected = value ?? false;
+                if (line.selected && line.quantity.text.trim().isEmpty) {
+                  line.quantity.text = line.maxQuantity.toStringAsFixed(2);
+                }
+                if (!line.selected) {
+                  line.quantity.clear();
+                }
+                onChanged();
+              },
+            ),
+          ),
+          ProfessionalBodyCell(
+            label: line.productName,
+            secondary: line.saleDetailId == null
+                ? 'Manual line'
+                : 'Source line #${line.saleDetailId}',
+            flex: 26,
+            secondaryMaxLines: 2,
+          ),
+          ProfessionalBodyCell(
+            label: line.originalQuantity.toStringAsFixed(2),
+            flex: 8,
+            textAlign: TextAlign.right,
+          ),
+          ProfessionalBodyCell(
+            label: line.maxQuantity.toStringAsFixed(2),
+            flex: 8,
+            textAlign: TextAlign.right,
+          ),
+          ProfessionalBodyCell(
+            label: line.unitPrice.toStringAsFixed(2),
+            flex: 9,
+            textAlign: TextAlign.right,
+          ),
+          ProfessionalBodyCell(
+            label: (selectedQty * line.unitPrice).toStringAsFixed(2),
+            flex: 9,
+            emphasize: true,
+            textAlign: TextAlign.right,
+          ),
+          Expanded(
+            flex: 11,
+            child: TextField(
+              controller: line.quantity,
+              enabled: line.selected,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              textAlign: TextAlign.center,
+              decoration: const InputDecoration(
+                labelText: 'Qty',
+                isDense: true,
+              ),
+              onChanged: (_) => onChanged(),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

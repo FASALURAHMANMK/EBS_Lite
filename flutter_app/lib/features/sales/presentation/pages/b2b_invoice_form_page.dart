@@ -53,7 +53,7 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
   bool _saving = false;
   String? _error;
   String? _info;
-  String? _receiptPreview;
+  String? _invoiceNumberPreview;
   final Map<int, DocumentTaxProfile> _taxProfilesById = {};
 
   String get _title => widget.isEdit
@@ -146,10 +146,11 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
 
   Future<void> _loadReceiptPreview() async {
     try {
-      final preview =
-          await ref.read(posRepositoryProvider).getNextReceiptPreview();
+      final preview = await ref
+          .read(salesRepositoryProvider)
+          .getNextDocumentNumberPreview('sale');
       if (!mounted) return;
-      setState(() => _receiptPreview = preview);
+      setState(() => _invoiceNumberPreview = preview);
     } catch (_) {
       // Best-effort preview only.
     }
@@ -868,9 +869,9 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
               _InvoiceMetaCell(
                 label: 'Invoice Number',
                 value: (saleNumber ?? '').trim().isEmpty
-                    ? ((_receiptPreview ?? '').trim().isEmpty
+                    ? ((_invoiceNumberPreview ?? '').trim().isEmpty
                         ? 'Auto-generated on save'
-                        : _receiptPreview!)
+                        : _invoiceNumberPreview!)
                     : saleNumber!,
               ),
               _InvoiceMetaCell(
