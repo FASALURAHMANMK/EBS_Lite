@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ebs_lite/core/layout/app_breakpoints.dart';
-import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 import 'package:ebs_lite/shared/widgets/app_selection_dialog.dart';
+import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
+import 'package:ebs_lite/shared/widgets/professional_document_widgets.dart';
 
 import '../../../../core/error_handler.dart';
 import '../../../../core/negative_stock_override.dart';
+import '../../../../shared/widgets/app_empty_view.dart';
 import '../../data/purchase_returns_repository.dart';
 import '../../data/purchases_repository.dart';
+import '../widgets/purchase_document_widgets.dart';
 import 'purchase_return_detail_page.dart';
 
 // Product picking (inventory)
@@ -60,13 +63,29 @@ class _PurchaseReturnsPageState extends ConsumerState<PurchaseReturnsPage> {
   @override
   Widget build(BuildContext context) {
     final isWide = AppBreakpoints.isTabletOrDesktop(context);
+    final isDesktop = AppBreakpoints.isDesktop(context);
     final q = _search.text.trim().toLowerCase();
     final filtered = q.isEmpty
         ? _all
         : _all
             .where((e) =>
-                (e['return_number'] ?? '').toString().toLowerCase().contains(q))
+                (e['return_number'] ?? '')
+                    .toString()
+                    .toLowerCase()
+                    .contains(q) ||
+                (e['supplier']?['name'] ?? e['supplier_name'] ?? '')
+                    .toString()
+                    .toLowerCase()
+                    .contains(q))
             .toList();
+    final linkedCount = filtered
+        .where(
+          (row) => (row['purchase']?['purchase_number'] ?? '')
+              .toString()
+              .trim()
+              .isNotEmpty,
+        )
+        .length;
     return Scaffold(
       appBar: AppBar(
         leadingWidth: isWide ? 104 : null,
@@ -94,72 +113,281 @@ class _PurchaseReturnsPageState extends ConsumerState<PurchaseReturnsPage> {
         ],
       ),
       body: SafeArea(
-        child: Column(children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: TextField(
-              controller: _search,
-              decoration: InputDecoration(
-                hintText: 'Search by Return #',
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: IconButton(
-                    icon: const Icon(Icons.refresh_rounded), onPressed: _load),
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-          ),
-          if (_loading) const LinearProgressIndicator(minHeight: 2),
-          Expanded(
-            child: _loading
-                ? const SizedBox.shrink()
-                : (filtered.isEmpty
-                    ? const Center(child: Text('No purchase returns'))
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(12),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (context, i) {
-                          final pr = filtered[i];
-                          return Card(
-                            elevation: 0,
-                            child: ListTile(
-                              leading:
-                                  const Icon(Icons.assignment_return_rounded),
-                              title:
-                                  Text(pr['return_number']?.toString() ?? ''),
-                              subtitle: Text([
-                                if ((pr['supplier']?['name'] ??
-                                        pr['supplier_name'] ??
-                                        '') !=
-                                    '')
-                                  (pr['supplier']?['name'] ??
-                                          pr['supplier_name'])
-                                      .toString(),
-                                if (pr['return_date'] != null)
-                                  pr['return_date'].toString(),
-                                if ((pr['purchase']?['purchase_number'] ??
-                                        '') !=
-                                    '')
-                                  'From: ${pr['purchase']['purchase_number']}',
-                              ].where((e) => e.isNotEmpty).join(' · ')),
-                              onTap: () async {
-                                final id = pr['return_id'] as int?;
-                                if (id != null) {
-                                  await Navigator.of(context).push(
-                                    MaterialPageRoute(
+        child: isDesktop
+            ? Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    ProfessionalDocumentHeader(
+                      title: 'Purchase Return Workbench',
+                      subtitle:
+                          'Desktop users get a denser return queue with source-purchase visibility and faster document review.',
+                      badges: [
+                        ProfessionalBadge(label: '${filtered.length} Visible'),
+                        ProfessionalBadge(
+                          label: '$linkedCount Linked',
+                          backgroundColor: const Color(0xFFEAF1F8),
+                          foregroundColor: const Color(0xFF23415F),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: _buildReturnToolbar()),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 220,
+                          child: FilledButton.icon(
+                            onPressed: () async {
+                              final id = await Navigator.of(context).push<int>(
+                                MaterialPageRoute(
+                                  builder: (_) => const _ReturnFormPage(),
+                                ),
+                              );
+                              if (id != null) {
+                                await _load();
+                                if (!context.mounted) return;
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        PurchaseReturnDetailPage(returnId: id),
+                                  ),
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.add_rounded),
+                            label: const Text('Create Return'),
+                            style: professionalCompactButtonStyle(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: PurchaseDocumentMetricCard(
+                            label: 'Visible Returns',
+                            value: '${filtered.length}',
+                            subtitle: 'Current search result',
+                            icon: Icons.assignment_return_outlined,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: PurchaseDocumentMetricCard(
+                            label: 'Linked Source POs',
+                            value: '$linkedCount',
+                            subtitle: 'Returns with explicit source purchase',
+                            icon: Icons.description_outlined,
+                            tint: const Color(0xFFEAF1F8),
+                            foreground: const Color(0xFF23415F),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? AppEmptyView(
+                              title: 'No purchase returns',
+                              message:
+                                  'Create a return or adjust the search to review recorded purchase returns.',
+                              onRetry: _load,
+                            )
+                          : ListView.separated(
+                              padding: EdgeInsets.zero,
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 10),
+                              itemBuilder: (context, index) {
+                                final pr = filtered[index];
+                                return PurchaseDocumentListCard(
+                                  title: pr['return_number']?.toString() ??
+                                      'Purchase Return',
+                                  subtitle: [
+                                    if ((pr['supplier']?['name'] ??
+                                            pr['supplier_name'] ??
+                                            '')
+                                        .toString()
+                                        .trim()
+                                        .isNotEmpty)
+                                      (pr['supplier']?['name'] ??
+                                              pr['supplier_name'])
+                                          .toString(),
+                                    if (pr['return_date'] != null)
+                                      pr['return_date'].toString(),
+                                    if ((pr['purchase']?['purchase_number'] ??
+                                            '')
+                                        .toString()
+                                        .trim()
+                                        .isNotEmpty)
+                                      'From ${pr['purchase']['purchase_number']}',
+                                  ].join(' • '),
+                                  badges: [
+                                    const ProfessionalBadge(
+                                      label: 'Return Posted',
+                                      backgroundColor: Color(0xFFFFF1D6),
+                                      foregroundColor: Color(0xFF8A5200),
+                                    ),
+                                    if ((pr['purchase']?['purchase_number'] ??
+                                            '')
+                                        .toString()
+                                        .trim()
+                                        .isNotEmpty)
+                                      const ProfessionalBadge(
+                                        label: 'Source Linked',
+                                        backgroundColor: Color(0xFFEAF1F8),
+                                        foregroundColor: Color(0xFF23415F),
+                                      ),
+                                  ],
+                                  onTap: () async {
+                                    final id = pr['return_id'] as int?;
+                                    if (id == null) return;
+                                    await Navigator.of(context).push(
+                                      MaterialPageRoute(
                                         builder: (_) =>
                                             PurchaseReturnDetailPage(
-                                                returnId: id)),
-                                  );
-                                  _load();
-                                }
+                                          returnId: id,
+                                        ),
+                                      ),
+                                    );
+                                    await _load();
+                                  },
+                                );
                               },
                             ),
+                    ),
+                  ],
+                ),
+              )
+            : ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  ProfessionalDocumentHeader(
+                    title: 'Purchase Returns',
+                    subtitle:
+                        'Mobile keeps return review stacked, with supplier and source-purchase context visible on every card.',
+                    badges: [
+                      ProfessionalBadge(label: '${filtered.length} Visible'),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _buildReturnToolbar(),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: () async {
+                      final id = await Navigator.of(context).push<int>(
+                        MaterialPageRoute(
+                          builder: (_) => const _ReturnFormPage(),
+                        ),
+                      );
+                      if (id != null) {
+                        await _load();
+                        if (!context.mounted) return;
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                PurchaseReturnDetailPage(returnId: id),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Create Return'),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_loading) const LinearProgressIndicator(minHeight: 2),
+                  if (filtered.isEmpty)
+                    AppEmptyView(
+                      title: 'No purchase returns',
+                      message:
+                          'Create a return or adjust the search to review recorded purchase returns.',
+                      onRetry: _load,
+                    )
+                  else
+                    for (final pr in filtered) ...[
+                      PurchaseDocumentListCard(
+                        title: pr['return_number']?.toString() ??
+                            'Purchase Return',
+                        subtitle: [
+                          if ((pr['supplier']?['name'] ??
+                                  pr['supplier_name'] ??
+                                  '')
+                              .toString()
+                              .trim()
+                              .isNotEmpty)
+                            (pr['supplier']?['name'] ?? pr['supplier_name'])
+                                .toString(),
+                          if (pr['return_date'] != null)
+                            pr['return_date'].toString(),
+                          if ((pr['purchase']?['purchase_number'] ?? '')
+                              .toString()
+                              .trim()
+                              .isNotEmpty)
+                            'From ${pr['purchase']['purchase_number']}',
+                        ].join(' • '),
+                        badges: [
+                          const ProfessionalBadge(
+                            label: 'Return Posted',
+                            backgroundColor: Color(0xFFFFF1D6),
+                            foregroundColor: Color(0xFF8A5200),
+                          ),
+                          if ((pr['purchase']?['purchase_number'] ?? '')
+                              .toString()
+                              .trim()
+                              .isNotEmpty)
+                            const ProfessionalBadge(
+                              label: 'Source Linked',
+                              backgroundColor: Color(0xFFEAF1F8),
+                              foregroundColor: Color(0xFF23415F),
+                            ),
+                        ],
+                        onTap: () async {
+                          final id = pr['return_id'] as int?;
+                          if (id == null) return;
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  PurchaseReturnDetailPage(returnId: id),
+                            ),
                           );
+                          await _load();
                         },
-                      )),
-          )
-        ]),
+                      ),
+                      if (pr != filtered.last) const SizedBox(height: 10),
+                    ],
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildReturnToolbar() {
+    return ProfessionalSectionCard(
+      title: 'Filters',
+      subtitle:
+          'Search by return number or supplier and refresh the return queue in place.',
+      child: Column(
+        children: [
+          TextField(
+            controller: _search,
+            decoration: InputDecoration(
+              hintText: 'Search by Return # or supplier',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.refresh_rounded),
+                onPressed: _load,
+              ),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          if (_loading) ...[
+            const SizedBox(height: 10),
+            const LinearProgressIndicator(minHeight: 2),
+          ],
+        ],
       ),
     );
   }
@@ -174,7 +402,7 @@ class _ReturnFormPage extends ConsumerStatefulWidget {
 class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
   int? _supplierId;
   String? _supplierName;
-  int? _linkedPurchaseId; // auto-linked for backend requirement
+  int? _linkedPurchaseId;
   Map<String, dynamic>? _linkedPurchase;
   bool _loadingLink = false;
   final _reason = TextEditingController();
@@ -183,6 +411,19 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
   final List<_RetLine> _lines = [
     _RetLine(),
   ];
+
+  List<_RetLine> get _activeLines => _lines
+      .where(
+        (line) =>
+            line.product != null &&
+            (double.tryParse(line.qty.text.trim()) ?? 0) > 0,
+      )
+      .toList(growable: false);
+
+  double get _totalQty => _activeLines.fold<double>(
+        0,
+        (sum, line) => sum + (double.tryParse(line.qty.text.trim()) ?? 0),
+      );
 
   @override
   void dispose() {
@@ -194,13 +435,11 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
     super.dispose();
   }
 
-  Future<void> _linkPurchaseForSupplier() async {
+  Future<void> _pickSourcePurchase() async {
     final supplierId = _supplierId;
     if (supplierId == null) return;
     setState(() {
       _loadingLink = true;
-      _linkedPurchase = null;
-      _linkedPurchaseId = null;
     });
     try {
       final repo = ref.read(purchasesRepositoryProvider);
@@ -209,24 +448,82 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
       final listPar = await repo.getOrders(
           status: 'PARTIALLY_RECEIVED', supplierId: supplierId);
       final list = [...listRec, ...listPar];
-      if (list.isEmpty) return;
-      // pick the latest by purchase_date
-      list.sort((a, b) {
-        final da = DateTime.tryParse((a['purchase_date'] ?? '').toString()) ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        final db = DateTime.tryParse((b['purchase_date'] ?? '').toString()) ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        return db.compareTo(da);
-      });
-      final id = list.first['purchase_id'] as int?;
-      if (id != null) {
-        final po = await repo.getPurchase(id);
+      if (list.isEmpty) {
         if (!mounted) return;
         setState(() {
-          _linkedPurchaseId = id;
-          _linkedPurchase = po;
+          _linkedPurchaseId = null;
+          _linkedPurchase = null;
         });
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(
+            content: Text('No received or partially received purchase found'),
+          ));
+        return;
       }
+
+      int? selected = _linkedPurchaseId;
+      if (!mounted) return;
+      final choice = await showDialog<int?>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setInner) => AlertDialog(
+            title: const Text('Select Source Purchase'),
+            content: SizedBox(
+              width: 720,
+              child: SizedBox(
+                height: 360,
+                child: RadioGroup<int>(
+                  groupValue: selected,
+                  onChanged: (value) => setInner(() => selected = value),
+                  child: ListView.builder(
+                    itemCount: list.length,
+                    itemBuilder: (context, index) {
+                      final item = list[index];
+                      return RadioListTile<int>(
+                        value: item['purchase_id'] as int,
+                        title: Text(item['purchase_number']?.toString() ?? ''),
+                        subtitle: Text([
+                          if ((item['supplier']?['name'] ??
+                                  item['supplier_name'] ??
+                                  '')
+                              .toString()
+                              .trim()
+                              .isNotEmpty)
+                            (item['supplier']?['name'] ?? item['supplier_name'])
+                                .toString(),
+                          if ((item['status'] ?? '')
+                              .toString()
+                              .trim()
+                              .isNotEmpty)
+                            (item['status']).toString(),
+                        ].join(' • ')),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, selected),
+                child: const Text('Select'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (choice == null) return;
+      final po = await repo.getPurchase(choice);
+      if (!mounted) return;
+      setState(() {
+        _linkedPurchaseId = choice;
+        _linkedPurchase = po;
+      });
     } finally {
       if (mounted) {
         setState(() {
@@ -282,21 +579,16 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
         return;
       }
 
-      // Ensure purchase link
       if (_linkedPurchaseId == null) {
-        await _linkPurchaseForSupplier();
-      }
-      final purchaseId = _linkedPurchaseId;
-      final purchase = _linkedPurchase;
-      if (purchaseId == null || purchase == null) {
-        if (!mounted) return;
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(const SnackBar(
-              content: Text(
-                  'No existing purchase found for supplier to link return')));
+          ..showSnackBar(
+            const SnackBar(content: Text('Select a source purchase first')),
+          );
         return;
       }
+      final purchaseId = _linkedPurchaseId!;
+      final purchase = _linkedPurchase!;
       // map purchase_detail_id if available
       final details =
           (purchase['items'] as List? ?? const []).cast<Map<String, dynamic>>();
@@ -358,6 +650,7 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
   @override
   Widget build(BuildContext context) {
     final isWide = AppBreakpoints.isTabletOrDesktop(context);
+    final isDesktop = AppBreakpoints.isDesktop(context);
     return Scaffold(
       appBar: AppBar(
         leadingWidth: isWide ? 104 : null,
@@ -365,38 +658,178 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
         title: const Text('New Purchase Return'),
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _SupplierPicker(
-              supplierId: _supplierId,
-              supplierName: _supplierName,
-              onPicked: (id, name) async {
-                setState(() {
-                  _supplierId = id;
-                  _supplierName = name;
-                });
-                await _linkPurchaseForSupplier();
-              },
+        child: isDesktop ? _buildDesktopBody() : _buildMobileBody(),
+      ),
+    );
+  }
+
+  Widget _buildDesktopBody() {
+    const gap = 12.0;
+    const railWidth = 320.0;
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          ProfessionalDocumentHeader(
+            title: 'Purchase Return Workspace',
+            subtitle:
+                'Desktop returns now require an explicit source purchase so the operator can verify the commercial origin before posting stock outflow.',
+            badges: [
+              const ProfessionalBadge(label: 'Purchase Return'),
+              if (_linkedPurchaseId != null)
+                const ProfessionalBadge(
+                  label: 'Source Selected',
+                  backgroundColor: Color(0xFFEAF1F8),
+                  foregroundColor: Color(0xFF23415F),
+                ),
+            ],
+          ),
+          if (_loadingLink) ...[
+            const SizedBox(height: gap),
+            const LinearProgressIndicator(minHeight: 2),
+          ],
+          const SizedBox(height: gap),
+          SizedBox(
+            height: 220,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _buildReturnOverviewCard()),
+                const SizedBox(width: gap),
+                Expanded(child: _buildSourcePurchaseCard()),
+                const SizedBox(width: gap),
+                SizedBox(width: railWidth, child: _buildReturnSummaryCard()),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _reason,
-              decoration: const InputDecoration(
-                labelText: 'Reason (optional)',
-                prefixIcon: Icon(Icons.description_outlined),
+          ),
+          const SizedBox(height: gap),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _buildReturnLinesSection()),
+                const SizedBox(width: gap),
+                SizedBox(width: railWidth, child: _buildReturnActionPanel()),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileBody() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        ProfessionalDocumentHeader(
+          title: 'New Purchase Return',
+          subtitle:
+              'Mobile keeps the return flow stacked while still making the source purchase an explicit operator choice.',
+          badges: [
+            ProfessionalBadge(label: '${_activeLines.length} Active Lines'),
+          ],
+        ),
+        if (_loadingLink) ...[
+          const SizedBox(height: 12),
+          const LinearProgressIndicator(minHeight: 2),
+        ],
+        const SizedBox(height: 12),
+        _buildReturnOverviewCard(),
+        const SizedBox(height: 12),
+        _buildSourcePurchaseCard(),
+        const SizedBox(height: 12),
+        _buildReturnLinesSection(),
+        const SizedBox(height: 12),
+        _buildReturnSummaryCard(),
+        const SizedBox(height: 12),
+        _buildReturnActionPanel(),
+      ],
+    );
+  }
+
+  Widget _buildReturnOverviewCard() {
+    return ProfessionalOverviewCard(
+      title: 'Supplier & Return Notes',
+      icon: Icons.assignment_return_rounded,
+      child: Column(
+        children: [
+          _SupplierPicker(
+            supplierId: _supplierId,
+            supplierName: _supplierName,
+            onPicked: (id, name) async {
+              setState(() {
+                _supplierId = id;
+                _supplierName = name;
+                _linkedPurchaseId = null;
+                _linkedPurchase = null;
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _reason,
+            minLines: 3,
+            maxLines: 4,
+            textAlignVertical: TextAlignVertical.top,
+            decoration: const InputDecoration(
+              labelText: 'Reason (optional)',
+              alignLabelWithHint: true,
+              prefixIcon: Icon(Icons.description_outlined),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSourcePurchaseCard() {
+    final purchase = _linkedPurchase;
+    final purchaseNumber = purchase?['purchase_number']?.toString() ?? '';
+    return ProfessionalSectionCard(
+      title: 'Source Purchase',
+      subtitle:
+          'Select the purchase order that authorizes this return so the stock and commercial trail stay explicit.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          FilledButton.tonalIcon(
+            onPressed: _supplierId == null ? null : _pickSourcePurchase,
+            icon: const Icon(Icons.search_rounded),
+            label: Text(
+              purchaseNumber.isEmpty
+                  ? 'Select Source Purchase'
+                  : 'Change Source',
+            ),
+            style: professionalCompactButtonStyle(context),
+          ),
+          const SizedBox(height: 12),
+          ProfessionalFieldGrid(
+            fields: [
+              ProfessionalFieldGridItem(
+                label: 'Selected Source',
+                value: purchaseNumber.isEmpty ? 'Not selected' : purchaseNumber,
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _receiptNumber,
-              decoration: const InputDecoration(
-                labelText: 'Return Receipt Number (optional)',
-                prefixIcon: Icon(Icons.confirmation_number_outlined),
+              ProfessionalFieldGridItem(
+                label: 'Supplier Match',
+                value: _supplierName ??
+                    (_supplierId == null
+                        ? 'Select supplier first'
+                        : 'Supplier selected'),
               ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _receiptNumber,
+            decoration: const InputDecoration(
+              labelText: 'Return Receipt Number (optional)',
+              prefixIcon: Icon(Icons.confirmation_number_outlined),
             ),
-            const SizedBox(height: 12),
-            Row(children: [
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
               Expanded(
                 child: InputDecorator(
                   decoration: const InputDecoration(
@@ -417,26 +850,87 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
                 icon: const Icon(Icons.attach_file_rounded),
                 label: const Text('Choose File'),
               ),
-            ]),
-            const SizedBox(height: 12),
-            if (_loadingLink) const LinearProgressIndicator(minHeight: 2),
-            Text('Items', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            ..._buildLines(context),
-            const SizedBox(height: 8),
-            Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                    onPressed: () => setState(() => _lines.add(_RetLine())),
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('Add Item'))),
-            const SizedBox(height: 16),
-            SizedBox(
-                height: 48,
-                child: FilledButton(
-                    onPressed: _save, child: const Text('Save Return'))),
-          ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReturnLinesSection() {
+    final isDesktop = AppBreakpoints.isDesktop(context);
+    return ProfessionalSectionCard(
+      title: 'Return Lines',
+      subtitle:
+          'Add products, quantities, and final issue tracking for every item leaving stock.',
+      action: FilledButton.tonalIcon(
+        onPressed: () => setState(() => _lines.add(_RetLine())),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Add Item'),
+        style: professionalCompactButtonStyle(context),
+      ),
+      expandChild: isDesktop,
+      child: _lines.isEmpty
+          ? const Center(
+              child: ProfessionalDocumentEmptyState(
+                title: 'No return lines',
+                message: 'Add at least one line before saving the return.',
+              ),
+            )
+          : isDesktop
+              ? ListView(
+                  padding: EdgeInsets.zero,
+                  children: _buildLines(context),
+                )
+              : Column(children: _buildLines(context)),
+    );
+  }
+
+  Widget _buildReturnSummaryCard() {
+    return ProfessionalSummaryCard(
+      title: 'Return Summary',
+      expandContent: AppBreakpoints.isDesktop(context),
+      rows: [
+        (
+          label: 'Active Lines',
+          value: '${_activeLines.length}',
+          emphasize: false,
         ),
+        (
+          label: 'Total Qty',
+          value: _totalQty.toStringAsFixed(2),
+          emphasize: false,
+        ),
+        (
+          label: 'Source Purchase',
+          value: _linkedPurchaseId == null ? 'Required' : 'Selected',
+          emphasize: true,
+        ),
+      ],
+      footer: Text(
+        'Returns now require an explicit source purchase instead of silently choosing the latest one.',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+      ),
+    );
+  }
+
+  Widget _buildReturnActionPanel() {
+    return ProfessionalSectionCard(
+      title: 'Post Return',
+      subtitle:
+          'Save the return once supplier, source purchase, and item tracking are fully confirmed.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FilledButton.icon(
+            onPressed: _save,
+            icon: const Icon(Icons.task_alt_rounded),
+            label: const Text('Save Return'),
+            style: professionalCompactButtonStyle(context),
+          ),
+        ],
       ),
     );
   }

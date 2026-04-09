@@ -20,7 +20,7 @@ Runtime device testing: not performed in this run
 | Dashboard shell | distinct mobile and wide layouts | strong | strong | label-based routing fallback can still hit `No route configured` |
 | Sales | strongest current document pattern | mixed-to-strong | strong | invoice listing missing, some detail pages stay single-column |
 | POS | operationally strong, desktop-light | weak | strong | body remains mostly one vertical flow; payment path lacks richer desktop treatment |
-| Purchases | responsive landing page, mixed documents | weak-to-mixed | acceptable | PO and GRN flows are mostly same-layout-on-all-sizes |
+| Purchases | first standardized document slice implemented | mixed-to-strong | strong | returns list still lacks a true split-pane preview; GRN create-to-detail contract is still weak |
 | Inventory | responsive hooks widely present | mixed | acceptable | not fully audited page by page; standard still inconsistent |
 | Customers | responsive landing page | mixed | acceptable | management/detail pages are mostly wide-nav plus same body |
 | Accounts | important pages use wide-nav | mixed | acceptable | landing page still uses older card-grid pattern |
@@ -59,10 +59,16 @@ Strong desktop candidates:
 - `quote_form_page.dart`
 - `b2b_invoice_form_page.dart`
 - `sales_returns_page.dart`
+- `purchase_orders_page.dart`
+- `po_detail_page.dart`
+- `goods_receipts_page.dart`
+- `grn_detail_page.dart`
+- `purchase_receipt_page.dart`
 
 Mixed desktop candidates:
-- `purchase_orders_page.dart`
-- `goods_receipts_page.dart`
+- `grn_form_page.dart`
+- `purchase_returns_page.dart`
+- `purchase_return_detail_page.dart`
 - `customer_management_page.dart`
 - `report_category_page.dart`
 
@@ -78,6 +84,7 @@ Strong mobile characteristics already present:
 - bottom-tab shell
 - shorter action paths in Sales create/edit flows
 - touch-friendly list tiles and sheet/dialog usage in many modules
+- Purchases PO, GRN, receipt, and return flows still stay stacked instead of forcing desktop split panes on small screens
 
 Mobile risks still unverified:
 - keyboard flow quality on long forms
@@ -113,7 +120,9 @@ Verified:
 - shell behavior
 - core breakpoint helper
 - module landing-page inconsistency
-- Sales reference pattern and major Sales/POS/Purchases findings
+- Sales reference pattern
+- Purchases first standardization slice for PO, GRN, receipt, and purchase return flows
+- dashboard quick purchase action now routes into the receipt workbench entry path instead of directly bypassing it
 
 Partially verified:
 - Inventory, Accounts, HR, Workflow, Notifications, and Suppliers deeper subpages were sampled but not exhaustively audited file by file

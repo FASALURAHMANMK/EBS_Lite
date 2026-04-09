@@ -9,7 +9,7 @@ import '../../expenses/presentation/widgets/quick_expense_sheet.dart';
 import '../../inventory/presentation/pages/inventory_management_page.dart';
 import '../../pos/controllers/pos_notifier.dart';
 import '../../pos/presentation/pages/pos_page.dart';
-import '../../purchases/presentation/pages/grn_form_page.dart';
+import '../../purchases/presentation/pages/goods_receipts_page.dart';
 import '../../accounts/presentation/pages/cash_register_page.dart';
 
 class DashboardActionDefinition {
@@ -98,15 +98,9 @@ Future<void> runDashboardAction(
       );
       return;
     case 'new_purchase':
-      final created = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(builder: (_) => const GrnFormPage()),
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const GoodsReceiptsPage()),
       );
-      if (!context.mounted) return;
-      if (created == true) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(const SnackBar(content: Text('Purchase/GRN created')));
-      }
       return;
     case 'new_collection':
       await showQuickCollectionSheet(context, ref);

@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ebs_lite/core/layout/app_breakpoints.dart';
-import 'package:ebs_lite/shared/widgets/desktop_sidebar_toggle_action.dart';
 
 import '../../../../core/app_date_time.dart';
 import '../../../../core/error_handler.dart';
+import '../../../../core/layout/app_breakpoints.dart';
 import '../../../../core/locale_preferences.dart';
+import '../../../../shared/widgets/app_empty_view.dart';
+import '../../../../shared/widgets/desktop_sidebar_toggle_action.dart';
+import '../../../../shared/widgets/professional_document_widgets.dart';
 import '../../data/grn_repository.dart';
-import '../../data/purchases_repository.dart';
 import '../../data/models.dart';
-import 'grn_form_page.dart';
+import '../../data/purchases_repository.dart';
+import '../widgets/purchase_document_widgets.dart';
 import 'grn_detail_page.dart';
+import 'grn_form_page.dart';
 import 'purchase_receipt_page.dart';
 
 class GoodsReceiptsPage extends ConsumerStatefulWidget {
@@ -23,7 +26,13 @@ class GoodsReceiptsPage extends ConsumerStatefulWidget {
 class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
   final _search = TextEditingController();
   bool _loading = true;
+  bool _detailLoading = false;
   List<GoodsReceiptDto> _list = const [];
+  GoodsReceiptDetailDto? _selectedDetail;
+  List<PurchaseCostAdjustmentDto> _selectedAddons = const [];
+  Object? _detailError;
+  int? _selectedReceiptId;
+  int _detailToken = 0;
 
   @override
   void initState() {
@@ -42,31 +51,215 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
     try {
       final repo = ref.read(grnRepositoryProvider);
       final list = await repo.getGoodsReceipts(
-          search: _search.text.trim().isEmpty ? null : _search.text.trim());
+        search: _search.text.trim().isEmpty ? null : _search.text.trim(),
+      );
       if (!mounted) return;
       setState(() => _list = list);
+      await _syncSelection(list);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
+  Future<void> _syncSelection(List<GoodsReceiptDto> visibleRows) async {
+    if (!AppBreakpoints.isDesktop(context)) return;
+    if (visibleRows.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _selectedReceiptId = null;
+        _selectedDetail = null;
+        _selectedAddons = const [];
+        _detailError = null;
+        _detailLoading = false;
+      });
+      return;
+    }
+    final selectedMatch = visibleRows.where(
+      (row) => row.goodsReceiptId == _selectedReceiptId,
+    );
+    final nextId = selectedMatch.isNotEmpty
+        ? selectedMatch.first.goodsReceiptId
+        : visibleRows.first.goodsReceiptId;
+    if (nextId != _selectedReceiptId) {
+      await _selectReceipt(nextId);
+    }
+  }
+
+  Future<void> _selectReceipt(int goodsReceiptId) async {
+    final token = ++_detailToken;
+    setState(() {
+      _selectedReceiptId = goodsReceiptId;
+      _selectedDetail = null;
+      _selectedAddons = const [];
+      _detailError = null;
+      _detailLoading = true;
+    });
+    try {
+      final repo = ref.read(grnRepositoryProvider);
+      final detail = await repo.getGoodsReceipt(goodsReceiptId);
+      final addons = await repo.getGoodsReceiptAddons(goodsReceiptId);
+      if (!mounted || token != _detailToken) return;
+      setState(() {
+        _selectedDetail = detail;
+        _selectedAddons = addons;
+        _detailLoading = false;
+      });
+    } catch (error) {
+      if (!mounted || token != _detailToken) return;
+      setState(() {
+        _detailError = error;
+        _detailLoading = false;
+      });
+    }
+  }
+
+  Future<void> _openCreateDialog() async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Create Goods Receipt'),
+        content: const Text('Choose entry type:'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'po'),
+            child: const Text('With PO'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, 'no_po'),
+            child: const Text('Without PO'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'po') {
+      final picked = await _pickPO();
+      if (!mounted) return;
+      if (picked != null) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PurchaseReceiptPage(purchaseId: picked),
+          ),
+        );
+        await _load();
+      }
+      return;
+    }
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const GrnFormPage()),
+    );
+    if (created == true) {
+      await _load();
+    }
+  }
+
+  Future<int?> _pickPO() async {
+    final repo = ref.read(purchasesRepositoryProvider);
+    List<Map<String, dynamic>> list = [];
+    try {
+      final pending = await repo.getPendingOrders();
+      list = pending
+          .where((row) => (row['status'] ?? '') == 'PARTIALLY_RECEIVED')
+          .toList();
+    } catch (_) {}
+    try {
+      final approved = await repo.getOrders(status: 'APPROVED');
+      final ids = list.map((row) => row['purchase_id'] as int).toSet();
+      for (final row in approved) {
+        final id = row['purchase_id'] as int?;
+        if (id != null && !ids.contains(id)) {
+          list.add(row);
+          ids.add(id);
+        }
+      }
+    } catch (_) {}
+
+    int? selected = list.isNotEmpty ? list.first['purchase_id'] as int? : null;
+    if (!mounted) return null;
+    return showDialog<int?>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setInner) => AlertDialog(
+          title: const Text('Select Purchase Order'),
+          content: SizedBox(
+            width: 720,
+            child: list.isEmpty
+                ? const Text('No approved or partially received orders')
+                : SizedBox(
+                    height: 360,
+                    child: RadioGroup<int>(
+                      groupValue: selected,
+                      onChanged: (value) => setInner(() => selected = value),
+                      child: ListView.builder(
+                        itemCount: list.length,
+                        itemBuilder: (context, index) {
+                          final item = list[index];
+                          return RadioListTile<int>(
+                            value: item['purchase_id'] as int,
+                            title:
+                                Text(item['purchase_number']?.toString() ?? ''),
+                            subtitle: Text(
+                              (item['supplier']?['name'] ??
+                                      item['supplier_name'] ??
+                                      '')
+                                  .toString(),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, selected),
+              child: const Text('Select'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<GoodsReceiptDto> _filteredItems() {
+    final q = _search.text.trim().toLowerCase();
+    if (q.isEmpty) return _list;
+    return _list.where((receipt) {
+      return receipt.receiptNumber.toLowerCase().contains(q) ||
+          (receipt.supplierName ?? '').toLowerCase().contains(q);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final localePrefs = ref.watch(localePreferencesProvider);
-    final q = _search.text.trim().toLowerCase();
-    final filtered = q.isEmpty
-        ? _list
-        : _list
-            .where((gr) =>
-                gr.receiptNumber.toLowerCase().contains(q) ||
-                (gr.supplierName ?? '').toLowerCase().contains(q))
-            .toList();
+    final showSidebarToggle = AppBreakpoints.isTabletOrDesktop(context);
+    final isDesktop = AppBreakpoints.isDesktop(context);
+    final filtered = _filteredItems();
+    if (isDesktop) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _syncSelection(filtered);
+        }
+      });
+    }
+
+    final linkedPoCount =
+        _list.where((receipt) => receipt.purchaseId != null).length;
+    final standaloneCount = _list.length - linkedPoCount;
 
     return Scaffold(
       appBar: AppBar(
-        leadingWidth: isWide ? 104 : null,
-        leading: isWide ? const DesktopSidebarToggleLeading() : null,
+        leadingWidth: showSidebarToggle ? 104 : null,
+        leading: showSidebarToggle ? const DesktopSidebarToggleLeading() : null,
         title: const Text('Goods Receipt Notes'),
         actions: [
           IconButton(
@@ -78,319 +271,510 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: TextField(
-                controller: _search,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  hintText: 'Search by GRN # or supplier',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.refresh_rounded),
-                    tooltip: 'Refresh',
-                    onPressed: _load,
-                  ),
+        child: isDesktop
+            ? _buildDesktopBody(
+                localePrefs,
+                filtered,
+                linkedPoCount,
+                standaloneCount,
+              )
+            : _buildMobileBody(
+                localePrefs,
+                filtered,
+                linkedPoCount,
+                standaloneCount,
+              ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopBody(
+    LocalePreferencesState localePrefs,
+    List<GoodsReceiptDto> filtered,
+    int linkedPoCount,
+    int standaloneCount,
+  ) {
+    const gap = 12.0;
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          ProfessionalDocumentHeader(
+            title: 'Goods Receipt Workbench',
+            subtitle:
+                'Desktop users can search receipts, review posted inventory, and jump into the next PO-backed or standalone GRN workflow.',
+            badges: [
+              ProfessionalBadge(label: '${filtered.length} Visible'),
+              ProfessionalBadge(
+                label: '$linkedPoCount PO-backed',
+                backgroundColor: const Color(0xFFEAF1F8),
+                foregroundColor: const Color(0xFF23415F),
+              ),
+            ],
+          ),
+          const SizedBox(height: gap),
+          Row(
+            children: [
+              Expanded(child: _buildToolbar()),
+              const SizedBox(width: gap),
+              SizedBox(
+                width: 220,
+                child: FilledButton.icon(
+                  onPressed: _openCreateDialog,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Create Goods Receipt'),
+                  style: professionalCompactButtonStyle(context),
                 ),
               ),
-            ),
-            if (_loading) const LinearProgressIndicator(minHeight: 2),
-            Expanded(
-              child: _loading
-                  ? const SizedBox.shrink()
-                  : (filtered.isEmpty
-                      ? const Center(child: Text('No goods receipts'))
-                      : ListView.separated(
-                          padding: const EdgeInsets.all(12),
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 8),
-                          itemCount: filtered.length,
-                          itemBuilder: (context, i) {
-                            final gr = filtered[i];
-                            return Card(
-                              elevation: 0,
-                              child: ListTile(
-                                leading: const Icon(Icons.receipt_long_rounded),
-                                title: Text(gr.receiptNumber),
-                                subtitle: Text([
-                                  if ((gr.supplierName ?? '').isNotEmpty)
-                                    gr.supplierName!,
+            ],
+          ),
+          const SizedBox(height: gap),
+          Row(
+            children: [
+              Expanded(
+                child: PurchaseDocumentMetricCard(
+                  label: 'Visible GRNs',
+                  value: '${filtered.length}',
+                  subtitle: 'Current search result',
+                  icon: Icons.receipt_long_outlined,
+                ),
+              ),
+              const SizedBox(width: gap),
+              Expanded(
+                child: PurchaseDocumentMetricCard(
+                  label: 'PO-backed',
+                  value: '$linkedPoCount',
+                  subtitle: 'Recorded from purchase orders',
+                  icon: Icons.description_outlined,
+                  tint: const Color(0xFFEAF1F8),
+                  foreground: const Color(0xFF23415F),
+                ),
+              ),
+              const SizedBox(width: gap),
+              Expanded(
+                child: PurchaseDocumentMetricCard(
+                  label: 'Standalone',
+                  value: '$standaloneCount',
+                  subtitle: 'Direct GRN creation path',
+                  icon: Icons.inventory_2_outlined,
+                  tint: const Color(0xFFE8F3EC),
+                  foreground: const Color(0xFF255C35),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: gap),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: ProfessionalSectionCard(
+                    title: 'Goods Receipts',
+                    subtitle:
+                        'Select a receipt to review quantities, totals, and any landed-cost add-ons.',
+                    expandChild: true,
+                    child: filtered.isEmpty
+                        ? AppEmptyView(
+                            title: 'No goods receipts',
+                            message:
+                                'Create a goods receipt or adjust the search to review posted receipts.',
+                            onRetry: _load,
+                          )
+                        : ListView.separated(
+                            padding: EdgeInsets.zero,
+                            itemCount: filtered.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (context, index) {
+                              final receipt = filtered[index];
+                              return PurchaseDocumentListCard(
+                                title: receipt.receiptNumber,
+                                subtitle: [
+                                  if ((receipt.supplierName ?? '')
+                                      .trim()
+                                      .isNotEmpty)
+                                    receipt.supplierName!,
                                   AppDateTime.formatDate(
                                     context,
                                     localePrefs,
-                                    gr.receivedDate,
+                                    receipt.receivedDate,
                                   ),
-                                ].join(' • ')),
-                                onTap: () async {
-                                  await Navigator.of(context).push(
-                                    MaterialPageRoute(
+                                ].join(' • '),
+                                selected: receipt.goodsReceiptId ==
+                                    _selectedReceiptId,
+                                badges: [
+                                  const ProfessionalBadge(
+                                    label: 'Posted',
+                                    backgroundColor: Color(0xFFE8F3EC),
+                                    foregroundColor: Color(0xFF255C35),
+                                  ),
+                                  if (receipt.purchaseId != null)
+                                    const ProfessionalBadge(
+                                      label: 'Linked PO',
+                                      backgroundColor: Color(0xFFEAF1F8),
+                                      foregroundColor: Color(0xFF23415F),
+                                    ),
+                                ],
+                                trailing: IconButton(
+                                  tooltip: 'Open detail',
+                                  onPressed: () async {
+                                    await Navigator.of(context).push(
+                                      MaterialPageRoute(
                                         builder: (_) => GoodsReceiptDetailPage(
-                                            goodsReceiptId: gr.goodsReceiptId)),
-                                  );
-                                },
-                              ),
-                            );
-                          },
-                        )),
+                                          goodsReceiptId:
+                                              receipt.goodsReceiptId,
+                                        ),
+                                      ),
+                                    );
+                                    await _load();
+                                  },
+                                  icon: const Icon(Icons.open_in_new_rounded),
+                                ),
+                                onTap: () =>
+                                    _selectReceipt(receipt.goodsReceiptId),
+                              );
+                            },
+                          ),
+                  ),
+                ),
+                const SizedBox(width: gap),
+                Expanded(
+                  flex: 4,
+                  child: _buildDetailPreview(localePrefs),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openCreateDialog() async {
-    final choice = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create Goods Receipt'),
-        content: const Text('Choose entry type:'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(context, 'po'),
-              child: const Text('With PO')),
-          FilledButton(
-              onPressed: () => Navigator.pop(context, 'no_po'),
-              child: const Text('Without PO')),
+          ),
         ],
       ),
     );
-    if (!mounted || choice == null) return;
-    if (choice == 'po') {
-      // Pick an APPROVED or PARTIALLY_RECEIVED PO and receive
-      final picked = await _pickPO();
-      if (!mounted) return;
-      if (picked != null) {
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PurchaseReceiptPage(purchaseId: picked),
-          ),
-        );
-        if (!mounted) return;
-        _load();
-      }
-      return;
-    }
-    final created = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const GrnFormPage()),
-    );
-    if (created == true) _load();
   }
 
-  Future<int?> _pickPO() async {
-    final repo = ref.read(purchasesRepositoryProvider);
-    List<Map<String, dynamic>> list = [];
-    try {
-      final pending = await repo.getPendingOrders();
-      // Keep only PARTIALLY_RECEIVED from this set
-      list = pending
-          .where((e) => (e['status'] ?? '') == 'PARTIALLY_RECEIVED')
-          .toList();
-    } catch (_) {}
-    try {
-      final approved = await repo.getOrders(status: 'APPROVED');
-      // Merge and deduplicate by purchase_id
-      final ids = list.map((e) => e['purchase_id'] as int).toSet();
-      for (final it in approved) {
-        final id = it['purchase_id'] as int?;
-        if (id != null && !ids.contains(id)) {
-          list.add(it);
-          ids.add(id);
-        }
-      }
-    } catch (_) {}
-    int? selected =
-        list.isNotEmpty ? (list.first['purchase_id'] as int?) : null;
-    if (!mounted) return null;
-    return showDialog<int?>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setInner) => AlertDialog(
-          title: const Text('Select Purchase Order'),
-          content: SizedBox(
-            width: 720,
-            child: list.isEmpty
-                ? const Text('No pending/partial orders')
-                : SizedBox(
-                    height: 360,
-                    child: RadioGroup<int>(
-                      groupValue: selected,
-                      onChanged: (value) => setInner(() => selected = value),
-                      child: ListView.builder(
-                        itemCount: list.length,
-                        itemBuilder: (context, i) {
-                          final it = list[i];
-                          return RadioListTile<int>(
-                            value: it['purchase_id'] as int,
-                            title:
-                                Text(it['purchase_number']?.toString() ?? ''),
-                            subtitle: Text((it['supplier']?['name'] ??
-                                    it['supplier_name'] ??
-                                    '')
-                                .toString()),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel')),
-            FilledButton(
-                onPressed: () => Navigator.pop(context, selected),
-                child: const Text('Select')),
+  Widget _buildMobileBody(
+    LocalePreferencesState localePrefs,
+    List<GoodsReceiptDto> filtered,
+    int linkedPoCount,
+    int standaloneCount,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        ProfessionalDocumentHeader(
+          title: 'Goods Receipts',
+          subtitle:
+              'Mobile keeps receipt review stacked: search, review, and then open the full GRN detail.',
+          badges: [
+            ProfessionalBadge(label: '${filtered.length} Visible'),
           ],
         ),
+        const SizedBox(height: 12),
+        _buildToolbar(),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: PurchaseDocumentMetricCard(
+                label: 'PO-backed',
+                value: '$linkedPoCount',
+                icon: Icons.description_outlined,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: PurchaseDocumentMetricCard(
+                label: 'Standalone',
+                value: '$standaloneCount',
+                icon: Icons.inventory_2_outlined,
+                tint: const Color(0xFFE8F3EC),
+                foreground: const Color(0xFF255C35),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: _openCreateDialog,
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Create Goods Receipt'),
+        ),
+        const SizedBox(height: 12),
+        if (_loading) const LinearProgressIndicator(minHeight: 2),
+        if (filtered.isEmpty)
+          AppEmptyView(
+            title: 'No goods receipts',
+            message:
+                'Create a goods receipt or adjust the search to review posted receipts.',
+            onRetry: _load,
+          )
+        else
+          for (final receipt in filtered) ...[
+            PurchaseDocumentListCard(
+              title: receipt.receiptNumber,
+              subtitle: [
+                if ((receipt.supplierName ?? '').trim().isNotEmpty)
+                  receipt.supplierName!,
+                AppDateTime.formatDate(
+                  context,
+                  localePrefs,
+                  receipt.receivedDate,
+                ),
+              ].join(' • '),
+              badges: [
+                const ProfessionalBadge(
+                  label: 'Posted',
+                  backgroundColor: Color(0xFFE8F3EC),
+                  foregroundColor: Color(0xFF255C35),
+                ),
+                if (receipt.purchaseId != null)
+                  const ProfessionalBadge(
+                    label: 'Linked PO',
+                    backgroundColor: Color(0xFFEAF1F8),
+                    foregroundColor: Color(0xFF23415F),
+                  ),
+              ],
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => GoodsReceiptDetailPage(
+                      goodsReceiptId: receipt.goodsReceiptId,
+                    ),
+                  ),
+                );
+                await _load();
+              },
+            ),
+            if (receipt != filtered.last) const SizedBox(height: 10),
+          ],
+      ],
+    );
+  }
+
+  Widget _buildToolbar() {
+    return ProfessionalSectionCard(
+      title: 'Filters',
+      subtitle:
+          'Search by receipt number or supplier and refresh the workbench without leaving the page.',
+      child: Column(
+        children: [
+          TextField(
+            controller: _search,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: 'Search by GRN # or supplier',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.refresh_rounded),
+                tooltip: 'Refresh',
+                onPressed: _load,
+              ),
+            ),
+          ),
+          if (_loading) ...[
+            const SizedBox(height: 10),
+            const LinearProgressIndicator(minHeight: 2),
+          ],
+        ],
       ),
     );
   }
-}
 
-class _ReceiveAgainstPoPage extends ConsumerStatefulWidget {
-  const _ReceiveAgainstPoPage({required this.purchaseId});
-  final int purchaseId;
-  @override
-  ConsumerState<_ReceiveAgainstPoPage> createState() =>
-      _ReceiveAgainstPoPageState();
-}
-
-class _ReceiveAgainstPoPageState extends ConsumerState<_ReceiveAgainstPoPage> {
-  Map<String, dynamic>? _po;
-  bool _loading = true;
-  final List<TextEditingController> _qty = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  @override
-  void dispose() {
-    for (final c in _qty) {
-      c.dispose();
+  Widget _buildDetailPreview(LocalePreferencesState localePrefs) {
+    if (_detailLoading) {
+      return const ProfessionalSectionCard(
+        title: 'GRN Preview',
+        expandChild: true,
+        child: Center(child: CircularProgressIndicator()),
+      );
     }
-    super.dispose();
-  }
-
-  Future<void> _load() async {
-    setState(() => _loading = true);
-    try {
-      final repo = ref.read(purchasesRepositoryProvider);
-      final po = await repo.getPurchase(widget.purchaseId);
-      if (!mounted) return;
-      _qty.clear();
-      final items =
-          (po['items'] as List? ?? const []).cast<Map<String, dynamic>>();
-      for (final it in items) {
-        final qty = ((it['quantity'] as num?)?.toDouble() ?? 0) -
-            ((it['received_quantity'] as num?)?.toDouble() ?? 0);
-        _qty.add(TextEditingController(
-            text: qty > 0 ? qty.toStringAsFixed(2) : '0'));
-      }
-      setState(() => _po = po);
-    } finally {
-      if (mounted) setState(() => _loading = false);
+    if (_detailError != null) {
+      return ProfessionalSectionCard(
+        title: 'GRN Preview',
+        child: AppEmptyView(
+          title: 'Preview unavailable',
+          message: ErrorHandler.message(_detailError!),
+          onRetry: () {
+            final receiptId = _selectedReceiptId;
+            if (receiptId != null) {
+              _selectReceipt(receiptId);
+            }
+          },
+        ),
+      );
     }
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    final po = _po;
-    final isWide = AppBreakpoints.isTabletOrDesktop(context);
-    final items =
-        (po?['items'] as List? ?? const []).cast<Map<String, dynamic>>();
-    return Scaffold(
-      appBar: AppBar(
-        leadingWidth: isWide ? 104 : null,
-        leading: isWide ? const DesktopSidebarToggleLeading() : null,
-        title: Text('Receive ${po?['purchase_number'] ?? ''}'),
-      ),
-      body: SafeArea(
-        child: _loading
-            ? const LinearProgressIndicator(minHeight: 2)
-            : ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  for (int i = 0; i < items.length; i++)
-                    Card(
-                      elevation: 0,
-                      child: ListTile(
-                        title: Text(items[i]['product']?['name']?.toString() ??
-                            'Product #${items[i]['product_id']}'),
-                        subtitle: Text(
-                            'Remaining: ${(((items[i]['quantity'] as num?)?.toDouble() ?? 0) - ((items[i]['received_quantity'] as num?)?.toDouble() ?? 0)).toStringAsFixed(2)}'),
-                        trailing: SizedBox(
-                          width: 120,
-                          child: TextField(
-                              controller: _qty[i],
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                      decimal: true),
-                              decoration:
-                                  const InputDecoration(labelText: 'Receive')),
+    final detail = _selectedDetail;
+    if (detail == null) {
+      return const ProfessionalSectionCard(
+        title: 'GRN Preview',
+        child: ProfessionalDocumentEmptyState(
+          title: 'Select a goods receipt',
+          message:
+              'Choose a posted GRN from the left pane to review quantities and add-ons.',
+        ),
+      );
+    }
+
+    final receivedQty = detail.items.fold<double>(
+      0,
+      (sum, item) => sum + item.receivedQuantity,
+    );
+    final totalValue = detail.items.fold<double>(
+      0,
+      (sum, item) => sum + item.lineTotal,
+    );
+    final addonsTotal = _selectedAddons.fold<double>(
+      0,
+      (sum, addon) => sum + addon.totalAmount,
+    );
+
+    return Column(
+      children: [
+        ProfessionalDocumentHeader(
+          title: detail.receiptNumber,
+          subtitle:
+              'Preview received quantities, source linkage, and posted add-ons before opening the full GRN detail page.',
+          badges: [
+            const ProfessionalBadge(
+              label: 'Posted',
+              backgroundColor: Color(0xFFE8F3EC),
+              foregroundColor: Color(0xFF255C35),
+            ),
+            if ((detail.supplierName ?? '').trim().isNotEmpty)
+              ProfessionalBadge(label: detail.supplierName!),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 6,
+                child: Column(
+                  children: [
+                    ProfessionalOverviewCard(
+                      title: 'Overview',
+                      icon: Icons.receipt_long_rounded,
+                      child: ProfessionalFieldGrid(
+                        fields: [
+                          ProfessionalFieldGridItem(
+                            label: 'Supplier',
+                            value: (detail.supplierName ?? '').trim().isEmpty
+                                ? 'Not available'
+                                : detail.supplierName!,
+                          ),
+                          ProfessionalFieldGridItem(
+                            label: 'Received Date',
+                            value: AppDateTime.formatDate(
+                              context,
+                              localePrefs,
+                              detail.receivedDate,
+                            ),
+                          ),
+                          ProfessionalFieldGridItem(
+                            label: 'Source PO',
+                            value: detail.purchaseId == null
+                                ? 'Standalone receipt'
+                                : 'Purchase #${detail.purchaseId}',
+                          ),
+                          ProfessionalFieldGridItem(
+                            label: 'Add-ons',
+                            value: '${_selectedAddons.length}',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: ProfessionalSectionCard(
+                        title: 'Line Snapshot',
+                        subtitle:
+                            'The first few posted lines stay visible for quick warehouse review.',
+                        expandChild: true,
+                        child: ListView.separated(
+                          padding: EdgeInsets.zero,
+                          itemCount:
+                              detail.items.length > 5 ? 5 : detail.items.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final item = detail.items[index];
+                            return PurchaseDocumentListCard(
+                              title: item.productName ??
+                                  'Product #${item.productId}',
+                              subtitle:
+                                  'Qty ${item.receivedQuantity.toStringAsFixed(2)} • Unit ${item.unitPrice.toStringAsFixed(2)} • Total ${item.lineTotal.toStringAsFixed(2)}',
+                              badges: [
+                                if ((item.sku ?? '').trim().isNotEmpty)
+                                  ProfessionalBadge(label: item.sku!),
+                              ],
+                            );
+                          },
                         ),
                       ),
                     ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 48,
-                    child: FilledButton(
-                      onPressed: _receive,
-                      child: const Text('Record GRN'),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-      ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 4,
+                child: ProfessionalSummaryCard(
+                  title: 'GRN Summary',
+                  expandContent: true,
+                  rows: [
+                    (
+                      label: 'Line Count',
+                      value: '${detail.items.length}',
+                      emphasize: false,
+                    ),
+                    (
+                      label: 'Received Qty',
+                      value: receivedQty.toStringAsFixed(2),
+                      emphasize: false,
+                    ),
+                    (
+                      label: 'Items Total',
+                      value: totalValue.toStringAsFixed(2),
+                      emphasize: false,
+                    ),
+                    (
+                      label: 'Add-ons Total',
+                      value: addonsTotal.toStringAsFixed(2),
+                      emphasize: true,
+                    ),
+                  ],
+                  footer: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => GoodsReceiptDetailPage(
+                                goodsReceiptId: detail.goodsReceiptId,
+                              ),
+                            ),
+                          );
+                          await _load();
+                        },
+                        icon: const Icon(Icons.open_in_new_rounded),
+                        label: const Text('Open Full Detail'),
+                        style: professionalCompactButtonStyle(
+                          context,
+                          outlined: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
-  }
-
-  Future<void> _receive() async {
-    final po = _po;
-    if (po == null) return;
-    final items =
-        (po['items'] as List? ?? const []).cast<Map<String, dynamic>>();
-    final payload = <Map<String, dynamic>>[];
-    for (int i = 0; i < items.length; i++) {
-      final rem = ((items[i]['quantity'] as num?)?.toDouble() ?? 0) -
-          ((items[i]['received_quantity'] as num?)?.toDouble() ?? 0);
-      final val = double.tryParse(_qty[i].text.trim()) ?? 0;
-      if (val > 0) {
-        final take = val > rem ? rem : val;
-        payload.add({
-          'purchase_detail_id': items[i]['purchase_detail_id'] as int,
-          'received_quantity': take
-        });
-      }
-    }
-    if (payload.isEmpty) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-            const SnackBar(content: Text('Enter quantities to receive')));
-      return;
-    }
-    try {
-      final repo = ref.read(purchasesRepositoryProvider);
-      await repo.receiveAgainstPO(
-          purchaseId: widget.purchaseId, items: payload);
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('GRN recorded')));
-    } catch (e) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(ErrorHandler.message(e))));
-    }
   }
 }

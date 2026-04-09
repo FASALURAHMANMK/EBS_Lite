@@ -21,6 +21,9 @@ import '../../hr/presentation/pages/employees_page.dart';
 import '../../hr/presentation/pages/hr_page.dart';
 import '../../hr/presentation/pages/payroll_page.dart';
 import '../../inventory/presentation/pages/combo_definitions_page.dart';
+import '../../purchases/presentation/pages/goods_receipts_page.dart';
+import '../../purchases/presentation/pages/purchase_orders_page.dart';
+import '../../purchases/presentation/pages/purchase_returns_page.dart';
 import '../../reports/presentation/pages/report_category_page.dart';
 import '../../reports/presentation/pages/reports_page.dart';
 import '../../reports/presentation/report_categories.dart';
@@ -92,6 +95,16 @@ class DashboardNavigation {
         );
       case 'Accounting':
         return const AccountingPage();
+      case 'Purchase Orders':
+      case 'Purchase Order':
+        return const PurchaseOrdersPage();
+      case 'Goods Receipts':
+      case 'Goods Receipt':
+      case 'Goods Receipt Note':
+        return const GoodsReceiptsPage();
+      case 'Purchase Returns':
+      case 'Purchase Return':
+        return const PurchaseReturnsPage();
       case 'Banking':
         return const BankingPage();
       case 'Cash Register':

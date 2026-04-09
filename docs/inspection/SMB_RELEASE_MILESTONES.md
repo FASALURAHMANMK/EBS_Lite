@@ -9,7 +9,7 @@ Status model: `completed`, `in_progress`, `pending`, `blocked`
 |---|---|---|---|---|
 | M0 | Repo bootstrap and continuity baseline | completed | none | `docs/inspection/` is populated, stale workflow docs are archived, `.codex` continuity files are current |
 | M1 | Responsive and document workflow baseline | in_progress | M0 | verified module audit exists, Sales reference pattern is documented, rollout priority for non-standard modules is agreed |
-| M2 | Shared UI/layout standardization | pending | M1 | shared desktop/mobile document shell exists and is applied to priority modules beyond Sales |
+| M2 | Shared UI/layout standardization | in_progress | M1 | shared desktop/mobile document shell exists and is applied to priority modules beyond Sales |
 | M3 | Backend/API hardening | pending | M0 | runtime schema tolerance removed from request paths, OpenAPI classification is tightened, major auth/settings/runtime drift issues are reduced |
 | M4 | DB, performance, and release safety hardening | pending | M3 | top N+1 hotspots, outbox claim races, and DB idempotency gaps have verified mitigation plans or fixes |
 | M5 | Validation, permissions, and security posture | pending | M3 | production config gates, uploads, password reset delivery, and permission-sensitive paths are verified and documented |
@@ -45,7 +45,7 @@ Scope:
 Current evidence:
 - Sales deeper document pages are the best current reference
 - POS is not yet the desktop reference
-- Purchases and several back-office modules remain mixed or mobile-first
+- Purchases first slice is now materially improved, but several back-office modules still remain mixed or mobile-first
 
 Exit criteria:
 - `docs/inspection/UI_RESPONSIVE_AUDIT.md` and `docs/inspection/DOCUMENT_WORKFLOW_STANDARD.md` stay current
@@ -63,6 +63,11 @@ Scope:
 - turn Sales professional document widgets into a reusable pattern
 - remove mixed desktop landing/page patterns
 - centralize responsive rules instead of ad hoc width checks
+
+Current evidence:
+- `flutter_app/lib/shared/widgets/professional_document_widgets.dart` now exists as the shared document primitive layer
+- Sales keeps continuity through a re-export file
+- the shared document shell is now actively used in Purchases PO/GRN/receipt/return pages
 
 Exit criteria:
 - shared document components are reused across multiple modules

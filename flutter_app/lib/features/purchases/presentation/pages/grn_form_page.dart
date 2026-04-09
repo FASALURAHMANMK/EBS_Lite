@@ -4,17 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:ebs_lite/core/error_handler.dart';
+import '../../../../core/layout/app_breakpoints.dart';
 import '../../../../core/outbox/outbox_notifier.dart';
 import '../../../../shared/widgets/app_selection_dialog.dart';
-import '../../../suppliers/data/supplier_repository.dart';
-import '../../../suppliers/data/models.dart';
+import '../../../../shared/widgets/desktop_sidebar_toggle_action.dart';
+import '../../../../shared/widgets/professional_document_widgets.dart';
+import '../../../dashboard/data/payment_methods_repository.dart';
 import '../../../inventory/data/inventory_repository.dart';
 import '../../../inventory/presentation/widgets/inventory_tracking_selector.dart';
+import '../../../pos/data/pos_repository.dart';
+import '../../../suppliers/data/models.dart';
+import '../../../suppliers/data/supplier_repository.dart';
 import '../../data/grn_repository.dart';
 import '../../data/models.dart';
 import '../widgets/cost_adjustment_editor.dart';
-import '../../../pos/data/pos_repository.dart';
-import '../../../dashboard/data/payment_methods_repository.dart';
 
 class GrnFormPage extends ConsumerStatefulWidget {
   const GrnFormPage({super.key});
@@ -43,6 +46,19 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
   ];
   bool _saving = false;
 
+  List<_GrnLine> get _activeLines => _lines
+      .where(
+        (line) =>
+            line.product != null &&
+            (double.tryParse(line.qty.text.trim()) ?? 0) > 0,
+      )
+      .toList(growable: false);
+
+  double get _totalQty => _activeLines.fold<double>(
+        0,
+        (sum, line) => sum + (double.tryParse(line.qty.text.trim()) ?? 0),
+      );
+
   @override
   void dispose() {
     _invoiceNumber.dispose();
@@ -60,103 +76,275 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final showSidebarToggle = AppBreakpoints.isTabletOrDesktop(context);
+    final isDesktop = AppBreakpoints.isDesktop(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('New Goods Receipt')),
+      appBar: AppBar(
+        leadingWidth: showSidebarToggle ? 104 : null,
+        leading: showSidebarToggle ? const DesktopSidebarToggleLeading() : null,
+        title: const Text('New Goods Receipt'),
+      ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _SupplierPicker(
-              supplierId: _supplierId,
-              supplierName: _supplierName,
-              onPicked: (id, name) => setState(() {
-                _supplierId = id;
-                _supplierName = name;
-              }),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _invoiceNumber,
-              decoration: const InputDecoration(
-                labelText: 'Invoice Number (physical)',
-                prefixIcon: Icon(Icons.confirmation_number_outlined),
+        child: isDesktop ? _buildDesktopBody(theme) : _buildMobileBody(theme),
+      ),
+    );
+  }
+
+  Widget _buildDesktopBody(ThemeData theme) {
+    const gap = 12.0;
+    const railWidth = 320.0;
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          ProfessionalDocumentHeader(
+            title: 'Standalone GRN Workspace',
+            subtitle:
+                'Desktop operators can capture supplier paperwork, landed costs, payment, and receipt lines in one dense workspace.',
+            badges: [
+              const ProfessionalBadge(label: 'Without PO'),
+              ProfessionalBadge(
+                label: '${_activeLines.length} Active Lines',
+                backgroundColor: const Color(0xFFEAF1F8),
+                foregroundColor: const Color(0xFF23415F),
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
+            ],
+          ),
+          if (_saving) ...[
+            const SizedBox(height: gap),
+            const LinearProgressIndicator(minHeight: 2),
+          ],
+          const SizedBox(height: gap),
+          SizedBox(
+            height: 228,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _pickInvoiceFile,
-                    icon: const Icon(Icons.upload_file_rounded),
-                    label: Text(_invoiceFilePath == null
-                        ? 'Upload Invoice (Image/PDF)'
-                        : 'Invoice Selected'),
-                  ),
-                ),
-                if (_invoiceFilePath != null) ...[
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: 'Clear',
-                    onPressed: () => setState(() => _invoiceFilePath = null),
-                    icon: const Icon(Icons.clear_rounded),
-                  )
-                ],
+                Expanded(child: _buildDocumentOverview()),
+                const SizedBox(width: gap),
+                Expanded(child: _buildHeaderAdjustmentsSection()),
+                const SizedBox(width: gap),
+                SizedBox(width: railWidth, child: _buildSummaryCard()),
               ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _notes,
-              decoration: const InputDecoration(
-                labelText: 'Notes (optional)',
-                prefixIcon: Icon(Icons.description_outlined),
-              ),
+          ),
+          const SizedBox(height: gap),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _buildItemsSection(theme, desktopLayout: true)),
+                const SizedBox(width: gap),
+                SizedBox(width: railWidth, child: _buildActionPanel(theme)),
+              ],
             ),
-            const SizedBox(height: 12),
-            CostAdjustmentListEditor(
-              title: 'Header Add-ons',
-              rows: _headerAdjustments,
-              onAdd: () => setState(
-                () => _headerAdjustments.add(EditableCostAdjustmentRow()),
-              ),
-              onChanged: () => setState(() {}),
-              onRemove: (index) => setState(() {
-                _headerAdjustments[index].dispose();
-                _headerAdjustments.removeAt(index);
-              }),
-              emptyLabel:
-                  'Add freight, duty, rebate, or other header-level costs.',
-            ),
-            const SizedBox(height: 12),
-            _buildPaymentCard(theme),
-            const SizedBox(height: 12),
-            Text('Items', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            ..._buildLines(theme),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                onPressed: () => setState(() => _lines.add(_GrnLine())),
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Add Item'),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 48,
-              child: FilledButton(
-                onPressed: _saving ? null : _save,
-                child: _saving
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2.4))
-                    : const Text('Create GRN'),
-              ),
-            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileBody(ThemeData theme) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        ProfessionalDocumentHeader(
+          title: 'New Goods Receipt',
+          subtitle:
+              'Mobile keeps the GRN flow stacked: paperwork, header add-ons, payment, then item receipt details.',
+          badges: [
+            ProfessionalBadge(label: '${_activeLines.length} Active Lines'),
           ],
         ),
+        if (_saving) ...[
+          const SizedBox(height: 12),
+          const LinearProgressIndicator(minHeight: 2),
+        ],
+        const SizedBox(height: 12),
+        _buildDocumentOverview(),
+        const SizedBox(height: 12),
+        _buildHeaderAdjustmentsSection(),
+        const SizedBox(height: 12),
+        _buildPaymentCard(theme),
+        const SizedBox(height: 12),
+        _buildItemsSection(theme),
+        const SizedBox(height: 12),
+        _buildSummaryCard(),
+        const SizedBox(height: 12),
+        _buildActionPanel(theme),
+      ],
+    );
+  }
+
+  Widget _buildDocumentOverview() {
+    return ProfessionalOverviewCard(
+      title: 'Supplier & Paperwork',
+      icon: Icons.receipt_long_rounded,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SupplierPicker(
+            supplierId: _supplierId,
+            supplierName: _supplierName,
+            onPicked: (id, name) => setState(() {
+              _supplierId = id;
+              _supplierName = name;
+            }),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _invoiceNumber,
+            decoration: const InputDecoration(
+              labelText: 'Invoice Number (physical)',
+              prefixIcon: Icon(Icons.confirmation_number_outlined),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _pickInvoiceFile,
+                  icon: const Icon(Icons.upload_file_rounded),
+                  label: Text(
+                    _invoiceFilePath == null
+                        ? 'Upload Invoice (Image/PDF)'
+                        : 'Invoice Selected',
+                  ),
+                ),
+              ),
+              if (_invoiceFilePath != null) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: 'Clear',
+                  onPressed: () => setState(() => _invoiceFilePath = null),
+                  icon: const Icon(Icons.clear_rounded),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _notes,
+            minLines: 3,
+            maxLines: 4,
+            textAlignVertical: TextAlignVertical.top,
+            decoration: const InputDecoration(
+              labelText: 'Notes (optional)',
+              alignLabelWithHint: true,
+              prefixIcon: Icon(Icons.description_outlined),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderAdjustmentsSection() {
+    return ProfessionalSectionCard(
+      title: 'Header Add-ons',
+      subtitle:
+          'Capture freight, duty, rebate, or other receipt-level costs before the GRN is created.',
+      child: CostAdjustmentListEditor(
+        title: 'Header Add-ons',
+        rows: _headerAdjustments,
+        onAdd: () => setState(
+          () => _headerAdjustments.add(EditableCostAdjustmentRow()),
+        ),
+        onChanged: () => setState(() {}),
+        onRemove: (index) => setState(() {
+          _headerAdjustments[index].dispose();
+          _headerAdjustments.removeAt(index);
+        }),
+        emptyLabel: 'Add freight, duty, rebate, or other header-level costs.',
+      ),
+    );
+  }
+
+  Widget _buildItemsSection(ThemeData theme, {bool desktopLayout = false}) {
+    return ProfessionalSectionCard(
+      title: 'Receipt Lines',
+      subtitle:
+          'Add products, confirm quantities and tracking, then capture any line-level landed-cost adjustments.',
+      action: FilledButton.tonalIcon(
+        onPressed: () => setState(() => _lines.add(_GrnLine())),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Add Item'),
+        style: professionalCompactButtonStyle(context),
+      ),
+      expandChild: desktopLayout,
+      child: _lines.isEmpty
+          ? const Center(
+              child: ProfessionalDocumentEmptyState(
+                title: 'No receipt lines',
+                message:
+                    'Add at least one item line before creating the goods receipt.',
+              ),
+            )
+          : desktopLayout
+              ? ListView(
+                  padding: EdgeInsets.zero,
+                  children: _buildLines(theme),
+                )
+              : Column(children: _buildLines(theme)),
+    );
+  }
+
+  Widget _buildSummaryCard() {
+    return ProfessionalSummaryCard(
+      title: 'GRN Summary',
+      expandContent: AppBreakpoints.isDesktop(context),
+      rows: [
+        (
+          label: 'Active Lines',
+          value: '${_activeLines.length}',
+          emphasize: false,
+        ),
+        (
+          label: 'Total Qty',
+          value: _totalQty.toStringAsFixed(2),
+          emphasize: false,
+        ),
+        (
+          label: 'Estimated Value',
+          value: _computeTotal().toStringAsFixed(2),
+          emphasize: true,
+        ),
+      ],
+      footer: Text(
+        _paidNow
+            ? 'This receipt will also post immediate payment when saved.'
+            : 'Leave payment off to record the purchase on credit.',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+      ),
+    );
+  }
+
+  Widget _buildActionPanel(ThemeData theme) {
+    return ProfessionalSectionCard(
+      title: 'Post Receipt',
+      subtitle:
+          'Create the standalone GRN after supplier, payment, and tracking details are complete.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildPaymentCard(theme),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _saving ? null : _save,
+            icon: _saving
+                ? const SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2.2),
+                  )
+                : const Icon(Icons.task_alt_rounded),
+            label: Text(_saving ? 'Creating...' : 'Create GRN'),
+            style: professionalCompactButtonStyle(context),
+          ),
+        ],
       ),
     );
   }
