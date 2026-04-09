@@ -57,5 +57,3 @@ Dataset prerequisite: use the governed demo dataset defined in `RELEASE_READINES
 | Admin and settings | ADM-03 | Generate a support bundle and review sync-health page | Bundle/share flow works and outbox data is visible to support users | Medium |
 | Bulk I/O | BIO-01 | Import customers using template and confirm validation behavior | Valid rows import, invalid rows fail clearly, resulting records are searchable | Medium |
 | Bulk I/O | BIO-02 | Import suppliers and export suppliers/customers | Exports match visible data and permission checks are enforced | Medium |
-| Limited web office shell | WEB-01 | Login and open dashboard, inventory, sales, purchases, and accounting pages intended for demo | Pages render and route without broken navigation, with scope clearly presented as limited | Medium |
-| Limited web office shell | WEB-02 | Verify no demo or sales script claims web parity with Flutter | Demo material and operator notes describe web as secondary office shell only | High |

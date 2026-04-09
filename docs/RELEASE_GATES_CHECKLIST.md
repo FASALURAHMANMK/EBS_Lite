@@ -9,7 +9,7 @@ Applies to: SMB Edition launch candidate
 
 - [ ] `docs/SMB_EDITION_SCOPE.md` is still accurate for the launch candidate.
 - [ ] No launch claim contradicts implemented behavior in Flutter or Go.
-- [ ] `next_frontend_web/` is not marketed as full parity unless its own readiness gates are added and satisfied.
+- [ ] `next_frontend_web/` is not treated as part of the SMB release unless a future scope decision adds its own readiness gates.
 - [ ] No reachable placeholder, dead route, or fake support action remains in launched Flutter navigation.
 
 ### Business logic
@@ -60,7 +60,8 @@ Applies to: SMB Edition launch candidate
 
 - [ ] `RELEASE_READINESS_PLAN.md` is current.
 - [ ] `docs/MODULE_UAT_MATRIX.md` has completed evidence for all in-scope modules.
-- [ ] `docs/REPO_GOVERNANCE_ARTIFACTS.md` contains no unresolved must-exist launch blocker.
+- [ ] `docs/inspection/RELEASE_BLOCKERS_AND_RISKS.md` contains no unresolved governance blocker.
+- [ ] `docs/inspection/EXECUTION_LEDGER.md` reflects the current active milestone and next action.
 - [ ] Required operator/admin manuals, SOPs, and onboarding assets exist in repo.
 
 ## Non-blocker gates

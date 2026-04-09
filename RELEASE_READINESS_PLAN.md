@@ -1,7 +1,7 @@
 # EBS Lite SMB Release Readiness Plan
 
 Date: 2026-03-30
-Scope baseline: Flutter client (`flutter_app/`), Go backend (`go_backend_rmt/`), limited office web shell (`next_frontend_web/`)
+Scope baseline: Flutter client (`flutter_app/`), Go backend (`go_backend_rmt/`), enterprise-directed future web project (`next_frontend_web/`)
 Status: Controlled release-program baseline for SMB Edition
 
 ## 1. Purpose
@@ -20,7 +20,9 @@ Authoritative companion documents created or governed by this plan:
 - `docs/SMB_EDITION_SCOPE.md`
 - `docs/RELEASE_GATES_CHECKLIST.md`
 - `docs/MODULE_UAT_MATRIX.md`
-- `docs/REPO_GOVERNANCE_ARTIFACTS.md`
+- `docs/inspection/CODEX_EXECUTION_PROTOCOL.md`
+- `docs/inspection/CURRENT_STATUS_SNAPSHOT.md`
+- `docs/inspection/EXECUTION_LEDGER.md`
 - `docs/release_market_readiness_report.md`
 - `docs/module_wise_feature_list.md`
 - `docs/ACCOUNTING_MODULE_USER_MANUAL.md`
@@ -32,7 +34,7 @@ The following assumptions were confirmed by repo inspection on 2026-03-30:
 
 - Flutter is the primary operational SMB release surface.
 - The Go backend supports a wider capability set than the currently commercialized Flutter and web UI surface.
-- The Next.js web application exists and is useful as an office/admin shell, but `go_backend_rmt/internal/routes/FRONTEND_PARITY.md` still marks many backend route groups as reserved or intentionally unused there.
+- The Next.js web application exists in the repo, but it is not part of the SMB release surface; it is an enterprise-directed future surface and `go_backend_rmt/internal/routes/FRONTEND_PARITY.md` still marks many backend route groups as reserved or intentionally unused there.
 - `tools/api_parity_report.md` currently shows no Flutter-called endpoints missing from OpenAPI and no method mismatches.
 - The read-first documents required by `AGENTS.md` now exist at the expected paths.
 - The shipped Flutter help and support entry now resolves to live operational help content rather than a placeholder action.
@@ -190,7 +192,7 @@ Severity definitions:
 | GAP-03 | P0 | Governance baseline was incomplete and required read-first docs were missing | `AGENTS.md` referenced three missing documents before this change | Required baseline docs exist, cross-reference each other, and are kept current in repo |
 | GAP-04 | P0 | Operator launch package must stay complete and current | Launch docs now exist, but UAT evidence and final sign-off still determine release readiness | Launch pack includes UAT matrix, demo dataset manifest, operator guides, backup/restore SOP, release checklist, and support triage guide |
 | GAP-05 | P1 | Security hardening must be verified in the packaged deployment | Security policy, session timeout, and step-up controls now exist but must be validated in the actual release environment | Production verification evidence is attached to the release candidate |
-| GAP-06 | P1 | Web app is not a parity-safe launch surface | `go_backend_rmt/internal/routes/FRONTEND_PARITY.md` marks many web route groups as reserved/intentionally unused; `next_frontend_web/README.md` says tests are not configured | Market web app as limited office shell only until its own gates exist |
+| GAP-06 | P1 | Web app is not an SMB launch surface and should stay outside SMB release claims | `go_backend_rmt/internal/routes/FRONTEND_PARITY.md` marks many web route groups as reserved/intentionally unused; `next_frontend_web/README.md` says tests are not configured | Keep web out of SMB release scope and govern it as an enterprise-later surface until it has its own readiness gates |
 | GAP-07 | P1 | Backend-ready endpoints exceed commercialized UI scope | `tools/api_parity_report.md` lists multiple OpenAPI paths unused by Flutter | Each unused endpoint is classified as internal, future, or intentionally uncommercialized |
 | GAP-08 | P1 | Production config still depends on external discipline | `go_backend_rmt/.env.example` includes `JWT_SECRET=change_me_in_production`; Flutter fallback base URL is localhost | Release gate requires production env verification and packaged build review |
 | GAP-09 | P1 | Workflow and notifications are present but lightly wired into high-risk flows | Current reports call out workflow depth as a gap | Limit claims to current approval list/review behavior until more flows are wired |
@@ -205,14 +207,14 @@ Severity definitions:
 - Any failing required command gate
 - Any Flutter-called endpoint missing from OpenAPI
 - Any reachable placeholder or dead-end workflow in production for launched modules
-- Missing launch governance documents called out in `docs/REPO_GOVERNANCE_ARTIFACTS.md`
+- Missing launch governance documents called out in `docs/inspection/RELEASE_BLOCKERS_AND_RISKS.md`
 - Lack of controlled UAT evidence for core financial and stock flows
 - Production secrets/base URLs/password reset URL not validated for release configuration
 
 ### Non-blockers if claims remain narrow
 
 - Unused backend endpoints that are clearly marked future/internal
-- Limited web office shell parity, provided the web app is not sold as the primary SMB surface
+- Enterprise-directed web work remaining outside SMB release scope
 - P2 architecture cleanups
 - Enterprise-only backlog items frozen out of Phase 1 claims
 

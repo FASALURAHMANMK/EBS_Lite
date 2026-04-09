@@ -10,7 +10,9 @@ Controlled follow-on documents produced from this report:
 - `docs/SMB_EDITION_SCOPE.md`
 - `docs/RELEASE_GATES_CHECKLIST.md`
 - `docs/MODULE_UAT_MATRIX.md`
-- `docs/REPO_GOVERNANCE_ARTIFACTS.md`
+- `docs/inspection/REPO_OVERVIEW.md`
+- `docs/inspection/RELEASE_BLOCKERS_AND_RISKS.md`
+- `docs/inspection/CODEX_EXECUTION_PROTOCOL.md`
 
 This report remains the supporting market and architecture analysis. The controlled SMB launch baseline is now defined by the documents above.
 

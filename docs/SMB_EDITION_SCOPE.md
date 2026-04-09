@@ -14,7 +14,7 @@ Primary launch surface:
 
 Secondary surface:
 
-- `next_frontend_web/` is an office/admin shell and pilot surface only. It is not the authoritative parity surface for the SMB launch.
+- `next_frontend_web/` exists in the repo as an enterprise-directed future surface. It is not part of the SMB release surface and is not the authoritative parity client for SMB launch.
 
 ## 2. In-scope launch modules
 
@@ -229,7 +229,6 @@ These capabilities may be shown in demos but should not be the primary promise o
 - promotions management
 - loyalty differentiation
 - warranty workflows
-- web office shell
 - workflow approvals
 - notifications
 - support bundle generation
@@ -277,7 +276,7 @@ The following areas are visible in backend/OpenAPI or parity artifacts but shoul
 
 - sale returns are documented as credit-note style behavior unless a separate refund/payout process is used
 - manual journals are intentionally blocked because only single-counterpart vouchers exist
-- the web application should be presented as limited office/admin coverage, not as a parity client
+- the web application should be presented as an enterprise-later repo asset, not as part of the SMB release surface
 - offline claims should remain limited to the modules explicitly documented in `docs/module_wise_feature_list.md`
 
 ## 7. Required release claims

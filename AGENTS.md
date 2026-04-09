@@ -10,10 +10,14 @@ Primary goal: make both projects **release-ready** and keep them **API 1:1 match
 
 ## Always read first (requirements + current gaps)
 
+- `docs/inspection/CODEX_EXECUTION_PROTOCOL.md`
+- `docs/inspection/CURRENT_STATUS_SNAPSHOT.md`
+- `docs/inspection/EXECUTION_LEDGER.md`
+- `docs/inspection/SMB_RELEASE_MILESTONES.md`
 - `RELEASE_READINESS_PLAN.md`
 - `flutter_app/ERP System Requirements Document.txt`
 - `go_backend_rmt/Docs & Schema/ERP System Requirements Document.txt`
-- `ebs_lite_win/Requirements.txt` (feature backlog reference)
+- `ebs_lite_win/Requirements.txt` (feature backlog reference; currently absent in repo, so treat as missing until restored)
 - `tools/api_parity_report.md` (generated snapshot; regenerate when needed)
 
 ## Non-negotiables (Definition of Done)

@@ -15,4 +15,4 @@ Date: 2026-03-30
 | HR core | Optional in SMB launch deals | - | Keep claims narrow by deployment |
 | Workflow and notifications | Limited | Yes | Position as controlled approvals, not enterprise orchestration |
 | Loyalty / promotions / warranty | Optional | Yes | Use as retail/distribution differentiators |
-| Web office shell | Secondary only | Demo-only where approved | Do not market as parity with Flutter |
+| Web project (`next_frontend_web/`) | Out of SMB scope | Enterprise-later surface | Do not market as part of the SMB release |
