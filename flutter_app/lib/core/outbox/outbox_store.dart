@@ -12,7 +12,26 @@ class OutboxStore {
 
   Future<int> enqueue(OutboxItem item) async {
     final db = await _open();
-    return db.insert('outbox', item.toDb());
+
+    // If the item has an idempotency key, check for an existing pending/queued
+    // entry with the same key to avoid duplicate server requests when the app
+    // restarts or the user retries while the previous attempt is still queued.
+    final idemKey = (item.idempotencyKey ?? '').trim();
+    if (idemKey.isNotEmpty) {
+      final existing = await db.query(
+        'outbox',
+        columns: ['id'],
+        where: 'idempotency_key = ? AND status IN (?, ?)',
+        whereArgs: [idemKey, 'queued', 'failed'],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        return existing.first['id'] as int;
+      }
+    }
+
+    return db.insert('outbox', item.toDb(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<int> countPending() async {

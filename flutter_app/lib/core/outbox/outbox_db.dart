@@ -6,6 +6,8 @@ import 'package:sqflite/sqflite.dart' as sqflite;
 class OutboxDb {
   sqflite.Database? _db;
 
+  static const int _currentVersion = 2;
+
   Future<sqflite.Database> open() async {
     if (_db != null) return _db!;
 
@@ -15,7 +17,7 @@ class OutboxDb {
     _db = await factory.openDatabase(
       path,
       options: sqflite.OpenDatabaseOptions(
-        version: 1,
+        version: _currentVersion,
         onCreate: (db, _) async {
           await db.execute('''
             CREATE TABLE outbox (
@@ -36,6 +38,18 @@ class OutboxDb {
           ''');
           await db.execute(
               'CREATE INDEX idx_outbox_status_created ON outbox(status, created_at)');
+          await db.execute(
+              'CREATE UNIQUE INDEX idx_outbox_idempotency_key ON outbox(idempotency_key)');
+        },
+        onUpgrade: (db, oldVersion, newVersion) async {
+          if (oldVersion < 2) {
+            // Migration v2: add unique index on idempotency_key to prevent
+            // duplicate outbox entries for the same idempotent operation.
+            // SQLite allows multiple NULLs in a UNIQUE column, which is
+            // desirable since not all outbox items carry an idempotency key.
+            await db.execute(
+                'CREATE UNIQUE INDEX idx_outbox_idempotency_key ON outbox(idempotency_key)');
+          }
         },
       ),
     );

@@ -1,6 +1,6 @@
 # Next Run Prompt
 
-Updated: 2026-04-11 UTC (post-M4-first-slice — N+1 hotspots fixed)
+Updated: 2026-04-11 UTC (post-M4-second-slice — outbox idempotency hardened)
 
 ## Instructions
 
@@ -18,10 +18,10 @@ Continue the existing EBS Lite milestone workflow. Do not restart discovery.
 - M1 is in progress (UI standardization wave substantially complete).
 - M2 is in progress (shared widget family comprehensive across modules).
 - M3 is substantially complete (5 slices covering all P0/P1 backend risks).
-- M4 is in progress — first slice complete:
+- M4 is in progress — 2 slices complete:
   - N+1 hotspots fixed in collection service (`GetCollections`, `GetOutstanding`)
+  - Outbox idempotency hardened (client-side duplicate detection + unique index + backend unique constraints)
 - Remaining M4 targets:
-  - outbox claim/idempotency guarantees (currently application-level only)
   - migration hygiene review (base migration contains duplicate DDL blocks)
   - dashboard `No route configured` fallback — add missing routes
 - Remaining P0:
@@ -30,26 +30,20 @@ Continue the existing EBS Lite milestone workflow. Do not restart discovery.
 
 ### Objective (pick the strongest slice):
 
-Option A: Outbox claim/idempotency review (M4)
-- Review the current outbox implementation in `flutter_app/lib/core/outbox/`
-- Verify that idempotency keys are properly used end-to-end
-- Identify any claim races where the same operation could be replayed
-- Add DB-level uniqueness constraints if missing
+Option A: Migration hygiene review (M4)
+- Review the base migration (`202601010000_init_schema.sql`) for duplicate DDL blocks
+- Clean up redundant schema statements
+- Ensure all migrations are idempotent and non-conflicting
 
 Option B: Dashboard route gap fix (M1/M4)
 - Add missing routes to `dashboard_navigation.dart` to eliminate the `No route configured` fallback
 - This is a quick fix that improves the user experience
 
-Option C: Migration hygiene review (M4)
-- Review the base migration for duplicate DDL blocks
-- Clean up redundant schema statements
-
-Pick Option A (outbox idempotency) as the recommended path. The offline-first claims are a core differentiator for EBS Lite vs browser-first competitors, and ensuring they are robust is the highest-impact remaining M4 target.
+Pick Option A (migration hygiene) as the recommended path. The base migration is the foundation of the database and ensuring it's clean is important for production deployments.
 
 ### Subagent requirements:
-- Use golang-pro (or general-purpose fallback) for backend code review
-- Use flutter-expert (or general-purpose fallback) for Flutter outbox review
-- Use sql-pro (or general-purpose fallback) if DB constraint changes are needed
+- Use sql-pro (or general-purpose fallback) for migration/schema review
+- Use flutter-expert only if frontend changes are required
 
 ### Verification:
 - `flutter analyze`
