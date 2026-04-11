@@ -1,6 +1,6 @@
 # UI Responsive Audit
 
-Updated: 2026-04-11 UTC (Supplier detail page + routing fix run)
+Updated: 2026-04-11 UTC (Purchase return detail hardening run)
 Audit mode: static repo inspection plus subagent-assisted Flutter audit
 Runtime device testing: not performed in this run
 
@@ -22,7 +22,7 @@ Runtime device testing: not performed in this run
 | Dashboard shell | distinct mobile and wide layouts | strong | strong | label-based routing fallback can still hit `No route configured` |
 | Sales | strongest current document pattern plus invoice, quote, and sale-return follow-up slices | strong | strong | no dedicated sale-return workbench caller is using the new typed result yet; broader desktop standardization is now a non-Sales priority |
 | POS | operationally strong, desktop-light | weak | strong | body remains mostly one vertical flow; payment path lacks richer desktop treatment |
-| Purchases | second standardized follow-up slice implemented | strong | strong | purchase return detail is still a separate full-page review; source-purchase / source-PO selection dialogs are still route-local rather than fully shared |
+| Purchases | standardized follow-up slices complete plus return detail hardening | strong | strong | purchase return detail page hardened with error handling, pull-to-refresh, and denser desktop items display; source-purchase / source-PO selection dialogs are still route-local rather than fully shared |
 | Inventory | responsive hooks widely present | mixed | acceptable | not fully audited page by page; standard still inconsistent |
 | Customers | responsive management workbench plus detail page standardization | strong | strong | management page follows desktop workbench contract; detail page now uses denser responsive review on desktop with ProfessionalDocumentHeader/SectionCard/SummaryCard and reuses CustomerReviewCard on mobile; inline collection sheet extracted to separate widget file |
 | Accounts | landing and report handoff are stronger, and the deeper finance rollout now includes ledgers, chart-of-accounts, and vouchers workbench standardization | mixed | acceptable | the deeper finance trio now follows the stronger desktop review direction, but other finance/admin pages still need the same standard applied consistently |
@@ -78,6 +78,7 @@ Strong desktop candidates:
 - `grn_detail_page.dart`
 - `purchase_receipt_page.dart`
 - `purchase_returns_page.dart`
+- `purchase_return_detail_page.dart`
 - `ledgers_page.dart`
 - `ledger_entries_page.dart`
 - `chart_of_accounts_page.dart`
@@ -198,6 +199,12 @@ Verified:
   - mobile: reuses `SupplierReviewCard` from `supplier_workbench_widgets.dart` and wraps transaction lists in `ProfessionalSectionCard`
   - inline `_PaySheet` extracted to `widgets/supplier_payment_sheet.dart` as a clean reusable widget
 - Dashboard routing fix for "Supplier Management" — added the missing case to `dashboard_navigation.dart` so label-based navigation to the supplier list no longer falls through to the "No route configured" fallback
+- Purchase return detail hardening slice for:
+  - `purchase_return_detail_page.dart` already using ProfessionalDocumentHeader, ProfessionalSectionCard, ProfessionalSummaryCard, ProfessionalFieldGrid, ProfessionalOverviewCard, and ProfessionalDocumentEmptyState with desktop/mobile branching
+  - added proper error state handling with `AppErrorView` + retry (previously `_loading` stayed true forever on error)
+  - added `RefreshIndicator` on mobile and Refresh AppBar action
+  - denser desktop items display with compact DataTable-style rows (line number, product name, quantity, unit price, line total)
+  - mobile retains ProfessionalOverviewCard per item pattern
 - Customer detail page responsive slice for:
   - `customer_detail_page.dart` refactored from a 770-line monolith with six nested `FutureBuilder` chains to a coordinated async load with separate desktop and mobile build paths
   - desktop: denser review layout with `ProfessionalDocumentHeader`, `ProfessionalOverviewCard`, `ProfessionalFieldGrid`, `ProfessionalSummaryCard`, and `ProfessionalBadge` transaction rows

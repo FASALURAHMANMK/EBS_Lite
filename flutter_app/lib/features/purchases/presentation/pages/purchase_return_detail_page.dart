@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/app_date_time.dart';
 import '../../../../core/layout/app_breakpoints.dart';
 import '../../../../core/locale_preferences.dart';
+import '../../../../shared/widgets/app_error_view.dart';
+import '../../../../shared/widgets/app_loading_view.dart';
 import '../../../../shared/widgets/desktop_sidebar_toggle_action.dart';
 import '../../../../shared/widgets/professional_document_widgets.dart';
 import '../../data/purchase_returns_repository.dart';
@@ -22,6 +24,7 @@ class _PurchaseReturnDetailPageState
     extends ConsumerState<PurchaseReturnDetailPage> {
   Map<String, dynamic>? _doc;
   bool _loading = true;
+  Object? _error;
 
   @override
   void initState() {
@@ -30,13 +33,19 @@ class _PurchaseReturnDetailPageState
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final doc = await ref
           .read(purchaseReturnsRepositoryProvider)
           .getReturn(widget.returnId);
       if (!mounted) return;
       setState(() => _doc = doc);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -47,9 +56,40 @@ class _PurchaseReturnDetailPageState
     final localePrefs = ref.watch(localePreferencesProvider);
     final showSidebarToggle = AppBreakpoints.isTabletOrDesktop(context);
     final isDesktop = AppBreakpoints.isDesktop(context);
-    final doc = _doc;
+    final isLoading = _loading && _doc == null;
+
+    return Scaffold(
+      appBar: AppBar(
+        leadingWidth: showSidebarToggle ? 104 : null,
+        leading: showSidebarToggle ? const DesktopSidebarToggleLeading() : null,
+        title: Text(_doc?['return_number']?.toString() ?? 'Purchase Return'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _load,
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: isLoading
+            ? const AppLoadingView(label: 'Loading return details')
+            : _error != null && _doc == null
+                ? AppErrorView(error: _error!, onRetry: _load)
+                : _doc == null
+                    ? const Center(child: Text('Purchase return not found'))
+                    : _buildBody(isDesktop, _doc!, localePrefs),
+      ),
+    );
+  }
+
+  Widget _buildBody(
+    bool isDesktop,
+    Map<String, dynamic> doc,
+    LocalePreferencesState localePrefs,
+  ) {
     final items =
-        (doc?['items'] as List? ?? const []).cast<Map<String, dynamic>>();
+        (doc['items'] as List? ?? const []).cast<Map<String, dynamic>>();
     final totalQty = items.fold<double>(
       0,
       (sum, item) => sum + ((item['quantity'] as num?)?.toDouble() ?? 0),
@@ -62,56 +102,51 @@ class _PurchaseReturnDetailPageState
               ((item['unit_price'] as num?)?.toDouble() ?? 0)),
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        leadingWidth: showSidebarToggle ? 104 : null,
-        leading: showSidebarToggle ? const DesktopSidebarToggleLeading() : null,
-        title: Text(doc?['return_number']?.toString() ?? 'Purchase Return'),
-      ),
-      body: SafeArea(
-        child: _loading && doc == null
-            ? const Center(child: CircularProgressIndicator())
-            : doc == null
-                ? const Center(child: Text('Purchase return not found'))
-                : (isDesktop
-                    ? Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          children: [
-                            _buildHeader(doc),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              height: 170,
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Expanded(
-                                      child: _buildOverview(doc, localePrefs)),
-                                  const SizedBox(width: 12),
-                                  SizedBox(
-                                    width: 320,
-                                    child: _buildSummary(totalQty, totalValue),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Expanded(child: _buildItemsSection(items)),
-                          ],
-                        ),
-                      )
-                    : ListView(
-                        padding: const EdgeInsets.all(16),
-                        children: [
-                          _buildHeader(doc),
-                          const SizedBox(height: 12),
-                          _buildOverview(doc, localePrefs),
-                          const SizedBox(height: 12),
-                          _buildItemsSection(items),
-                          const SizedBox(height: 12),
-                          _buildSummary(totalQty, totalValue),
-                        ],
-                      )),
+    if (isDesktop) {
+      return Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            _buildHeader(doc),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 170,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: _buildOverview(doc, localePrefs)),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 320,
+                    child: _buildSummary(
+                      items.length,
+                      totalQty,
+                      totalValue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(child: _buildItemsSection(items, isDesktop: true)),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _buildHeader(doc),
+          const SizedBox(height: 12),
+          _buildOverview(doc, localePrefs),
+          const SizedBox(height: 12),
+          _buildItemsSection(items, isDesktop: false),
+          const SizedBox(height: 12),
+          _buildSummary(items.length, totalQty, totalValue),
+        ],
       ),
     );
   }
@@ -187,7 +222,10 @@ class _PurchaseReturnDetailPageState
     );
   }
 
-  Widget _buildItemsSection(List<Map<String, dynamic>> items) {
+  Widget _buildItemsSection(
+    List<Map<String, dynamic>> items, {
+    required bool isDesktop,
+  }) {
     return ProfessionalSectionCard(
       title: 'Returned Items',
       subtitle:
@@ -197,43 +235,131 @@ class _PurchaseReturnDetailPageState
               title: 'No returned items',
               message: 'This return does not contain line items.',
             )
-          : Column(
-              children: [
-                for (final item in items) ...[
-                  ProfessionalOverviewCard(
-                    title: item['product']?['name']?.toString() ??
-                        'Product #${item['product_id']}',
-                    icon: Icons.inventory_2_rounded,
-                    child: ProfessionalFieldGrid(
-                      fields: [
-                        ProfessionalFieldGridItem(
-                          label: 'Quantity',
-                          value: ((item['quantity'] as num?)?.toDouble() ?? 0)
-                              .toStringAsFixed(2),
+          : isDesktop
+              ? Column(
+                  children: [
+                    for (int i = 0; i < items.length; i++) ...[
+                      _buildDesktopItemRow(items[i], i),
+                      if (i < items.length - 1)
+                        Divider(
+                            height: 1, color: Theme.of(context).dividerColor),
+                    ],
+                  ],
+                )
+              : Column(
+                  children: [
+                    for (final item in items) ...[
+                      ProfessionalOverviewCard(
+                        title: item['product']?['name']?.toString() ??
+                            'Product #${item['product_id']}',
+                        icon: Icons.inventory_2_rounded,
+                        child: ProfessionalFieldGrid(
+                          fields: [
+                            ProfessionalFieldGridItem(
+                              label: 'Quantity',
+                              value:
+                                  ((item['quantity'] as num?)?.toDouble() ?? 0)
+                                      .toStringAsFixed(2),
+                            ),
+                            ProfessionalFieldGridItem(
+                              label: 'Unit Price',
+                              value:
+                                  ((item['unit_price'] as num?)?.toDouble() ??
+                                          0)
+                                      .toStringAsFixed(2),
+                            ),
+                          ],
                         ),
-                        ProfessionalFieldGridItem(
-                          label: 'Unit Price',
-                          value: ((item['unit_price'] as num?)?.toDouble() ?? 0)
-                              .toStringAsFixed(2),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (item != items.last) const SizedBox(height: 10),
-                ],
-              ],
-            ),
+                      ),
+                      if (item != items.last) const SizedBox(height: 10),
+                    ],
+                  ],
+                ),
     );
   }
 
-  Widget _buildSummary(double totalQty, double totalValue) {
+  Widget _buildDesktopItemRow(Map<String, dynamic> item, int index) {
+    final theme = Theme.of(context);
+    final productName = item['product']?['name']?.toString() ??
+        'Product #${item['product_id']}';
+    final quantity =
+        ((item['quantity'] as num?)?.toDouble() ?? 0).toStringAsFixed(2);
+    final unitPrice =
+        ((item['unit_price'] as num?)?.toDouble() ?? 0).toStringAsFixed(2);
+    final lineTotal = (((item['quantity'] as num?)?.toDouble() ?? 0) *
+            ((item['unit_price'] as num?)?.toDouble() ?? 0))
+        .toStringAsFixed(2);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 1,
+            child: Text(
+              '#${index + 1}',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 4,
+            child: Text(
+              productName,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 2,
+            child: Text(
+              quantity,
+              textAlign: TextAlign.right,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 2,
+            child: Text(
+              unitPrice,
+              textAlign: TextAlign.right,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 2,
+            child: Text(
+              lineTotal,
+              textAlign: TextAlign.right,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummary(int itemCount, double totalQty, double totalValue) {
     return ProfessionalSummaryCard(
       title: 'Return Summary',
       expandContent: AppBreakpoints.isDesktop(context),
       rows: [
         (
           label: 'Item Count',
-          value: '${(_doc?['items'] as List? ?? const []).length}',
+          value: '$itemCount',
           emphasize: false,
         ),
         (

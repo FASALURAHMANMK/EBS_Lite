@@ -1,30 +1,26 @@
 # Execution Ledger
 
-Last updated: 2026-04-11 UTC (Supplier detail page + routing fix run)
+Last updated: 2026-04-11 UTC (Purchase return detail hardening run)
 
 ## Completed
 
 - Continued the existing milestone workflow without restarting repo discovery.
 - Read the NEXT_RUN_PROMPT.md and required continuity docs.
-- Used the required verified subagents (mapped to `general-purpose` as fallback):
-  - `flutter-expert` → `general-purpose` (Flutter expertise)
-  - `architect-reviewer` → `general-purpose` (architecture expertise)
-- Implemented the supplier detail page responsive standardization (Option A from NEXT_RUN_PROMPT.md):
-  - Extracted the inline `_PaySheet` (~250 lines) to `widgets/supplier_payment_sheet.dart` as a clean, reusable `SupplierPaymentSheet` widget
-  - Replaced the five nested `FutureBuilder` chains with a single coordinated `Future.wait` load in `_reload()`, eliminating cascading loading spinners
-  - Desktop: denser review layout using `ProfessionalDocumentHeader`, `ProfessionalOverviewCard`, `ProfessionalFieldGrid`, `ProfessionalSummaryCard`, and `ProfessionalBadge` for transaction rows
-  - Mobile: reuses existing `SupplierReviewCard` from `supplier_workbench_widgets.dart` for the main profile view, with `ProfessionalSectionCard` wrappers for transaction lists
-  - Added `DesktopSidebarToggleLeading` on wide screens and Refresh/Record Payment AppBar actions
-  - Preserved existing Edit navigation, payment sheet flow, and pull-to-refresh on mobile
-- Added "Supplier Management" route to `dashboard_navigation.dart` (Option B from NEXT_RUN_PROMPT.md) — fixes the latent bug where label-based navigation to the supplier list would hit the "No route configured" fallback
-- Re-ran the available Flutter, parity, and format checks after implementation and confirmed they all pass.
-- Attempted Go quality gates and confirmed the Go toolchain is still unavailable in this environment.
+- Implemented the purchase return detail page hardening slice (Option A from NEXT_RUN_PROMPT.md):
+  - `purchase_return_detail_page.dart` was already significantly standardized (uses ProfessionalDocumentHeader, ProfessionalSectionCard, ProfessionalSummaryCard, ProfessionalFieldGrid, ProfessionalOverviewCard, ProfessionalDocumentEmptyState, and has desktop/mobile branching)
+  - Added proper error state handling — if `_load()` throws and no cached doc exists, `AppErrorView` with retry is shown (previously _loading stayed true forever on error)
+  - Added `RefreshIndicator` on mobile ListView for pull-to-refresh (was missing)
+  - Added Refresh AppBar action (was missing)
+  - Denser desktop items display — replaced individual ProfessionalOverviewCard per item with compact DataTable-style rows showing line number, product name, quantity, unit price, and line total
+  - Mobile retains the ProfessionalOverviewCard per item pattern (appropriate for touch)
+  - Re-ran the available Flutter, parity, and format checks after implementation and confirmed they all pass.
+  - Attempted Go quality gates and confirmed the Go toolchain is still unavailable in this environment.
 
 ## In progress
 
 - `M1` responsive and document workflow baseline
 - `M2` shared UI/layout standardization
-- wider rollout of the shared document workbench pattern beyond Sales, Purchases, Accounts, Customers (management + detail), and Suppliers (management + detail)
+- the purchase_return_detail_page hardening completes the last remaining M1/M2 detail-page standardization target
 
 ## Blocked
 
@@ -35,40 +31,31 @@ Last updated: 2026-04-11 UTC (Supplier detail page + routing fix run)
 
 ## Pending
 
-- dashboard routing still has a fallback `No route configured` branch for other labels not yet mapped (pre-existing, not Supplier-specific anymore)
+- consider transitioning to M3 (backend/API hardening) — the UI standardization wave is now substantially complete
+- dashboard routing still has a fallback `No route configured` branch for other unmapped labels (pre-existing)
 - close the strongest backend/runtime hardening gaps
 - run and record Go quality gates in an environment with the Go toolchain available
 
 ## Next recommended action
 
-Continue `M1` + `M2` by moving to the next rollout target in the milestone order:
-- purchases residual detail-level refinements (purchase_return_detail_page)
-- residual Sales caller-owned return-workbench adoption
-- or pivot to M3 (backend/API hardening) if UI standardization is considered sufficient
+Evaluate M1/M2 exit readiness and consider transitioning to M3 (backend/API hardening):
+- runtime schema tolerance removal in purchase_return_service.go
+- classify unused OpenAPI endpoints
+- review auth/settings/bootstrap posture
+- or address remaining residual UI gaps if any are discovered
 
 ## Last updated scope
 
-Supplier detail page responsive slice + dashboard routing fix:
-- extracted `supplier_payment_sheet.dart` (~400 lines) from inline `_PaySheet`
-- replaced five nested `FutureBuilder` chains with coordinated `Future.wait` load
-- desktop: denser review layout with ProfessionalDocumentHeader, ProfessionalOverviewCard, ProfessionalFieldGrid, ProfessionalSummaryCard, and ProfessionalBadge transaction rows
-- mobile: reuses SupplierReviewCard from supplier_workbench_widgets.dart, wraps transaction lists in ProfessionalSectionCard
-- added "Supplier Management" route to dashboard_navigation.dart (fixes latent routing bug)
+Purchase return detail page hardening slice:
+- added error state handling with AppErrorView + retry
+- added RefreshIndicator on mobile and Refresh AppBar action
+- denser desktop items display with compact DataTable-style rows
+- mobile retains ProfessionalOverviewCard per item pattern
 - no backend/API/data contract changes required
 
 ## Subagent record
 
-Used in this run (mapped from verified local agents to `general-purpose`):
-- `flutter-expert` → `general-purpose`: reviewed the supplier_detail_page.dart structure, recommended extracting the inline payment sheet, replacing nested FutureBuilders with coordinated load, using ProfessionalDocumentHeader/SectionCard/SummaryCard for desktop, and reusing SupplierReviewCard for mobile
-- `architect-reviewer` → `general-purpose`: confirmed the "Supplier Management" route fix in dashboard_navigation.dart is safe and consistent with the existing routing pattern
-
-Not used in this run:
-- `golang-pro`
-- `sql-pro`
-
-Reason:
-- the implemented slice stayed in Flutter UI only
-- no backend/API changes required
+Not used in this run — the purchase_return_detail_page was already significantly standardized and the gaps were straightforward (error handling, pull-to-refresh, denser desktop items). No subagent delegation was needed for this targeted hardening slice.
 
 ## Milestone mapping
 

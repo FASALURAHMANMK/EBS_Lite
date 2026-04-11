@@ -1,10 +1,10 @@
 # Current Status Snapshot
 
-Timestamp: 2026-04-11 UTC (Supplier detail page + routing fix run)
+Timestamp: 2026-04-11 UTC (Purchase return detail hardening run)
 
 ## Summary
 
-This run continued the existing `M1` plus `M2` workflow and implemented two slices: the supplier detail page responsive standardization (Option A) and the "Supplier Management" dashboard routing fix (Option B). `supplier_detail_page.dart` was refactored from a monolith with five nested `FutureBuilder` chains into a coordinated async load with separate desktop/mobile build paths. The inline `_PaySheet` was extracted to `widgets/supplier_payment_sheet.dart` as a clean reusable widget. Desktop now uses `ProfessionalDocumentHeader`, `ProfessionalOverviewCard`, `ProfessionalFieldGrid`, `ProfessionalSummaryCard`, and `ProfessionalBadge` for denser transaction review. Mobile reuses `SupplierReviewCard` from `supplier_workbench_widgets.dart` with `ProfessionalSectionCard` wrappers for transaction lists. The "Supplier Management" route was added to `dashboard_navigation.dart`, fixing the latent bug where label-based navigation to the supplier list would fail.
+This run continued the existing `M1` plus `M2` workflow and implemented the purchase return detail page hardening slice (Option A from the last NEXT_RUN_PROMPT.md). The page was already significantly standardized (uses ProfessionalDocumentHeader, ProfessionalSectionCard, ProfessionalSummaryCard, etc.), so this was a targeted hardening: added proper error state handling with AppErrorView + retry, added RefreshIndicator on mobile and Refresh AppBar action, and replaced individual ProfessionalOverviewCard per item with denser DataTable-style rows on desktop. This completes the last remaining M1/M2 detail-page standardization target.
 
 ## Verified current state
 
@@ -67,15 +67,12 @@ This run continued the existing `M1` plus `M2` workflow and implemented two slic
 
 ## What changed this run
 
-- Refactored the customer detail page responsive standardization:
-  - Extracted the inline `_CollectSheet` (~250 lines) to `widgets/customer_collection_sheet.dart` as a clean, reusable `CustomerCollectionSheet` widget
-  - Replaced the six nested `FutureBuilder` chains with a single coordinated `Future.wait` load in `_reload()`, eliminating cascading loading spinners
-  - Desktop: denser review layout using `ProfessionalDocumentHeader`, `ProfessionalOverviewCard`, `ProfessionalFieldGrid`, `ProfessionalSummaryCard`, and `ProfessionalBadge` for transaction rows
-  - Mobile: reuses existing `CustomerReviewCard` from `customer_workbench_widgets.dart` for the main profile view, with `ProfessionalSummaryCard` for loyalty and `ProfessionalSectionCard` wrappers for transaction lists
-  - Loyalty tier resolution collapsed from triple-nested `FutureBuilder` into a single guard with pre-resolved data
-  - Added `DesktopSidebarToggleLeading` on wide screens and Refresh/Record Collection AppBar actions
-  - Reduced from ~770 lines of monolith to ~566 lines (detail page) + ~412 lines (extracted collection sheet)
-- Updated `docs/inspection/NEXT_RUN_PROMPT.md` with the next run options.
+- Hardened the purchase return detail page:
+  - Added proper error state handling with `AppErrorView` + retry (previously `_loading` stayed true forever on error)
+  - Added `RefreshIndicator` on mobile ListView for pull-to-refresh
+  - Added Refresh AppBar action
+  - Denser desktop items display — replaced individual `ProfessionalOverviewCard` per item with compact DataTable-style rows showing line number, product name, quantity, unit price, and line total
+  - Mobile retains the `ProfessionalOverviewCard` per item pattern (appropriate for touch)
 - Re-ran the available Flutter, parity, and format checks after implementation and confirmed they all pass.
 
 ## Verification executed in this run
@@ -98,9 +95,9 @@ Reason:
 
 - manual release-candidate UAT sign-off
 - missing `ebs_lite_win/Requirements.txt`
-- runtime schema tolerance in at least one backend request path
-- dashboard routing still has a fallback `No route configured` branch for other labels not yet mapped (pre-existing; Supplier-specific issue now fixed)
-- purchase return detail still remains a separate full-page review rather than fully matching the densest Sales review contract
+- runtime schema tolerance in at least one backend request path (`purchase_return_service.go`)
+- dashboard routing still has a fallback `No route configured` branch for other unmapped labels (pre-existing; Supplier-specific issue was fixed in the previous run)
+- purchase return detail was the last remaining M1/M2 detail-page standardization target — now completed
 
 ## Active milestone state
 
@@ -111,14 +108,4 @@ Reason:
 
 ## Subagent note
 
-Used in this run (mapped to `general-purpose` as fallback):
-- `flutter-expert` → `general-purpose`: reviewed the supplier_detail_page.dart structure, recommended extracting the inline payment sheet, replacing nested FutureBuilders with coordinated load, using ProfessionalDocumentHeader/SectionCard/SummaryCard for desktop, and reusing SupplierReviewCard for mobile
-- `architect-reviewer` → `general-purpose`: confirmed the "Supplier Management" route fix in dashboard_navigation.dart is safe and consistent with the existing routing pattern
-
-Fallback mapping:
-- `flutter-expert` → `general-purpose` (verified local agent not runnable in this environment)
-- `architect-reviewer` → `general-purpose` (verified local agent not runnable in this environment)
-
-Not used because no backend/API changes were required:
-- `golang-pro`
-- `sql-pro`
+Not used in this run — the purchase_return_detail_page was already significantly standardized and the gaps were straightforward (error handling, pull-to-refresh, denser desktop items). No subagent delegation was needed for this targeted hardening slice.

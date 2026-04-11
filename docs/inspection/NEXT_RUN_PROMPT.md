@@ -1,6 +1,6 @@
 # Next Run Prompt
 
-Updated: 2026-04-11 UTC (post-supplier-detail + routing fix run)
+Updated: 2026-04-11 UTC (post-purchase-return-detail hardening run)
 
 ## Instructions
 
@@ -15,37 +15,40 @@ Continue the existing EBS Lite milestone workflow. Do not restart discovery.
 
 ### Current milestone context:
 - M0 is complete.
-- M1 is in progress.
-- M2 is in progress.
-- The Customer Management workbench slice is implemented.
-- The Supplier Management workbench slice is implemented.
-- The Customer detail page responsive slice is implemented.
-- The Supplier detail page responsive slice is implemented.
-- The "Supplier Management" dashboard routing fix is implemented.
-- Both customer/supplier standardization waves are complete (management + detail pages).
-- Remaining M1/M2 targets:
-  - purchase_return_detail_page desktop standardization (from Purchases residual refinements)
-  - residual Sales caller-owned return-workbench adoption (if a dedicated returns workbench or routing contradiction surfaces)
-  - the `No route configured` fallback branch still exists for other unmapped labels
+- M1 is in progress — UI standardization wave substantially complete:
+  - Sales: invoices, quotes, sale returns, sales history all standardized
+  - Purchases: PO, GRN, receipt, returns, purchase return detail all standardized
+  - Accounts: ledgers, chart of accounts, vouchers all standardized
+  - Customers: management workbench + detail page standardized
+  - Suppliers: management workbench + detail page standardized + "Supplier Management" route fixed
+  - Reports: category viewer + report viewer standardized
+  - purchase_return_detail_page was the last remaining detail-page target — now hardened
+- M2 is in progress — shared widget family comprehensive across modules
+- Remaining M1/M2 residual gaps:
+  - `No route configured` fallback branch still exists for other unmapped labels
+  - POS desktop treatment still light
+  - residual Sales caller-owned return-workbench adoption (low priority, no contradiction surfaced)
+- M3 (backend/API hardening) has not been started
 
 ### Objective (pick the strongest slice):
 
-Option A: `purchase_return_detail_page.dart` desktop responsive standardization
-- Upgrade the purchase return detail page to denser responsive review patterns on desktop while keeping mobile stacked
-- Use the existing Purchases document widgets and professional_document_widgets
-- Mirror the pattern used in customer_detail_page.dart and supplier_detail_page.dart (coordinated async load, ProfessionalDocumentHeader on desktop)
-
-Option B: Pivot toward M3 (backend/API hardening) if UI standardization is considered sufficient
-- Focus on runtime schema tolerance removal in purchase_return_service.go
-- Classify unused OpenAPI endpoints
+Option A: Transition to M3 — Backend/API hardening
+- Fix runtime schema tolerance in `go_backend_rmt/internal/services/purchase_return_service.go`
+- Classify unused OpenAPI endpoints (internal, future, or uncommercialized)
 - Review auth/settings/bootstrap posture
+- This is the highest-impact path toward a release-ready backend
 
-Pick whichever is strongest. Option A continues the M1/M2 UI standardization wave. Option B starts the M3 backend hardening phase.
+Option B: Address residual UI gaps
+- Add "Suppliers" or other missing routes to dashboard_navigation.dart
+- POS desktop payment path treatment
+- Both are lower priority than M3 given the UI standardization wave is complete
+
+Pick Option A (M3 transition) as the recommended path. The M1/M2 UI standardization wave has been running for multiple runs and is now substantially complete across all major modules. The P0 runtime schema tolerance in purchase_return_service.go should be the first M3 target.
 
 ### Subagent requirements:
-- Use flutter-expert (or general-purpose fallback) for implementation review
-- Use architect-reviewer (or general-purpose fallback) for cross-module consistency
-- Use golang-pro and sql-pro if backend/API changes are required (Option B)
+- Use golang-pro (or general-purpose fallback) for backend code review
+- Use sql-pro (or general-purpose fallback) if query/schema changes are needed
+- Use flutter-expert only if frontend changes are required
 
 ### Verification:
 - `flutter analyze`

@@ -1,6 +1,6 @@
 # SMB Release Milestones
 
-Updated: 2026-04-11 UTC (Supplier detail page + routing fix run)
+Updated: 2026-04-11 UTC (Purchase return detail hardening run)
 Status model: `completed`, `in_progress`, `pending`, `blocked`
 
 ## Milestone table
@@ -94,6 +94,12 @@ Current evidence:
   - inline `_PaySheet` extracted to `widgets/supplier_payment_sheet.dart` as a clean reusable widget
 - Dashboard routing fix for "Supplier Management" is now implemented:
   - added the missing case to `dashboard_navigation.dart` so label-based navigation to the supplier list no longer falls through to the "No route configured" fallback
+- Purchase return detail hardening slice is now implemented:
+  - `purchase_return_detail_page.dart` already used ProfessionalDocumentHeader, ProfessionalSectionCard, ProfessionalSummaryCard, ProfessionalFieldGrid, ProfessionalOverviewCard, and ProfessionalDocumentEmptyState with desktop/mobile branching
+  - added proper error state handling with `AppErrorView` + retry (previously `_loading` stayed true forever on error)
+  - added `RefreshIndicator` on mobile and Refresh AppBar action
+  - denser desktop items display with compact DataTable-style rows
+  - mobile retains ProfessionalOverviewCard per item pattern
 - several back-office modules still remain mixed or mobile-first
 
 Exit criteria:
