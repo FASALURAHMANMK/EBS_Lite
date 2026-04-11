@@ -1,6 +1,6 @@
 # SMB Release Milestones
 
-Updated: 2026-04-10 UTC
+Updated: 2026-04-11 UTC
 Status model: `completed`, `in_progress`, `pending`, `blocked`
 
 ## Milestone table
@@ -73,6 +73,10 @@ Current evidence:
   - GRN creation/receipt returns into desktop workbench review and mobile detail when a real receipt id exists
   - purchase returns now have a desktop split-pane preview
   - shared Purchases supplier/product picker components reduce local duplication
+- Customer Management workbench slice is now implemented:
+  - `customer_management_page.dart` now provides a desktop split workbench with searchable customer queue and in-pane selected-customer review while mobile stays stacked with enhanced list cards and route-driven detail navigation
+  - `flutter_app/lib/features/customers/presentation/widgets/customer_workbench_widgets.dart` now provides reusable customer type/status badges, credit chips, metric cards, and a comprehensive customer review card
+  - outbox sync refresh behavior preserved and extended to refresh the selected-customer review pane on desktop
 - several back-office modules still remain mixed or mobile-first
 
 Exit criteria:
@@ -105,6 +109,7 @@ Current evidence:
 - `flutter_app/lib/features/reports/presentation/report_navigation.dart` now centralizes report-category destination construction across Reports, Accounts, and dashboard routing
 - `flutter_app/lib/shared/widgets/workbench_pane.dart` now exists as a generic shared workbench shell and is first used by the Accounts ledger slice
 - `flutter_app/lib/features/accounts/presentation/widgets/accounts_workbench_widgets.dart` now also carries shared account title/status and voucher title/type/line helpers reused by the Chart of Accounts and Vouchers workbenches
+- `flutter_app/lib/features/customers/presentation/widgets/customer_workbench_widgets.dart` now provides shared customer type/status badges, credit chips, metric cards, and a comprehensive customer review card reused by the Customer Management workbench
 
 Exit criteria:
 - shared document components are reused across multiple modules

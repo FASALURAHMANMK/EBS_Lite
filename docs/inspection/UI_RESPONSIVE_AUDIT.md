@@ -1,6 +1,6 @@
 # UI Responsive Audit
 
-Updated: 2026-04-10 UTC
+Updated: 2026-04-11 UTC
 Audit mode: static repo inspection plus subagent-assisted Flutter audit
 Runtime device testing: not performed in this run
 
@@ -24,7 +24,7 @@ Runtime device testing: not performed in this run
 | POS | operationally strong, desktop-light | weak | strong | body remains mostly one vertical flow; payment path lacks richer desktop treatment |
 | Purchases | second standardized follow-up slice implemented | strong | strong | purchase return detail is still a separate full-page review; source-purchase / source-PO selection dialogs are still route-local rather than fully shared |
 | Inventory | responsive hooks widely present | mixed | acceptable | not fully audited page by page; standard still inconsistent |
-| Customers | responsive landing page | mixed | acceptable | management/detail pages are mostly wide-nav plus same body |
+| Customers | responsive landing page plus management workbench slice | strong | strong | management page now follows desktop workbench contract; customer_detail_page.dart remains a 770-line monolith without desktop responsive adaptation |
 | Accounts | landing and report handoff are stronger, and the deeper finance rollout now includes ledgers, chart-of-accounts, and vouchers workbench standardization | mixed | acceptable | the deeper finance trio now follows the stronger desktop review direction, but other finance/admin pages still need the same standard applied consistently |
 | Reports | dense workbench slice implemented | strong | strong | result rendering is still generic-table driven for many endpoints even though the desktop shell is now much stronger |
 | HR | responsive hooks present | mixed | acceptable | landing page still uses older card-grid pattern |
@@ -81,11 +81,12 @@ Strong desktop candidates:
 - `ledger_entries_page.dart`
 - `chart_of_accounts_page.dart`
 - `vouchers_page.dart`
+- `customer_management_page.dart`
 
 Mixed desktop candidates:
 - `grn_form_page.dart`
 - `purchase_return_detail_page.dart`
-- `customer_management_page.dart`
+- `customer_detail_page.dart`
 
 Weak desktop candidates:
 - `pos_page.dart`
@@ -174,6 +175,13 @@ Verified:
   - purchase returns desktop split-pane preview
   - shared Purchases supplier/product picker reuse in PO, GRN, and return forms
   - dashboard quick purchase action now routes into the receipt workbench entry path instead of directly bypassing it
+- Customer Management workbench slice for:
+  - `customer_management_page.dart` gaining a desktop split workbench with a searchable customer queue and pinned selected-customer review pane while mobile remains stacked with enhanced list cards (now including type badges) and route-driven detail navigation
+  - the review pane loading customer detail + summary via existing `getCustomer` + `getCustomerSummary` endpoints so the workbench can show contact details, financial terms, business summary metrics, and credit status without a backend contract change
+  - `_syncDesktopSelection` auto-selecting the first customer on desktop and re-syncing when the filtered queue changes
+  - outbox sync refresh behavior preserved and extended to refresh the selected-customer review pane on desktop
+  - `flutter_app/lib/features/customers/presentation/widgets/customer_workbench_widgets.dart` providing reusable customer type/status badges, credit chips, metric cards, and a comprehensive customer review card for the workbench
+- Suppliers remain the next rollout target (mirroring the Customer pattern)
 
 Partially verified:
 - Inventory, Accounts, HR, Workflow, Notifications, and Suppliers deeper subpages were sampled but not exhaustively audited file by file

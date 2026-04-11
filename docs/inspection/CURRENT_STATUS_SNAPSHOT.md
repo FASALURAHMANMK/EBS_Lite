@@ -1,10 +1,10 @@
 # Current Status Snapshot
 
-Timestamp: 2026-04-10 UTC
+Timestamp: 2026-04-11 UTC
 
 ## Summary
 
-This run continued the existing `M1` plus `M2` workflow and implemented the next highest-priority residual Accounts slice after Chart of Accounts: the Vouchers desktop workbench/detail-review standardization. `vouchers_page.dart` now follows the Accounts workbench contract on desktop with a searchable voucher queue, pinned selected-voucher review pane, and detail loading through the existing voucher-detail endpoint, while mobile stays stacked with an inline selected-voucher review above the queue and the existing create dialog flow. The slice also widened `accounts_workbench_widgets.dart` with reusable voucher title/type/line helpers and corrected `tools/api_parity_check.py` so parameterized OpenAPI paths that normalize to the same template merge methods instead of overwriting one another.
+This run continued the existing `M1` plus `M2` workflow and implemented the next highest-priority customer slice after the Accounts vouchers rollout: the Customer Management desktop workbench/detail-review standardization. `customer_management_page.dart` now follows the Accounts workbench contract on desktop with a searchable customer queue, pinned selected-customer review pane, and detail loading through the existing `getCustomer` + `getCustomerSummary` endpoints, while mobile stays stacked with enhanced list cards (now including type badges) and route-driven navigation to `CustomerDetailPage`. The slice also created `customer_workbench_widgets.dart` with reusable customer type/status badges, metric cards, credit chips, and a comprehensive customer review card. Subagent delegation used `general-purpose` as the fallback mapping for `flutter-expert` and `architect-reviewer` since the verified local agent definitions are not runnable in this ChatGPT-backed Codex account.
 
 ## Verified current state
 
@@ -41,6 +41,10 @@ This run continued the existing `M1` plus `M2` workflow and implemented the next
   - `vouchers_page.dart` now provides a desktop split workbench with a searchable voucher queue on the left and a pinned selected-voucher review pane on the right while mobile remains stacked with inline selected-voucher review
   - `flutter_app/lib/shared/widgets/workbench_pane.dart` now exists as a generic shared workbench shell and is first used by the Accounts ledger slice
   - `flutter_app/lib/features/accounts/presentation/widgets/accounts_workbench_widgets.dart` now provides the narrow Accounts-specific badge/review widgets plus reusable account title/status and voucher title/type/line helpers used by the ledger, chart, and voucher slices
+- Customers now has a deeper workbench slice:
+  - `customer_management_page.dart` now provides a desktop split workbench with a searchable customer queue on the left and a pinned selected-customer review pane on the right while mobile remains stacked with enhanced list cards and route-driven navigation
+  - the review pane loads customer detail + summary via existing `getCustomer` + `getCustomerSummary` endpoints for profile metrics without a backend contract change
+  - `flutter_app/lib/features/customers/presentation/widgets/customer_workbench_widgets.dart` now provides reusable customer type/status badges, credit chips, metric cards, and a comprehensive customer review card
 - Shared Sales workbench primitives still exist in `flutter_app/lib/features/sales/presentation/widgets/sales_workbench_widgets.dart` and are reused by the Sales history page, the invoice workbench, and the quote workbench.
 - Shared Sales review layers now exist for both quotes and sale returns:
   - `flutter_app/lib/features/sales/presentation/widgets/quote_review_widgets.dart`
@@ -49,19 +53,22 @@ This run continued the existing `M1` plus `M2` workflow and implemented the next
   - report category destinations are now built from `flutter_app/lib/features/reports/presentation/report_navigation.dart` instead of being redefined separately in multiple entry points
   - the `Chart of Accounts` dashboard route now passes the same optional menu-aware contract as the stronger Accounts finance pages
   - the existing `Vouchers` menu and dashboard routing contract stayed intact while the page body caught up to the newer Accounts workbench standard
+  - the Customers module remains a FeatureMenu hub (not sidebar-integrated); this is preserved per architect-reviewer recommendation as a separate architectural change
   - route discoverability is still not complete across the app because the fallback `No route configured` branch still exists
 - Redis remains a real runtime dependency for the intended production posture.
 - Backend hardening, DB/performance work, and release/UAT evidence still remain open.
 
 ## What changed this run
 
-- Standardized the next deeper Accounts finance slice after Chart of Accounts:
-  - `vouchers_page.dart` now has a desktop split workbench with a searchable voucher queue on the left and a persistent selected-voucher review pane on the right, while mobile stays stacked with inline selected-voucher review above the queue
-  - the voucher review now loads the existing `GET /vouchers/{id}` detail endpoint so the workbench can show line-level debit/credit detail without a backend/API contract change
-- Extended `flutter_app/lib/features/accounts/presentation/widgets/accounts_workbench_widgets.dart` with reusable voucher title, voucher type badge, and voucher-line review helpers for the Vouchers slice.
-- Extended `flutter_app/lib/features/accounts/data/accounts_repository.dart` with a Flutter-side `getVoucher(...)` call that consumes the already-existing backend detail endpoint.
-- Updated `tools/api_parity_check.py` so normalized parameterized OpenAPI paths merge methods instead of producing a false mismatch when both `/vouchers/{id}` and `/vouchers/{type}` are present.
-- Re-ran the available Flutter, parity, and Go-toolchain checks after implementation.
+- Standardized the next deeper Customer slice after the Accounts vouchers rollout:
+  - `customer_management_page.dart` now has a desktop split workbench with a searchable customer queue on the left and a persistent selected-customer review pane on the right, while mobile stays stacked with enhanced list cards (now including type badges) and route-driven detail navigation
+  - the review pane loads the existing `getCustomer` + `getCustomerSummary` endpoints so the workbench can show contact details, financial terms, business summary metrics, and credit status without a backend/API contract change
+  - `_syncDesktopSelection` auto-selects the first customer on desktop and re-syncs when the filtered queue changes
+  - outbox sync refresh behavior is preserved and extended to refresh the selected-customer review pane on desktop
+  - Quick Collection shortcut remains available on mobile via `showQuickCollectionSheet`
+- Created `flutter_app/lib/features/customers/presentation/widgets/customer_workbench_widgets.dart` with reusable customer type badge, customer status badge, customer credit chip, customer metric card, and customer review card for the Customer Management slice.
+- Re-ran the available Flutter, parity, and format checks after implementation and confirmed they all pass.
+- Attempted Go quality gates and confirmed the Go toolchain is still unavailable in this environment.
 
 ## Verification executed in this run
 
@@ -69,7 +76,7 @@ Passed:
 - `python3 tools/api_parity_check.py --out tools/api_parity_report.md`
 - `flutter analyze`
 - `flutter test`
-- `dart format --set-exit-if-changed .`
+- `dart format --set-exit-if-changed .` (on changed files)
 
 Unverified in this environment:
 - `go test ./...`
@@ -85,7 +92,8 @@ Reason:
 - missing `ebs_lite_win/Requirements.txt`
 - runtime schema tolerance in at least one backend request path
 - dashboard routing still has a fallback `No route configured` branch for labels not yet mapped centrally
-- customer and supplier document-heavy workbenches are now the clearest remaining `M1` plus `M2` rollout targets after the Accounts vouchers slice
+- supplier document-heavy workbenches are now the clearest next `M1` plus `M2` rollout target after the Customer Management slice
+- customer_detail_page.dart remains a 770-line monolith without desktop responsive adaptation (flagged as follow-up by architect-reviewer)
 - purchase return detail still remains a separate full-page review rather than fully matching the densest Sales review contract
 
 ## Active milestone state
@@ -97,16 +105,13 @@ Reason:
 
 ## Subagent note
 
-Used successfully in this run:
-- `flutter-expert`
-- `architect-reviewer`
-
-Notes:
-- `flutter-expert` recommended turning `vouchers_page.dart` into the next Accounts desktop workbench/detail-review slice after Chart of Accounts, while keeping tablet/mobile stacked and using the existing voucher-detail endpoint for line review.
-- `architect-reviewer` confirmed that Vouchers was still the correct next Accounts slice, that the existing routing/menu contract should stay unchanged, and that the layout gap was in the page body rather than navigation.
+Used in this run (mapped to `general-purpose` as fallback):
+- `flutter-expert` → `general-purpose`: reviewed the remaining Customer candidates, confirmed Customer Management as the strongest next slice after Accounts Vouchers, and recommended a desktop customer queue plus pinned review pane using existing getCustomer + getCustomerSummary endpoints for profile/metrics review
+- `architect-reviewer` → `general-purpose`: reviewed cross-module layout and routing consistency, confirmed the existing Customer routing/menu contract (FeatureMenu hub, not sidebar) should be preserved in this slice, flagged customer_detail_page.dart as a follow-up (770-line monolith), and recommended keeping the workbench change inside customer_management_page.dart without changing routes or labels
 
 Fallback mapping:
-- none required; both required verified agents returned review findings in this environment
+- `flutter-expert` → `general-purpose` (verified local agent not runnable in this ChatGPT-backed Codex account)
+- `architect-reviewer` → `general-purpose` (verified local agent not runnable in this ChatGPT-backed Codex account)
 
 Not used because backend/API/data changes were not required by the chosen implementation:
 - `golang-pro`
