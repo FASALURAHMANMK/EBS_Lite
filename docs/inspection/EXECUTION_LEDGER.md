@@ -1,25 +1,30 @@
 # Execution Ledger
 
-Last updated: 2026-04-11 UTC (M3 fourth slice — password reset delivery hardening)
+Last updated: 2026-04-11 UTC (M3 fifth slice — settings permission seeding review)
 
 ## Completed
 
 - Continued the existing milestone workflow without restarting discovery.
 - Read the NEXT_RUN_PROMPT.md and required continuity docs.
-- Implemented the M3 fourth slice — password reset delivery hardening:
-  - **SMTP STARTTLS support**: Replaced `smtp.SendMail` (no TLS) with explicit STARTTLS handshake on port 587 in `internal/utils/email.go`. Added `CheckSMTPConnectivity()` function for readiness checks.
-  - **SMTP health check in /ready endpoint**: Added `smtp_ok` to the readiness probe response. Now checks DB + Redis + SMTP connectivity.
-  - **FrontendBaseURL startup validation**: Added `ValidateFrontendBaseURL()` method to Config. Called unconditionally at startup (error in production, warning in other environments).
-  - **Session invalidation after password reset**: Added `UPDATE device_sessions SET is_active = FALSE WHERE user_id = $1` after successful password reset to terminate any stolen or lingering sessions.
-  - **Dedicated rate limiter for forgot-password**: Added `StrictEndpointLimiter` middleware with separate key namespace. Applied to `/auth/forgot-password` with a limit of 5 requests per hour per IP+user (vs the global 100 req/hour).
-  - **Configurable token expiry**: Added `PASSWORD_RESET_TOKEN_EXPIRY_MINS` environment variable (default 60). Replaced hard-coded 1-hour expiry in `ForgotPassword`.
-  - No Flutter changes required (password reset flow is backend-only).
+- Implemented the M3 fifth slice — settings permission seeding review:
+  - **Investigated the P1 risk**: Reviewed how settings permissions are seeded and how roles are referenced in app code.
+  - **Finding**: The "fixed role ID" concern was overstated. The app code correctly uses role *names* (not IDs) for all authorization checks:
+    - `RequireAnyRole("Admin", "Super Admin")` in routes.go looks up roles by name
+    - `findApproverRoleTx` in workflow_service.go looks up roles by name
+    - `RequireRole` middleware in auth.go resolves roles by name
+  - **Added startup verification**: Created `VerifySystemRoles()` in `internal/database/schema_validation.go` that confirms critical system roles (Super Admin, Admin, Manager) exist and are marked as `is_system_role = true` after migrations. Called at startup in `cmd/server/main.go`.
+  - **Role service protections confirmed**: `is_system_role` flag prevents modification or deletion of system roles; role permissions for system roles are protected.
+  - **Conclusion**: The settings permission seeding architecture is sound. Migration-seeded hardcoded role IDs (1, 2, 3) are acceptable because:
+    - Migrations run before app starts
+    - System roles are protected from modification by `is_system_role`
+    - All app code uses role names, not IDs
+  - The startup verification ensures that if migrations fail to create roles, the server refuses to start with a clear error message.
   - Re-ran Flutter checks (analyze, test) and API parity — all pass.
   - Attempted Go quality gates — Go toolchain unavailable in this environment.
 
 ## In progress
 
-- M3 (backend/API hardening) — fourth slice complete (password reset delivery); remaining target: settings permission seeding review
+- M3 (backend/API hardening) — fifth slice complete (settings permission seeding reviewed and hardened with startup verification)
 
 ## Blocked
 
@@ -29,37 +34,31 @@ Last updated: 2026-04-11 UTC (M3 fourth slice — password reset delivery harden
 
 ## Pending
 
-- settings permission seeding review (P1)
-- optional: remove uncommercialized endpoints after product owner sign-off
-- optional: add background job to purge expired reset tokens
-- optional: add HTML email support for password reset emails
+- M3 has 5 complete slices; consider M3 exit and transition to M4
+- Optional M3 follow-ups (not blockers): remove uncommercialized endpoints, add background job for expired token cleanup, add HTML email support
 
 ## Next recommended action
 
-Continue M3:
-- settings permission seeding review (P1: assumes fixed role IDs)
-- or pivot to M4 (DB/performance/release safety) if M3 is considered sufficient
+Evaluate M3 exit readiness. The 5 completed M3 slices cover:
+1. Runtime schema tolerance removed from service code
+2. OpenAPI endpoint classification (35 endpoints classified)
+3. Upload authorization hardened
+4. Password reset delivery hardened
+5. Settings permission seeding reviewed and verified at startup
+
+Recommended next step: Transition to M4 (DB/performance/release safety hardening).
 
 ## Last updated scope
 
-M3 fourth slice — password reset delivery hardening:
-- added STARTTLS support to SendEmail in email.go
-- added CheckSMTPConnectivity() and smtp_ok to /ready endpoint
-- added ValidateFrontendBaseURL() called at startup
-- added session invalidation after password reset
-- added StrictEndpointLimiter middleware for forgot-password (5 req/hour)
-- added PASSWORD_RESET_TOKEN_EXPIRY_MINS config (default 60)
+M3 fifth slice — settings permission seeding review:
+- investigated role seeding architecture; confirmed app uses role names not IDs
+- added `VerifySystemRoles()` startup verification in schema_validation.go
+- verified system role protection in role_service.go (is_system_role prevents modification/deletion)
 - no backend/API contract changes required
 
 ## Subagent record
 
-Used in this run (mapped from verified local agents to `general-purpose`):
-- general-purpose (backend exploration): reviewed the complete password reset flow including token generation, email sending, FrontendBaseURL configuration, buildResetLink, ResetPassword flow, /ready endpoint, and identified all production-readiness gaps
-
-Not used in this run:
-- `golang-pro` (not runnable in this environment)
-- `sql-pro` (not needed — no query/schema changes)
-- `flutter-expert` (not needed — no frontend changes)
+Not used in this run — the settings permission seeding review was a code investigation task. The grep search and manual review confirmed that the app code uses role names (not IDs) throughout, and the migration-seeded hardcoded role IDs are protected by the is_system_role flag.
 
 ## Milestone mapping
 
@@ -68,6 +67,6 @@ Not used in this run:
 | continuity and docs baseline | M0 |
 | responsive/document audit | M1 |
 | shared document standard rollout | M2 |
-| backend/API/runtime hardening | M3 (in progress — 4 slices complete) |
+| backend/API/runtime hardening | M3 (in progress — 5 slices complete) |
 | DB/performance/release safety | M4 |
 | UAT and release gate | M6, M7 |

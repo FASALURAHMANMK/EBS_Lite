@@ -1,6 +1,6 @@
 # SMB Release Milestones
 
-Updated: 2026-04-11 UTC (M3 fourth slice — password reset delivery hardening)
+Updated: 2026-04-11 UTC (M3 fifth slice — settings permission seeding review)
 Status model: `completed`, `in_progress`, `pending`, `blocked`
 
 ## Milestone table

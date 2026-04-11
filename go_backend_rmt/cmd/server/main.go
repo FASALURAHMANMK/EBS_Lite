@@ -53,6 +53,12 @@ func main() {
 		log.Fatal("Schema validation failed:", err)
 	}
 
+	// Verify that critical system roles exist after migrations. The app code
+	// references these roles by name (not by ID), so we must ensure they exist.
+	if err := database.VerifySystemRoles(database.GetDB(), "Super Admin", "Admin", "Manager"); err != nil {
+		log.Fatalf("System role verification failed: %v", err)
+	}
+
 	// Set Gin mode
 	if cfg.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)

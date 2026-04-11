@@ -153,3 +153,37 @@ func hasUniqueIndex(db *sql.DB, table string, columns []string) (bool, error) {
 	}
 	return exists, nil
 }
+
+// VerifySystemRoles confirms that the named system roles exist and are marked
+// as system roles in the database. The app code references roles by name (not
+// by ID), so missing or misconfigured roles would cause silent authorization
+// failures. This is called at startup after migrations are applied.
+func VerifySystemRoles(db *sql.DB, roleNames ...string) error {
+	if db == nil {
+		db = DB
+	}
+	if db == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+
+	for _, name := range roleNames {
+		var exists bool
+		var isSystem bool
+		err := db.QueryRow(
+			`SELECT EXISTS(SELECT 1 FROM roles WHERE name = $1),
+			 COALESCE((SELECT is_system_role FROM roles WHERE name = $1 LIMIT 1), false)`,
+			name,
+		).Scan(&exists, &isSystem)
+		if err != nil {
+			return fmt.Errorf("failed to verify role %q: %w", name, err)
+		}
+		if !exists {
+			return fmt.Errorf("system role %q is missing from the database (expected after migrations)", name)
+		}
+		if !isSystem {
+			return fmt.Errorf("system role %q exists but is not marked as a system role (is_system_role = false)", name)
+		}
+	}
+
+	return nil
+}

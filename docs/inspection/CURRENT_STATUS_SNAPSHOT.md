@@ -1,19 +1,17 @@
 # Current Status Snapshot
 
-Timestamp: 2026-04-11 UTC (M3 fourth slice — password reset delivery hardening)
+Timestamp: 2026-04-11 UTC (M3 fifth slice — settings permission seeding review)
 
 ## Summary
 
-This run continued the M3 (backend/API hardening) phase by hardening the password reset delivery flow. Added STARTTLS support to the email sending function (replacing plaintext `smtp.SendMail`), added SMTP connectivity check to the `/ready` endpoint, added unconditional FrontendBaseURL validation at startup, added session invalidation after password reset to terminate stolen sessions, added a dedicated strict rate limiter for the forgot-password endpoint (5 req/hour vs global 100 req/hour), and made the reset token expiry configurable via `PASSWORD_RESET_TOKEN_EXPIRY_MINS` environment variable. No Flutter changes were required since the password reset flow is backend-only.
+This run completed the M3 (backend/API hardening) phase's fifth and final slice — settings permission seeding review. The P1 risk ("settings permission seeding assumes fixed role IDs") was investigated and found to be largely mitigated by the existing architecture: all app code uses role *names* (not IDs) for authorization checks, and system roles are protected from modification by the `is_system_role` flag. A startup verification function `VerifySystemRoles()` was added to confirm critical system roles (Super Admin, Admin, Manager) exist and are properly marked after migrations. If migrations fail to create roles, the server now refuses to start with a clear error message. With 5 complete M3 slices, the backend hardening phase is now substantially complete.
 
 ## What changed this run
 
-- Added STARTTLS support to `SendEmail` in `internal/utils/email.go` (replaced plaintext `smtp.SendMail`)
-- Added `CheckSMTPConnectivity()` function and `smtp_ok` to the `/ready` endpoint
-- Added `ValidateFrontendBaseURL()` method to Config, called unconditionally at startup
-- Added session invalidation (`UPDATE device_sessions SET is_active = FALSE`) after password reset
-- Added `StrictEndpointLimiter` middleware for forgot-password (5 req/hour per IP+user)
-- Added `PASSWORD_RESET_TOKEN_EXPIRY_MINS` config (default 60, was hard-coded 1 hour)
+- Investigated the settings permission seeding architecture — confirmed all app code uses role *names* (not IDs) for authorization
+- Added `VerifySystemRoles()` in `internal/database/schema_validation.go` for startup verification of system roles
+- Added `VerifySystemRoles("Super Admin", "Admin", "Manager")` call in `cmd/server/main.go` after migrations
+- Confirmed system role protections in `role_service.go` (is_system_role prevents modification/deletion)
 - Re-ran the available Flutter, parity, and format checks after implementation and confirmed they all pass.
 
 ## Active milestone state
@@ -21,7 +19,7 @@ This run continued the M3 (backend/API hardening) phase by hardening the passwor
 - `M0 Repo bootstrap and continuity baseline`: completed
 - `M1 Responsive and document workflow baseline`: in progress (UI standardization wave substantially complete)
 - `M2 Shared UI/layout standardization`: in progress
-- `M3 Backend/API hardening`: in progress (4 slices complete — runtime schema tolerance removed, OpenAPI endpoint classification done, upload authorization hardened, password reset delivery hardened)
+- `M3 Backend/API hardening`: in progress (5 slices complete — runtime schema tolerance removed, OpenAPI endpoint classification done, upload authorization hardened, password reset delivery hardened, settings permission seeding reviewed and verified at startup)
 - `M6 QA/UAT and operational readiness`: blocked pending implementation and manual evidence
 
 ## Verification executed in this run
@@ -38,20 +36,14 @@ Unverified in this environment:
 
 - manual release-candidate UAT sign-off
 - missing `ebs_lite_win/Requirements.txt`
-- upload authorization — **resolved**; files now require JWT authentication and company-level ownership verification
-- password reset delivery — **hardened in this run**; STARTTLS added, SMTP health check in /ready, FrontendBaseURL validated, sessions invalidated on reset, strict rate limiting, configurable token expiry
-- settings permission seeding assumes fixed role IDs (P1)
+- upload authorization — **resolved**
+- password reset delivery — **hardened**
+- settings permission seeding — **reviewed and hardened** (app uses role names, not IDs; startup verification added)
 - dashboard routing still has a fallback `No route configured` branch for other unmapped labels (pre-existing)
 
 ## Subagent note
 
-Used in this run (mapped to `general-purpose` as fallback):
-- general-purpose (backend exploration): reviewed the complete password reset flow including token generation, email sending, FrontendBaseURL configuration, buildResetLink, ResetPassword flow, /ready endpoint, and identified all production-readiness gaps
-
-Not used because no Flutter or database changes were required and golang-pro was not runnable:
-- `golang-pro`
-- `sql-pro`
-- `flutter-expert`
+Not used in this run — the settings permission seeding review was a code investigation task. The grep search and manual review confirmed that the app code uses role names (not IDs) throughout, and the migration-seeded hardcoded role IDs are protected by the is_system_role flag. A startup verification function was added as additional safety.
 
 ## Verified current state
 
