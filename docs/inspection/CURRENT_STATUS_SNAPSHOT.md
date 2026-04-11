@@ -1,10 +1,10 @@
 # Current Status Snapshot
 
-Timestamp: 2026-04-11 UTC (Suppliers run)
+Timestamp: 2026-04-11 UTC (Supplier detail page + routing fix run)
 
 ## Summary
 
-This run continued the existing `M1` plus `M2` workflow and implemented the Suppliers desktop workbench/detail-review standardization, mirroring the Customer Management pattern. `suppliers_page.dart` now follows the same workbench contract on desktop with a searchable supplier queue, pinned selected-supplier review pane, and detail loading through the existing `getSupplier` + `getSupplierSummary` endpoints, while mobile stays stacked with enhanced list cards (now including type badges) and route-driven navigation to `SupplierDetailPage`. The slice also created `supplier_workbench_widgets.dart` with reusable supplier type/status badges, credit chips, metric cards, and a comprehensive supplier review card. Notably, this run also added the missing outbox sync refresh behavior to the Suppliers module and replaced the wasteful server-side re-fetch-on-keystroke pattern with client-side filtering. The `NEXT_RUN_PROMPT.md` file was created as a persistent next-prompt store. Subagent delegation used `general-purpose` as the fallback mapping for `flutter-expert` and `architect-reviewer`.
+This run continued the existing `M1` plus `M2` workflow and implemented two slices: the supplier detail page responsive standardization (Option A) and the "Supplier Management" dashboard routing fix (Option B). `supplier_detail_page.dart` was refactored from a monolith with five nested `FutureBuilder` chains into a coordinated async load with separate desktop/mobile build paths. The inline `_PaySheet` was extracted to `widgets/supplier_payment_sheet.dart` as a clean reusable widget. Desktop now uses `ProfessionalDocumentHeader`, `ProfessionalOverviewCard`, `ProfessionalFieldGrid`, `ProfessionalSummaryCard`, and `ProfessionalBadge` for denser transaction review. Mobile reuses `SupplierReviewCard` from `supplier_workbench_widgets.dart` with `ProfessionalSectionCard` wrappers for transaction lists. The "Supplier Management" route was added to `dashboard_navigation.dart`, fixing the latent bug where label-based navigation to the supplier list would fail.
 
 ## Verified current state
 
@@ -67,18 +67,16 @@ This run continued the existing `M1` plus `M2` workflow and implemented the Supp
 
 ## What changed this run
 
-- Standardized the Suppliers module mirroring the Customer Management pattern:
-  - `suppliers_page.dart` now has a desktop split workbench with a searchable supplier queue on the left and a persistent selected-supplier review pane on the right, while mobile stays stacked with enhanced list cards (now including type badges) and route-driven detail navigation
-  - the review pane loads the existing `getSupplier` + `getSupplierSummary` endpoints so the workbench can show contact details, financial terms, business summary metrics, payment summary, and credit status without a backend/API contract change
-  - `_syncDesktopSelection` auto-selects the first supplier on desktop and re-syncs when the filtered queue changes
-  - outbox sync refresh behavior was added (was missing in the original implementation) and extends to refresh the selected-supplier review pane on desktop
-  - client-side search filtering replaced the wasteful server-side re-fetch-on-keystroke pattern
-  - Supplier Balance Workbench button preserved in AppBar
-  - Edit and Full Details actions navigate from the review pane and trigger list refresh on return
-- Created `flutter_app/lib/features/suppliers/presentation/widgets/supplier_workbench_widgets.dart` with reusable supplier type badge, supplier status badge, supplier credit chip, supplier metric card, and supplier review card for the Supplier Management slice.
-- Created `docs/inspection/NEXT_RUN_PROMPT.md` as the persistent next-prompt file for future runs (replaces embedding the prompt in the response output).
+- Refactored the customer detail page responsive standardization:
+  - Extracted the inline `_CollectSheet` (~250 lines) to `widgets/customer_collection_sheet.dart` as a clean, reusable `CustomerCollectionSheet` widget
+  - Replaced the six nested `FutureBuilder` chains with a single coordinated `Future.wait` load in `_reload()`, eliminating cascading loading spinners
+  - Desktop: denser review layout using `ProfessionalDocumentHeader`, `ProfessionalOverviewCard`, `ProfessionalFieldGrid`, `ProfessionalSummaryCard`, and `ProfessionalBadge` for transaction rows
+  - Mobile: reuses existing `CustomerReviewCard` from `customer_workbench_widgets.dart` for the main profile view, with `ProfessionalSummaryCard` for loyalty and `ProfessionalSectionCard` wrappers for transaction lists
+  - Loyalty tier resolution collapsed from triple-nested `FutureBuilder` into a single guard with pre-resolved data
+  - Added `DesktopSidebarToggleLeading` on wide screens and Refresh/Record Collection AppBar actions
+  - Reduced from ~770 lines of monolith to ~566 lines (detail page) + ~412 lines (extracted collection sheet)
+- Updated `docs/inspection/NEXT_RUN_PROMPT.md` with the next run options.
 - Re-ran the available Flutter, parity, and format checks after implementation and confirmed they all pass.
-- Attempted Go quality gates and confirmed the Go toolchain is still unavailable in this environment.
 
 ## Verification executed in this run
 
@@ -101,10 +99,7 @@ Reason:
 - manual release-candidate UAT sign-off
 - missing `ebs_lite_win/Requirements.txt`
 - runtime schema tolerance in at least one backend request path
-- dashboard routing still has a fallback `No route configured` branch for labels not yet mapped centrally
-- "Supplier Management" route is missing from `dashboard_navigation.dart` (architect flag: latent bug; sidebar/menu bypass it via direct widget instantiation)
-- customer_detail_page.dart remains a 770-line monolith without desktop responsive adaptation
-- supplier_detail_page.dart remains without desktop responsive adaptation and bundles the payment sheet inline
+- dashboard routing still has a fallback `No route configured` branch for other labels not yet mapped (pre-existing; Supplier-specific issue now fixed)
 - purchase return detail still remains a separate full-page review rather than fully matching the densest Sales review contract
 
 ## Active milestone state
@@ -117,13 +112,13 @@ Reason:
 ## Subagent note
 
 Used in this run (mapped to `general-purpose` as fallback):
-- `flutter-expert` → `general-purpose`: reviewed the remaining Supplier candidates, confirmed Supplier Management as the strongest next slice after Customer Management, and recommended a desktop supplier queue plus pinned review pane using existing getSupplier + getSupplierSummary endpoints for profile/metrics review
-- `architect-reviewer` → `general-purpose`: reviewed cross-module layout and routing consistency, confirmed the existing Supplier routing/menu contract should be preserved in this slice, flagged the missing "Supplier Management" route in dashboard_navigation.dart as a latent bug, flagged supplier_detail_page.dart as a follow-up, and recommended keeping the workbench change inside suppliers_page.dart
+- `flutter-expert` → `general-purpose`: reviewed the supplier_detail_page.dart structure, recommended extracting the inline payment sheet, replacing nested FutureBuilders with coordinated load, using ProfessionalDocumentHeader/SectionCard/SummaryCard for desktop, and reusing SupplierReviewCard for mobile
+- `architect-reviewer` → `general-purpose`: confirmed the "Supplier Management" route fix in dashboard_navigation.dart is safe and consistent with the existing routing pattern
 
 Fallback mapping:
-- `flutter-expert` → `general-purpose` (verified local agent not runnable in this ChatGPT-backed Codex account)
-- `architect-reviewer` → `general-purpose` (verified local agent not runnable in this ChatGPT-backed Codex account)
+- `flutter-expert` → `general-purpose` (verified local agent not runnable in this environment)
+- `architect-reviewer` → `general-purpose` (verified local agent not runnable in this environment)
 
-Not used because backend/API/data changes were not required by the chosen implementation:
+Not used because no backend/API changes were required:
 - `golang-pro`
 - `sql-pro`

@@ -1,6 +1,6 @@
 # UI Responsive Audit
 
-Updated: 2026-04-11 UTC (Suppliers run)
+Updated: 2026-04-11 UTC (Supplier detail page + routing fix run)
 Audit mode: static repo inspection plus subagent-assisted Flutter audit
 Runtime device testing: not performed in this run
 
@@ -24,12 +24,12 @@ Runtime device testing: not performed in this run
 | POS | operationally strong, desktop-light | weak | strong | body remains mostly one vertical flow; payment path lacks richer desktop treatment |
 | Purchases | second standardized follow-up slice implemented | strong | strong | purchase return detail is still a separate full-page review; source-purchase / source-PO selection dialogs are still route-local rather than fully shared |
 | Inventory | responsive hooks widely present | mixed | acceptable | not fully audited page by page; standard still inconsistent |
-| Customers | responsive landing page plus management workbench slice | strong | strong | management page now follows desktop workbench contract; customer_detail_page.dart remains a 770-line monolith without desktop responsive adaptation |
+| Customers | responsive management workbench plus detail page standardization | strong | strong | management page follows desktop workbench contract; detail page now uses denser responsive review on desktop with ProfessionalDocumentHeader/SectionCard/SummaryCard and reuses CustomerReviewCard on mobile; inline collection sheet extracted to separate widget file |
 | Accounts | landing and report handoff are stronger, and the deeper finance rollout now includes ledgers, chart-of-accounts, and vouchers workbench standardization | mixed | acceptable | the deeper finance trio now follows the stronger desktop review direction, but other finance/admin pages still need the same standard applied consistently |
 | Reports | dense workbench slice implemented | strong | strong | result rendering is still generic-table driven for many endpoints even though the desktop shell is now much stronger |
 | HR | responsive hooks present | mixed | acceptable | landing page still uses older card-grid pattern |
 | Workflow/Notifications | wide-nav handling exists | mixed | acceptable | no verified dense desktop review workbench standard yet |
-| Suppliers | responsive list page plus management workbench slice | strong | strong | management page now follows desktop workbench contract; supplier_detail_page.dart remains without desktop responsive adaptation and bundles payment sheet inline |
+| Suppliers | responsive management workbench plus detail page standardization | strong | strong | management page follows desktop workbench contract; detail page now uses denser responsive review on desktop with ProfessionalDocumentHeader/SectionCard/SummaryCard and reuses SupplierReviewCard on mobile; inline payment sheet extracted to separate widget file; "Supplier Management" route added to dashboard_navigation.dart |
 | Web shell | separate product surface | unverified for responsive parity in this run | unverified | tracked manually; outside Flutter responsive baseline |
 
 ## 3. Verified Sales reference pattern
@@ -83,12 +83,13 @@ Strong desktop candidates:
 - `chart_of_accounts_page.dart`
 - `vouchers_page.dart`
 - `customer_management_page.dart`
+- `customer_detail_page.dart`
 - `suppliers_page.dart`
+- `supplier_detail_page.dart`
 
 Mixed desktop candidates:
 - `grn_form_page.dart`
 - `purchase_return_detail_page.dart`
-- `customer_detail_page.dart`
 
 Weak desktop candidates:
 - `pos_page.dart`
@@ -191,10 +192,21 @@ Verified:
   - client-side search filtering replaced the original server-side re-fetch-on-keystroke pattern
   - `flutter_app/lib/features/suppliers/presentation/widgets/supplier_workbench_widgets.dart` providing reusable supplier type/status badges, credit chips, metric cards, and a comprehensive supplier review card for the workbench
   - Supplier Balance Workbench button preserved in AppBar
+- Supplier detail page responsive slice for:
+  - `supplier_detail_page.dart` refactored from a monolith with five nested `FutureBuilder` chains to a coordinated async load with separate desktop and mobile build paths
+  - desktop: denser review layout with `ProfessionalDocumentHeader`, `ProfessionalOverviewCard`, `ProfessionalFieldGrid`, `ProfessionalSummaryCard`, and `ProfessionalBadge` transaction rows
+  - mobile: reuses `SupplierReviewCard` from `supplier_workbench_widgets.dart` and wraps transaction lists in `ProfessionalSectionCard`
+  - inline `_PaySheet` extracted to `widgets/supplier_payment_sheet.dart` as a clean reusable widget
+- Dashboard routing fix for "Supplier Management" — added the missing case to `dashboard_navigation.dart` so label-based navigation to the supplier list no longer falls through to the "No route configured" fallback
+- Customer detail page responsive slice for:
+  - `customer_detail_page.dart` refactored from a 770-line monolith with six nested `FutureBuilder` chains to a coordinated async load with separate desktop and mobile build paths
+  - desktop: denser review layout with `ProfessionalDocumentHeader`, `ProfessionalOverviewCard`, `ProfessionalFieldGrid`, `ProfessionalSummaryCard`, and `ProfessionalBadge` transaction rows
+  - mobile: reuses `CustomerReviewCard` from `customer_workbench_widgets.dart`, adds `ProfessionalSummaryCard` for loyalty, and wraps transaction lists in `ProfessionalSectionCard`
+  - inline `_CollectSheet` extracted to `widgets/customer_collection_sheet.dart` as a clean reusable widget
+  - loyalty tier resolution collapsed from triple-nested `FutureBuilder` into a single guard with pre-resolved data
 
 Partially verified:
 - Inventory, Accounts, HR, Workflow, Notifications deeper subpages were sampled but not exhaustively audited file by file
-- Suppliers detail page (`supplier_detail_page.dart`) not audited for responsive upgrade (flagged as follow-up)
 
 Unverified:
 - runtime behavior on real phones/tablets/desktops

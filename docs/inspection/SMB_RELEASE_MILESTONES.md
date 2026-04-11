@@ -1,6 +1,6 @@
 # SMB Release Milestones
 
-Updated: 2026-04-11 UTC (Suppliers run)
+Updated: 2026-04-11 UTC (Supplier detail page + routing fix run)
 Status model: `completed`, `in_progress`, `pending`, `blocked`
 
 ## Milestone table
@@ -82,6 +82,18 @@ Current evidence:
   - `flutter_app/lib/features/suppliers/presentation/widgets/supplier_workbench_widgets.dart` now provides reusable supplier type/status badges, credit chips, metric cards, and a comprehensive supplier review card
   - outbox sync refresh was added (was missing in original); client-side filtering replaced server-side re-fetch-on-keystroke
   - Supplier Balance Workbench button preserved in AppBar
+- Customer detail page responsive slice is now implemented:
+  - `customer_detail_page.dart` refactored from a 770-line monolith with six nested `FutureBuilder` chains to a coordinated async load with separate desktop and mobile build paths
+  - desktop: denser review layout with `ProfessionalDocumentHeader`, `ProfessionalOverviewCard`, `ProfessionalFieldGrid`, `ProfessionalSummaryCard`, and `ProfessionalBadge` transaction rows
+  - mobile: reuses `CustomerReviewCard` from `customer_workbench_widgets.dart`, adds `ProfessionalSummaryCard` for loyalty, and wraps transaction lists in `ProfessionalSectionCard`
+  - inline `_CollectSheet` extracted to `widgets/customer_collection_sheet.dart` as a clean reusable widget
+- Supplier detail page responsive slice is now implemented:
+  - `supplier_detail_page.dart` refactored from a monolith with five nested `FutureBuilder` chains to a coordinated async load with separate desktop and mobile build paths
+  - desktop: denser review layout with `ProfessionalDocumentHeader`, `ProfessionalOverviewCard`, `ProfessionalFieldGrid`, `ProfessionalSummaryCard`, and `ProfessionalBadge` transaction rows
+  - mobile: reuses `SupplierReviewCard` from `supplier_workbench_widgets.dart` and wraps transaction lists in `ProfessionalSectionCard`
+  - inline `_PaySheet` extracted to `widgets/supplier_payment_sheet.dart` as a clean reusable widget
+- Dashboard routing fix for "Supplier Management" is now implemented:
+  - added the missing case to `dashboard_navigation.dart` so label-based navigation to the supplier list no longer falls through to the "No route configured" fallback
 - several back-office modules still remain mixed or mobile-first
 
 Exit criteria:
@@ -114,8 +126,10 @@ Current evidence:
 - `flutter_app/lib/features/reports/presentation/report_navigation.dart` now centralizes report-category destination construction across Reports, Accounts, and dashboard routing
 - `flutter_app/lib/shared/widgets/workbench_pane.dart` now exists as a generic shared workbench shell and is first used by the Accounts ledger slice
 - `flutter_app/lib/features/accounts/presentation/widgets/accounts_workbench_widgets.dart` now also carries shared account title/status and voucher title/type/line helpers reused by the Chart of Accounts and Vouchers workbenches
-- `flutter_app/lib/features/customers/presentation/widgets/customer_workbench_widgets.dart` now provides shared customer type/status badges, credit chips, metric cards, and a comprehensive customer review card reused by the Customer Management workbench
-- `flutter_app/lib/features/suppliers/presentation/widgets/supplier_workbench_widgets.dart` now provides shared supplier type/status badges, credit chips, metric cards, and a comprehensive supplier review card reused by the Supplier Management workbench
+- `flutter_app/lib/features/customers/presentation/widgets/customer_workbench_widgets.dart` now provides shared customer type/status badges, credit chips, metric cards, and a comprehensive customer review card reused by the Customer Management workbench and CustomerDetailPage mobile body
+- `flutter_app/lib/features/customers/presentation/widgets/customer_collection_sheet.dart` now exists as a clean extracted collection sheet widget replacing the inline `_CollectSheet` in the detail page
+- `flutter_app/lib/features/suppliers/presentation/widgets/supplier_workbench_widgets.dart` now provides shared supplier type/status badges, credit chips, metric cards, and a comprehensive supplier review card reused by the Supplier Management workbench and SupplierDetailPage mobile body
+- `flutter_app/lib/features/suppliers/presentation/widgets/supplier_payment_sheet.dart` now exists as a clean extracted payment sheet widget replacing the inline `_PaySheet` in the detail page
 
 Exit criteria:
 - shared document components are reused across multiple modules
