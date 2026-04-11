@@ -1,6 +1,6 @@
 # Next Run Prompt
 
-Updated: 2026-04-11 UTC (post-M3-fifth-slice — settings permission seeding hardened)
+Updated: 2026-04-11 UTC (post-M4-first-slice — N+1 hotspots fixed)
 
 ## Instructions
 
@@ -17,36 +17,39 @@ Continue the existing EBS Lite milestone workflow. Do not restart discovery.
 - M0 is complete.
 - M1 is in progress (UI standardization wave substantially complete).
 - M2 is in progress (shared widget family comprehensive across modules).
-- M3 is in progress — 5 slices complete (substantially complete):
-  - Runtime schema tolerance removed from service code (3 probes eliminated)
-  - OpenAPI endpoint classification done (35 endpoints classified, 7 annotated with x-status)
-  - Upload authorization hardened (files now require JWT auth + company ownership verification)
-  - Password reset delivery hardened (STARTTLS, SMTP health check, FrontendBaseURL validation, session invalidation, strict rate limiting, configurable token expiry)
-  - Settings permission seeding reviewed and hardened (app uses role names, startup verification added)
+- M3 is substantially complete (5 slices covering all P0/P1 backend risks).
+- M4 is in progress — first slice complete:
+  - N+1 hotspots fixed in collection service (`GetCollections`, `GetOutstanding`)
+- Remaining M4 targets:
+  - outbox claim/idempotency guarantees (currently application-level only)
+  - migration hygiene review (base migration contains duplicate DDL blocks)
+  - dashboard `No route configured` fallback — add missing routes
 - Remaining P0:
   - missing `ebs_lite_win/Requirements.txt`
   - manual release-candidate UAT sign-off
 
 ### Objective (pick the strongest slice):
 
-Option A: Transition to M4 — DB/performance/release safety hardening
-- Focus on N+1 hotspots identified in the release blockers doc
-  - `GET /collections` performs N+1 invoice loading
-  - stock adjustment and several dashboard paths remain query-heavy
-  - purchase creation and receipt flows still perform per-line lookups inside transactions
-- Address outbox claim/idempotency guarantees (currently application-level only)
-- Review migration hygiene (base migration contains duplicate DDL blocks)
+Option A: Outbox claim/idempotency review (M4)
+- Review the current outbox implementation in `flutter_app/lib/core/outbox/`
+- Verify that idempotency keys are properly used end-to-end
+- Identify any claim races where the same operation could be replayed
+- Add DB-level uniqueness constraints if missing
 
-Option B: Address remaining P1 risks before M4 transition
-- Review dashboard `No route configured` fallback branch — add missing routes
-- Address `ebs_lite_win/Requirements.txt` — restore or document as missing
+Option B: Dashboard route gap fix (M1/M4)
+- Add missing routes to `dashboard_navigation.dart` to eliminate the `No route configured` fallback
+- This is a quick fix that improves the user experience
 
-Pick Option A (M4 transition) as the recommended path. The M3 backend hardening wave is now substantially complete with 5 slices covering all P0/P1 backend risks. The N+1 hotspots and outbox idempotency gaps are the highest-impact remaining technical risks.
+Option C: Migration hygiene review (M4)
+- Review the base migration for duplicate DDL blocks
+- Clean up redundant schema statements
+
+Pick Option A (outbox idempotency) as the recommended path. The offline-first claims are a core differentiator for EBS Lite vs browser-first competitors, and ensuring they are robust is the highest-impact remaining M4 target.
 
 ### Subagent requirements:
 - Use golang-pro (or general-purpose fallback) for backend code review
-- Use sql-pro (or general-purpose fallback) if query optimization is needed
-- Use flutter-expert only if frontend changes are required
+- Use flutter-expert (or general-purpose fallback) for Flutter outbox review
+- Use sql-pro (or general-purpose fallback) if DB constraint changes are needed
 
 ### Verification:
 - `flutter analyze`

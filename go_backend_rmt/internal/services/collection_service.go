@@ -19,7 +19,8 @@ func NewCollectionService() *CollectionService {
 	return &CollectionService{db: database.GetDB()}
 }
 
-// GetCollections retrieves collection records for a company with optional filters
+// GetCollections retrieves collection records for a company with optional filters.
+// Uses a single batch query for collection_invoices to avoid N+1.
 func (s *CollectionService) GetCollections(companyID int, filters map[string]string) ([]models.Collection, error) {
 	query := `
                 SELECT c.collection_id, c.collection_number, c.customer_id, c.location_id, c.amount,
@@ -58,6 +59,9 @@ func (s *CollectionService) GetCollections(companyID int, filters map[string]str
 	defer rows.Close()
 
 	var collections []models.Collection
+	collectionIDs := make([]int, 0)
+	idxByCollectionID := make(map[int]int)
+
 	for rows.Next() {
 		var col models.Collection
 		if err := rows.Scan(
@@ -67,20 +71,43 @@ func (s *CollectionService) GetCollections(companyID int, filters map[string]str
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan collection: %w", err)
 		}
-		invRows, err := s.db.Query(`SELECT ci.sale_id, s.sale_number, ci.amount
-                        FROM collection_invoices ci
-                        JOIN sales s ON ci.sale_id = s.sale_id
-                        WHERE ci.collection_id = $1`, col.CollectionID)
+		idxByCollectionID[col.CollectionID] = len(collections)
+		collectionIDs = append(collectionIDs, col.CollectionID)
+		collections = append(collections, col)
+	}
+
+	// Batch-load all collection_invoices in a single query (avoids N+1)
+	if len(collectionIDs) > 0 {
+		// Build the IN clause with placeholders
+		placeholders := make([]string, len(collectionIDs))
+		inArgs := make([]interface{}, len(collectionIDs))
+		for i, id := range collectionIDs {
+			placeholders[i] = fmt.Sprintf("$%d", i+1)
+			inArgs[i] = id
+		}
+
+		invQuery := fmt.Sprintf(
+			`SELECT ci.collection_id, ci.sale_id, s.sale_number, ci.amount
+			 FROM collection_invoices ci
+			 JOIN sales s ON ci.sale_id = s.sale_id
+			 WHERE ci.collection_id IN (%s)
+			 ORDER BY ci.collection_id, ci.sale_id`,
+			strings.Join(placeholders, ","),
+		)
+
+		invRows, err := s.db.Query(invQuery, inArgs...)
 		if err == nil {
 			for invRows.Next() {
+				var colID int
 				var inv models.CollectionInvoice
-				if err := invRows.Scan(&inv.SaleID, &inv.SaleNumber, &inv.Amount); err == nil {
-					col.Invoices = append(col.Invoices, inv)
+				if err := invRows.Scan(&colID, &inv.SaleID, &inv.SaleNumber, &inv.Amount); err == nil {
+					if idx, ok := idxByCollectionID[colID]; ok {
+						collections[idx].Invoices = append(collections[idx].Invoices, inv)
+					}
 				}
 			}
 			invRows.Close()
 		}
-		collections = append(collections, col)
 	}
 
 	return collections, nil
@@ -455,7 +482,8 @@ func (s *CollectionService) GetCollectionByID(collectionID, companyID int) (*mod
 	return &col, nil
 }
 
-// GetOutstanding returns customers with outstanding balances
+// GetOutstanding returns customers with outstanding balances.
+// Uses a single batch query for outstanding invoices per customer (avoids N+1).
 func (s *CollectionService) GetOutstanding(companyID int) ([]models.Customer, error) {
 	query := `
                SELECT c.customer_id, c.name,
@@ -474,27 +502,49 @@ func (s *CollectionService) GetOutstanding(companyID int) ([]models.Customer, er
 	defer rows.Close()
 
 	var customers []models.Customer
+	customerIDs := make([]int, 0)
+	idxByCustomerID := make(map[int]int)
+
 	for rows.Next() {
 		var cust models.Customer
 		if err := rows.Scan(&cust.CustomerID, &cust.Name, &cust.CreditBalance); err != nil {
 			return nil, fmt.Errorf("failed to scan customer: %w", err)
 		}
+		idxByCustomerID[cust.CustomerID] = len(customers)
+		customerIDs = append(customerIDs, cust.CustomerID)
+		customers = append(customers, cust)
+	}
 
-		invRows, err := s.db.Query(`
-                       SELECT sale_id, sale_number, (total_amount - paid_amount) AS amount_due
-                       FROM sales
-                       WHERE customer_id = $1 AND is_deleted = FALSE AND (total_amount - paid_amount) > 0`, cust.CustomerID)
+	// Batch-load all outstanding invoices in a single query (avoids N+1)
+	if len(customerIDs) > 0 {
+		placeholders := make([]string, len(customerIDs))
+		inArgs := make([]interface{}, len(customerIDs))
+		for i, id := range customerIDs {
+			placeholders[i] = fmt.Sprintf("$%d", i+1)
+			inArgs[i] = id
+		}
+
+		invQuery := fmt.Sprintf(
+			`SELECT customer_id, sale_id, sale_number, (total_amount - paid_amount) AS amount_due
+			 FROM sales
+			 WHERE customer_id IN (%s) AND is_deleted = FALSE AND (total_amount - paid_amount) > 0
+			 ORDER BY customer_id, sale_date ASC`,
+			strings.Join(placeholders, ","),
+		)
+
+		invRows, err := s.db.Query(invQuery, inArgs...)
 		if err == nil {
 			for invRows.Next() {
+				var custID int
 				var ref models.CustomerInvoiceReference
-				if err := invRows.Scan(&ref.SaleID, &ref.SaleNumber, &ref.AmountDue); err == nil {
-					cust.Invoices = append(cust.Invoices, ref)
+				if err := invRows.Scan(&custID, &ref.SaleID, &ref.SaleNumber, &ref.AmountDue); err == nil {
+					if idx, ok := idxByCustomerID[custID]; ok {
+						customers[idx].Invoices = append(customers[idx].Invoices, ref)
+					}
 				}
 			}
 			invRows.Close()
 		}
-
-		customers = append(customers, cust)
 	}
 
 	return customers, nil

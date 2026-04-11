@@ -1,6 +1,6 @@
 # SMB Release Milestones
 
-Updated: 2026-04-11 UTC (M3 fifth slice — settings permission seeding review)
+Updated: 2026-04-11 UTC (M4 first slice — N+1 hotspot fixes)
 Status model: `completed`, `in_progress`, `pending`, `blocked`
 
 ## Milestone table
@@ -11,7 +11,7 @@ Status model: `completed`, `in_progress`, `pending`, `blocked`
 | M1 | Responsive and document workflow baseline | in_progress | M0 | verified module audit exists, Sales reference pattern is documented, rollout priority for non-standard modules is agreed |
 | M2 | Shared UI/layout standardization | in_progress | M1 | shared desktop/mobile document shell exists and is applied to priority modules beyond Sales |
 | M3 | Backend/API hardening | in_progress | M0 | runtime schema tolerance removed from service code, OpenAPI endpoint classification started, auth/settings posture reviewed |
-| M4 | DB, performance, and release safety hardening | pending | M3 | top N+1 hotspots, outbox claim races, and DB idempotency gaps have verified mitigation plans or fixes |
+| M4 | DB, performance, and release safety hardening | in_progress | M3 | top N+1 hotspots have batch-loading fixes; outbox claim races and DB idempotency gaps remain for verified mitigation plans or fixes |
 | M5 | Validation, permissions, and security posture | pending | M3 | production config gates, uploads, password reset delivery, and permission-sensitive paths are verified and documented |
 | M6 | QA/UAT and operational readiness | blocked | M1, M3, M4, M5 | blocker UAT scenarios are executed, evidence is attached, release ops docs match reality |
 | M7 | Deployment and final release gate | blocked | M6 | packaged environment verification is complete and a current go/no-go decision is evidence-backed |
