@@ -1,17 +1,19 @@
 # Current Status Snapshot
 
-Timestamp: 2026-04-11 UTC (M3 third slice — upload authorization hardening)
+Timestamp: 2026-04-11 UTC (M3 fourth slice — password reset delivery hardening)
 
 ## Summary
 
-This run continued the M3 (backend/API hardening) phase by hardening upload authorization. The unauthenticated `router.Static("/uploads", cfg.UploadPath)` was replaced with a protected `GET /api/v1/uploads/:subdir/:filename` endpoint behind `RequireAuth()` middleware. A new `UploadHandler` verifies JWT authentication, restricts access to known subdirectories (`invoices`, `returns`, `logos`), prevents path traversal, and verifies file ownership against the requesting user's company_id before serving. On the Flutter side, a new `AuthImage` widget loads images through the authenticated Dio client instead of `NetworkImage`, and the company logo display was updated to use it. This closes the P1 risk that uploaded business files were served based on path secrecy alone.
+This run continued the M3 (backend/API hardening) phase by hardening the password reset delivery flow. Added STARTTLS support to the email sending function (replacing plaintext `smtp.SendMail`), added SMTP connectivity check to the `/ready` endpoint, added unconditional FrontendBaseURL validation at startup, added session invalidation after password reset to terminate stolen sessions, added a dedicated strict rate limiter for the forgot-password endpoint (5 req/hour vs global 100 req/hour), and made the reset token expiry configurable via `PASSWORD_RESET_TOKEN_EXPIRY_MINS` environment variable. No Flutter changes were required since the password reset flow is backend-only.
 
 ## What changed this run
 
-- Replaced unauthenticated `router.Static("/uploads", ...)` with protected `GET /api/v1/uploads/:subdir/:filename` behind `RequireAuth()`
-- Created `internal/handlers/upload_handler.go` with `UploadHandler.ServeFile()` for authenticated, company-scoped file serving
-- Created `lib/core/auth_image.dart` with `AuthImage` widget for authenticated image loading in Flutter
-- Updated `company_logo.dart` and `company_settings_page.dart` to use `AuthImage` instead of `NetworkImage`
+- Added STARTTLS support to `SendEmail` in `internal/utils/email.go` (replaced plaintext `smtp.SendMail`)
+- Added `CheckSMTPConnectivity()` function and `smtp_ok` to the `/ready` endpoint
+- Added `ValidateFrontendBaseURL()` method to Config, called unconditionally at startup
+- Added session invalidation (`UPDATE device_sessions SET is_active = FALSE`) after password reset
+- Added `StrictEndpointLimiter` middleware for forgot-password (5 req/hour per IP+user)
+- Added `PASSWORD_RESET_TOKEN_EXPIRY_MINS` config (default 60, was hard-coded 1 hour)
 - Re-ran the available Flutter, parity, and format checks after implementation and confirmed they all pass.
 
 ## Active milestone state
@@ -19,7 +21,7 @@ This run continued the M3 (backend/API hardening) phase by hardening upload auth
 - `M0 Repo bootstrap and continuity baseline`: completed
 - `M1 Responsive and document workflow baseline`: in progress (UI standardization wave substantially complete)
 - `M2 Shared UI/layout standardization`: in progress
-- `M3 Backend/API hardening`: in progress (3 slices complete — runtime schema tolerance removed, OpenAPI endpoint classification done, upload authorization hardened)
+- `M3 Backend/API hardening`: in progress (4 slices complete — runtime schema tolerance removed, OpenAPI endpoint classification done, upload authorization hardened, password reset delivery hardened)
 - `M6 QA/UAT and operational readiness`: blocked pending implementation and manual evidence
 
 ## Verification executed in this run
@@ -36,19 +38,20 @@ Unverified in this environment:
 
 - manual release-candidate UAT sign-off
 - missing `ebs_lite_win/Requirements.txt`
-- upload authorization — **resolved in this run**; files now require JWT authentication and company-level ownership verification
-- password reset delivery (P1: production-readiness checks do not verify SMTP posture)
+- upload authorization — **resolved**; files now require JWT authentication and company-level ownership verification
+- password reset delivery — **hardened in this run**; STARTTLS added, SMTP health check in /ready, FrontendBaseURL validated, sessions invalidated on reset, strict rate limiting, configurable token expiry
 - settings permission seeding assumes fixed role IDs (P1)
 - dashboard routing still has a fallback `No route configured` branch for other unmapped labels (pre-existing)
 
 ## Subagent note
 
 Used in this run (mapped to `general-purpose` as fallback):
-- general-purpose (backend exploration): explored upload architecture — identified 3 upload endpoints, file storage structure, company linkage, and the security gap in `router.Static("/uploads", ...)`
+- general-purpose (backend exploration): reviewed the complete password reset flow including token generation, email sending, FrontendBaseURL configuration, buildResetLink, ResetPassword flow, /ready endpoint, and identified all production-readiness gaps
 
-Not used because no database changes were required and golang-pro was not runnable:
+Not used because no Flutter or database changes were required and golang-pro was not runnable:
 - `golang-pro`
 - `sql-pro`
+- `flutter-expert`
 
 ## Verified current state
 

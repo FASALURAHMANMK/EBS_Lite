@@ -2,6 +2,7 @@ package routes
 
 import (
 	"net/http"
+	"time"
 
 	"erp-backend/internal/config"
 	"erp-backend/internal/database"
@@ -80,18 +81,20 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 		})
 	})
 
-	// Readiness endpoint (checks DB + Redis connectivity)
+	// Readiness endpoint (checks DB + Redis + SMTP connectivity)
 	router.GET("/ready", func(c *gin.Context) {
 		dbErr := database.HealthCheck()
 		redisErr := error(nil)
 		if cfg.ReadyCheckRedis {
 			redisErr = database.RedisHealthCheck(cfg.RedisURL, cfg.ReadyCheckTimeout)
 		}
+		smtpErr := utils.CheckSMTPConnectivity()
 
-		if dbErr != nil || redisErr != nil {
+		if dbErr != nil || redisErr != nil || smtpErr != nil {
 			data := gin.H{
 				"db_ok":    dbErr == nil,
 				"redis_ok": redisErr == nil,
+				"smtp_ok":  smtpErr == nil,
 			}
 			if dbErr != nil {
 				data["db_error"] = dbErr.Error()
@@ -99,11 +102,14 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			if redisErr != nil {
 				data["redis_error"] = redisErr.Error()
 			}
+			if smtpErr != nil {
+				data["smtp_error"] = smtpErr.Error()
+			}
 			utils.JSONResponse(c, http.StatusServiceUnavailable, false, "Not ready", data, nil)
 			return
 		}
 
-		utils.SuccessResponse(c, "Ready", gin.H{"db_ok": true, "redis_ok": true})
+		utils.SuccessResponse(c, "Ready", gin.H{"db_ok": true, "redis_ok": true, "smtp_ok": true})
 	})
 
 	// API version 1 routes
@@ -114,7 +120,10 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 		{
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/register", authHandler.Register)
-			auth.POST("/forgot-password", authHandler.ForgotPassword)
+			// Forgot-password gets a dedicated strict rate limiter (5 req/hour per IP+user)
+			forgotPw := auth.Group("/forgot-password")
+			forgotPw.Use(middleware.StrictEndpointLimiter(cfg, "forgot_password", 5, time.Hour))
+			forgotPw.POST("", authHandler.ForgotPassword)
 			auth.POST("/reset-password", authHandler.ResetPassword)
 			auth.POST("/refresh-token", authHandler.RefreshToken)
 		}

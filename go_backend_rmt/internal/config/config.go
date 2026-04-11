@@ -70,6 +70,9 @@ type Config struct {
 	FromEmail       string
 	FrontendBaseURL string
 
+	// Password reset
+	PasswordResetTokenExpiryMins int // default 60
+
 	// Printing
 	DefaultPrinter string
 	TemplatePath   string
@@ -136,6 +139,9 @@ func Load() *Config {
 		SMTPPassword:    getEnv("SMTP_PASSWORD", ""),
 		FromEmail:       getEnv("FROM_EMAIL", "noreply@company.com"),
 		FrontendBaseURL: getEnv("FRONTEND_BASE_URL", "http://localhost:3000"),
+
+		// Password reset
+		PasswordResetTokenExpiryMins: parseInt("PASSWORD_RESET_TOKEN_EXPIRY_MINS", 60),
 
 		// Printing
 		DefaultPrinter: getEnv("DEFAULT_PRINTER", "default"),
@@ -273,6 +279,19 @@ func validateFrontendBaseURL(raw string) error {
 	}
 	if isLocalHostString(strings.ToLower(parsed.Hostname())) {
 		return fmt.Errorf("FRONTEND_BASE_URL must not point to localhost in production")
+	}
+	return nil
+}
+
+// ValidateFrontendBaseURL checks the configured frontend base URL for correctness.
+// In production this is an error; in other environments it logs a warning.
+func (c *Config) ValidateFrontendBaseURL() error {
+	if err := validateFrontendBaseURL(c.FrontendBaseURL); err != nil {
+		if strings.TrimSpace(c.Environment) == "production" {
+			return err
+		}
+		// Non-production: warn but do not block startup.
+		fmt.Printf("[WARN] %v (environment=%s, ignoring)\n", err, c.Environment)
 	}
 	return nil
 }

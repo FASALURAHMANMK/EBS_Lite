@@ -14,6 +14,7 @@ import (
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
 	"erp-backend/internal/utils"
+
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 )
@@ -245,7 +246,11 @@ func (s *AuthService) ForgotPassword(req *models.ForgotPasswordRequest) error {
 
 	// Generate token
 	token := uuid.NewString()
-	expiresAt := time.Now().Add(1 * time.Hour)
+	expiryMins := s.cfg.PasswordResetTokenExpiryMins
+	if expiryMins <= 0 {
+		expiryMins = 60 // fallback default
+	}
+	expiresAt := time.Now().Add(time.Duration(expiryMins) * time.Minute)
 
 	// Remove existing tokens for this user
 	_, _ = s.db.Exec("DELETE FROM password_reset_tokens WHERE user_id = $1", user.UserID)
@@ -335,6 +340,10 @@ func (s *AuthService) ResetPassword(req *models.ResetPasswordRequest) error {
 
 	// Delete token after successful reset
 	_, _ = s.db.Exec(`DELETE FROM password_reset_tokens WHERE token = $1`, req.Token)
+
+	// Invalidate all active device sessions for this user after password reset.
+	// This ensures that any stolen or lingering sessions are terminated.
+	_, _ = s.db.Exec(`UPDATE device_sessions SET is_active = FALSE WHERE user_id = $1`, userID)
 
 	return nil
 }

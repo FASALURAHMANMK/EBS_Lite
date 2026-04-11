@@ -187,3 +187,73 @@ func newRedisClient(redisURL string) (*redis.Client, error) {
 	}
 	return redis.NewClient(opts), nil
 }
+
+// StrictEndpointLimiter creates a targeted rate limiter for sensitive endpoints
+// like forgot-password. It uses a separate key namespace and a much lower limit
+// (default 5 requests per hour per IP + email).
+func StrictEndpointLimiter(cfg *config.Config, endpointName string, limit int, window time.Duration) gin.HandlerFunc {
+	if cfg == nil || !cfg.RateLimitEnabled || limit <= 0 || window <= 0 {
+		return func(c *gin.Context) {
+			c.Next()
+		}
+	}
+
+	client, err := newRedisClient(cfg.RedisURL)
+	if err != nil {
+		log.Printf("strict_endpoint_limiter[%s]: disabled (redis init failed): %v", endpointName, err)
+		return func(c *gin.Context) {
+			c.Next()
+		}
+	}
+
+	if err := client.Ping(context.Background()).Err(); err != nil {
+		log.Printf("strict_endpoint_limiter[%s]: disabled (redis ping failed): %v", endpointName, err)
+		return func(c *gin.Context) {
+			c.Next()
+		}
+	}
+
+	limiter := &redisRateLimiter{
+		client:    client,
+		limit:     limit,
+		window:    window,
+		keyPrefix: "strict_limit:" + endpointName,
+		keyBy:     rateLimitKeyByIPUser,
+		failOpen:  cfg.RateLimitFailOpen,
+	}
+
+	return func(c *gin.Context) {
+		if c.Request.Method == http.MethodOptions {
+			c.Next()
+			return
+		}
+
+		allowed, remaining, resetAt, err := limiter.Allow(c)
+		if err != nil {
+			if limiter.failOpen {
+				log.Printf("strict_endpoint_limiter[%s]: allow on error: %v", endpointName, err)
+				c.Next()
+				return
+			}
+			utils.ErrorResponse(c, http.StatusTooManyRequests, "Too many requests, please try again later", nil)
+			c.Abort()
+			return
+		}
+
+		if remaining >= 0 {
+			c.Header("X-RateLimit-Limit", strconv.Itoa(limit))
+			c.Header("X-RateLimit-Remaining", strconv.Itoa(remaining))
+		}
+		if !resetAt.IsZero() {
+			c.Header("X-RateLimit-Reset", strconv.FormatInt(resetAt.Unix(), 10))
+		}
+
+		if !allowed {
+			utils.ErrorResponse(c, http.StatusTooManyRequests, "Too many requests, please try again later", nil)
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}

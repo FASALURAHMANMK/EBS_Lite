@@ -64,6 +64,12 @@ func main() {
 		}
 	}
 
+	// Validate FrontendBaseURL unconditionally (blocks startup only on production errors;
+	// non-production environments get a warning and continue).
+	if err := cfg.ValidateFrontendBaseURL(); err != nil {
+		log.Fatalf("Refusing to start: %v", err)
+	}
+
 	// Initialize Gin router
 	router := gin.New()
 
