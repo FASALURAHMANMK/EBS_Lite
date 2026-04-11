@@ -2041,11 +2041,11 @@ ON CONFLICT (role_id, permission_id) DO NOTHING;
 CREATE INDEX IF NOT EXISTS idx_customers_company_active ON customers(company_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_sales_location_date ON sales(location_id, sale_date);
 CREATE INDEX IF NOT EXISTS idx_sales_customer_date ON sales(customer_id, sale_date);
-CREATE INDEX IF NOT EXISTS idx_sales_status ON sales(status);
+-- idx_sales_status already defined in the main schema section
 CREATE INDEX IF NOT EXISTS idx_sales_pos_status ON sales(pos_status);
 CREATE INDEX IF NOT EXISTS idx_quotes_customer_date ON quotes(customer_id, quote_date);
-CREATE INDEX IF NOT EXISTS idx_quotes_status ON quotes(status);
-CREATE INDEX IF NOT EXISTS idx_sale_details_product ON sale_details(product_id);
+-- idx_quotes_status already defined in the main schema section
+-- idx_sale_details_product already defined in the main schema section
 CREATE INDEX IF NOT EXISTS idx_payment_methods_company ON payment_methods(company_id);
 
 -- Add any missing stock adjustment table (if not exists)
@@ -2135,7 +2135,7 @@ CREATE INDEX IF NOT EXISTS idx_loyalty_redemptions_date ON loyalty_redemptions(r
 CREATE INDEX IF NOT EXISTS idx_promotions_company_active ON promotions(company_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_promotions_dates ON promotions(start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_sale_returns_location_date ON sale_returns(location_id, return_date);
-CREATE INDEX IF NOT EXISTS idx_sale_returns_sale ON sale_returns(sale_id);
+-- idx_sale_returns_sale already defined in the main schema section
 CREATE INDEX IF NOT EXISTS idx_sale_returns_customer ON sale_returns(customer_id);
 CREATE INDEX IF NOT EXISTS idx_sale_return_details_return ON sale_return_details(return_id);
 CREATE INDEX IF NOT EXISTS idx_sale_return_details_product ON sale_return_details(product_id);
@@ -2809,32 +2809,6 @@ BEGIN
 END;
 $$;
 -- +goose StatementEnd
--- payment
-CREATE TABLE IF NOT EXISTS payment_method_currencies (
-    id SERIAL PRIMARY KEY,
-    method_id INTEGER NOT NULL REFERENCES payment_methods(method_id) ON DELETE CASCADE,
-    currency_id INTEGER NOT NULL REFERENCES currencies(currency_id),
-    exchange_rate NUMERIC(18,6) NOT NULL DEFAULT 1.0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(method_id, currency_id)
-);
-CREATE INDEX IF NOT EXISTS idx_pmc_method ON payment_method_currencies(method_id);
-CREATE INDEX IF NOT EXISTS idx_pmc_currency ON payment_method_currencies(currency_id);
--- sale payments
-CREATE TABLE IF NOT EXISTS sale_payments (
-    sale_payment_id SERIAL PRIMARY KEY,
-    sale_id INTEGER NOT NULL REFERENCES sales(sale_id) ON DELETE CASCADE,
-    method_id INTEGER NOT NULL REFERENCES payment_methods(method_id),
-    currency_id INTEGER REFERENCES currencies(currency_id),
-    amount NUMERIC(12,2) NOT NULL, -- amount in given currency (or base if NULL currency)
-    base_amount NUMERIC(12,2) NOT NULL, -- converted amount in base currency
-    exchange_rate NUMERIC(18,6) NOT NULL DEFAULT 1.0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_sale_payments_sale ON sale_payments(sale_id);
-CREATE INDEX IF NOT EXISTS idx_sale_payments_method ON sale_payments(method_id);
-
 -- loyalty additions
 
 -- Loyalty Tiers: define tiers like Silver/Gold/Platinum with minimum points

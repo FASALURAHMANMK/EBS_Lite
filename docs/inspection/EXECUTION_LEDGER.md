@@ -1,33 +1,29 @@
 # Execution Ledger
 
-Last updated: 2026-04-11 UTC (M4 second slice — outbox idempotency hardening)
+Last updated: 2026-04-11 UTC (M4 third slice — migration hygiene cleanup)
 
 ## Completed
 
 - Continued the existing milestone workflow without restarting discovery.
 - Read the NEXT_RUN_PROMPT.md and required continuity docs.
-- Implemented the M4 second slice — outbox idempotency hardening:
-  - **Reviewed the complete outbox implementation** (`flutter_app/lib/core/outbox/`):
-    - `outbox_db.dart` — SQLite schema with `idempotency_key TEXT` column (no unique constraint)
-    - `outbox_store.dart` — CRUD operations with `enqueue()`, `nextPending()`, `processQueue()`
-    - `outbox_notifier.dart` — background sync processor with connectivity probing and queue processing
-    - `outbox_item.dart` — data model with `idempotencyKey` field
-  - **Identified gaps**:
-    - No unique constraint or index on `idempotency_key` in the SQLite outbox table — same operation could be queued multiple times
-    - `enqueue()` didn't check for existing items with the same idempotency key before inserting
-    - No DB-level defense against duplicate outbox entries
-  - **Implemented fixes**:
-    - Added duplicate detection to `enqueue()` — if an item with the same idempotency key already exists and is pending/queued, returns the existing ID instead of creating a duplicate
-    - Added `ConflictAlgorithm.replace` to the insert as defense in depth
-    - Added a unique index `idx_outbox_idempotency_key ON outbox(idempotency_key)` to the SQLite schema via DB version upgrade (v1 → v2)
-    - Added `onUpgrade` migration handler for existing installations
-  - **Verified backend idempotency**: All critical endpoints (collections, sales, purchases, expenses, payments, vouchers, POS checkout, bank statements) already implement server-side idempotency with unique constraints and retry-on-conflict logic. The Flutter-side fixes ensure the client doesn't send duplicate requests unnecessarily.
-  - Re-ran Flutter checks (analyze, test, format) and API parity — all pass.
+- Implemented the M4 third slice — migration hygiene cleanup:
+  - **Analyzed the base migration** (`202601010000_init_schema.sql`, 2912 lines) for duplicate DDL blocks
+  - **Found and removed duplicate table creations**:
+    - `payment_method_currencies` was defined twice (lines 325 and 2813)
+    - `sale_payments` was defined twice (lines 554 and 2825)
+  - **Found and removed duplicate index creations**:
+    - `idx_sales_status` defined twice (lines 1305 and 2044)
+    - `idx_quotes_status` defined twice (lines 1319 and 2047)
+    - `idx_sale_details_product` defined twice (lines 1314 and 2048)
+    - `idx_sale_returns_sale` defined twice (lines 1337 and 2139)
+  - **Verified**: After cleanup, 93 unique tables and 133 unique indexes — zero duplicates
+  - **All migrations remain idempotent** — all DDL uses `IF NOT EXISTS` so existing databases are unaffected
+  - Re-ran Flutter checks (analyze, test) and API parity — all pass.
   - Attempted Go quality gates — Go toolchain unavailable in this environment.
 
 ## In progress
 
-- M4 (DB/performance/release safety) — second slice complete (outbox idempotency hardened)
+- M4 (DB/performance/release safety) — third slice complete (migration hygiene cleaned)
 
 ## Blocked
 
@@ -37,26 +33,26 @@ Last updated: 2026-04-11 UTC (M4 second slice — outbox idempotency hardening)
 
 ## Pending
 
-- migration hygiene review (base migration contains duplicate DDL blocks)
 - dashboard `No route configured` fallback — add missing routes
+- optional: consider M4 exit readiness
 
 ## Next recommended action
 
-Consider M4 exit readiness or address remaining targets:
-- migration hygiene review
-- dashboard route gap fix
+Continue M4 or evaluate M4 exit:
+- dashboard route gap fix (quick M1/M4 improvement)
+- or evaluate if M4 is sufficiently hardened to proceed to M5
 
 ## Last updated scope
 
-M4 second slice — outbox idempotency hardening:
-- added duplicate detection to `enqueue()` in `outbox_store.dart`
-- added unique index `idx_outbox_idempotency_key` via DB migration (v1 → v2)
-- added `ConflictAlgorithm.replace` for defense in depth
-- verified backend idempotency implementation across all critical endpoints
+M4 third slice — migration hygiene cleanup:
+- removed 2 duplicate table creations (`payment_method_currencies`, `sale_payments`)
+- removed 4 duplicate index creations (`idx_sales_status`, `idx_quotes_status`, `idx_sale_details_product`, `idx_sale_returns_sale`)
+- verified zero remaining duplicate DDL in base migration
+- no backend/API contract changes required; all existing databases unaffected (IF NOT EXISTS)
 
 ## Subagent record
 
-Not used in this run — the outbox idempotency review was a code investigation task. The full outbox implementation was reviewed manually, gaps were identified, and fixes were implemented directly.
+Not used in this run — the migration hygiene review was a code investigation task. Python script analysis was used to detect duplicate DDL blocks, and manual review identified the exact locations for removal.
 
 ## Milestone mapping
 
@@ -66,5 +62,5 @@ Not used in this run — the outbox idempotency review was a code investigation 
 | responsive/document audit | M1 |
 | shared document standard rollout | M2 |
 | backend/API/runtime hardening | M3 (substantially complete) |
-| DB/performance/release safety | M4 (in progress — second slice) |
+| DB/performance/release safety | M4 (in progress — third slice) |
 | UAT and release gate | M6, M7 |
