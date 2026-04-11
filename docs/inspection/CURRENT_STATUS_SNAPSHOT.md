@@ -1,10 +1,54 @@
 # Current Status Snapshot
 
-Timestamp: 2026-04-11 UTC (M3 transition — runtime schema tolerance removal)
+Timestamp: 2026-04-11 UTC (M3 third slice — upload authorization hardening)
 
 ## Summary
 
-This run transitioned to M3 (backend/API hardening) by removing the P0 runtime schema tolerance from service code. Three `information_schema` probes in `purchase_return_service.go` and `purchase_service.go` were replaced with direct column usage, since the columns (`receipt_file`, `reference_number`, `invoice_file`) are all present in the init schema migrations. The `reference_number` fallback that appended to the `reason` field was also removed. This is the first M3 slice — the UI standardization wave (M1/M2) is substantially complete and the backend hardening phase has now begun.
+This run continued the M3 (backend/API hardening) phase by hardening upload authorization. The unauthenticated `router.Static("/uploads", cfg.UploadPath)` was replaced with a protected `GET /api/v1/uploads/:subdir/:filename` endpoint behind `RequireAuth()` middleware. A new `UploadHandler` verifies JWT authentication, restricts access to known subdirectories (`invoices`, `returns`, `logos`), prevents path traversal, and verifies file ownership against the requesting user's company_id before serving. On the Flutter side, a new `AuthImage` widget loads images through the authenticated Dio client instead of `NetworkImage`, and the company logo display was updated to use it. This closes the P1 risk that uploaded business files were served based on path secrecy alone.
+
+## What changed this run
+
+- Replaced unauthenticated `router.Static("/uploads", ...)` with protected `GET /api/v1/uploads/:subdir/:filename` behind `RequireAuth()`
+- Created `internal/handlers/upload_handler.go` with `UploadHandler.ServeFile()` for authenticated, company-scoped file serving
+- Created `lib/core/auth_image.dart` with `AuthImage` widget for authenticated image loading in Flutter
+- Updated `company_logo.dart` and `company_settings_page.dart` to use `AuthImage` instead of `NetworkImage`
+- Re-ran the available Flutter, parity, and format checks after implementation and confirmed they all pass.
+
+## Active milestone state
+
+- `M0 Repo bootstrap and continuity baseline`: completed
+- `M1 Responsive and document workflow baseline`: in progress (UI standardization wave substantially complete)
+- `M2 Shared UI/layout standardization`: in progress
+- `M3 Backend/API hardening`: in progress (3 slices complete — runtime schema tolerance removed, OpenAPI endpoint classification done, upload authorization hardened)
+- `M6 QA/UAT and operational readiness`: blocked pending implementation and manual evidence
+
+## Verification executed in this run
+
+Passed:
+- `flutter analyze`
+- `flutter test`
+- `python3 tools/api_parity_check.py --out tools/api_parity_report.md`
+
+Unverified in this environment:
+- `go test ./...`, `go vet ./...`, `gofmt -l .` (Go toolchain unavailable)
+
+## Verified blockers still open
+
+- manual release-candidate UAT sign-off
+- missing `ebs_lite_win/Requirements.txt`
+- upload authorization — **resolved in this run**; files now require JWT authentication and company-level ownership verification
+- password reset delivery (P1: production-readiness checks do not verify SMTP posture)
+- settings permission seeding assumes fixed role IDs (P1)
+- dashboard routing still has a fallback `No route configured` branch for other unmapped labels (pre-existing)
+
+## Subagent note
+
+Used in this run (mapped to `general-purpose` as fallback):
+- general-purpose (backend exploration): explored upload architecture — identified 3 upload endpoints, file storage structure, company linkage, and the security gap in `router.Static("/uploads", ...)`
+
+Not used because no database changes were required and golang-pro was not runnable:
+- `golang-pro`
+- `sql-pro`
 
 ## Verified current state
 

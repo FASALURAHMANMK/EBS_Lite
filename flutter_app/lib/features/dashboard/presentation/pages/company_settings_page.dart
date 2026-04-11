@@ -1,3 +1,5 @@
+import 'package:ebs_lite/core/api_client.dart';
+import 'package:ebs_lite/core/auth_image.dart';
 import 'package:ebs_lite/features/auth/data/models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,7 +13,6 @@ import 'taxes_management_page.dart';
 import 'payment_modes_page.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../auth/controllers/auth_notifier.dart';
-import '../../../../core/api_client.dart';
 import '../../../../core/error_handler.dart';
 import 'locations_management_page.dart';
 import 'printer_settings_page.dart';
@@ -174,10 +175,15 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                     children: [
                       CircleAvatar(
                         radius: 28,
-                        backgroundImage: _logoProvider(context),
-                        child: _logoPath == null
-                            ? const Icon(Icons.business)
-                            : null,
+                        child: _logoPath != null && _logoPath!.isNotEmpty
+                            ? ClipOval(
+                                child: AuthImage(
+                                  url: _logoFullUrl(context),
+                                  fit: BoxFit.cover,
+                                  fallback: const Icon(Icons.business),
+                                ),
+                              )
+                            : const Icon(Icons.business),
                       ),
                       const SizedBox(width: 12),
                       FilledButton.icon(
@@ -345,17 +351,16 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
     );
   }
 
-  ImageProvider? _logoProvider(BuildContext context) {
+  String _logoFullUrl(BuildContext context) {
     final logo = _logoPath;
-    if (logo == null || logo.isEmpty) return null;
+    if (logo == null || logo.isEmpty) return '';
     final dio = ref.read(dioProvider);
-    var base = dio.options.baseUrl; // e.g. http://10.0.2.2:8080/api/v1
+    var base = dio.options.baseUrl;
     if (base.endsWith('/')) base = base.substring(0, base.length - 1);
     if (base.endsWith('/api/v1')) {
       base = base.substring(0, base.length - '/api/v1'.length);
     }
-    final url = logo.startsWith('http') ? logo : (base + logo);
-    return NetworkImage(url);
+    return logo.startsWith('http') ? logo : (base + logo);
   }
 
   Future<void> _pickAndUploadLogo() async {

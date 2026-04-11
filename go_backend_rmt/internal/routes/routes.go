@@ -904,6 +904,12 @@ func Initialize(router *gin.Engine, cfg *config.Config) {
 			"message": "Method not allowed",
 		})
 	})
-	// Serve uploaded files
-	router.Static("/uploads", cfg.UploadPath)
+
+	// Serve uploaded files with authorization checks
+	uploadHandler := handlers.NewUploadHandler()
+	uploads := v1.Group("/uploads")
+	uploads.Use(middleware.RequireAuth())
+	{
+		uploads.GET("/:subdir/:filename", uploadHandler.ServeFile)
+	}
 }

@@ -6,6 +6,8 @@ servers:
 - url: /api/v1
 paths:
   /health:
+    x-status: internal
+    x-note: "Server reachability ping used by Flutter outbox connectivity probe and load balancers."
     servers:
     - url: /
     get:
@@ -18,6 +20,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/APIResponse'
   /ready:
+    x-status: internal
+    x-note: "Readiness probe checking DB + Redis connectivity. Used by orchestrators."
     servers:
     - url: /
     get:
@@ -2672,6 +2676,8 @@ paths:
         schema:
           type: string
   /loyalty/award-points:
+    x-status: internal
+    x-note: "Internal endpoint for finance integrity event replay (financeEventLoyaltyAward). Not for direct client calls."
     post:
       summary: POST /api/v1/loyalty/award-points
       responses:
@@ -4103,6 +4109,8 @@ paths:
             schema:
               $ref: '#/components/schemas/ReceivePurchaseRequest'
   /employee-roles:
+    x-status: uncommercialized
+    x-note: "Backward-compatible alias for /designations. No client references this path. Candidate for removal."
     get:
       summary: GET /api/v1/employee-roles
       responses:
@@ -4157,6 +4165,8 @@ paths:
             schema:
               $ref: '#/components/schemas/CreatePurchaseReturnRequest'
   /employee-roles/{id}:
+    x-status: uncommercialized
+    x-note: "Backward-compatible alias for /designations/{id}. No client references this path. Candidate for removal."
     put:
       summary: PUT /api/v1/employee-roles/{id}
       responses:
@@ -6032,6 +6042,8 @@ paths:
             schema:
               $ref: '#/components/schemas/GenericObject'
   /settings:
+    x-status: uncommercialized
+    x-note: "Legacy catch-all superseded by specific sub-routes (/settings/company, /settings/inventory, etc.). Neither client calls this. Candidate for deprecation."
     get:
       summary: GET /api/v1/settings
       responses:
@@ -6450,6 +6462,8 @@ paths:
             schema:
               $ref: '#/components/schemas/GenericObject'
   /translations:
+    x-status: uncommercialized
+    x-note: "Intentionally unused. Both Flutter and web shell use local i18n. Server-side translation store was never integrated. Candidate for removal."
     get:
       summary: GET /api/v1/translations
       responses:

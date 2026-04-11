@@ -1,6 +1,6 @@
 # SMB Release Milestones
 
-Updated: 2026-04-11 UTC (M3 transition — runtime schema tolerance removal)
+Updated: 2026-04-11 UTC (M3 third slice — upload authorization hardening)
 Status model: `completed`, `in_progress`, `pending`, `blocked`
 
 ## Milestone table
