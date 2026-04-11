@@ -81,12 +81,13 @@ class PurchasesRepository {
     await _dio.put('/purchase-orders/$id/approve');
   }
 
-  Future<void> receiveAgainstPO(
-      {required int purchaseId,
-      required List<Map<String, dynamic>> items,
-      List<CostAdjustmentDraft> headerAdjustments = const [],
-      List<Map<String, dynamic>> itemAdjustments = const []}) async {
-    await _dio.post('/goods-receipts', data: {
+  Future<GoodsReceiptWorkflowResult> receiveAgainstPO({
+    required int purchaseId,
+    required List<Map<String, dynamic>> items,
+    List<CostAdjustmentDraft> headerAdjustments = const [],
+    List<Map<String, dynamic>> itemAdjustments = const [],
+  }) async {
+    final res = await _dio.post('/goods-receipts', data: {
       'purchase_id': purchaseId,
       'items': items,
       if (headerAdjustments.isNotEmpty)
@@ -95,6 +96,14 @@ class PurchasesRepository {
         ],
       if (itemAdjustments.isNotEmpty) 'item_adjustments': itemAdjustments,
     });
+    final data = res.data is Map && (res.data['data'] != null)
+        ? res.data['data'] as Map<String, dynamic>
+        : res.data as Map<String, dynamic>;
+    return (
+      purchaseId: purchaseId,
+      goodsReceiptId: data['goods_receipt_id'] as int?,
+      queued: false,
+    );
   }
 
   Future<List<PurchaseCostAdjustmentDto>> getSupplierDebitNotes({

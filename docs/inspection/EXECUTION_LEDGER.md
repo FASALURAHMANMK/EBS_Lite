@@ -1,6 +1,6 @@
 # Execution Ledger
 
-Last updated: 2026-04-09 UTC
+Last updated: 2026-04-10 UTC
 
 ## Completed
 
@@ -9,24 +9,22 @@ Last updated: 2026-04-09 UTC
 - Used the required verified subagents:
   - `flutter-expert`
   - `architect-reviewer`
-- Standardized the first Purchases document-workflow slice using the Sales reference pattern:
-  - purchase orders list/create/detail
-  - PO receipt workspace
-  - goods receipts list/create/detail
-  - purchase returns list/create/detail
-- Extracted the professional document widget family into `flutter_app/lib/shared/widgets/professional_document_widgets.dart`.
-- Added shared Purchases document helpers in `flutter_app/lib/features/purchases/presentation/widgets/purchase_document_widgets.dart`.
-- Made purchase returns choose a source purchase explicitly instead of silently auto-linking the latest supplier purchase.
-- Improved dashboard routing consistency for Purchases by:
-  - routing the quick purchase action into `GoodsReceiptsPage`
-  - adding Purchases document destinations to `dashboard_navigation.dart`
-- Re-ran the available Flutter and parity checks after implementation.
+- Implemented the next highest-priority Accounts `M1` plus `M2` slice after Chart of Accounts: Vouchers desktop workbench/detail-review standardization.
+- Rebuilt `flutter_app/lib/features/accounts/presentation/pages/vouchers_page.dart` into a menu-aware responsive Accounts workbench:
+  - desktop now keeps a searchable voucher queue on the left and a pinned selected-voucher review pane on the right
+  - the review pane now loads the existing voucher-detail endpoint so it can show header metadata, settlement context, description, and line-level debit/credit detail
+  - mobile remains stacked by showing optional selected-voucher review above the queue instead of forcing a split-pane layout or new detail route
+- Added `getVoucher(...)` to `flutter_app/lib/features/accounts/data/accounts_repository.dart` so Flutter can consume the already-existing backend voucher-detail endpoint without changing backend contracts.
+- Extended `flutter_app/lib/features/accounts/presentation/widgets/accounts_workbench_widgets.dart` with reusable voucher title, voucher-type badge, and voucher-line review helpers for the new voucher review surface.
+- Updated `tools/api_parity_check.py` to merge methods across normalized parameterized OpenAPI paths so `/vouchers/{id}` and `/vouchers/{type}` no longer create a false parity mismatch.
+- Re-ran the available Flutter and parity checks after implementation and confirmed they still pass.
+- Attempted Go quality gates and confirmed the Go toolchain is still unavailable in this environment.
 
 ## In progress
 
 - `M1` responsive and document workflow baseline
 - `M2` shared UI/layout standardization
-- wider rollout of the shared document workbench pattern beyond the first Purchases slice
+- wider rollout of the shared document workbench pattern beyond Sales and the first Purchases slices
 
 ## Blocked
 
@@ -37,37 +35,38 @@ Last updated: 2026-04-09 UTC
 
 ## Pending
 
-- strengthen Purchases further with a richer returns list preview and a stronger GRN create-to-detail contract
 - continue the same document-workflow standardization into the next highest-priority modules
 - close the strongest backend/runtime hardening gaps
 - run and record Go quality gates in an environment with the Go toolchain available
 
 ## Next recommended action
 
-Continue `M1` + `M2` by carrying the same shared document-workbench pattern into the next high-priority rollout target from the milestone order:
-- Sales remaining gaps first if staying strictly on the milestone priority list
-- or Accounts/reporting dense-workbench pages if the next run should continue broader non-Sales standardization after Purchases
+Continue `M1` + `M2` by moving to the next rollout target in the milestone order:
+- customer and supplier document-heavy workbenches first
+- purchases residual detail-level refinements only if a contradiction or regression is discovered
+- revisit residual Sales caller-owned return-workbench adoption only if a dedicated returns workbench or routing contradiction surfaces
 
 ## Last updated scope
 
-First Purchases implementation slice:
-- shared document widget extraction
-- Purchases PO/GRN/receipt/return UI standardization
-- explicit source-purchase selection for returns
-- minor Purchases routing consistency cleanup
+Next deeper Accounts finance slice after the Chart of Accounts rollout:
+- menu-aware desktop split `vouchers_page.dart` workbench with selected-voucher review
+- Flutter-side `getVoucher(...)` repository support for the existing voucher-detail endpoint
+- shared voucher title, voucher-type badge, and voucher-line helpers in `accounts_workbench_widgets.dart`
+- parity-check normalization fix for colliding parameterized OpenAPI paths
 
 ## Subagent record
 
 Used in this run:
-- `flutter-expert`: reviewed Purchases pages against the Sales reference and recommended the smallest strong implementation
-- `architect-reviewer`: reviewed layout/routing consistency and highlighted route-contract and navigation risks
+- `flutter-expert`: reviewed the remaining Accounts candidates, confirmed Vouchers as the strongest next slice after Chart of Accounts, and recommended a desktop voucher queue plus pinned review pane using the existing voucher-detail endpoint for line review
+- `architect-reviewer`: reviewed cross-module layout and routing consistency, confirmed the existing `Vouchers` routing/menu contract was already correct, and recommended keeping the workbench change inside the page body without renaming routes or labels
 
 Not used in this run:
 - `golang-pro`
 - `sql-pro`
 
 Reason:
-- the implemented slice stayed in Flutter UI and did not require backend/API/data-contract changes
+- the implemented slice stayed in Flutter UI and only consumed an already-existing backend detail endpoint without changing backend/API/data contracts
+- no fallback subagent mapping was required in this run
 
 ## Milestone mapping
 

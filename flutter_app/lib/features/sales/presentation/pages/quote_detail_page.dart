@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error_handler.dart';
+import '../../../../core/layout/app_breakpoints.dart';
+import '../../../../core/locale_preferences.dart';
 import '../../../../core/negative_stock_override.dart';
+import '../../../../shared/widgets/desktop_sidebar_toggle_action.dart';
+import '../../../../shared/widgets/professional_document_widgets.dart';
 import '../../data/sales_repository.dart';
 import '../utils/quote_actions.dart';
+import '../widgets/quote_review_widgets.dart';
 import 'quote_form_page.dart';
 import 'sale_detail_page.dart';
 
@@ -47,10 +52,15 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
   }
 
   Future<void> _edit() async {
-    final res = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => QuoteFormPage(quoteId: widget.quoteId)),
+    final result = await Navigator.of(context).push<QuoteWorkflowResult>(
+      MaterialPageRoute(
+        builder: (_) => QuoteFormPage(
+          quoteId: widget.quoteId,
+          returnResultOnSave: true,
+        ),
+      ),
     );
-    if (res == true) {
+    if (result != null) {
       await _load();
     }
   }
@@ -73,7 +83,8 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
 
   Future<void> _convertToSale() async {
     if (_converting) return;
-    final status = _quote?['status']?.toString() ?? 'DRAFT';
+    final snapshot = _quote == null ? null : QuoteDocumentSnapshot(_quote!);
+    final status = snapshot?.status ?? 'DRAFT';
     if (status != 'ACCEPTED') {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -87,7 +98,8 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
       builder: (_) => AlertDialog(
         title: const Text('Convert to Sale'),
         content: const Text(
-            'Convert this accepted quote into a sale? This will create a new sale record.'),
+          'Convert this accepted quote into a sale? This will create a new sale record.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -104,7 +116,7 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
 
     setState(() => _converting = true);
     try {
-      var saleId = await ref.read(salesRepositoryProvider).convertQuoteToSale(
+      final saleId = await ref.read(salesRepositoryProvider).convertQuoteToSale(
             widget.quoteId,
           );
       if (!mounted) return;
@@ -123,23 +135,7 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
         setState(() => _converting = false);
         return;
       }
-      try {
-        final saleId =
-            await ref.read(salesRepositoryProvider).convertQuoteToSale(
-                  widget.quoteId,
-                  overridePassword: password,
-                );
-        if (!mounted) return;
-        await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => SaleDetailPage(saleId: saleId)),
-        );
-        await _load();
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(ErrorHandler.message(e))),
-        );
-      }
+      await _convertWithOverride(password);
     } on NegativeProfitApprovalRequiredException catch (e) {
       if (!mounted) return;
       final password = await showNegativeProfitApprovalDialog(
@@ -151,23 +147,7 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
         setState(() => _converting = false);
         return;
       }
-      try {
-        final saleId =
-            await ref.read(salesRepositoryProvider).convertQuoteToSale(
-                  widget.quoteId,
-                  overridePassword: password,
-                );
-        if (!mounted) return;
-        await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => SaleDetailPage(saleId: saleId)),
-        );
-        await _load();
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(ErrorHandler.message(e))),
-        );
-      }
+      await _convertWithOverride(password);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -175,6 +155,25 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
       );
     } finally {
       if (mounted) setState(() => _converting = false);
+    }
+  }
+
+  Future<void> _convertWithOverride(String password) async {
+    try {
+      final saleId = await ref.read(salesRepositoryProvider).convertQuoteToSale(
+            widget.quoteId,
+            overridePassword: password,
+          );
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => SaleDetailPage(saleId: saleId)),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ErrorHandler.message(e))),
+      );
     }
   }
 
@@ -220,29 +219,153 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
     }
   }
 
+  Widget _buildSummaryActions(QuoteDocumentSnapshot quote, bool isDesktop) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        if (!quote.isConverted)
+          FilledButton.icon(
+            onPressed: _edit,
+            icon: const Icon(Icons.edit_rounded),
+            label: const Text('Edit'),
+            style: professionalCompactButtonStyle(context),
+          ),
+        FilledButton.tonalIcon(
+          onPressed: _print,
+          icon: const Icon(Icons.print_rounded),
+          label: const Text('Print'),
+          style: professionalCompactButtonStyle(context),
+        ),
+        FilledButton.tonalIcon(
+          onPressed: _share,
+          icon: const Icon(Icons.share_rounded),
+          label: const Text('Share'),
+          style: professionalCompactButtonStyle(context),
+        ),
+        if (!quote.isConverted)
+          FilledButton.icon(
+            onPressed: (_converting || quote.status != 'ACCEPTED')
+                ? null
+                : _convertToSale,
+            icon: _converting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.receipt_long_rounded),
+            label: Text(
+              _converting
+                  ? 'Converting…'
+                  : (isDesktop ? 'Convert to Sale' : 'Convert'),
+            ),
+            style: professionalCompactButtonStyle(context),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildBody(
+    QuoteDocumentSnapshot quote,
+    LocalePreferencesState localePrefs,
+  ) {
+    final isDesktop = AppBreakpoints.isDesktop(context);
+
+    if (isDesktop) {
+      return Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            QuoteDocumentHeaderCard(quote: quote),
+            const SizedBox(height: 12),
+            QuoteConvertedBanner(quote: quote),
+            if (quote.isConverted) const SizedBox(height: 12),
+            SizedBox(
+              height: 220,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: QuoteOverviewSection(
+                      quote: quote,
+                      localePrefs: localePrefs,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 340,
+                    child: QuoteSummarySection(
+                      quote: quote,
+                      isDesktop: true,
+                      footer: _buildSummaryActions(quote, true),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView(
+                children: [
+                  QuoteItemsSection(quote: quote),
+                  if (quote.notes.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    QuoteNotesSection(quote: quote),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        QuoteDocumentHeaderCard(quote: quote),
+        const SizedBox(height: 12),
+        QuoteConvertedBanner(quote: quote),
+        if (quote.isConverted) const SizedBox(height: 12),
+        QuoteOverviewSection(
+          quote: quote,
+          localePrefs: localePrefs,
+        ),
+        const SizedBox(height: 12),
+        QuoteItemsSection(quote: quote),
+        const SizedBox(height: 12),
+        QuoteSummarySection(
+          quote: quote,
+          isDesktop: false,
+          footer: _buildSummaryActions(quote, false),
+        ),
+        if (quote.notes.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          QuoteNotesSection(quote: quote),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final q = _quote;
-    final items =
-        (q?['items'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
-    final status = q?['status']?.toString() ?? 'DRAFT';
-    final transactionType = q?['transaction_type']?.toString() ?? 'B2B';
-    final convertedSaleId = q?['converted_sale_id'] as int?;
-    final isConverted = convertedSaleId != null || status == 'CONVERTED';
-    final number = q?['quote_number']?.toString() ?? '';
-    final customer = q?['customer'] as Map<String, dynamic>?;
-    final customerName = (customer?['name']?.toString() ?? '').trim();
+    final localePrefs = ref.watch(localePreferencesProvider);
+    final quote = _quote == null ? null : QuoteDocumentSnapshot(_quote!);
+    final showSidebarToggle = AppBreakpoints.isTabletOrDesktop(context);
+    final isDesktop = AppBreakpoints.isDesktop(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(number.isEmpty ? 'Quote #${widget.quoteId}' : number),
+        leadingWidth: showSidebarToggle ? 104 : null,
+        leading: showSidebarToggle ? const DesktopSidebarToggleLeading() : null,
+        title: Text(quote?.title ?? 'Quote #${widget.quoteId}'),
         actions: [
-          if (!isConverted)
+          if (quote != null && !quote.isConverted)
             IconButton(
               tooltip: 'Edit',
               icon: const Icon(Icons.edit_rounded),
-              onPressed: q == null ? null : _edit,
+              onPressed: _edit,
             ),
           IconButton(
             tooltip: 'Refresh',
@@ -252,14 +375,14 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
           IconButton(
             tooltip: 'Print',
             icon: const Icon(Icons.print_rounded),
-            onPressed: q == null ? null : _print,
+            onPressed: quote == null ? null : _print,
           ),
           IconButton(
             tooltip: 'Share',
             icon: const Icon(Icons.share_rounded),
-            onPressed: q == null ? null : _share,
+            onPressed: quote == null ? null : _share,
           ),
-          if (!isConverted)
+          if (quote != null && !quote.isConverted)
             PopupMenuButton<String>(
               onSelected: (value) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -278,13 +401,12 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
           const SizedBox(width: 4),
         ],
       ),
-      bottomNavigationBar: (q == null || isConverted)
-          ? null
-          : SafeArea(
+      bottomNavigationBar: (!isDesktop && quote != null && !quote.isConverted)
+          ? SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: FilledButton.icon(
-                  onPressed: (_converting || status != 'ACCEPTED')
+                  onPressed: (_converting || quote.status != 'ACCEPTED')
                       ? null
                       : _convertToSale,
                   icon: _converting
@@ -297,82 +419,27 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
                   label: Text(_converting ? 'Converting…' : 'Convert to Sale'),
                 ),
               ),
-            ),
+            )
+          : null,
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (_loading) const LinearProgressIndicator(minHeight: 2),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(_error!,
-                    style: TextStyle(color: theme.colorScheme.error)),
-              ),
-            if (q != null && isConverted)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Card(
-                  elevation: 0,
-                  color: theme.colorScheme.secondaryContainer,
-                  child: ListTile(
-                    leading: const Icon(Icons.lock_rounded),
-                    title: const Text('Converted to Sale'),
-                    subtitle: Text(convertedSaleId == null
-                        ? 'This quote is now read-only.'
-                        : 'Sale #$convertedSaleId created. This quote is now read-only.'),
-                  ),
-                ),
-              ),
-            if (q != null) ...[
-              Card(
-                elevation: 0,
-                child: ListTile(
-                  leading: const Icon(Icons.request_quote_rounded),
-                  title: Text(number.isEmpty ? 'Quote' : number),
-                  subtitle: Text([
-                    'Type: $transactionType',
-                    if (customerName.isNotEmpty) customerName,
-                    'Status: $status',
-                  ].join(' - ')),
-                  trailing: Text(
-                    ((q['total_amount'] as num?)?.toDouble() ?? 0.0)
-                        .toStringAsFixed(2),
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Card(
-                elevation: 0,
-                child: Column(children: [
-                  const ListTile(title: Text('Items')),
-                  const Divider(height: 1),
-                  if (items.isEmpty)
-                    const ListTile(title: Text('No items'))
-                  else
-                    for (final it in items)
-                      ListTile(
-                        leading: const Icon(Icons.inventory_2_rounded),
-                        title: Text(
-                          it['product_name']?.toString() ??
-                              it['product']?['name']?.toString() ??
-                              'Item',
-                        ),
-                        subtitle: Text(
-                          'Qty: ${(it['quantity'] as num?)?.toDouble() ?? 0} - Price: ${(it['unit_price'] as num?)?.toDouble() ?? 0}',
-                        ),
-                        trailing: Text(
-                          ((it['line_total'] as num?)?.toDouble() ?? 0.0)
-                              .toStringAsFixed(2),
-                          style: theme.textTheme.bodyLarge,
-                        ),
+        child: _loading && quote == null
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null && quote == null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: ProfessionalDocumentEmptyState(
+                        title: 'Unable to load quote details',
+                        message: _error!,
+                        actionLabel: 'Retry',
+                        onAction: _load,
+                        icon: Icons.error_outline_rounded,
                       ),
-                ]),
-              ),
-            ],
-          ],
-        ),
+                    ),
+                  )
+                : quote == null
+                    ? const Center(child: Text('Quote not found'))
+                    : _buildBody(quote, localePrefs),
       ),
     );
   }

@@ -27,17 +27,29 @@ enum SaleReturnDocumentMode {
   refundInvoice,
 }
 
+class SaleReturnWorkflowResult {
+  const SaleReturnWorkflowResult({
+    required this.documentId,
+    required this.mode,
+  });
+
+  final int documentId;
+  final SaleReturnDocumentMode mode;
+}
+
 class SaleReturnFormPage extends ConsumerStatefulWidget {
   const SaleReturnFormPage({
     super.key,
     this.initialSaleId,
     this.selectAllReturnable = false,
     this.mode = SaleReturnDocumentMode.saleReturn,
+    this.returnResultOnSave = false,
   });
 
   final int? initialSaleId;
   final bool selectAllReturnable;
   final SaleReturnDocumentMode mode;
+  final bool returnResultOnSave;
 
   @override
   ConsumerState<SaleReturnFormPage> createState() => _SaleReturnFormPageState();
@@ -182,6 +194,32 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
     }
   }
 
+  Future<void> _completeWithResult(int documentId) async {
+    if (!mounted) return;
+    if (widget.returnResultOnSave) {
+      Navigator.of(context).pop(
+        SaleReturnWorkflowResult(
+          documentId: documentId,
+          mode: widget.mode,
+        ),
+      );
+      return;
+    }
+    if (widget.mode == SaleReturnDocumentMode.refundInvoice) {
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => SaleDetailPage(saleId: documentId),
+        ),
+      );
+      return;
+    }
+    await Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => SaleReturnDetailPage(returnId: documentId),
+      ),
+    );
+  }
+
   Future<void> _findInvoice() async {
     final code = _invoiceCtrl.text.trim();
     if (code.isEmpty) return;
@@ -304,12 +342,7 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
                   reason: reason,
                   overridePassword: overridePassword,
                 );
-        if (!mounted) return;
-        await Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => SaleDetailPage(saleId: refundSaleId),
-          ),
-        );
+        await _completeWithResult(refundSaleId);
         return;
       }
 
@@ -354,10 +387,7 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
         }
       }
       if (!mounted) return;
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-            builder: (_) => SaleReturnDetailPage(returnId: returnId)),
-      );
+      await _completeWithResult(returnId);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)

@@ -63,8 +63,7 @@ class GrnRepository {
   }
 
   // Creates a purchase without PO and immediately records a GRN against it.
-  // Returns the created purchaseId.
-  Future<int> createGrnWithoutPo({
+  Future<GoodsReceiptWorkflowResult> createGrnWithoutPo({
     required int supplierId,
     required List<GrnCreateItem> items,
     List<CostAdjustmentDraft> headerAdjustments = const [],
@@ -206,7 +205,7 @@ class GrnRepository {
     });
 
     // 3) Record goods receipt
-    await _dio.post('/goods-receipts', data: {
+    final receiptRes = await _dio.post('/goods-receipts', data: {
       'purchase_id': purchaseId,
       'items': receiveItems,
       if (headerAdjustments.isNotEmpty)
@@ -216,6 +215,11 @@ class GrnRepository {
       if (itemAdjustmentPayload.isNotEmpty)
         'item_adjustments': itemAdjustmentPayload,
     });
+    final receiptData =
+        receiptRes.data is Map && (receiptRes.data['data'] != null)
+            ? receiptRes.data['data'] as Map<String, dynamic>
+            : receiptRes.data as Map<String, dynamic>;
+    final goodsReceiptId = receiptData['goods_receipt_id'] as int?;
 
     // 4) Optionally upload invoice file
     if (invoiceFilePath != null && invoiceFilePath.isNotEmpty) {
@@ -225,7 +229,11 @@ class GrnRepository {
       await _dio.post('/purchases/$purchaseId/invoice', data: form);
     }
 
-    return purchaseId;
+    return (
+      purchaseId: purchaseId,
+      goodsReceiptId: goodsReceiptId,
+      queued: false,
+    );
   }
 
   Future<PurchaseCostAdjustmentDto> addGoodsReceiptAddons({

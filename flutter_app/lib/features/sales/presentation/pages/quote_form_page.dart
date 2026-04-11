@@ -20,10 +20,25 @@ import '../widgets/document_line_editor_dialog.dart';
 import '../widgets/professional_document_widgets.dart';
 import 'sale_detail_page.dart';
 
+class QuoteWorkflowResult {
+  const QuoteWorkflowResult({
+    required this.quoteId,
+    required this.updatedExistingQuote,
+  });
+
+  final int quoteId;
+  final bool updatedExistingQuote;
+}
+
 class QuoteFormPage extends ConsumerStatefulWidget {
-  const QuoteFormPage({super.key, this.quoteId});
+  const QuoteFormPage({
+    super.key,
+    this.quoteId,
+    this.returnResultOnSave = false,
+  });
 
   final int? quoteId;
+  final bool returnResultOnSave;
 
   @override
   ConsumerState<QuoteFormPage> createState() => _QuoteFormPageState();
@@ -404,6 +419,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
       final repo = ref.read(salesRepositoryProvider);
       final payloadItems =
           items.map((line) => line.toQuoteJson()).toList(growable: false);
+      late final int savedQuoteId;
       if (_isEdit) {
         await repo.updateQuote(
           widget.quoteId!,
@@ -415,8 +431,9 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
           discountAmount: double.tryParse(_discountCtrl.text.trim()) ?? 0,
           items: payloadItems,
         );
+        savedQuoteId = widget.quoteId!;
       } else {
-        await repo.createQuote(
+        savedQuoteId = await repo.createQuote(
           customerId: _customer?.customerId,
           transactionType: _transactionType,
           validUntil: _validUntil,
@@ -426,7 +443,16 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
         );
       }
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      if (widget.returnResultOnSave) {
+        Navigator.of(context).pop(
+          QuoteWorkflowResult(
+            quoteId: savedQuoteId,
+            updatedExistingQuote: _isEdit,
+          ),
+        );
+      } else {
+        Navigator.of(context).pop(true);
+      }
     } catch (e) {
       if (mounted) setState(() => _error = ErrorHandler.message(e));
     } finally {

@@ -4,14 +4,12 @@ import 'package:ebs_lite/features/inventory/data/models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../shared/widgets/app_selection_dialog.dart';
 import '../../../../shared/widgets/desktop_sidebar_toggle_action.dart';
 import '../../../../shared/widgets/professional_document_widgets.dart';
-import '../../../suppliers/data/supplier_repository.dart';
 import '../../../inventory/data/inventory_repository.dart';
 import '../../../inventory/presentation/widgets/inventory_variant_selector.dart';
-import '../../../suppliers/data/models.dart';
 import '../../data/purchases_repository.dart';
+import '../widgets/purchase_document_widgets.dart';
 
 class PoFormPage extends ConsumerStatefulWidget {
   const PoFormPage({super.key});
@@ -169,7 +167,7 @@ class _PoFormPageState extends ConsumerState<PoFormPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SupplierPicker(
+          PurchaseSupplierPicker(
             supplierId: _supplierId,
             supplierName: _supplierName,
             onPicked: (id, name) => setState(() {
@@ -348,7 +346,33 @@ class _PoFormPageState extends ConsumerState<PoFormPage> {
           ),
           child: Column(
             children: [
-              _LineProductPicker(line: _lines[i]),
+              PurchaseProductPicker(
+                product: _lines[i].product,
+                selectedVariantName: _lines[i].variation?.variantName,
+                onPicked: (picked) async {
+                  InventoryTrackingSelection? variation;
+                  try {
+                    final variants = await ref
+                        .read(inventoryRepositoryProvider)
+                        .getStockVariants(picked.productId);
+                    if (variants.isNotEmpty) {
+                      final variant = variants.first;
+                      variation = InventoryTrackingSelection(
+                        barcodeId: variant.barcodeId,
+                        trackingType: variant.trackingType,
+                        isSerialized: variant.isSerialized,
+                        barcode: variant.barcode,
+                        variantName: variant.variantName,
+                      );
+                    }
+                  } catch (_) {}
+                  if (!mounted) return;
+                  setState(() {
+                    _lines[i].product = picked;
+                    _lines[i].variation = variation;
+                  });
+                },
+              ),
               const SizedBox(height: 10),
               Row(
                 children: [
@@ -488,270 +512,5 @@ class _PoLine {
   void dispose() {
     qty.dispose();
     price.dispose();
-  }
-}
-
-class _LineProductPicker extends ConsumerStatefulWidget {
-  const _LineProductPicker({required this.line});
-  final _PoLine line;
-
-  @override
-  ConsumerState<_LineProductPicker> createState() => _LineProductPickerState();
-}
-
-class _LineProductPickerState extends ConsumerState<_LineProductPicker> {
-  @override
-  Widget build(BuildContext context) {
-    final p = widget.line.product;
-    return InkWell(
-      onTap: () async {
-        final picked = await _openProductPicker(context);
-        if (picked != null) {
-          InventoryTrackingSelection? variation;
-          try {
-            final variants = await ref
-                .read(inventoryRepositoryProvider)
-                .getStockVariants(picked.productId);
-            if (variants.isNotEmpty) {
-              final v = variants.first;
-              variation = InventoryTrackingSelection(
-                barcodeId: v.barcodeId,
-                trackingType: v.trackingType,
-                isSerialized: v.isSerialized,
-                barcode: v.barcode,
-                variantName: v.variantName,
-              );
-            }
-          } catch (_) {}
-          setState(() {
-            widget.line.product = picked;
-            widget.line.variation = variation;
-          });
-        }
-      },
-      borderRadius: BorderRadius.circular(8),
-      child: InputDecorator(
-        decoration: const InputDecoration(
-          labelText: 'Product',
-          prefixIcon: Icon(Icons.inventory_2_rounded),
-          border: OutlineInputBorder(),
-        ),
-        child: Row(children: [
-          Expanded(
-              child: Text(
-                  p == null
-                      ? 'Tap to select a product'
-                      : [
-                          p.name,
-                          if ((widget.line.variation?.variantName ?? '')
-                              .trim()
-                              .isNotEmpty)
-                            widget.line.variation!.variantName!.trim(),
-                          if ((p.sku ?? '').isNotEmpty) 'SKU: ${p.sku}',
-                        ].join(' • '),
-                  overflow: TextOverflow.ellipsis)),
-          const Icon(Icons.arrow_drop_down_rounded),
-        ]),
-      ),
-    );
-  }
-
-  Future<InventoryListItem?> _openProductPicker(BuildContext context) async {
-    final repo = ref.read(inventoryRepositoryProvider);
-    List<InventoryListItem> initial = [];
-    try {
-      initial = await repo.getStock();
-    } catch (_) {}
-    List<InventoryListItem> results = List.of(initial);
-    int? selectedId = widget.line.product?.productId;
-    if (!context.mounted) return null;
-    return showDialog<InventoryListItem?>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setInner) => AppSelectionDialog(
-          title: 'Select Product',
-          maxWidth: 720,
-          searchField: TextField(
-            decoration: const InputDecoration(
-              hintText: 'Search by name or SKU',
-              prefixIcon: Icon(Icons.search_rounded),
-            ),
-            onChanged: (v) async {
-              final q = v.trim();
-              if (q.isEmpty) {
-                setInner(() => results = List.of(initial));
-                return;
-              }
-              final list = await repo.searchProducts(q);
-              setInner(() => results = list);
-            },
-          ),
-          body: results.isEmpty
-              ? const Center(child: Text('No products'))
-              : RadioGroup<int>(
-                  groupValue: selectedId,
-                  onChanged: (value) => setInner(() => selectedId = value),
-                  child: ListView.builder(
-                    itemCount: results.length,
-                    itemBuilder: (context, i) {
-                      final it = results[i];
-                      return RadioListTile<int>(
-                        value: it.productId,
-                        title: Text(it.name),
-                        subtitle: Text([
-                          if ((it.sku ?? '').isNotEmpty) 'SKU: ${it.sku}',
-                          'Stock: ${it.stock.toStringAsFixed(2)}'
-                        ].join(' • ')),
-                      );
-                    },
-                  ),
-                ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context, null),
-                child: const Text('Cancel')),
-            FilledButton(
-                onPressed: () {
-                  final it = results.firstWhere(
-                    (e) => e.productId == selectedId,
-                    orElse: () => InventoryListItem(
-                        productId: -1,
-                        name: '',
-                        sku: null,
-                        categoryName: null,
-                        brandName: null,
-                        unitSymbol: null,
-                        reorderLevel: 0,
-                        stock: 0,
-                        isLowStock: false,
-                        price: null),
-                  );
-                  Navigator.pop(context, it.productId == -1 ? null : it);
-                },
-                child: const Text('Select')),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SupplierPicker extends ConsumerWidget {
-  const _SupplierPicker(
-      {this.supplierId, this.supplierName, required this.onPicked});
-  final int? supplierId;
-  final String? supplierName;
-  final void Function(int id, String name) onPicked;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final display = supplierName ??
-        (supplierId == null
-            ? 'Tap to select supplier'
-            : 'Supplier #$supplierId');
-    return InkWell(
-      onTap: () async {
-        final picked = await _openSupplierPicker(context, ref);
-        if (picked != null) onPicked(picked.$1, picked.$2);
-      },
-      borderRadius: BorderRadius.circular(8),
-      child: InputDecorator(
-        decoration: const InputDecoration(
-            labelText: 'Supplier',
-            prefixIcon: Icon(Icons.local_shipping_outlined),
-            border: OutlineInputBorder()),
-        child: Row(children: [
-          Expanded(child: Text(display, overflow: TextOverflow.ellipsis)),
-          const Icon(Icons.arrow_drop_down_rounded)
-        ]),
-      ),
-    );
-  }
-
-  Future<(int, String)?> _openSupplierPicker(
-      BuildContext context, WidgetRef ref) async {
-    final repo = ref.read(supplierRepositoryProvider);
-    List<SupplierDto> results = [];
-    try {
-      results = await repo.getSuppliers();
-    } catch (_) {}
-    String q = '';
-    int? selected = supplierId;
-    if (!context.mounted) return null;
-    return showDialog<(int, String)?>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setInner) => AppSelectionDialog(
-          title: 'Select Supplier',
-          maxWidth: 720,
-          searchField: TextField(
-            decoration: const InputDecoration(
-              hintText: 'Search suppliers',
-              prefixIcon: Icon(Icons.search_rounded),
-            ),
-            onChanged: (v) async {
-              q = v.trim();
-              final list =
-                  await repo.getSuppliers(search: q.isEmpty ? null : q);
-              setInner(() => results = list);
-            },
-          ),
-          body: results.isEmpty
-              ? const Center(child: Text('No suppliers'))
-              : RadioGroup<int>(
-                  groupValue: selected,
-                  onChanged: (value) => setInner(() => selected = value),
-                  child: ListView.builder(
-                    itemCount: results.length,
-                    itemBuilder: (context, i) {
-                      final s = results[i];
-                      return RadioListTile<int>(
-                        value: s.supplierId,
-                        title: Text(s.name),
-                        subtitle: Text(
-                          [(s.phone ?? ''), (s.email ?? '')]
-                              .where((e) => e.isNotEmpty)
-                              .join(' • '),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel')),
-            FilledButton(
-                onPressed: () {
-                  final s = results.firstWhere((e) => e.supplierId == selected,
-                      orElse: () => results.isEmpty
-                          ? SupplierDto(
-                              supplierId: -1,
-                              name: '',
-                              contactPerson: null,
-                              phone: null,
-                              email: null,
-                              address: null,
-                              paymentTerms: 0,
-                              creditLimit: 0,
-                              isMercantile: true,
-                              isNonMercantile: false,
-                              isActive: true,
-                              totalPurchases: 0,
-                              totalReturns: 0,
-                              outstandingAmount: 0,
-                              lastPurchaseDate: null)
-                          : results.first);
-                  if (s.supplierId <= 0) {
-                    Navigator.pop(context, null);
-                    return;
-                  }
-                  Navigator.pop(context, (s.supplierId, s.name));
-                },
-                child: const Text('Select')),
-          ],
-        ),
-      ),
-    );
   }
 }

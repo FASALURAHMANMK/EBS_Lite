@@ -24,15 +24,27 @@ import '../widgets/document_line_editor_dialog.dart';
 import '../widgets/professional_document_widgets.dart';
 import 'sale_detail_page.dart';
 
+class B2BInvoiceWorkflowResult {
+  const B2BInvoiceWorkflowResult({
+    required this.saleId,
+    required this.updatedExistingSale,
+  });
+
+  final int saleId;
+  final bool updatedExistingSale;
+}
+
 class B2BInvoiceFormPage extends ConsumerStatefulWidget {
   const B2BInvoiceFormPage({
     super.key,
     this.sale,
     this.exchangeItems = const [],
+    this.returnResultOnSave = false,
   });
 
   final SaleDto? sale;
   final List<SaleItemDto> exchangeItems;
+  final bool returnResultOnSave;
 
   bool get isEdit => sale != null && exchangeItems.isEmpty;
   bool get isExchange => sale != null && exchangeItems.isNotEmpty;
@@ -83,6 +95,22 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
     _notesCtrl.dispose();
     _itemsScrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _completeWithSale(int saleId) async {
+    if (!mounted) return;
+    if (widget.returnResultOnSave) {
+      Navigator.of(context).pop(
+        B2BInvoiceWorkflowResult(
+          saleId: saleId,
+          updatedExistingSale: widget.isEdit,
+        ),
+      );
+      return;
+    }
+    await Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => SaleDetailPage(saleId: saleId)),
+    );
   }
 
   void _hydrateFromSale() {
@@ -519,12 +547,7 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
               notes: _notesCtrl.text.trim(),
               salesActionPassword: salesActionPassword,
             );
-        if (!mounted) return;
-        await Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => SaleDetailPage(saleId: result.saleId),
-          ),
-        );
+        await _completeWithSale(result.saleId);
         return;
       }
 
@@ -550,10 +573,7 @@ class _B2BInvoiceFormPageState extends ConsumerState<B2BInvoiceFormPage> {
             transactionType: 'B2B',
             overridePassword: overridePassword,
           );
-      if (!mounted) return;
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => SaleDetailPage(saleId: saleId)),
-      );
+      await _completeWithSale(saleId);
     } catch (e) {
       if (mounted) setState(() => _error = ErrorHandler.message(e));
     } finally {

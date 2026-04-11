@@ -142,20 +142,21 @@ class _PurchaseReceiptPageState extends ConsumerState<PurchaseReceiptPage> {
           );
         return;
       }
-      await ref.read(purchasesRepositoryProvider).receiveAgainstPO(
-            purchaseId: widget.purchaseId,
-            items: payload,
-            headerAdjustments: _headerAdjustments
-                .map((row) => row.toDraft())
-                .whereType<CostAdjustmentDraft>()
-                .toList(),
-            itemAdjustments: itemAdjustments,
-          );
+      final result =
+          await ref.read(purchasesRepositoryProvider).receiveAgainstPO(
+                purchaseId: widget.purchaseId,
+                items: payload,
+                headerAdjustments: _headerAdjustments
+                    .map((row) => row.toDraft())
+                    .whereType<CostAdjustmentDraft>()
+                    .toList(),
+                itemAdjustments: itemAdjustments,
+              );
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(const SnackBar(content: Text('GRN recorded')));
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(result);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)

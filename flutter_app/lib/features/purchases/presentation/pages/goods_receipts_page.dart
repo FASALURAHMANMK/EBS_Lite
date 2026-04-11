@@ -46,7 +46,7 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({int? preferredReceiptId}) async {
     setState(() => _loading = true);
     try {
       final repo = ref.read(grnRepositoryProvider);
@@ -55,13 +55,19 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
       );
       if (!mounted) return;
       setState(() => _list = list);
-      await _syncSelection(list);
+      await _syncSelection(
+        list,
+        preferredReceiptId: preferredReceiptId,
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _syncSelection(List<GoodsReceiptDto> visibleRows) async {
+  Future<void> _syncSelection(
+    List<GoodsReceiptDto> visibleRows, {
+    int? preferredReceiptId,
+  }) async {
     if (!AppBreakpoints.isDesktop(context)) return;
     if (visibleRows.isEmpty) {
       if (!mounted) return;
@@ -74,12 +80,19 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
       });
       return;
     }
-    final selectedMatch = visibleRows.where(
-      (row) => row.goodsReceiptId == _selectedReceiptId,
-    );
-    final nextId = selectedMatch.isNotEmpty
-        ? selectedMatch.first.goodsReceiptId
-        : visibleRows.first.goodsReceiptId;
+    final preferredMatch = preferredReceiptId == null
+        ? const <GoodsReceiptDto>[]
+        : visibleRows
+            .where((row) => row.goodsReceiptId == preferredReceiptId)
+            .toList(growable: false);
+    final selectedMatch = visibleRows
+        .where((row) => row.goodsReceiptId == _selectedReceiptId)
+        .toList(growable: false);
+    final nextId = preferredMatch.isNotEmpty
+        ? preferredMatch.first.goodsReceiptId
+        : selectedMatch.isNotEmpty
+            ? selectedMatch.first.goodsReceiptId
+            : visibleRows.first.goodsReceiptId;
     if (nextId != _selectedReceiptId) {
       await _selectReceipt(nextId);
     }
@@ -140,21 +153,44 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
       final picked = await _pickPO();
       if (!mounted) return;
       if (picked != null) {
-        await Navigator.of(context).push(
+        final result =
+            await Navigator.of(context).push<GoodsReceiptWorkflowResult>(
           MaterialPageRoute(
             builder: (_) => PurchaseReceiptPage(purchaseId: picked),
           ),
         );
-        await _load();
+        await _handleCreateResult(result);
       }
       return;
     }
-    final created = await Navigator.of(context).push<bool>(
+    final created =
+        await Navigator.of(context).push<GoodsReceiptWorkflowResult>(
       MaterialPageRoute(builder: (_) => const GrnFormPage()),
     );
-    if (created == true) {
-      await _load();
+    await _handleCreateResult(created);
+  }
+
+  Future<void> _handleCreateResult(GoodsReceiptWorkflowResult? result) async {
+    if (result == null) return;
+    if (result.goodsReceiptId != null && _search.text.trim().isNotEmpty) {
+      setState(_search.clear);
     }
+    await _load(preferredReceiptId: result.goodsReceiptId);
+    if (!mounted || result.queued || result.goodsReceiptId == null) {
+      return;
+    }
+    if (AppBreakpoints.isDesktop(context)) {
+      await _selectReceipt(result.goodsReceiptId!);
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GoodsReceiptDetailPage(
+          goodsReceiptId: result.goodsReceiptId!,
+        ),
+      ),
+    );
+    await _load(preferredReceiptId: result.goodsReceiptId);
   }
 
   Future<int?> _pickPO() async {
@@ -380,7 +416,7 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
                             title: 'No goods receipts',
                             message:
                                 'Create a goods receipt or adjust the search to review posted receipts.',
-                            onRetry: _load,
+                            onRetry: () => _load(),
                           )
                         : ListView.separated(
                             padding: EdgeInsets.zero,
@@ -506,7 +542,7 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
             title: 'No goods receipts',
             message:
                 'Create a goods receipt or adjust the search to review posted receipts.',
-            onRetry: _load,
+            onRetry: () => _load(),
           )
         else
           for (final receipt in filtered) ...[
@@ -567,7 +603,7 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
               suffixIcon: IconButton(
                 icon: const Icon(Icons.refresh_rounded),
                 tooltip: 'Refresh',
-                onPressed: _load,
+                onPressed: () => _load(),
               ),
             ),
           ),

@@ -163,6 +163,15 @@ class AccountsRepository {
     return _extractPaginated(res, VoucherDto.fromJson);
   }
 
+  Future<VoucherDto> getVoucher(int voucherId) async {
+    final res = await _dio.get('/vouchers/$voucherId');
+    final data = _extractMap(res);
+    final payload = (data['data'] is Map<String, dynamic>)
+        ? data['data'] as Map<String, dynamic>
+        : data;
+    return VoucherDto.fromJson(payload);
+  }
+
   Future<int> createVoucher({
     required String type,
     int? accountId,

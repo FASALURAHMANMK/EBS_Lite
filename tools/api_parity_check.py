@@ -124,7 +124,7 @@ def read_openapi(openapi_yaml: Path) -> dict[str, set[str]]:
     for raw_path, ops in (doc.get("paths") or {}).items():
         norm_path = _norm_openapi_path(raw_path)
         methods = {m.upper() for m in (ops or {}).keys() if m.lower() in {"get", "post", "put", "delete", "patch"}}
-        paths[norm_path] = methods
+        paths.setdefault(norm_path, set()).update(methods)
     return paths
 
 

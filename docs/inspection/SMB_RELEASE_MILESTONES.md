@@ -1,6 +1,6 @@
 # SMB Release Milestones
 
-Updated: 2026-04-09 UTC
+Updated: 2026-04-10 UTC
 Status model: `completed`, `in_progress`, `pending`, `blocked`
 
 ## Milestone table
@@ -44,18 +44,45 @@ Scope:
 
 Current evidence:
 - Sales deeper document pages are the best current reference
+- Sales first follow-up slice is now implemented:
+  - `InvoicesPage` is a true B2B invoice workbench entry instead of a direct form alias
+  - `B2BInvoiceFormPage` can now return a typed workflow result for workbench callers
+  - `sale_detail_page.dart` now uses a denser shared document review layout
+- Sales second follow-up slice is now implemented:
+  - `quotes_page.dart` now uses the same desktop workbench contract as invoices and sales history while preserving mobile detail routing
+  - `quote_form_page.dart` can now return a typed workflow result for workbench callers
+  - `quote_detail_page.dart` now uses shared quote review sections and a denser responsive review shell
+- Sales third follow-up slice is now implemented:
+  - `sale_return_detail_page.dart` now uses shared sale-return review sections and a denser responsive review shell while preserving stacked mobile routing
+  - `sales_returns_page.dart` now supports an optional typed workflow result for future caller-owned desktop/workbench follow-up without changing the default form-owned route
+- Reports first follow-up slice is now implemented:
+  - `reports_page.dart` now uses `FeatureMenu` for the desktop report-category launcher while mobile preserves the grid
+  - `report_category_page.dart` now provides a desktop split report workbench with in-pane selection and review while mobile stays list-to-detail
+  - `report_viewer_page.dart` now provides a desktop filter/action rail plus result pane while preserving stacked mobile report review
+  - `accounting_page.dart` now routes `Accounting Reports` through the centralized Reports destination helper and also uses `FeatureMenu` on desktop
+- Accounts deeper finance follow-up slices are now implemented:
+  - `ledgers_page.dart` now provides a desktop split workbench with searchable ledger selection and in-pane selected-ledger review while mobile stays route-driven
+  - `ledger_entries_page.dart` now provides a stronger standalone desktop ledger review shell with visible account context, filters, summaries, and linked document references
+  - `flutter_app/lib/shared/widgets/workbench_pane.dart` now exists as a generic shared workbench shell first used by the Accounts ledger slice
+  - `chart_of_accounts_page.dart` now provides a menu-aware desktop split workbench with searchable account selection and in-pane selected-account review while mobile stays stacked and dialog-driven
+  - `vouchers_page.dart` now provides a menu-aware desktop split workbench with searchable voucher selection and in-pane selected-voucher review while mobile stays stacked with inline selected-voucher review
+  - `flutter_app/lib/features/accounts/data/accounts_repository.dart` now consumes the existing voucher-detail endpoint for the workbench review surface
+  - `flutter_app/lib/features/accounts/presentation/widgets/accounts_workbench_widgets.dart` now also provides reusable account title/status and voucher title/type/line helpers for the deeper Accounts review surfaces
 - POS is not yet the desktop reference
-- Purchases first slice is now materially improved, but several back-office modules still remain mixed or mobile-first
+- Purchases second follow-up slice is now implemented:
+  - GRN creation/receipt returns into desktop workbench review and mobile detail when a real receipt id exists
+  - purchase returns now have a desktop split-pane preview
+  - shared Purchases supplier/product picker components reduce local duplication
+- several back-office modules still remain mixed or mobile-first
 
 Exit criteria:
 - `docs/inspection/UI_RESPONSIVE_AUDIT.md` and `docs/inspection/DOCUMENT_WORKFLOW_STANDARD.md` stay current
 - the next implementation slice is picked from the priority rollout order below
 
 Priority rollout order:
-1. Sales gaps: invoice listing, quote list/detail, sale detail desktop pattern
-2. Purchases: PO, GRN, purchase returns
-3. Accounts and reports dense-workbench pages
-4. Customer and supplier document-heavy workbenches
+1. Customer and supplier document-heavy workbenches
+2. Purchases residual detail-level refinements only if a contradiction or regression is discovered
+3. Residual Sales caller-owned return-workbench adoption only if a dedicated returns workbench or routing contradiction surfaces
 
 ### M2. Shared UI/layout standardization
 
@@ -68,6 +95,16 @@ Current evidence:
 - `flutter_app/lib/shared/widgets/professional_document_widgets.dart` now exists as the shared document primitive layer
 - Sales keeps continuity through a re-export file
 - the shared document shell is now actively used in Purchases PO/GRN/receipt/return pages
+- the shared document shell is now also used by Reports category/viewer pages for desktop review framing
+- `flutter_app/lib/features/purchases/presentation/widgets/purchase_document_widgets.dart` now carries shared Purchases picker components as well as metric/list helpers
+- `flutter_app/lib/features/sales/presentation/widgets/sales_workbench_widgets.dart` now provides a narrow shared Sales workbench shell and badge layer
+- the shared Sales workbench shell is now reused by `sales_history_page.dart`, `invoices_page.dart`, and `quotes_page.dart`
+- `flutter_app/lib/features/sales/presentation/widgets/quote_review_widgets.dart` now provides shared quote review/list widgets reused by the quote workbench and `quote_detail_page.dart`
+- `flutter_app/lib/features/sales/presentation/widgets/sale_return_review_widgets.dart` now provides shared sale-return review widgets reused by `sale_return_detail_page.dart`
+- `flutter_app/lib/features/reports/presentation/widgets/report_workbench_widgets.dart` now provides narrow shared report-workbench pane and capability widgets reused by `report_category_page.dart` and `report_viewer_page.dart`
+- `flutter_app/lib/features/reports/presentation/report_navigation.dart` now centralizes report-category destination construction across Reports, Accounts, and dashboard routing
+- `flutter_app/lib/shared/widgets/workbench_pane.dart` now exists as a generic shared workbench shell and is first used by the Accounts ledger slice
+- `flutter_app/lib/features/accounts/presentation/widgets/accounts_workbench_widgets.dart` now also carries shared account title/status and voucher title/type/line helpers reused by the Chart of Accounts and Vouchers workbenches
 
 Exit criteria:
 - shared document components are reused across multiple modules

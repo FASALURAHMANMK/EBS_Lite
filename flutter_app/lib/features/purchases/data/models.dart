@@ -1,3 +1,9 @@
+typedef GoodsReceiptWorkflowResult = ({
+  int? purchaseId,
+  int? goodsReceiptId,
+  bool queued,
+});
+
 class GoodsReceiptDto {
   GoodsReceiptDto({
     required this.goodsReceiptId,

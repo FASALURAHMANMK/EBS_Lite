@@ -22,8 +22,6 @@ import 'package:ebs_lite/features/purchases/presentation/pages/goods_receipts_pa
 import 'package:ebs_lite/features/purchases/presentation/pages/purchase_orders_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/purchase_returns_page.dart';
 import 'package:ebs_lite/features/purchases/presentation/pages/supplier_debit_notes_page.dart';
-import 'package:ebs_lite/features/reports/presentation/pages/report_category_page.dart';
-import 'package:ebs_lite/features/reports/presentation/report_categories.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/invoices_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/b2b_party_management_page.dart';
 import 'package:ebs_lite/features/sales/presentation/pages/quotes_page.dart';
@@ -473,10 +471,7 @@ class DashboardDesktopSidebar extends ConsumerWidget {
                   icon: Icons.storefront_rounded,
                   label: 'Sales Reports',
                   onTap: () => onOpen(
-                    const ReportCategoryPage(
-                      title: salesReportCategoryTitle,
-                      reports: salesReports,
-                    ),
+                    DashboardNavigation.pageForLabel('Sales Reports'),
                   ),
                 ),
                 _child(
@@ -484,10 +479,7 @@ class DashboardDesktopSidebar extends ConsumerWidget {
                   icon: Icons.shopping_cart_rounded,
                   label: 'Purchase Reports',
                   onTap: () => onOpen(
-                    const ReportCategoryPage(
-                      title: purchaseReportCategoryTitle,
-                      reports: purchaseReports,
-                    ),
+                    DashboardNavigation.pageForLabel('Purchase Reports'),
                   ),
                 ),
                 _child(
@@ -495,10 +487,7 @@ class DashboardDesktopSidebar extends ConsumerWidget {
                   icon: Icons.account_balance_wallet_rounded,
                   label: 'Accounts Reports',
                   onTap: () => onOpen(
-                    const ReportCategoryPage(
-                      title: accountsReportCategoryTitle,
-                      reports: accountsReports,
-                    ),
+                    DashboardNavigation.pageForLabel('Accounts Reports'),
                   ),
                 ),
                 _child(
@@ -506,10 +495,7 @@ class DashboardDesktopSidebar extends ConsumerWidget {
                   icon: Icons.inventory_2_rounded,
                   label: 'Inventory Reports',
                   onTap: () => onOpen(
-                    const ReportCategoryPage(
-                      title: inventoryReportCategoryTitle,
-                      reports: inventoryReports,
-                    ),
+                    DashboardNavigation.pageForLabel('Inventory Reports'),
                   ),
                 ),
               ],

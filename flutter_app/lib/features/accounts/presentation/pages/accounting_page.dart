@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:ebs_lite/shared/widgets/feature_grid.dart';
+import 'package:ebs_lite/shared/widgets/feature_menu.dart';
 import 'package:ebs_lite/features/expenses/presentation/pages/expenses_page.dart';
-import '../../../reports/presentation/pages/report_category_page.dart';
-import '../../../reports/presentation/report_categories.dart';
+import '../../../reports/presentation/report_navigation.dart';
 import 'audit_logs_page.dart';
 import 'banking_page.dart';
 import 'cash_register_page.dart';
@@ -87,10 +86,7 @@ class AccountingPage extends StatelessWidget {
         label: 'Accounting Reports',
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => const ReportCategoryPage(
-              title: accountsReportCategoryTitle,
-              reports: accountsReports,
-            ),
+            builder: (_) => buildReportCategoryPage(accountsReportDestination),
           ),
         ),
       ),
@@ -105,7 +101,10 @@ class AccountingPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Accounts')),
-      body: FeatureGrid(items: items),
+      body: FeatureMenu(
+        items: items,
+        title: 'Accounting workbench',
+      ),
     );
   }
 }

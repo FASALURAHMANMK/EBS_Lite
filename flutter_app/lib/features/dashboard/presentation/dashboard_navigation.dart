@@ -11,6 +11,9 @@ import '../../accounts/presentation/pages/ledgers_page.dart';
 import '../../accounts/presentation/pages/period_close_page.dart';
 import '../../accounts/presentation/pages/vouchers_page.dart';
 import '../../sales/presentation/pages/b2b_party_management_page.dart';
+import '../../sales/presentation/pages/invoices_page.dart';
+import '../../sales/presentation/pages/quotes_page.dart';
+import '../../sales/presentation/pages/sales_history_page.dart';
 import '../../customers/presentation/pages/customer_care_hub_page.dart';
 import '../../customers/presentation/pages/collections_workbench_page.dart';
 import '../../expenses/presentation/pages/expense_categories_page.dart';
@@ -24,9 +27,8 @@ import '../../inventory/presentation/pages/combo_definitions_page.dart';
 import '../../purchases/presentation/pages/goods_receipts_page.dart';
 import '../../purchases/presentation/pages/purchase_orders_page.dart';
 import '../../purchases/presentation/pages/purchase_returns_page.dart';
-import '../../reports/presentation/pages/report_category_page.dart';
+import '../../reports/presentation/report_navigation.dart';
 import '../../reports/presentation/pages/reports_page.dart';
-import '../../reports/presentation/report_categories.dart';
 import '../../suppliers/presentation/pages/supplier_balance_workbench_page.dart';
 import '../../workflow/presentation/pages/workflow_requests_page.dart';
 import '../../workflow/presentation/pages/approvals_hub_page.dart';
@@ -57,44 +59,28 @@ class DashboardNavigation {
     bool fromMenu = false,
     DashboardMenuSelectHandler? onMenuSelect,
   }) {
+    final reportDestination = reportDestinationForLabel(label);
+    if (reportDestination != null) {
+      return buildReportCategoryPage(
+        reportDestination,
+        fromMenu: fromMenu,
+        onMenuSelect: onMenuSelect,
+      );
+    }
+
     switch (label) {
       case 'Reports':
         return const ReportsPage();
-      case 'Sales':
-      case 'Sales Reports':
-        return ReportCategoryPage(
-          title: salesReportCategoryTitle,
-          reports: salesReports,
-          fromMenu: fromMenu,
-          onMenuSelect: onMenuSelect,
-        );
-      case 'Purchase':
-      case 'Purchase Reports':
-        return ReportCategoryPage(
-          title: purchaseReportCategoryTitle,
-          reports: purchaseReports,
-          fromMenu: fromMenu,
-          onMenuSelect: onMenuSelect,
-        );
-      case 'Accounts':
-      case 'Accounts Reports':
-      case 'Accounting Reports':
-        return ReportCategoryPage(
-          title: accountsReportCategoryTitle,
-          reports: accountsReports,
-          fromMenu: fromMenu,
-          onMenuSelect: onMenuSelect,
-        );
-      case 'Inventory':
-      case 'Inventory Reports':
-        return ReportCategoryPage(
-          title: inventoryReportCategoryTitle,
-          reports: inventoryReports,
-          fromMenu: fromMenu,
-          onMenuSelect: onMenuSelect,
-        );
       case 'Accounting':
         return const AccountingPage();
+      case 'Invoices':
+      case 'B2B Invoices':
+        return const InvoicesPage();
+      case 'Quotes':
+        return const QuotesPage();
+      case 'Sale History':
+      case 'Sales History':
+        return const SalesHistoryPage();
       case 'Purchase Orders':
       case 'Purchase Order':
         return const PurchaseOrdersPage();
@@ -110,7 +96,10 @@ class DashboardNavigation {
       case 'Cash Register':
         return CashRegisterPage(fromMenu: fromMenu, onMenuSelect: onMenuSelect);
       case 'Chart of Accounts':
-        return const ChartOfAccountsPage();
+        return ChartOfAccountsPage(
+          fromMenu: fromMenu,
+          onMenuSelect: onMenuSelect,
+        );
       case 'Day Open/Close':
         return DayEndFlowPage(fromMenu: fromMenu, onMenuSelect: onMenuSelect);
       case 'Expenses':

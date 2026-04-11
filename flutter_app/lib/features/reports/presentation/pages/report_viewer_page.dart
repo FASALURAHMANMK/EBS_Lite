@@ -4,9 +4,13 @@ import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 
 import '../../../../core/app_date_time.dart';
+import '../../../../core/layout/app_breakpoints.dart';
 import '../../../../core/locale_preferences.dart';
+import '../../../../shared/widgets/desktop_sidebar_toggle_action.dart';
+import '../../../../shared/widgets/professional_document_widgets.dart';
 import '../../../dashboard/controllers/location_notifier.dart';
 import '../../../dashboard/data/models.dart';
+import '../../../dashboard/presentation/widgets/dashboard_sidebar.dart';
 import '../../data/reports_repository.dart';
 import '../../../../core/error_handler.dart';
 import '../../../../shared/widgets/app_empty_view.dart';
@@ -14,11 +18,21 @@ import '../../../../shared/widgets/app_error_view.dart';
 import '../../../../shared/widgets/app_loading_view.dart';
 import '../../../../shared/widgets/app_scrollbar.dart';
 import 'report_category_page.dart';
+import '../widgets/report_workbench_widgets.dart';
 
 class ReportViewerPage extends ConsumerStatefulWidget {
-  const ReportViewerPage({super.key, required this.config});
+  const ReportViewerPage({
+    super.key,
+    required this.config,
+    this.categoryTitle,
+    this.fromMenu = false,
+    this.onMenuSelect,
+  });
 
   final ReportConfig config;
+  final String? categoryTitle;
+  final bool fromMenu;
+  final void Function(BuildContext context, String label)? onMenuSelect;
 
   @override
   ConsumerState<ReportViewerPage> createState() => _ReportViewerPageState();
@@ -160,14 +174,108 @@ class _ReportViewerPageState extends ConsumerState<ReportViewerPage> {
     }
   }
 
+  int _activeFilterCount() {
+    var total = 0;
+    if (_fromDate != null) total += 1;
+    if (_toDate != null) total += 1;
+    if (widget.config.supportsLocation && _locationId != null) total += 1;
+    if (widget.config.supportsGroupBy) total += 1;
+    if (widget.config.supportsExpensesGroupBy && _expensesGroupBy != 'none') {
+      total += 1;
+    }
+    if (widget.config.supportsLimit &&
+        int.tryParse(_limitCtrl.text.trim()) != null) {
+      total += 1;
+    }
+    if (widget.config.supportsProductId &&
+        int.tryParse(_productIdCtrl.text.trim()) != null) {
+      total += 1;
+    }
+    return total;
+  }
+
+  String _dateRangeLabel(BuildContext context, LocalePreferencesState locale) {
+    if (!widget.config.supportsDateRange) {
+      return 'Not used';
+    }
+    final from = _fromDate == null
+        ? 'Any'
+        : AppDateTime.formatDate(context, locale, _fromDate!);
+    final to = _toDate == null
+        ? 'Any'
+        : AppDateTime.formatDate(context, locale, _toDate!);
+    return '$from to $to';
+  }
+
+  String _locationLabel(List<Location> locations) {
+    if (!widget.config.supportsLocation) {
+      return 'Not used';
+    }
+    if (_locationId == null) {
+      return 'All locations';
+    }
+    for (final location in locations) {
+      if (location.locationId == _locationId) {
+        return location.name;
+      }
+    }
+    return 'Location #$_locationId';
+  }
+
+  String _resultSummary() {
+    final data = _data;
+    if (_loading) {
+      return 'Loading current result set';
+    }
+    if (_error != null) {
+      return 'Needs retry';
+    }
+    if (data == null) {
+      return 'No data';
+    }
+    if (data is List) {
+      return '${data.length} row${data.length == 1 ? '' : 's'}';
+    }
+    if (data is Map) {
+      return '${data.length} field${data.length == 1 ? '' : 's'}';
+    }
+    return 'Single value result';
+  }
+
+  Widget _buildResultBody(LocalePreferencesState localePrefs) {
+    if (_loading) {
+      return const AppLoadingView(label: 'Loading report');
+    }
+    if (_error != null) {
+      return AppErrorView(error: _error!, onRetry: _load);
+    }
+    return _ReportDataView(
+      endpoint: widget.config.endpoint,
+      data: _data,
+      localePrefs: localePrefs,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isWide = AppBreakpoints.isTabletOrDesktop(context);
     final locationState = ref.watch(locationNotifierProvider);
     final localePrefs = ref.watch(localePreferencesProvider);
     final locations = locationState.locations;
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.fromMenu,
+        leading: widget.fromMenu
+            ? Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Menu',
+                  icon: const Icon(Icons.menu_rounded),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              )
+            : (isWide ? const DesktopSidebarToggleLeading() : null),
+        leadingWidth: (!widget.fromMenu && isWide) ? 104 : null,
         title: Text(widget.config.title),
         actions: [
           IconButton(
@@ -191,41 +299,150 @@ class _ReportViewerPageState extends ConsumerState<ReportViewerPage> {
           ),
         ],
       ),
+      drawer: widget.fromMenu
+          ? DashboardSidebar(
+              onSelect: (label) => widget.onMenuSelect?.call(context, label),
+            )
+          : null,
       body: SafeArea(
-        child: Column(
-          children: [
-            _FiltersCard(
-              config: widget.config,
-              fromDate: _fromDate,
-              toDate: _toDate,
-              localePrefs: localePrefs,
-              onPickFrom: () => _pickDate(from: true),
-              onPickTo: () => _pickDate(from: false),
-              locations: locations,
-              locationId: _locationId,
-              onLocationChanged: (id) => setState(() => _locationId = id),
-              groupBy: _groupBy,
-              onGroupByChanged: (v) => setState(() => _groupBy = v),
-              expensesGroupBy: _expensesGroupBy,
-              onExpensesGroupByChanged: (v) =>
-                  setState(() => _expensesGroupBy = v),
-              limitCtrl: _limitCtrl,
-              productIdCtrl: _productIdCtrl,
-              onApply: _load,
-            ),
-            Expanded(
-              child: _loading
-                  ? const AppLoadingView(label: 'Loading report')
-                  : _error != null
-                      ? AppErrorView(error: _error!, onRetry: _load)
-                      : _ReportDataView(
-                          endpoint: widget.config.endpoint,
-                          data: _data,
-                          localePrefs: localePrefs,
+        child: isWide
+            ? Padding(
+                padding: AppBreakpoints.pagePadding(context),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      width: 360,
+                      child: ListView(
+                        children: [
+                          ProfessionalDocumentHeader(
+                            title: widget.config.title,
+                            subtitle:
+                                'Desktop report review keeps filters, output actions, and result context visible without collapsing into one long stacked page.',
+                            badges: [
+                              if ((widget.categoryTitle ?? '')
+                                  .trim()
+                                  .isNotEmpty)
+                                ProfessionalBadge(label: widget.categoryTitle!),
+                              const ProfessionalBadge(label: 'Desktop review'),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          ReportConfigOverviewCard(config: widget.config),
+                          const SizedBox(height: 16),
+                          _FiltersCard(
+                            config: widget.config,
+                            fromDate: _fromDate,
+                            toDate: _toDate,
+                            localePrefs: localePrefs,
+                            onPickFrom: () => _pickDate(from: true),
+                            onPickTo: () => _pickDate(from: false),
+                            locations: locations,
+                            locationId: _locationId,
+                            onLocationChanged: (id) =>
+                                setState(() => _locationId = id),
+                            groupBy: _groupBy,
+                            onGroupByChanged: (v) =>
+                                setState(() => _groupBy = v),
+                            expensesGroupBy: _expensesGroupBy,
+                            onExpensesGroupByChanged: (v) =>
+                                setState(() => _expensesGroupBy = v),
+                            limitCtrl: _limitCtrl,
+                            productIdCtrl: _productIdCtrl,
+                            onApply: _load,
+                          ),
+                          const SizedBox(height: 16),
+                          ProfessionalSummaryCard(
+                            title: 'Run context',
+                            rows: [
+                              (
+                                label: 'Applied filters',
+                                value: '${_activeFilterCount()}',
+                                emphasize: true,
+                              ),
+                              (
+                                label: 'Date range',
+                                value: _dateRangeLabel(context, localePrefs),
+                                emphasize: false,
+                              ),
+                              (
+                                label: 'Location',
+                                value: _locationLabel(locations),
+                                emphasize: false,
+                              ),
+                              (
+                                label: 'Current output',
+                                value: _resultSummary(),
+                                emphasize: false,
+                              ),
+                            ],
+                            footer: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: () => _export('pdf'),
+                                  icon:
+                                      const Icon(Icons.picture_as_pdf_rounded),
+                                  label: const Text('PDF'),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: () => _export('excel'),
+                                  icon: const Icon(Icons.grid_on_rounded),
+                                  label: const Text('Excel'),
+                                ),
+                                FilledButton.icon(
+                                  onPressed: _printPdf,
+                                  icon: const Icon(Icons.print_rounded),
+                                  label: const Text('Print'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ReportWorkbenchPane(
+                        title: 'Results',
+                        subtitle:
+                            '${widget.config.title} • ${_resultSummary()}',
+                        headerTrailing: IconButton(
+                          tooltip: 'Refresh',
+                          onPressed: _load,
+                          icon: const Icon(Icons.refresh_rounded),
                         ),
-            ),
-          ],
-        ),
+                        child: _buildResultBody(localePrefs),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : Column(
+                children: [
+                  _FiltersCard(
+                    config: widget.config,
+                    fromDate: _fromDate,
+                    toDate: _toDate,
+                    localePrefs: localePrefs,
+                    onPickFrom: () => _pickDate(from: true),
+                    onPickTo: () => _pickDate(from: false),
+                    locations: locations,
+                    locationId: _locationId,
+                    onLocationChanged: (id) => setState(() => _locationId = id),
+                    groupBy: _groupBy,
+                    onGroupByChanged: (v) => setState(() => _groupBy = v),
+                    expensesGroupBy: _expensesGroupBy,
+                    onExpensesGroupByChanged: (v) =>
+                        setState(() => _expensesGroupBy = v),
+                    limitCtrl: _limitCtrl,
+                    productIdCtrl: _productIdCtrl,
+                    onApply: _load,
+                  ),
+                  Expanded(child: _buildResultBody(localePrefs)),
+                ],
+              ),
       ),
     );
   }
