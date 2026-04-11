@@ -1,10 +1,10 @@
 # Current Status Snapshot
 
-Timestamp: 2026-04-11 UTC (Purchase return detail hardening run)
+Timestamp: 2026-04-11 UTC (M3 transition — runtime schema tolerance removal)
 
 ## Summary
 
-This run continued the existing `M1` plus `M2` workflow and implemented the purchase return detail page hardening slice (Option A from the last NEXT_RUN_PROMPT.md). The page was already significantly standardized (uses ProfessionalDocumentHeader, ProfessionalSectionCard, ProfessionalSummaryCard, etc.), so this was a targeted hardening: added proper error state handling with AppErrorView + retry, added RefreshIndicator on mobile and Refresh AppBar action, and replaced individual ProfessionalOverviewCard per item with denser DataTable-style rows on desktop. This completes the last remaining M1/M2 detail-page standardization target.
+This run transitioned to M3 (backend/API hardening) by removing the P0 runtime schema tolerance from service code. Three `information_schema` probes in `purchase_return_service.go` and `purchase_service.go` were replaced with direct column usage, since the columns (`receipt_file`, `reference_number`, `invoice_file`) are all present in the init schema migrations. The `reference_number` fallback that appended to the `reason` field was also removed. This is the first M3 slice — the UI standardization wave (M1/M2) is substantially complete and the backend hardening phase has now begun.
 
 ## Verified current state
 
@@ -95,17 +95,19 @@ Reason:
 
 - manual release-candidate UAT sign-off
 - missing `ebs_lite_win/Requirements.txt`
-- runtime schema tolerance in at least one backend request path (`purchase_return_service.go`)
-- dashboard routing still has a fallback `No route configured` branch for other unmapped labels (pre-existing; Supplier-specific issue was fixed in the previous run)
-- purchase return detail was the last remaining M1/M2 detail-page standardization target — now completed
+- runtime schema tolerance in service code — **resolved in this run**; remaining schema tolerance exists only in migrations (acceptable) and `schema_validation.go` startup check (acceptable)
+- dashboard routing still has a fallback `No route configured` branch for other unmapped labels (pre-existing)
+- upload authorization (P1: files served from `/uploads` rely on path secrecy)
+- password reset delivery (P1: production-readiness checks do not verify SMTP posture)
 
 ## Active milestone state
 
 - `M0 Repo bootstrap and continuity baseline`: completed
-- `M1 Responsive and document workflow baseline`: in progress
+- `M1 Responsive and document workflow baseline`: in progress (UI standardization wave substantially complete)
 - `M2 Shared UI/layout standardization`: in progress
+- `M3 Backend/API hardening`: in progress (first slice complete — runtime schema tolerance removed)
 - `M6 QA/UAT and operational readiness`: blocked pending implementation and manual evidence
 
 ## Subagent note
 
-Not used in this run — the purchase_return_detail_page was already significantly standardized and the gaps were straightforward (error handling, pull-to-refresh, denser desktop items). No subagent delegation was needed for this targeted hardening slice.
+Not used in this run — the runtime schema tolerance probes were straightforward to identify and fix. All three `information_schema` queries were in service code (not migrations), and the columns they probed for were confirmed to exist in the init schema migrations.

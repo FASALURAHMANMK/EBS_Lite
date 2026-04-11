@@ -1,6 +1,6 @@
 # SMB Release Milestones
 
-Updated: 2026-04-11 UTC (Purchase return detail hardening run)
+Updated: 2026-04-11 UTC (M3 transition — runtime schema tolerance removal)
 Status model: `completed`, `in_progress`, `pending`, `blocked`
 
 ## Milestone table
@@ -10,7 +10,7 @@ Status model: `completed`, `in_progress`, `pending`, `blocked`
 | M0 | Repo bootstrap and continuity baseline | completed | none | `docs/inspection/` is populated, stale workflow docs are archived, `.codex` continuity files are current |
 | M1 | Responsive and document workflow baseline | in_progress | M0 | verified module audit exists, Sales reference pattern is documented, rollout priority for non-standard modules is agreed |
 | M2 | Shared UI/layout standardization | in_progress | M1 | shared desktop/mobile document shell exists and is applied to priority modules beyond Sales |
-| M3 | Backend/API hardening | pending | M0 | runtime schema tolerance removed from request paths, OpenAPI classification is tightened, major auth/settings/runtime drift issues are reduced |
+| M3 | Backend/API hardening | in_progress | M0 | runtime schema tolerance removed from service code, OpenAPI endpoint classification started, auth/settings posture reviewed |
 | M4 | DB, performance, and release safety hardening | pending | M3 | top N+1 hotspots, outbox claim races, and DB idempotency gaps have verified mitigation plans or fixes |
 | M5 | Validation, permissions, and security posture | pending | M3 | production config gates, uploads, password reset delivery, and permission-sensitive paths are verified and documented |
 | M6 | QA/UAT and operational readiness | blocked | M1, M3, M4, M5 | blocker UAT scenarios are executed, evidence is attached, release ops docs match reality |

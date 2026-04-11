@@ -1203,16 +1203,10 @@ func (s *PurchaseService) SetPurchaseInvoiceFile(purchaseID, companyID int, path
 	if exists == 0 {
 		return fmt.Errorf("purchase not found")
 	}
-	// Check if column exists; if not, skip update for backward compatibility
-	var colCount int
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'purchases' AND column_name = 'invoice_file'`).Scan(&colCount); err == nil && colCount == 0 {
-		// Silently ignore missing column
-		return nil
-	}
 	if _, err := s.db.Exec(`
-        UPDATE purchases p SET invoice_file = $1, updated_at = CURRENT_TIMESTAMP
-        FROM suppliers s WHERE p.purchase_id = $2 AND p.supplier_id = s.supplier_id AND s.company_id = $3
-    `, path, purchaseID, companyID); err != nil {
+		UPDATE purchases p SET invoice_file = $1, updated_at = CURRENT_TIMESTAMP
+		FROM suppliers s WHERE p.purchase_id = $2 AND p.supplier_id = s.supplier_id AND s.company_id = $3
+	`, path, purchaseID, companyID); err != nil {
 		return fmt.Errorf("failed to set invoice file: %w", err)
 	}
 	return nil
