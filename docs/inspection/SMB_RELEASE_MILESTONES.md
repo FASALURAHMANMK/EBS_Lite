@@ -1,6 +1,6 @@
 # SMB Release Milestones
 
-Updated: 2026-04-11 UTC
+Updated: 2026-04-11 UTC (Suppliers run)
 Status model: `completed`, `in_progress`, `pending`, `blocked`
 
 ## Milestone table
@@ -77,6 +77,11 @@ Current evidence:
   - `customer_management_page.dart` now provides a desktop split workbench with searchable customer queue and in-pane selected-customer review while mobile stays stacked with enhanced list cards and route-driven detail navigation
   - `flutter_app/lib/features/customers/presentation/widgets/customer_workbench_widgets.dart` now provides reusable customer type/status badges, credit chips, metric cards, and a comprehensive customer review card
   - outbox sync refresh behavior preserved and extended to refresh the selected-customer review pane on desktop
+- Supplier Management workbench slice is now implemented:
+  - `suppliers_page.dart` now provides a desktop split workbench with searchable supplier queue and in-pane selected-supplier review while mobile stays stacked with enhanced list cards and route-driven detail navigation
+  - `flutter_app/lib/features/suppliers/presentation/widgets/supplier_workbench_widgets.dart` now provides reusable supplier type/status badges, credit chips, metric cards, and a comprehensive supplier review card
+  - outbox sync refresh was added (was missing in original); client-side filtering replaced server-side re-fetch-on-keystroke
+  - Supplier Balance Workbench button preserved in AppBar
 - several back-office modules still remain mixed or mobile-first
 
 Exit criteria:
@@ -110,6 +115,7 @@ Current evidence:
 - `flutter_app/lib/shared/widgets/workbench_pane.dart` now exists as a generic shared workbench shell and is first used by the Accounts ledger slice
 - `flutter_app/lib/features/accounts/presentation/widgets/accounts_workbench_widgets.dart` now also carries shared account title/status and voucher title/type/line helpers reused by the Chart of Accounts and Vouchers workbenches
 - `flutter_app/lib/features/customers/presentation/widgets/customer_workbench_widgets.dart` now provides shared customer type/status badges, credit chips, metric cards, and a comprehensive customer review card reused by the Customer Management workbench
+- `flutter_app/lib/features/suppliers/presentation/widgets/supplier_workbench_widgets.dart` now provides shared supplier type/status badges, credit chips, metric cards, and a comprehensive supplier review card reused by the Supplier Management workbench
 
 Exit criteria:
 - shared document components are reused across multiple modules

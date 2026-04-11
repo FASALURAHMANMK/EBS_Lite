@@ -1,6 +1,6 @@
 # UI Responsive Audit
 
-Updated: 2026-04-11 UTC
+Updated: 2026-04-11 UTC (Suppliers run)
 Audit mode: static repo inspection plus subagent-assisted Flutter audit
 Runtime device testing: not performed in this run
 
@@ -29,6 +29,7 @@ Runtime device testing: not performed in this run
 | Reports | dense workbench slice implemented | strong | strong | result rendering is still generic-table driven for many endpoints even though the desktop shell is now much stronger |
 | HR | responsive hooks present | mixed | acceptable | landing page still uses older card-grid pattern |
 | Workflow/Notifications | wide-nav handling exists | mixed | acceptable | no verified dense desktop review workbench standard yet |
+| Suppliers | responsive list page plus management workbench slice | strong | strong | management page now follows desktop workbench contract; supplier_detail_page.dart remains without desktop responsive adaptation and bundles payment sheet inline |
 | Web shell | separate product surface | unverified for responsive parity in this run | unverified | tracked manually; outside Flutter responsive baseline |
 
 ## 3. Verified Sales reference pattern
@@ -82,6 +83,7 @@ Strong desktop candidates:
 - `chart_of_accounts_page.dart`
 - `vouchers_page.dart`
 - `customer_management_page.dart`
+- `suppliers_page.dart`
 
 Mixed desktop candidates:
 - `grn_form_page.dart`
@@ -181,10 +183,18 @@ Verified:
   - `_syncDesktopSelection` auto-selecting the first customer on desktop and re-syncing when the filtered queue changes
   - outbox sync refresh behavior preserved and extended to refresh the selected-customer review pane on desktop
   - `flutter_app/lib/features/customers/presentation/widgets/customer_workbench_widgets.dart` providing reusable customer type/status badges, credit chips, metric cards, and a comprehensive customer review card for the workbench
-- Suppliers remain the next rollout target (mirroring the Customer pattern)
+- Supplier Management workbench slice for:
+  - `suppliers_page.dart` gaining a desktop split workbench with a searchable supplier queue and pinned selected-supplier review pane while mobile remains stacked with enhanced list cards (now including type badges) and route-driven detail navigation
+  - the review pane loading supplier detail + summary via existing `getSupplier` + `getSupplierSummary` endpoints so the workbench can show contact details, financial terms, business summary metrics, payment summary, and credit status without a backend contract change
+  - `_syncDesktopSelection` auto-selecting the first supplier on desktop and re-syncing when the filtered queue changes
+  - outbox sync refresh behavior added (was missing in original implementation)
+  - client-side search filtering replaced the original server-side re-fetch-on-keystroke pattern
+  - `flutter_app/lib/features/suppliers/presentation/widgets/supplier_workbench_widgets.dart` providing reusable supplier type/status badges, credit chips, metric cards, and a comprehensive supplier review card for the workbench
+  - Supplier Balance Workbench button preserved in AppBar
 
 Partially verified:
-- Inventory, Accounts, HR, Workflow, Notifications, and Suppliers deeper subpages were sampled but not exhaustively audited file by file
+- Inventory, Accounts, HR, Workflow, Notifications deeper subpages were sampled but not exhaustively audited file by file
+- Suppliers detail page (`supplier_detail_page.dart`) not audited for responsive upgrade (flagged as follow-up)
 
 Unverified:
 - runtime behavior on real phones/tablets/desktops
