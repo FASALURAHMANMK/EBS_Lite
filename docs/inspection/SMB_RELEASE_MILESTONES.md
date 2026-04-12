@@ -1,6 +1,6 @@
 # SMB Release Milestones
 
-Updated: 2026-04-11 UTC (M5 exit evaluation — M1, M2, M3, M4, M5 all ready for exit)
+Updated: 2026-04-12 UTC (M1-M5 formally completed — all implementation milestones done)
 Status model: `completed`, `in_progress`, `pending`, `blocked`
 
 ## Milestone table
@@ -8,11 +8,11 @@ Status model: `completed`, `in_progress`, `pending`, `blocked`
 | ID | Milestone | Status | Depends on | Exit criteria |
 |---|---|---|---|---|
 | M0 | Repo bootstrap and continuity baseline | completed | none | `docs/inspection/` is populated, stale workflow docs are archived, `.codex` continuity files are current |
-| M1 | Responsive and document workflow baseline | ready for exit | M0 | verified module audit exists, Sales reference pattern is documented, all major modules standardized, dashboard routing gap substantially reduced |
-| M2 | Shared UI/layout standardization | ready for exit | M1 | shared desktop/mobile document shell exists and is applied to all priority modules beyond Sales |
-| M3 | Backend/API hardening | ready for exit | M0 | runtime schema tolerance removed from service code, OpenAPI classification tightened, auth/settings/runtime drift issues reduced |
-| M4 | DB, performance, and release safety hardening | ready for exit | M3 | top N+1 hotspots have batch-loading fixes, outbox idempotency hardened, base migration DDL is clean |
-| M5 | Validation, permissions, and security posture | ready for exit | M3 | production config gates verified, uploads authorization confirmed, password reset delivery confirmed, permission-sensitive paths reviewed |
+| M1 | Responsive and document workflow baseline | completed | M0 | verified module audit exists, Sales reference pattern is documented, all major modules standardized, dashboard routing gap substantially reduced |
+| M2 | Shared UI/layout standardization | completed | M1 | shared desktop/mobile document shell exists and is applied to all priority modules beyond Sales |
+| M3 | Backend/API hardening | completed | M0 | runtime schema tolerance removed from service code, OpenAPI classification tightened, auth/settings/runtime drift issues reduced |
+| M4 | DB, performance, and release safety hardening | completed | M3 | top N+1 hotspots have batch-loading fixes, outbox idempotency hardened, base migration DDL is clean |
+| M5 | Validation, permissions, and security posture | completed | M3 | production config gates verified, uploads authorization confirmed, password reset delivery confirmed, permission-sensitive paths reviewed |
 | M6 | QA/UAT and operational readiness | blocked | M1, M3, M4, M5 | blocker UAT scenarios are executed, evidence is attached, release ops docs match reality |
 | M7 | Deployment and final release gate | blocked | M6 | packaged environment verification is complete and a current go/no-go decision is evidence-backed |
 

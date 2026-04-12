@@ -1,6 +1,6 @@
 # Next Run Prompt
 
-Updated: 2026-04-11 UTC (post-M5 exit evaluation — M1, M2, M3, M4, M5 all ready for exit)
+Updated: 2026-04-12 UTC (M1-M5 formally completed — ready for M6/UAT phase)
 
 ## Instructions
 
@@ -14,39 +14,37 @@ Continue the existing EBS Lite milestone workflow. Do not restart discovery.
 - docs/inspection/NEXT_RUN_PROMPT.md (this file)
 
 ### Current milestone context:
-- M0 is complete.
-- M1 is ready for exit (UI standardization wave complete; dashboard routing gap substantially reduced).
-- M2 is ready for exit (shared widget family comprehensive across modules).
-- M3 is ready for exit (5 slices covering all P0/P1 backend risks).
-- M4 is ready for exit (3 slices covering highest-impact DB/performance risks).
-- M5 is ready for exit (2 slices covering validation, permissions, and security posture).
-- All M1-M5 milestones are now ready for exit.
+- M0-M5 are all formally **completed**.
+- M6 (QA/UAT) is the next active milestone — currently blocked pending manual release-candidate UAT sign-off.
+- M7 (Deployment) is blocked pending M6 completion.
+- All automated quality gates pass:
+  - Flutter: analyze (0 errors), test (15/15 pass), format (0 changes)
+  - API parity: zero missing paths, zero method mismatches
 - Remaining blockers:
-  - M6 (QA/UAT): blocked pending manual release-candidate UAT sign-off
-  - M7 (Deployment): blocked pending M6 completion
-  - P0: missing `ebs_lite_win/Requirements.txt`
-  - P0: manual release-candidate UAT sign-off
+  - Manual release-candidate UAT sign-off (M6)
+  - Missing `ebs_lite_win/Requirements.txt` (P0)
+  - Go quality gates unverifiable in this environment (toolchain unavailable)
 
 ### Objective (pick the strongest remaining work):
 
-Option A: Formally mark M1-M5 as completed
-- Update SMB_RELEASE_MILESTONES.md to change M1-M5 status from "ready for exit" to "completed"
-- Update CURRENT_STATUS_SNAPSHOT.md to reflect all implementation milestones complete
-- Prepare release candidate documentation summary
+Option A: M6 UAT test-plan preparation
+- Create a structured UAT test plan covering all P0/P1 user journeys
+- Define pass/fail criteria and evidence requirements for M6 exit
+- Map test cases to existing Flutter test suite gaps
 
-Option B: Release candidate package preparation
-- Ensure all release documentation is current and cross-referenced
-- Verify RELEASE_READINESS_PLAN.md gates are satisfied (except UAT)
-- Prepare release notes template
+Option B: Release candidate documentation package
+- Assemble RELEASE_NOTES.md with all M1-M5 changes
+- Ensure RELEASE_READINESS_PLAN.md gates are documented as satisfied (except UAT)
+- Cross-reference all release artifacts
 
-Option C: Import/Export permission hardening (optional)
-- Add backend permission checks for bulk import/export endpoints
-- Add Flutter-side permission checks for Import/Export page
+Option C: Minor polish — consolidate Sales-local professional_document_widgets.dart
+- Replace the Sales-local copy import in sales_returns_page.dart with the shared version
+- Verify no behavioral change
 
-Pick Option A (formally mark M1-M5 as completed) as the recommended path. This is the final implementation milestone before the M6/UAT phase.
+Pick Option A (M6 UAT test-plan preparation) as the recommended path. This unblocks the M6 milestone with a concrete, executable test plan rather than waiting passively.
 
 ### Subagent requirements:
-- Use architect-reviewer (or general-purpose fallback) for cross-module consistency review
+- Use architect-reviewer (or general-purpose fallback) to validate UAT test-plan coverage against the ERP requirements document
 
 ### Verification:
 - `flutter analyze`

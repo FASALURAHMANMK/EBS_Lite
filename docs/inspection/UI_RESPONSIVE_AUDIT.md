@@ -1,6 +1,6 @@
 # UI Responsive Audit
 
-Updated: 2026-04-11 UTC (Purchase return detail hardening run)
+Updated: 2026-04-12 UTC (M1-M5 formally completed — audit baseline current)
 Audit mode: static repo inspection plus subagent-assisted Flutter audit
 Runtime device testing: not performed in this run
 
@@ -218,3 +218,20 @@ Partially verified:
 Unverified:
 - runtime behavior on real phones/tablets/desktops
 - hidden routes that may still reach the dashboard fallback page
+
+## 9. M1-M5 Completion re-audit (2026-04-12)
+
+Cross-module consistency review (architect-reviewer subagent) confirmed:
+
+### Confirmed holding
+- `ProfessionalDocumentHeader`, `ProfessionalSectionCard`, `ProfessionalSummaryCard`, `ProfessionalBadge`, `ProfessionalFieldGrid`, `ProfessionalOverviewCard`, `ProfessionalDocumentEmptyState` imported by 33 files across Sales, Purchases, Accounts, Customers, Suppliers
+- `WorkbenchPane` imported by 6 files (Accounts ledgers, chart-of-accounts, vouchers; Customer Management; Supplier Management) — no feature-local clones
+- `FeatureMenu` imported by 6 module landing pages (Sales, Customers, Inventory, Purchases, Accounting, Reports) — responsive grid-on-mobile, list-on-desktop
+
+### Known pre-existing inconsistencies (not worsened)
+- HR landing page still uses `FeatureGrid` directly instead of `FeatureMenu`
+- Inventory pages still use `GridView` heavily (5 pages sampled)
+- 3 "coming soon" placeholders in `dashboard_navigation.dart` (Supplier Debit Notes, Promotions, Returns workbench)
+
+### New observation
+- `sales_returns_page.dart` imports a Sales-local copy of `professional_document_widgets.dart` rather than the shared version. If the local copy diverges, Sales returns will show inconsistent styling. Consolidation recommended but not a release blocker.
