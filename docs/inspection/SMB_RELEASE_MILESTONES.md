@@ -1,6 +1,6 @@
 # SMB Release Milestones
 
-Updated: 2026-04-11 UTC (Dashboard route gap fix)
+Updated: 2026-04-11 UTC (M3/M4 exit evaluation)
 Status model: `completed`, `in_progress`, `pending`, `blocked`
 
 ## Milestone table
@@ -8,10 +8,10 @@ Status model: `completed`, `in_progress`, `pending`, `blocked`
 | ID | Milestone | Status | Depends on | Exit criteria |
 |---|---|---|---|---|
 | M0 | Repo bootstrap and continuity baseline | completed | none | `docs/inspection/` is populated, stale workflow docs are archived, `.codex` continuity files are current |
-| M1 | Responsive and document workflow baseline | in progress | M0 | verified module audit exists, Sales reference pattern is documented, rollout priority for non-standard modules is agreed, dashboard routing gap substantially reduced |
-| M2 | Shared UI/layout standardization | in_progress | M1 | shared desktop/mobile document shell exists and is applied to priority modules beyond Sales |
-| M3 | Backend/API hardening | in_progress | M0 | runtime schema tolerance removed from service code, OpenAPI endpoint classification started, auth/settings posture reviewed |
-| M4 | DB, performance, and release safety hardening | in progress | M3 | top N+1 hotspots have batch-loading fixes; outbox idempotency has client-side duplicate detection + unique index + backend unique constraints; base migration DDL is clean with zero duplicates |
+| M1 | Responsive and document workflow baseline | ready for exit | M0 | verified module audit exists, Sales reference pattern is documented, all major modules standardized, dashboard routing gap substantially reduced |
+| M2 | Shared UI/layout standardization | ready for exit | M1 | shared desktop/mobile document shell exists and is applied to all priority modules beyond Sales |
+| M3 | Backend/API hardening | ready for exit | M0 | runtime schema tolerance removed from service code, OpenAPI classification tightened, auth/settings/runtime drift issues reduced |
+| M4 | DB, performance, and release safety hardening | ready for exit | M3 | top N+1 hotspots have batch-loading fixes, outbox idempotency hardened, base migration DDL is clean |
 | M5 | Validation, permissions, and security posture | pending | M3 | production config gates, uploads, password reset delivery, and permission-sensitive paths are verified and documented |
 | M6 | QA/UAT and operational readiness | blocked | M1, M3, M4, M5 | blocker UAT scenarios are executed, evidence is attached, release ops docs match reality |
 | M7 | Deployment and final release gate | blocked | M6 | packaged environment verification is complete and a current go/no-go decision is evidence-backed |

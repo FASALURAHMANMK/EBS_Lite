@@ -1,6 +1,6 @@
 # Next Run Prompt
 
-Updated: 2026-04-11 UTC (post-dashboard route gap fix)
+Updated: 2026-04-11 UTC (post-M3/M4 exit evaluation — M1, M2, M3, M4 ready for exit)
 
 ## Instructions
 
@@ -15,37 +15,40 @@ Continue the existing EBS Lite milestone workflow. Do not restart discovery.
 
 ### Current milestone context:
 - M0 is complete.
-- M1 is in progress (UI standardization wave substantially complete; dashboard routing gap substantially reduced).
-- M2 is in progress (shared widget family comprehensive across modules).
-- M3 is substantially complete (5 slices covering all P0/P1 backend risks).
-- M4 is in progress — 3 slices complete:
-  - N+1 hotspots fixed in collection service (`GetCollections`, `GetOutstanding`)
-  - Outbox idempotency hardened (client-side duplicate detection + unique index + backend unique constraints)
-  - Migration hygiene cleaned (zero duplicate DDL in base migration)
-- Remaining targets:
-  - Evaluate M3/M4 exit readiness
-  - Consider M5 transition (validation, permissions, and security posture)
-- Remaining P0:
-  - missing `ebs_lite_win/Requirements.txt`
-  - manual release-candidate UAT sign-off
+- M1 is ready for exit (UI standardization wave complete; dashboard routing gap substantially reduced).
+- M2 is ready for exit (shared widget family comprehensive across modules).
+- M3 is ready for exit (5 slices covering all P0/P1 backend risks).
+- M4 is ready for exit (3 slices covering highest-impact DB/performance risks).
+- M5 is pending — validation, permissions, and security posture.
 
-### Objective (pick the strongest slice):
+### M5 Scope (from SMB_RELEASE_MILESTONES.md):
+- tighten upload confidentiality (already addressed in M3)
+- verify password reset deliverability and production-readiness checks (already addressed in M3)
+- review permission-sensitive settings/admin flows
+- verify release config guidance against actual code paths
 
-Option A: Evaluate M3/M4 exit readiness and plan M5
-- Assess whether the 5 M3 slices and 3 M4 slices are sufficient for exit
-- Document the current state and plan M5 (validation, permissions, and security posture)
+### Objective (pick the strongest M5 slice):
 
-Option B: Continue with remaining M4 targets
-- Any remaining N+1 hotspots discovered through profiling
-- Outbox claim race verification edge cases
-- Dashboard route gap further reduction
+Option A: Settings/admin permission flow review
+- Review settings_page.dart and admin pages for proper permission checks
+- Verify that sensitive admin operations require appropriate permissions
+- Ensure role-based access control is enforced on settings endpoints
 
-Pick Option A (M3/M4 exit evaluation) as the recommended path. The M3 and M4 workstreams have accumulated substantial evidence of completion across 8 slices. It's time to evaluate exit readiness and plan the next phase.
+Option B: Release config guidance verification
+- Verify that RELEASE_READINESS_PLAN.md and config guidance match actual code paths
+- Update docs where they diverge from implementation
+- Ensure production config gates are properly documented
+
+Option C: M3/M4 formal exit documentation
+- Formally mark M3 and M4 as completed in the milestone docs
+- Prepare the M5 kickoff document
+
+Pick Option A (settings/admin permission flow review) as the recommended path. This addresses the remaining M5 scope item that hasn't been covered yet.
 
 ### Subagent requirements:
-- Use architect-reviewer (or general-purpose fallback) for cross-module consistency review
-- Use golang-pro (or general-purpose fallback) for backend code review if needed
-- Use flutter-expert (or general-purpose fallback) for Flutter review if needed
+- Use flutter-expert (or general-purpose fallback) for Flutter permission flow review
+- Use golang-pro (or general-purpose fallback) for backend permission enforcement review
+- Use architect-reviewer (or general-purpose fallback) for cross-module consistency
 
 ### Verification:
 - `flutter analyze`
