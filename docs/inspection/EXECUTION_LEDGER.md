@@ -1,6 +1,6 @@
 # Execution Ledger
 
-Last updated: 2026-04-11 UTC (M5 first slice — settings/admin permission flow review)
+Last updated: 2026-04-11 UTC (M5 second slice — release config guidance verification)
 
 ## Completed
 

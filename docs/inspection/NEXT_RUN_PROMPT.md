@@ -1,6 +1,6 @@
 # Next Run Prompt
 
-Updated: 2026-04-11 UTC (post-M5-first-slice — settings/admin permission flow hardened)
+Updated: 2026-04-11 UTC (post-M5-second-slice — release config guidance verified)
 
 ## Instructions
 
@@ -19,26 +19,25 @@ Continue the existing EBS Lite milestone workflow. Do not restart discovery.
 - M2 is ready for exit (shared widget family comprehensive across modules).
 - M3 is ready for exit (5 slices covering all P0/P1 backend risks).
 - M4 is ready for exit (3 slices covering highest-impact DB/performance risks).
-- M5 is in progress — first slice complete (settings/admin permission flow reviewed and hardened).
+- M5 is in progress — second slice complete (release config guidance verified and RELEASE_BLOCKERS_AND_RISKS.md updated).
 - Remaining M5 targets:
-  - verify release config guidance against actual code paths
+  - evaluate M5 exit readiness (settings/admin permission flow + release config guidance)
 
 ### Objective (pick the strongest M5 slice):
 
-Option A: Release config guidance verification
-- Verify that RELEASE_READINESS_PLAN.md and config guidance match actual code paths
-- Update docs where they diverge from implementation
-- Ensure production config gates are properly documented
+Option A: M5 exit evaluation and documentation
+- Assess whether the 2 M5 slices are sufficient for exit
+- Document M5 exit assessment in EXECUTION_LEDGER.md and CURRENT_STATUS_SNAPSHOT.md
+- Update SMB_RELEASE_MILESTONES.md M5 status accordingly
 
-Option B: Evaluate M5 exit readiness
-- Assess whether the 2 M5 slices (settings permission flow + config guidance verification) are sufficient for exit
-- Document M5 exit assessment
+Option B: Further M5 hardening
+- Import/Export page permission check (no backend permission enforcement for bulk import/export)
+- Additional permission-sensitive settings review
 
-Pick Option A (release config guidance verification) as the recommended path. This is the remaining M5 scope item that hasn't been covered yet.
+Pick Option A (M5 exit evaluation) as the recommended path. The 2 completed M5 slices cover the core M5 scope items: settings/admin permission flow reviewed and release config guidance verified. Further hardening (Import/Export permissions) can be tracked as M5 follow-up or deferred to M6.
 
 ### Subagent requirements:
 - Use architect-reviewer (or general-purpose fallback) for cross-module consistency
-- Use golang-pro (or general-purpose fallback) for backend code review if needed
 
 ### Verification:
 - `flutter analyze`
