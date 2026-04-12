@@ -1,6 +1,6 @@
 # SMB Release Milestones
 
-Updated: 2026-04-11 UTC (M5 first slice — settings/admin permission flow review)
+Updated: 2026-04-11 UTC (M5 exit evaluation — M1, M2, M3, M4, M5 all ready for exit)
 Status model: `completed`, `in_progress`, `pending`, `blocked`
 
 ## Milestone table
@@ -12,7 +12,7 @@ Status model: `completed`, `in_progress`, `pending`, `blocked`
 | M2 | Shared UI/layout standardization | ready for exit | M1 | shared desktop/mobile document shell exists and is applied to all priority modules beyond Sales |
 | M3 | Backend/API hardening | ready for exit | M0 | runtime schema tolerance removed from service code, OpenAPI classification tightened, auth/settings/runtime drift issues reduced |
 | M4 | DB, performance, and release safety hardening | ready for exit | M3 | top N+1 hotspots have batch-loading fixes, outbox idempotency hardened, base migration DDL is clean |
-| M5 | Validation, permissions, and security posture | pending | M3 | production config gates, uploads, password reset delivery, and permission-sensitive paths are verified and documented |
+| M5 | Validation, permissions, and security posture | ready for exit | M3 | production config gates verified, uploads authorization confirmed, password reset delivery confirmed, permission-sensitive paths reviewed |
 | M6 | QA/UAT and operational readiness | blocked | M1, M3, M4, M5 | blocker UAT scenarios are executed, evidence is attached, release ops docs match reality |
 | M7 | Deployment and final release gate | blocked | M6 | packaged environment verification is complete and a current go/no-go decision is evidence-backed |
 

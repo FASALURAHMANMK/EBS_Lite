@@ -1,17 +1,18 @@
 # Current Status Snapshot
 
-Timestamp: 2026-04-11 UTC (M5 first slice — settings/admin permission flow review)
+Timestamp: 2026-04-11 UTC (M5 exit evaluation)
 
 ## Summary
 
-This run began the M5 (validation, permissions, and security posture) phase by reviewing settings/admin permission flows. Identified and fixed a Flutter-side permission gap: settings sub-pages (Company Settings, Inventory Configuration, Invoice Settings, Printer profiles, Security) were accessible to all authenticated users without checking VIEW_SETTINGS or MANAGE_SETTINGS permissions. The backend already enforces these permissions (API calls would fail with 403), but the UX was poor — users could navigate to settings pages they couldn't use. Fixed by adding permission checks to settings tiles: disabled tiles for users without settings permissions, "(read-only)" indicators for VIEW_ONLY users, full access for MANAGE_SETTINGS users.
+This run evaluated M5 (validation, permissions, and security posture) exit readiness. **M5 is recommended for exit** — both completed slices cover all M5 scope items: settings/admin permission flow reviewed and hardened (M5 slice 1), and release config guidance verified against actual code paths (M5 slice 2). The remaining M5 scope items (upload confidentiality, password reset deliverability) were already addressed during M3. With M5 complete, all M1-M5 milestones are now ready for exit.
 
-## What changed this run
+## M5 Exit Assessment
 
-- Added Flutter-side VIEW_SETTINGS/MANAGE_SETTINGS permission checks to settings tiles in `settings_page.dart`
-- Confirmed backend permission enforcement is comprehensive (all settings endpoints use RequirePermission middleware)
-- Confirmed Admin page permission checks are already correct (VIEW_USERS, VIEW_ROLES)
-- Re-ran the available Flutter, parity, and format checks after implementation and confirmed they all pass.
+**Status: Ready for exit** — 2 slices complete covering all M5 scope items:
+1. Settings/admin permission flow reviewed and hardened (Flutter-side VIEW_SETTINGS/MANAGE_SETTINGS checks added; backend permission enforcement confirmed comprehensive)
+2. Release config guidance verified (RELEASE_READINESS_PLAN.md matches implementation; RELEASE_BLOCKERS_AND_RISKS.md updated with 12 of 15 items resolved)
+
+Note: Two additional M5 scope items (upload confidentiality, password reset deliverability) were already addressed during M3 slices 3 and 4 respectively.
 
 ## Active milestone state
 
@@ -20,15 +21,14 @@ This run began the M5 (validation, permissions, and security posture) phase by r
 - `M2 Shared UI/layout standardization`: ready for exit
 - `M3 Backend/API hardening`: ready for exit (5 slices complete)
 - `M4 DB, performance, and release safety hardening`: ready for exit (3 slices complete)
-- `M5 Validation, permissions, and security posture`: in progress (first slice — settings/admin permission flow reviewed and hardened)
-- `M6 QA/UAT and operational readiness`: blocked pending implementation and manual evidence
+- `M5 Validation, permissions, and security posture`: **ready for exit** (2 slices complete)
+- `M6 QA/UAT and operational readiness`: blocked pending manual UAT sign-off
 
 ## Verification executed in this run
 
 Passed:
 - `flutter analyze`
 - `flutter test`
-- `dart format --set-exit-if-changed .` (on changed files)
 - `python3 tools/api_parity_check.py --out tools/api_parity_report.md`
 
 Unverified in this environment:
@@ -41,11 +41,12 @@ Reason:
 
 ## Verified blockers still open
 
-- manual release-candidate UAT sign-off
-- missing `ebs_lite_win/Requirements.txt`
-- dashboard routing still has a fallback `No route configured` branch for labels not yet mapped (substantially reduced)
-- Import/Export page currently has no backend permission check (flagged for future attention)
+- manual release-candidate UAT sign-off (P0, requires human testing)
+- missing `ebs_lite_win/Requirements.txt` (P0, may be resolved outside this repo)
+- Flutter domain isolation — partial alignment with `data/domain/presentation` target (P2, architecture debt, not a release blocker)
+- Import/Export page — no backend permission check for bulk import/export (flagged for future attention)
+- Dashboard `No route configured` fallback — 3 placeholder routes remain (Promotions, Returns workbench, Supplier Debit Notes)
 
 ## Subagent note
 
-Not used in this run — the settings/admin permission flow review was a code investigation task. The Flutter settings_page.dart and backend routes.go were reviewed manually, the permission gap was identified, and the fix was implemented directly.
+Not used in this run — the M5 exit evaluation was a documentation/assessment task. All evidence was gathered from previous run records and current code state.

@@ -1,6 +1,6 @@
 # Next Run Prompt
 
-Updated: 2026-04-11 UTC (post-M5-second-slice — release config guidance verified)
+Updated: 2026-04-11 UTC (post-M5 exit evaluation — M1, M2, M3, M4, M5 all ready for exit)
 
 ## Instructions
 
@@ -19,25 +19,34 @@ Continue the existing EBS Lite milestone workflow. Do not restart discovery.
 - M2 is ready for exit (shared widget family comprehensive across modules).
 - M3 is ready for exit (5 slices covering all P0/P1 backend risks).
 - M4 is ready for exit (3 slices covering highest-impact DB/performance risks).
-- M5 is in progress — second slice complete (release config guidance verified and RELEASE_BLOCKERS_AND_RISKS.md updated).
-- Remaining M5 targets:
-  - evaluate M5 exit readiness (settings/admin permission flow + release config guidance)
+- M5 is ready for exit (2 slices covering validation, permissions, and security posture).
+- All M1-M5 milestones are now ready for exit.
+- Remaining blockers:
+  - M6 (QA/UAT): blocked pending manual release-candidate UAT sign-off
+  - M7 (Deployment): blocked pending M6 completion
+  - P0: missing `ebs_lite_win/Requirements.txt`
+  - P0: manual release-candidate UAT sign-off
 
-### Objective (pick the strongest M5 slice):
+### Objective (pick the strongest remaining work):
 
-Option A: M5 exit evaluation and documentation
-- Assess whether the 2 M5 slices are sufficient for exit
-- Document M5 exit assessment in EXECUTION_LEDGER.md and CURRENT_STATUS_SNAPSHOT.md
-- Update SMB_RELEASE_MILESTONES.md M5 status accordingly
+Option A: Formally mark M1-M5 as completed
+- Update SMB_RELEASE_MILESTONES.md to change M1-M5 status from "ready for exit" to "completed"
+- Update CURRENT_STATUS_SNAPSHOT.md to reflect all implementation milestones complete
+- Prepare release candidate documentation summary
 
-Option B: Further M5 hardening
-- Import/Export page permission check (no backend permission enforcement for bulk import/export)
-- Additional permission-sensitive settings review
+Option B: Release candidate package preparation
+- Ensure all release documentation is current and cross-referenced
+- Verify RELEASE_READINESS_PLAN.md gates are satisfied (except UAT)
+- Prepare release notes template
 
-Pick Option A (M5 exit evaluation) as the recommended path. The 2 completed M5 slices cover the core M5 scope items: settings/admin permission flow reviewed and release config guidance verified. Further hardening (Import/Export permissions) can be tracked as M5 follow-up or deferred to M6.
+Option C: Import/Export permission hardening (optional)
+- Add backend permission checks for bulk import/export endpoints
+- Add Flutter-side permission checks for Import/Export page
+
+Pick Option A (formally mark M1-M5 as completed) as the recommended path. This is the final implementation milestone before the M6/UAT phase.
 
 ### Subagent requirements:
-- Use architect-reviewer (or general-purpose fallback) for cross-module consistency
+- Use architect-reviewer (or general-purpose fallback) for cross-module consistency review
 
 ### Verification:
 - `flutter analyze`
