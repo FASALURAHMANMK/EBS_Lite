@@ -1,6 +1,6 @@
 # SMB Release Milestones
 
-Updated: 2026-04-11 UTC (M3/M4 exit evaluation)
+Updated: 2026-04-11 UTC (M5 first slice — settings/admin permission flow review)
 Status model: `completed`, `in_progress`, `pending`, `blocked`
 
 ## Milestone table

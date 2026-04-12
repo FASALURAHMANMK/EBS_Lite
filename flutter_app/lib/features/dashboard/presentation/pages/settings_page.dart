@@ -33,6 +33,9 @@ class SettingsPage extends ConsumerWidget {
     final perms = ref.watch(authPermissionsProvider);
     final showAdmin =
         perms.contains('VIEW_USERS') || perms.contains('VIEW_ROLES');
+    final hasSettings =
+        perms.contains('VIEW_SETTINGS') || perms.contains('MANAGE_SETTINGS');
+    final canManageSettings = perms.contains('MANAGE_SETTINGS');
     final scaffold = Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: !fromMenu,
@@ -120,74 +123,97 @@ class SettingsPage extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.business_rounded),
             title: const Text('Company Settings'),
-            subtitle: const Text('Company profile, taxes, payment methods'),
+            subtitle: Text(
+                'Company profile, taxes, payment methods${hasSettings && !canManageSettings ? ' (read-only)' : ''}'),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: theme.colorScheme.surface,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CompanySettingsPage()),
-              );
-            },
+            enabled: hasSettings,
+            onTap: hasSettings
+                ? () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const CompanySettingsPage()),
+                    );
+                  }
+                : null,
           ),
           const SizedBox(height: 12),
           ListTile(
             leading: const Icon(Icons.inventory_2_rounded),
             title: const Text('Inventory Configuration'),
-            subtitle: const Text(
-                'View costing method and manage stock and profit guards'),
+            subtitle: Text(
+                'View costing method and manage stock and profit guards${hasSettings && !canManageSettings ? ' (read-only)' : ''}'),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: theme.colorScheme.surface,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const InventorySettingsPage(),
-                ),
-              );
-            },
+            enabled: hasSettings,
+            onTap: hasSettings
+                ? () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const InventorySettingsPage(),
+                      ),
+                    );
+                  }
+                : null,
           ),
           const SizedBox(height: 12),
           ListTile(
             leading: const Icon(Icons.receipt_long_rounded),
             title: const Text('Invoice Settings'),
-            subtitle: const Text('Numbering + templates'),
+            subtitle: Text(
+                'Numbering + templates${hasSettings && !canManageSettings ? ' (read-only)' : ''}'),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: theme.colorScheme.surface,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const InvoiceSettingsPage()),
-              );
-            },
+            enabled: hasSettings,
+            onTap: hasSettings
+                ? () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const InvoiceSettingsPage()),
+                    );
+                  }
+                : null,
           ),
           const SizedBox(height: 12),
           ListTile(
             leading: const Icon(Icons.print_rounded),
             title: const Text('Printer profiles'),
-            subtitle: const Text('Server-side printer configurations'),
+            subtitle: Text(
+                'Server-side printer configurations${hasSettings && !canManageSettings ? ' (read-only)' : ''}'),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: theme.colorScheme.surface,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const PrinterProfilesPage()),
-              );
-            },
+            enabled: hasSettings,
+            onTap: hasSettings
+                ? () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const PrinterProfilesPage()),
+                    );
+                  }
+                : null,
           ),
           const SizedBox(height: 12),
           ListTile(
             leading: const Icon(Icons.security_rounded),
             title: const Text('Security'),
-            subtitle: const Text('Step-up approval, password, sessions'),
+            subtitle: Text(
+                'Step-up approval, password, sessions${hasSettings && !canManageSettings ? ' (read-only)' : ''}'),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: theme.colorScheme.surface,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SecuritySettingsPage()),
-              );
-            },
+            enabled: hasSettings,
+            onTap: hasSettings
+                ? () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const SecuritySettingsPage()),
+                    );
+                  }
+                : null,
           ),
           const SizedBox(height: 12),
           if (showAdmin)

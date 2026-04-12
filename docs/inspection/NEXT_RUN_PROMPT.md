@@ -1,6 +1,6 @@
 # Next Run Prompt
 
-Updated: 2026-04-11 UTC (post-M3/M4 exit evaluation — M1, M2, M3, M4 ready for exit)
+Updated: 2026-04-11 UTC (post-M5-first-slice — settings/admin permission flow hardened)
 
 ## Instructions
 
@@ -19,36 +19,26 @@ Continue the existing EBS Lite milestone workflow. Do not restart discovery.
 - M2 is ready for exit (shared widget family comprehensive across modules).
 - M3 is ready for exit (5 slices covering all P0/P1 backend risks).
 - M4 is ready for exit (3 slices covering highest-impact DB/performance risks).
-- M5 is pending — validation, permissions, and security posture.
-
-### M5 Scope (from SMB_RELEASE_MILESTONES.md):
-- tighten upload confidentiality (already addressed in M3)
-- verify password reset deliverability and production-readiness checks (already addressed in M3)
-- review permission-sensitive settings/admin flows
-- verify release config guidance against actual code paths
+- M5 is in progress — first slice complete (settings/admin permission flow reviewed and hardened).
+- Remaining M5 targets:
+  - verify release config guidance against actual code paths
 
 ### Objective (pick the strongest M5 slice):
 
-Option A: Settings/admin permission flow review
-- Review settings_page.dart and admin pages for proper permission checks
-- Verify that sensitive admin operations require appropriate permissions
-- Ensure role-based access control is enforced on settings endpoints
-
-Option B: Release config guidance verification
+Option A: Release config guidance verification
 - Verify that RELEASE_READINESS_PLAN.md and config guidance match actual code paths
 - Update docs where they diverge from implementation
 - Ensure production config gates are properly documented
 
-Option C: M3/M4 formal exit documentation
-- Formally mark M3 and M4 as completed in the milestone docs
-- Prepare the M5 kickoff document
+Option B: Evaluate M5 exit readiness
+- Assess whether the 2 M5 slices (settings permission flow + config guidance verification) are sufficient for exit
+- Document M5 exit assessment
 
-Pick Option A (settings/admin permission flow review) as the recommended path. This addresses the remaining M5 scope item that hasn't been covered yet.
+Pick Option A (release config guidance verification) as the recommended path. This is the remaining M5 scope item that hasn't been covered yet.
 
 ### Subagent requirements:
-- Use flutter-expert (or general-purpose fallback) for Flutter permission flow review
-- Use golang-pro (or general-purpose fallback) for backend permission enforcement review
 - Use architect-reviewer (or general-purpose fallback) for cross-module consistency
+- Use golang-pro (or general-purpose fallback) for backend code review if needed
 
 ### Verification:
 - `flutter analyze`

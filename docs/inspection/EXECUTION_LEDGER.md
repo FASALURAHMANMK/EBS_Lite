@@ -1,35 +1,32 @@
 # Execution Ledger
 
-Last updated: 2026-04-11 UTC (M3/M4 exit evaluation)
+Last updated: 2026-04-11 UTC (M5 first slice — settings/admin permission flow review)
 
 ## Completed
 
 - Continued the existing milestone workflow without restarting discovery.
 - Read the NEXT_RUN_PROMPT.md and required continuity docs.
-- Evaluated M3 (backend/API hardening) exit readiness:
-  - **5 slices complete**, covering all P0/P1 backend risks identified in the release blockers doc:
-    1. Runtime schema tolerance removed (3 probes eliminated from purchase_return_service.go and purchase_service.go)
-    2. OpenAPI endpoint classification done (35 endpoints classified, 7 annotated with x-status)
-    3. Upload authorization hardened (JWT auth + company ownership verification for all file access)
-    4. Password reset delivery hardened (STARTTLS, SMTP health check, FrontendBaseURL validation, session invalidation, strict rate limiting, configurable token expiry)
-    5. Settings permission seeding reviewed and hardened (app uses role names, startup verification added)
-  - **Exit criteria met**: runtime schema tolerance removed from service code ✓, OpenAPI classification tightened ✓, auth/settings/runtime drift issues reduced ✓
-  - **Recommendation**: M3 is ready for exit
-- Evaluated M4 (DB/performance/release safety) exit readiness:
-  - **3 slices complete**, covering the highest-impact DB/performance risks:
-    1. N+1 hotspots fixed (collection service batch loading for GetCollections and GetOutstanding)
-    2. Outbox idempotency hardened (client-side duplicate detection + unique index + backend unique constraints)
-    3. Migration hygiene cleaned (zero duplicate DDL in base migration)
-  - **Partial exit criteria met**: top N+1 hotspots have batch-loading fixes ✓, outbox claim races have verified mitigation ✓, DB idempotency gaps addressed ✓
-  - **Remaining gaps**: not all N+1 paths profiled (dashboard, stock adjustment paths not yet measured), but the highest-impact ones are fixed
-  - **Recommendation**: M4 is ready for exit with the caveat that further N+1 optimization should be driven by profiling data, not speculation
-- Re-ran Flutter checks (analyze, test) and API parity — all pass
-- Attempted Go quality gates — Go toolchain unavailable in this environment
+- Implemented the M5 first slice — settings/admin permission flow review:
+  - **Reviewed the settings permission architecture**:
+    - Backend: All settings endpoints use `RequirePermission("VIEW_SETTINGS")` or `RequirePermission("MANAGE_SETTINGS")` middleware — properly enforced
+    - Backend: Admin endpoints (users, roles, permissions) use `RequirePermission("VIEW_USERS")`, `RequirePermission("VIEW_ROLES")`, etc. — properly enforced
+    - Backend: Company logo upload uses `RequirePermission("MANAGE_SETTINGS")` — properly enforced
+    - Frontend: `AdminPage` properly checks `VIEW_USERS` and `VIEW_ROLES` before showing sub-pages ✓
+    - Frontend: `SettingsPage` previously did NOT check `VIEW_SETTINGS` or `MANAGE_SETTINGS` before allowing navigation to settings sub-pages — **GAP IDENTIFIED**
+  - **Fixed the Flutter-side permission gap** in `settings_page.dart`:
+    - Added `hasSettings` check (VIEW_SETTINGS or MANAGE_SETTINGS) for Company Settings, Inventory Configuration, Invoice Settings, Printer profiles, and Security tiles
+    - Users without any settings permission now see disabled tiles (cannot navigate)
+    - Users with VIEW_SETTINGS but not MANAGE_SETTINGS see "(read-only)" indicators in subtitles
+    - Users with MANAGE_SETTINGS get full access (no change from previous behavior)
+    - Theme, Dashboard, Notifications, and Language & Region tiles remain accessible to all authenticated users (user-level preferences, not company-wide settings)
+  - **Confirmed Admin page permission enforcement** is already correct (checks VIEW_USERS and VIEW_ROLES before showing sub-pages)
+  - **Confirmed backend permission enforcement** is comprehensive — all settings endpoints require VIEW_SETTINGS or MANAGE_SETTINGS
+  - Re-ran Flutter checks (analyze, test, format) and API parity — all pass.
+  - Attempted Go quality gates — Go toolchain unavailable in this environment.
 
 ## In progress
 
-- M3 (backend/API hardening) — ready for exit
-- M4 (DB/performance/release safety) — ready for exit
+- M5 (validation, permissions, and security posture) — first slice complete (settings/admin permission flow reviewed and hardened)
 
 ## Blocked
 
@@ -39,26 +36,26 @@ Last updated: 2026-04-11 UTC (M3/M4 exit evaluation)
 
 ## Pending
 
-- Transition to M5 (validation, permissions, and security posture)
-- Optional: further N+1 optimization driven by profiling data (not speculation)
+- verify release config guidance against actual code paths (remaining M5 scope item)
+- Import/Export page currently has no backend permission check — flagged for future attention
 
 ## Next recommended action
 
-Transition to M5 (validation, permissions, and security posture):
-- review permission-sensitive settings/admin flows
-- verify release config guidance against actual code paths
-- or evaluate M3/M4 formal exit and prepare M5 kickoff document
+Continue M5:
+- verify RELEASE_READINESS_PLAN.md and config guidance match actual code paths
+- or evaluate M5 exit readiness after remaining scope item is addressed
 
 ## Last updated scope
 
-M3/M4 exit evaluation:
-- M3: 5 slices complete, all exit criteria met — ready for exit
-- M4: 3 slices complete, highest-impact risks addressed — ready for exit with caveat
-- No code changes; documentation/assessment only
+M5 first slice — settings/admin permission flow review:
+- added Flutter-side VIEW_SETTINGS/MANAGE_SETTINGS checks to settings tiles
+- confirmed backend permission enforcement is comprehensive
+- confirmed Admin page permission checks are already correct
+- no backend/API changes required
 
 ## Subagent record
 
-Not used in this run — the M3/M4 exit evaluation was a documentation/assessment task. All evidence was gathered from previous run records and current code state.
+Not used in this run — the settings/admin permission flow review was a code investigation task. The Flutter settings_page.dart and backend routes.go were reviewed manually, the permission gap was identified, and the fix was implemented directly.
 
 ## Milestone mapping
 
@@ -69,5 +66,5 @@ Not used in this run — the M3/M4 exit evaluation was a documentation/assessmen
 | shared document standard rollout | M2 | ready for exit |
 | backend/API/runtime hardening | M3 | ready for exit |
 | DB/performance/release safety | M4 | ready for exit |
-| validation/permissions/security | M5 | pending (recommended next) |
+| validation/permissions/security | M5 | in progress (first slice) |
 | UAT and release gate | M6, M7 | blocked |
