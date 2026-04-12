@@ -1,6 +1,6 @@
 # Next Run Prompt
 
-Updated: 2026-04-12 UTC (M1-M5 formally completed — ready for M6/UAT phase)
+Updated: 2026-04-12 UTC (M6 UAT test plan created and validated — awaiting manual execution)
 
 ## Instructions
 
@@ -11,40 +11,42 @@ Continue the existing EBS Lite milestone workflow. Do not restart discovery.
 - docs/inspection/CURRENT_STATUS_SNAPSHOT.md
 - docs/inspection/SMB_RELEASE_MILESTONES.md
 - docs/inspection/UI_RESPONSIVE_AUDIT.md
+- docs/inspection/M6_UAT_TEST_PLAN.md
 - docs/inspection/NEXT_RUN_PROMPT.md (this file)
 
 ### Current milestone context:
 - M0-M5 are all formally **completed**.
-- M6 (QA/UAT) is the next active milestone — currently blocked pending manual release-candidate UAT sign-off.
+- M6 (QA/UAT) is **in progress** — test plan created with 59 scenarios (22 P0, 32 P1, 5 P2), validated against ERP requirements.
 - M7 (Deployment) is blocked pending M6 completion.
 - All automated quality gates pass:
   - Flutter: analyze (0 errors), test (15/15 pass), format (0 changes)
   - API parity: zero missing paths, zero method mismatches
+  - Go backend: 42 test files covering ledger posting, idempotency, vouchers, auth, uploads, workflow
 - Remaining blockers:
-  - Manual release-candidate UAT sign-off (M6)
+  - Manual UAT execution against governed demo dataset (M6 phase 2)
   - Missing `ebs_lite_win/Requirements.txt` (P0)
-  - Go quality gates unverifiable in this environment (toolchain unavailable)
 
 ### Objective (pick the strongest remaining work):
 
-Option A: M6 UAT test-plan preparation
-- Create a structured UAT test plan covering all P0/P1 user journeys
-- Define pass/fail criteria and evidence requirements for M6 exit
-- Map test cases to existing Flutter test suite gaps
-
-Option B: Release candidate documentation package
+Option A: Release candidate documentation package (Option B from previous run)
 - Assemble RELEASE_NOTES.md with all M1-M5 changes
 - Ensure RELEASE_READINESS_PLAN.md gates are documented as satisfied (except UAT)
 - Cross-reference all release artifacts
+- Prepare operator launch package (SOPs, quick-reference guides per role)
 
-Option C: Minor polish — consolidate Sales-local professional_document_widgets.dart
-- Replace the Sales-local copy import in sales_returns_page.dart with the shared version
-- Verify no behavioral change
+Option B: UAT execution support automation
+- Create automated demo dataset reset verification script
+- Create automated evidence collection template (screenshot naming convention, report export paths)
+- Create automated UAT results tracker (spreadsheet or markdown)
 
-Pick Option A (M6 UAT test-plan preparation) as the recommended path. This unblocks the M6 milestone with a concrete, executable test plan rather than waiting passively.
+Option C: Flutter test suite expansion (long-term quality investment)
+- Add integration tests for top 3 P0 UAT scenarios (FIN-01 POS cash sale, AUTH-01 login, OFF-01 offline sync)
+- Establish shared test fixture pattern with mock repositories
+
+Pick Option A (release candidate documentation package) as the recommended path. This prepares the full release artifact set while M6 manual UAT is being executed by humans, keeping the pipeline moving.
 
 ### Subagent requirements:
-- Use architect-reviewer (or general-purpose fallback) to validate UAT test-plan coverage against the ERP requirements document
+- Use general-purpose agent to review existing release documentation and identify gaps in the operator launch package
 
 ### Verification:
 - `flutter analyze`

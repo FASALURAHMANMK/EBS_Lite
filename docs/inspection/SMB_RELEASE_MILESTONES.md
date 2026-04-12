@@ -1,6 +1,6 @@
 # SMB Release Milestones
 
-Updated: 2026-04-12 UTC (M1-M5 formally completed — all implementation milestones done)
+Updated: 2026-04-12 UTC (M6 UAT test plan created — M6 moved to in_progress)
 Status model: `completed`, `in_progress`, `pending`, `blocked`
 
 ## Milestone table
@@ -13,7 +13,7 @@ Status model: `completed`, `in_progress`, `pending`, `blocked`
 | M3 | Backend/API hardening | completed | M0 | runtime schema tolerance removed from service code, OpenAPI classification tightened, auth/settings/runtime drift issues reduced |
 | M4 | DB, performance, and release safety hardening | completed | M3 | top N+1 hotspots have batch-loading fixes, outbox idempotency hardened, base migration DDL is clean |
 | M5 | Validation, permissions, and security posture | completed | M3 | production config gates verified, uploads authorization confirmed, password reset delivery confirmed, permission-sensitive paths reviewed |
-| M6 | QA/UAT and operational readiness | blocked | M1, M3, M4, M5 | blocker UAT scenarios are executed, evidence is attached, release ops docs match reality |
+| M6 | QA/UAT and operational readiness | in_progress | M1, M3, M4, M5 | blocker UAT scenarios are executed, evidence is attached, release ops docs match reality |
 | M7 | Deployment and final release gate | blocked | M6 | packaged environment verification is complete and a current go/no-go decision is evidence-backed |
 
 ## Milestone details

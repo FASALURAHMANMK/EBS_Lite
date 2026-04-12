@@ -1,10 +1,10 @@
 # Current Status Snapshot
 
-Timestamp: 2026-04-12 UTC (M1-M5 formally completed — all implementation milestones done)
+Timestamp: 2026-04-12 UTC (M6 UAT test plan created and validated)
 
 ## Summary
 
-All implementation milestones M1-M5 are now formally **completed**. The EBS Lite Flutter client and Go backend have passed all automated quality gates (Flutter analyze, test, format; API parity). The remaining path to release consists solely of manual UAT sign-off (M6) and deployment packaging verification (M7).
+All implementation milestones M0-M5 are formally **completed**. M6 (QA/UAT) is now **in progress** — a structured UAT test plan with 59 scenarios (22 P0, 32 P1, 5 P2) has been created at `docs/inspection/M6_UAT_TEST_PLAN.md`, validated by architect-reviewer against ERP requirements documents, and enhanced with 6 additional scenarios covering previously identified gaps. The remaining path to release is manual UAT execution against the governed demo dataset.
 
 ## Active milestone state
 
@@ -14,13 +14,13 @@ All implementation milestones M1-M5 are now formally **completed**. The EBS Lite
 - `M3 Backend/API hardening`: **completed**
 - `M4 DB, performance, and release safety hardening`: **completed**
 - `M5 Validation, permissions, and security posture`: **completed**
-- `M6 QA/UAT and operational readiness`: blocked pending manual UAT sign-off
+- `M6 QA/UAT and operational readiness`: **in progress** — test plan created, awaiting manual execution
 - `M7 Deployment and final release gate`: blocked pending M6 completion
 
 ## Verification executed in this run
 
 Passed:
-- `flutter analyze` — 4 lint info-level issues (prefer_null_aware_operators in detail pages; zero errors/warnings)
+- `flutter analyze` — 4 info-level issues (prefer_null_aware_operators in detail pages; zero errors/warnings)
 - `flutter test` — 15/15 tests passed
 - `dart format --set-exit-if-changed .` — 282 files formatted, 0 changed
 - `python3 tools/api_parity_check.py --out tools/api_parity_report.md` — **zero** Flutter paths missing from OpenAPI; zero method mismatches
@@ -33,15 +33,15 @@ Unverified in this environment:
 Reason:
 - `go` and `gofmt` were not installed on PATH in this session
 
-## Cross-module consistency review (architect-reviewer)
+## M6 UAT Test Plan (new artifact)
 
-Completed. Key findings:
-- Shared widget families (ProfessionalDocument*, WorkbenchPane, FeatureMenu) used consistently across all "strong" modules
-- No "strong" pages regressed to grid-heavy desktop or nested FutureBuilder chains
-- No hardcoded base URLs in feature code (centralized in AppConfig with release guard)
-- No new "No route configured" fallbacks introduced
-- Responsive split present in all "strong" pages
-- One minor observation: `sales_returns_page.dart` imports a Sales-local copy of `professional_document_widgets.dart` rather than the shared version (consolidation recommended but not a release blocker)
+- **Document**: `docs/inspection/M6_UAT_TEST_PLAN.md`
+- **Total scenarios**: 59 (22 P0, 32 P1, 5 P2)
+- **P0 coverage**: Finance integrity (10), Auth/Sessions (4), Offline Outbox (4), Dashboard (3+1 settings)
+- **P1 coverage**: Sales/POS (5), Purchases (4), Inventory (5), Customers (3), Accounting (6), Reports (3), HR/Workflow (5), Bulk I/O (2)
+- **Validation**: architect-reviewer validated coverage against ERP requirements — PASS with recommendations (all recommendations applied)
+- **Flutter test gap**: 55 of 59 scenarios require full manual execution (Flutter test suite has 0 integration tests, 10 shallow unit/widget tests)
+- **Go backend**: 42 test files provide meaningful automated coverage for backend services (ledger posting, idempotency, vouchers, auth), but do not eliminate the need for end-to-end UAT
 
 ## Verified known gaps (not release blockers)
 
