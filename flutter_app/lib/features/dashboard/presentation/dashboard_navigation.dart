@@ -16,6 +16,10 @@ import '../../sales/presentation/pages/quotes_page.dart';
 import '../../sales/presentation/pages/sales_history_page.dart';
 import '../../customers/presentation/pages/customer_care_hub_page.dart';
 import '../../customers/presentation/pages/collections_workbench_page.dart';
+import '../../customers/presentation/pages/customer_management_page.dart';
+import '../../customers/presentation/pages/loyalty_management_page.dart';
+import '../../customers/presentation/pages/loyalty_gift_redeem_page.dart';
+import '../../customers/presentation/pages/customer_warranty_page.dart';
 import '../../expenses/presentation/pages/expense_categories_page.dart';
 import '../../expenses/presentation/pages/expenses_page.dart';
 import '../../hr/presentation/pages/attendance_page.dart';
@@ -24,11 +28,21 @@ import '../../hr/presentation/pages/employees_page.dart';
 import '../../hr/presentation/pages/hr_page.dart';
 import '../../hr/presentation/pages/payroll_page.dart';
 import '../../inventory/presentation/pages/combo_definitions_page.dart';
+import '../../inventory/presentation/pages/inventory_page.dart';
+import '../../inventory/presentation/pages/product_form_page.dart';
+import '../../inventory/presentation/pages/category_management_page.dart';
+import '../../inventory/presentation/pages/brand_management_page.dart';
+import '../../inventory/presentation/pages/stock_adjustments_page.dart';
+import '../../inventory/presentation/pages/stock_transfers_page.dart';
+import '../../inventory/presentation/pages/asset_management_page.dart';
+import '../../inventory/presentation/pages/consumable_management_page.dart';
+import '../../inventory/presentation/pages/attribute_management_page.dart';
 import '../../purchases/presentation/pages/goods_receipts_page.dart';
 import '../../purchases/presentation/pages/purchase_orders_page.dart';
 import '../../purchases/presentation/pages/purchase_returns_page.dart';
 import '../../reports/presentation/report_navigation.dart';
 import '../../reports/presentation/pages/reports_page.dart';
+import '../../suppliers/presentation/pages/suppliers_page.dart';
 import '../../suppliers/presentation/pages/supplier_balance_workbench_page.dart';
 import '../../workflow/presentation/pages/workflow_requests_page.dart';
 import '../../workflow/presentation/pages/approvals_hub_page.dart';
@@ -162,6 +176,49 @@ class DashboardNavigation {
         return const SupplierBalanceWorkbenchPage();
       case 'Combo Definitions':
         return const ComboDefinitionsPage();
+      case 'Supplier Management':
+      case 'Suppliers':
+        return const SuppliersPage();
+      case 'Supplier Debit Notes':
+        return const Scaffold(
+          body: Center(child: Text('Supplier Debit Notes — coming soon')),
+        );
+      case 'Customer Management':
+      case 'Customers':
+        return const CustomerManagementPage();
+      case 'Loyalty Management':
+        return const LoyaltyManagementPage();
+      case 'Gift Redeem':
+      case 'Loyalty Gift Redeem':
+        return const LoyaltyGiftRedeemPage();
+      case 'Warranty Management':
+        return const CustomerWarrantyPage();
+      case 'Inventory':
+        return const InventoryPage();
+      case 'Products':
+        return const ProductFormPage();
+      case 'Stock Transfer':
+        return const StockTransfersPage();
+      case 'Stock Adjustments':
+        return const StockAdjustmentsPage();
+      case 'Categories':
+        return const CategoryManagementPage();
+      case 'Brands':
+        return const BrandManagementPage();
+      case 'Attributes':
+        return const AttributeManagementPage();
+      case 'Asset Register':
+        return const AssetManagementPage();
+      case 'Consumables':
+        return const ConsumableManagementPage();
+      case 'Promotions':
+        return const Scaffold(
+          body: Center(child: Text('Promotions — coming soon')),
+        );
+      case 'Returns':
+        return const Scaffold(
+          body: Center(child: Text('Returns workbench — coming soon')),
+        );
       default:
         return Scaffold(
           appBar: AppBar(title: Text(label)),

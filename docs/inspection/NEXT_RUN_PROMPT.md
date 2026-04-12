@@ -1,6 +1,6 @@
 # Next Run Prompt
 
-Updated: 2026-04-11 UTC (post-M4-third-slice — migration hygiene cleaned)
+Updated: 2026-04-11 UTC (post-dashboard route gap fix)
 
 ## Instructions
 
@@ -15,7 +15,7 @@ Continue the existing EBS Lite milestone workflow. Do not restart discovery.
 
 ### Current milestone context:
 - M0 is complete.
-- M1 is in progress (UI standardization wave substantially complete).
+- M1 is in progress (UI standardization wave substantially complete; dashboard routing gap substantially reduced).
 - M2 is in progress (shared widget family comprehensive across modules).
 - M3 is substantially complete (5 slices covering all P0/P1 backend risks).
 - M4 is in progress — 3 slices complete:
@@ -23,27 +23,29 @@ Continue the existing EBS Lite milestone workflow. Do not restart discovery.
   - Outbox idempotency hardened (client-side duplicate detection + unique index + backend unique constraints)
   - Migration hygiene cleaned (zero duplicate DDL in base migration)
 - Remaining targets:
-  - dashboard `No route configured` fallback — add missing routes
+  - Evaluate M3/M4 exit readiness
+  - Consider M5 transition (validation, permissions, and security posture)
 - Remaining P0:
   - missing `ebs_lite_win/Requirements.txt`
   - manual release-candidate UAT sign-off
 
 ### Objective (pick the strongest slice):
 
-Option A: Dashboard route gap fix (M1/M4)
-- Add missing routes to `dashboard_navigation.dart` to eliminate the `No route configured` fallback
-- This is a quick fix that improves the user experience
+Option A: Evaluate M3/M4 exit readiness and plan M5
+- Assess whether the 5 M3 slices and 3 M4 slices are sufficient for exit
+- Document the current state and plan M5 (validation, permissions, and security posture)
 
-Option B: Evaluate M4 exit readiness and plan M5
-- Assess whether the 3 completed M4 slices are sufficient for exit
-- Begin M5 (validation, permissions, and security posture)
+Option B: Continue with remaining M4 targets
+- Any remaining N+1 hotspots discovered through profiling
+- Outbox claim race verification edge cases
+- Dashboard route gap further reduction
 
-Pick Option A (dashboard route gap fix) as the recommended path. It's a quick win that eliminates the `No route configured` fallback for additional routes, improving the user experience and addressing a pre-existing gap.
+Pick Option A (M3/M4 exit evaluation) as the recommended path. The M3 and M4 workstreams have accumulated substantial evidence of completion across 8 slices. It's time to evaluate exit readiness and plan the next phase.
 
 ### Subagent requirements:
-- Use flutter-expert (or general-purpose fallback) for implementation review
-- Use architect-reviewer (or general-purpose fallback) for cross-module consistency
-- Use golang-pro and sql-pro only if backend/API changes are required
+- Use architect-reviewer (or general-purpose fallback) for cross-module consistency review
+- Use golang-pro (or general-purpose fallback) for backend code review if needed
+- Use flutter-expert (or general-purpose fallback) for Flutter review if needed
 
 ### Verification:
 - `flutter analyze`

@@ -1,6 +1,6 @@
 # SMB Release Milestones
 
-Updated: 2026-04-11 UTC (M4 third slice — migration hygiene cleanup)
+Updated: 2026-04-11 UTC (Dashboard route gap fix)
 Status model: `completed`, `in_progress`, `pending`, `blocked`
 
 ## Milestone table
@@ -8,7 +8,7 @@ Status model: `completed`, `in_progress`, `pending`, `blocked`
 | ID | Milestone | Status | Depends on | Exit criteria |
 |---|---|---|---|---|
 | M0 | Repo bootstrap and continuity baseline | completed | none | `docs/inspection/` is populated, stale workflow docs are archived, `.codex` continuity files are current |
-| M1 | Responsive and document workflow baseline | in_progress | M0 | verified module audit exists, Sales reference pattern is documented, rollout priority for non-standard modules is agreed |
+| M1 | Responsive and document workflow baseline | in progress | M0 | verified module audit exists, Sales reference pattern is documented, rollout priority for non-standard modules is agreed, dashboard routing gap substantially reduced |
 | M2 | Shared UI/layout standardization | in_progress | M1 | shared desktop/mobile document shell exists and is applied to priority modules beyond Sales |
 | M3 | Backend/API hardening | in_progress | M0 | runtime schema tolerance removed from service code, OpenAPI endpoint classification started, auth/settings posture reviewed |
 | M4 | DB, performance, and release safety hardening | in progress | M3 | top N+1 hotspots have batch-loading fixes; outbox idempotency has client-side duplicate detection + unique index + backend unique constraints; base migration DDL is clean with zero duplicates |

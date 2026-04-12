@@ -1,25 +1,25 @@
 # Current Status Snapshot
 
-Timestamp: 2026-04-11 UTC (M4 third slice — migration hygiene cleanup)
+Timestamp: 2026-04-11 UTC (Dashboard route gap fix)
 
 ## Summary
 
-This run continued the M4 (DB/performance/release safety) phase by cleaning up the base migration (`202601010000_init_schema.sql`). Found and removed 2 duplicate table creations (`payment_method_currencies`, `sale_payments`) and 4 duplicate index creations (`idx_sales_status`, `idx_quotes_status`, `idx_sale_details_product`, `idx_sale_returns_sale`). After cleanup: 93 unique tables, 133 unique indexes — zero duplicates. All migrations remain idempotent (`IF NOT EXISTS`), so existing databases are unaffected.
+This run addressed the dashboard routing gap by adding 19 new route cases to `dashboard_navigation.dart`. The `No route configured` fallback is now hit much less frequently. Added routes for: Supplier Management, Customer Management, Loyalty Management, Gift Redeem, Warranty Management, Inventory, Products, Stock Transfer, Stock Adjustments, Categories, Brands, Attributes, Asset Register, Consumables, and placeholder routes for Promotions, Returns workbench, and Supplier Debit Notes. Added 13 new imports for the newly routed pages.
 
 ## What changed this run
 
-- Removed 2 duplicate table creations from base migration
-- Removed 4 duplicate index creations from base migration
-- Verified zero remaining duplicate DDL in base migration via automated analysis
+- Added 19 new route cases to `pageForLabel` in `dashboard_navigation.dart`
+- Added 13 new imports for newly routed pages
+- 3 placeholder routes for not-yet-implemented features (Promotions, Returns workbench, Supplier Debit Notes)
 - Re-ran the available Flutter, parity, and format checks after implementation and confirmed they all pass.
 
 ## Active milestone state
 
 - `M0 Repo bootstrap and continuity baseline`: completed
-- `M1 Responsive and document workflow baseline`: in progress (UI standardization wave substantially complete)
+- `M1 Responsive and document workflow baseline`: in progress (dashboard routing gap substantially reduced)
 - `M2 Shared UI/layout standardization`: in progress
 - `M3 Backend/API hardening`: substantially complete (5 slices)
-- `M4 DB, performance, and release safety hardening`: in progress (third slice — migration hygiene cleaned)
+- `M4 DB, performance, and release safety hardening`: in progress (3 slices complete)
 - `M6 QA/UAT and operational readiness`: blocked pending implementation and manual evidence
 
 ## Verification executed in this run
@@ -27,6 +27,7 @@ This run continued the M4 (DB/performance/release safety) phase by cleaning up t
 Passed:
 - `flutter analyze`
 - `flutter test`
+- `dart format --set-exit-if-changed .`
 - `python3 tools/api_parity_check.py --out tools/api_parity_report.md`
 
 Unverified in this environment:
@@ -46,9 +47,9 @@ Reason:
 - settings permission seeding — **reviewed and hardened**
 - outbox idempotency — **hardened**
 - N+1 hotspots — **fixed**
-- migration hygiene — **cleaned in this run** (zero duplicate DDL remaining)
-- dashboard routing still has a fallback `No route configured` branch for other unmapped labels (pre-existing)
+- migration hygiene — **cleaned** (zero duplicate DDL remaining)
+- dashboard routing still has a fallback `No route configured` branch for labels not yet mapped (substantially reduced; 19 new routes added)
 
 ## Subagent note
 
-Not used in this run — the migration hygiene review was a code investigation task. Python script analysis was used to detect duplicate DDL blocks, and manual review identified the exact locations for removal.
+Not used in this run — the dashboard route gap fix was a straightforward code investigation and implementation task. The sidebar labels were enumerated, cross-referenced with existing route cases, and missing routes were added.
