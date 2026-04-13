@@ -241,7 +241,7 @@ class _SupplierPaymentSheetState extends ConsumerState<SupplierPaymentSheet> {
                       const Text('Apply to invoices'),
                     ],
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   ValueListenableBuilder<DateTime>(
                     valueListenable: _date,
                     builder: (context, d, _) => InkWell(
@@ -361,7 +361,7 @@ class _SupplierPaymentSheetState extends ConsumerState<SupplierPaymentSheet> {
                   children: [
                     const Text('Outstanding Purchases',
                         style: TextStyle(fontWeight: FontWeight.w700)),
-                    const Spacer(),
+                    const SizedBox(width: 8),
                     TextButton.icon(
                         onPressed: _autoAllocate,
                         icon: const Icon(Icons.auto_awesome_rounded),

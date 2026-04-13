@@ -1018,7 +1018,7 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
                           icon: const Icon(Icons.add_circle_outline_rounded),
                           label: const Text('Add New Item'),
                         ),
-                        const Spacer(),
+                        const SizedBox(width: 12),
                         Text(
                           'Items: ${lines.length}    Total Qty: ${formatDocumentQuantity(totalQty)}',
                           style: Theme.of(context).textTheme.bodySmall,

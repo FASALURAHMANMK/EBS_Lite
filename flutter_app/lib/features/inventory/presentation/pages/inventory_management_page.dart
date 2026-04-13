@@ -693,7 +693,7 @@ class _InventoryCard extends ConsumerWidget {
                   ),
                 ),
               ],
-              const Spacer(),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(

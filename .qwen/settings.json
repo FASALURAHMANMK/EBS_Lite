@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(sudo *)"
+      "Bash(sudo *)",
+      "Bash(redis-cli *)"
     ]
   },
   "$version": 3

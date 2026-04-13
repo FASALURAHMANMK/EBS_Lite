@@ -234,7 +234,7 @@ class _CustomerCollectionSheetState
                       const Text('Apply to invoices'),
                     ],
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   ValueListenableBuilder<DateTime>(
                     valueListenable: _date,
                     builder: (context, d, _) => InkWell(

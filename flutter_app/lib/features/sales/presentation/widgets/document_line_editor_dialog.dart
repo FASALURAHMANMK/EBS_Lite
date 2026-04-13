@@ -811,7 +811,7 @@ class _DocumentLineEditorDialogState
                       )
                     else
                       const SizedBox.shrink(),
-                    const Spacer(),
+                    const SizedBox(width: 12),
                     OutlinedButton(
                       onPressed: () => Navigator.of(context).pop(),
                       child: const Text('Cancel'),

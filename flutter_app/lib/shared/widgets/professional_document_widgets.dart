@@ -119,50 +119,46 @@ class ProfessionalSectionCard extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      if ((subtitle ?? '').trim().isNotEmpty) ...[
-                        const SizedBox(height: 4),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          subtitle!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            height: 1.3,
+                          title,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
+                        if ((subtitle ?? '').trim().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            subtitle!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                if (action != null) ...[
-                  const SizedBox(width: 12),
-                  action!,
+                  if (action != null) ...[
+                    const SizedBox(width: 12),
+                    action!,
+                  ],
                 ],
-              ],
-            ),
-            const SizedBox(height: 14),
-            if (expandChild)
-              Expanded(child: child)
-            else
-              Flexible(
-                fit: FlexFit.loose,
-                child: child,
               ),
-          ],
+              const SizedBox(height: 14),
+              child,
+            ],
+          ),
         ),
       ),
     );
@@ -220,7 +216,7 @@ class ProfessionalSummaryCard extends StatelessWidget {
             if (row != rows.last) const SizedBox(height: 10),
           ],
           if (footer != null) ...[
-            if (expandContent) const Spacer(),
+            if (expandContent) const SizedBox(height: 14),
             const SizedBox(height: 14),
             footer!,
           ],
@@ -282,41 +278,43 @@ class ProfessionalOverviewCard extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (showHeader) ...[
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        if (icon != null) ...[
-                          Icon(icon, size: 16),
-                          const SizedBox(width: 8),
-                        ],
-                        Expanded(
-                          child: Text(
-                            title ?? '',
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (showHeader) ...[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          if (icon != null) ...[
+                            Icon(icon, size: 16),
+                            const SizedBox(width: 8),
+                          ],
+                          Expanded(
+                            child: Text(
+                              title ?? '',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  if (action != null) ...[
-                    const SizedBox(width: 10),
-                    action!,
+                    if (action != null) ...[
+                      const SizedBox(width: 10),
+                      action!,
+                    ],
                   ],
-                ],
-              ),
-              const SizedBox(height: 12),
+                ),
+                const SizedBox(height: 12),
+              ],
+              child,
             ],
-            if (expandChild) Expanded(child: child) else child,
-          ],
+          ),
         ),
       ),
     );
