@@ -32,12 +32,12 @@ func seedMinimalChartOfAccountsTx(tx *sql.Tx, companyID int) error {
 		// Use NOT EXISTS to remain safe even when unique indexes are not present.
 		if _, err := tx.Exec(`
 			INSERT INTO chart_of_accounts (company_id, account_code, name, type, subtype, is_active)
-			SELECT $1,$2,$3,$4,$5,TRUE
+			SELECT $1, $2, $3, $4, $5, TRUE
 			WHERE NOT EXISTS (
 				SELECT 1 FROM chart_of_accounts
-				WHERE company_id = $1 AND account_code = $2
+				WHERE company_id = $6 AND account_code = $7
 			)
-		`, companyID, a.Code, a.Name, a.Type, a.Subtype); err != nil {
+		`, companyID, a.Code, a.Name, a.Type, a.Subtype, companyID, a.Code); err != nil {
 			return fmt.Errorf("failed to seed chart of accounts (%s): %w", a.Code, err)
 		}
 	}

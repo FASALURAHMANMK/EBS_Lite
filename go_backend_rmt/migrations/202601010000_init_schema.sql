@@ -1294,7 +1294,6 @@ CREATE INDEX IF NOT EXISTS idx_stock_location_product ON stock(location_id, prod
 CREATE INDEX IF NOT EXISTS idx_stock_low_stock ON stock(product_id) WHERE quantity <= 0;
 CREATE INDEX IF NOT EXISTS idx_stock_lots_product_location ON stock_lots(product_id, location_id);
 CREATE INDEX IF NOT EXISTS idx_stock_lots_expiry ON stock_lots(expiry_date) WHERE expiry_date IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_stock_adjustments_location_created_at ON stock_adjustments(location_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_stock_transfers_from_location_created_at ON stock_transfers(from_location_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_stock_transfers_to_location_created_at ON stock_transfers(to_location_id, created_at);
 
@@ -2370,7 +2369,6 @@ CREATE INDEX IF NOT EXISTS idx_loyalty_transactions_reference ON loyalty_transac
 CREATE INDEX IF NOT EXISTS idx_promotion_usage_promotion ON promotion_usage(promotion_id);
 CREATE INDEX IF NOT EXISTS idx_promotion_usage_customer ON promotion_usage(customer_id);
 CREATE INDEX IF NOT EXISTS idx_promotion_usage_date ON promotion_usage(used_at);
-CREATE INDEX IF NOT EXISTS idx_loyalty_settings_company ON loyalty_settings(company_id);
 CREATE INDEX IF NOT EXISTS idx_return_reasons_company ON return_reasons(company_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_credit_notes_return ON credit_notes(return_id);
 CREATE INDEX IF NOT EXISTS idx_credit_notes_customer ON credit_notes(customer_id);
@@ -2379,11 +2377,6 @@ CREATE INDEX IF NOT EXISTS idx_customer_segments_company ON customer_segments(co
 CREATE INDEX IF NOT EXISTS idx_customer_segment_members_customer ON customer_segment_members(customer_id);
 
 -- Add triggers for updated_at timestamps
-DROP TRIGGER IF EXISTS update_loyalty_settings_updated_at ON loyalty_settings;
-CREATE TRIGGER update_loyalty_settings_updated_at 
-    BEFORE UPDATE ON loyalty_settings 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
 DROP TRIGGER IF EXISTS update_customer_segments_updated_at ON customer_segments;
 CREATE TRIGGER update_customer_segments_updated_at 
     BEFORE UPDATE ON customer_segments 
@@ -2879,6 +2872,13 @@ SELECT company_id, 1.0, 0.01, 100, 365
 FROM companies
 WHERE company_id NOT IN (SELECT company_id FROM loyalty_settings)
 ON CONFLICT (company_id) DO NOTHING;
+
+CREATE INDEX IF NOT EXISTS idx_loyalty_settings_company ON loyalty_settings(company_id);
+
+DROP TRIGGER IF EXISTS update_loyalty_settings_updated_at ON loyalty_settings;
+CREATE TRIGGER update_loyalty_settings_updated_at
+    BEFORE UPDATE ON loyalty_settings
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- +goose Down
 -- No-op (initial schema).

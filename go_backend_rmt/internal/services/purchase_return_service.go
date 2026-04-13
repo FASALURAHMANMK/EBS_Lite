@@ -565,7 +565,7 @@ func (s *PurchaseReturnService) allocatePurchaseReturnLines(tx *sql.Tx, companyI
 		query += fmt.Sprintf(" AND pd.purchase_detail_id = $%d", nextArg)
 		args = append(args, *preferredDetailID)
 	}
-	query += " ORDER BY pd.purchase_detail_id FOR UPDATE"
+	query += " ORDER BY pd.purchase_detail_id"
 
 	rows, err := tx.Query(query, args...)
 	if err != nil {

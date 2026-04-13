@@ -15,6 +15,7 @@ import (
 	"erp-backend/internal/database"
 	"erp-backend/internal/models"
 	"erp-backend/internal/services"
+	"erp-backend/internal/utils"
 
 	"github.com/joho/godotenv"
 )
@@ -151,6 +152,15 @@ func seedDemoDataset(db *sql.DB) (*datasetSummary, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	// Set sales action password hash for the admin user (required for sale returns).
+	salesPassHash, err := utils.HashPassword(demoPassword)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash sales action password: %w", err)
+	}
+	if _, err := db.Exec(`UPDATE users SET sales_action_password_hash = $1 WHERE user_id = $2`, salesPassHash, adminResp.UserID); err != nil {
+		return nil, fmt.Errorf("failed to set admin sales action password: %w", err)
 	}
 
 	address := "HQ, Muscat"
@@ -323,11 +333,18 @@ func seedDemoDataset(db *sql.DB) (*datasetSummary, error) {
 		return nil, err
 	}
 	purchaseCount++
+
+	// CreatePurchase does not populate Items; load detail IDs from DB.
+	stdDetails, err := lookupPurchaseDetails(db, standardPurchase.PurchaseID)
+	if err != nil {
+		return nil, err
+	}
+
 	if _, err := purchaseSvc.RecordGoodsReceiptDetailed(standardPurchase.PurchaseID, company.CompanyID, adminResp.UserID, &models.RecordGoodsReceiptRequest{
 		PurchaseID: standardPurchase.PurchaseID,
 		Items: []models.ReceivePurchaseItemRequest{
-			{PurchaseDetailID: standardPurchase.Items[0].PurchaseDetailID, BarcodeID: intPtr(products["std_01"].BarcodeID), ReceivedQuantity: 40},
-			{PurchaseDetailID: standardPurchase.Items[1].PurchaseDetailID, BarcodeID: intPtr(products["var_01"].BarcodeID), ReceivedQuantity: 20},
+			{PurchaseDetailID: stdDetails[0].PurchaseDetailID, BarcodeID: intPtr(products["std_01"].BarcodeID), ReceivedQuantity: 40},
+			{PurchaseDetailID: stdDetails[1].PurchaseDetailID, BarcodeID: intPtr(products["var_01"].BarcodeID), ReceivedQuantity: 20},
 		},
 	}); err != nil {
 		return nil, err
@@ -345,10 +362,14 @@ func seedDemoDataset(db *sql.DB) (*datasetSummary, error) {
 		return nil, err
 	}
 	purchaseCount++
+	batchDetails, err := lookupPurchaseDetails(db, batchPurchase.PurchaseID)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := purchaseSvc.RecordGoodsReceiptDetailed(batchPurchase.PurchaseID, company.CompanyID, adminResp.UserID, &models.RecordGoodsReceiptRequest{
 		PurchaseID: batchPurchase.PurchaseID,
 		Items: []models.ReceivePurchaseItemRequest{
-			{PurchaseDetailID: batchPurchase.Items[0].PurchaseDetailID, BarcodeID: intPtr(products["batch_01"].BarcodeID), ReceivedQuantity: 30, BatchNumber: &batchNumber, ExpiryDate: &expiry},
+			{PurchaseDetailID: batchDetails[0].PurchaseDetailID, BarcodeID: intPtr(products["batch_01"].BarcodeID), ReceivedQuantity: 30, BatchNumber: &batchNumber, ExpiryDate: &expiry},
 		},
 	}); err != nil {
 		return nil, err
@@ -368,10 +389,14 @@ func seedDemoDataset(db *sql.DB) (*datasetSummary, error) {
 		return nil, err
 	}
 	purchaseCount++
+	serialDetails, err := lookupPurchaseDetails(db, serialPurchase.PurchaseID)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := purchaseSvc.RecordGoodsReceiptDetailed(serialPurchase.PurchaseID, company.CompanyID, adminResp.UserID, &models.RecordGoodsReceiptRequest{
 		PurchaseID: serialPurchase.PurchaseID,
 		Items: []models.ReceivePurchaseItemRequest{
-			{PurchaseDetailID: serialPurchase.Items[0].PurchaseDetailID, BarcodeID: intPtr(products["ser_01"].BarcodeID), ReceivedQuantity: 2, SerialNumbers: []string{"SER-0001", "SER-0002"}},
+			{PurchaseDetailID: serialDetails[0].PurchaseDetailID, BarcodeID: intPtr(products["ser_01"].BarcodeID), ReceivedQuantity: 2, SerialNumbers: []string{"SER-0001", "SER-0002"}},
 		},
 	}); err != nil {
 		return nil, err
@@ -382,7 +407,7 @@ func seedDemoDataset(db *sql.DB) (*datasetSummary, error) {
 		PurchaseID: batchPurchase.PurchaseID,
 		Reason:     &reasonPurchaseReturn,
 		Items: []models.CreatePurchaseReturnDetailRequest{
-			{PurchaseDetailID: intPtr(batchPurchase.Items[0].PurchaseDetailID), ProductID: products["batch_01"].ProductID, BarcodeID: intPtr(products["batch_01"].BarcodeID), Quantity: 2, UnitPrice: 12, BatchAllocations: []models.InventoryBatchSelectionInput{{LotID: batchLotID, Quantity: 2}}},
+			{PurchaseDetailID: intPtr(batchDetails[0].PurchaseDetailID), ProductID: products["batch_01"].ProductID, BarcodeID: intPtr(products["batch_01"].BarcodeID), Quantity: 2, UnitPrice: 12, BatchAllocations: []models.InventoryBatchSelectionInput{{LotID: batchLotID, Quantity: 2}}},
 		},
 	}); err != nil {
 		return nil, err
@@ -404,13 +429,13 @@ func seedDemoDataset(db *sql.DB) (*datasetSummary, error) {
 
 	if _, err := posSvc.ProcessCheckout(company.CompanyID, mainStoreID, adminResp.UserID, &models.POSCheckoutRequest{
 		CustomerID: intPtr(customers[1]),
-		PaidAmount: 42,
+		PaidAmount: 37.8,
 		Items: []models.CreateSaleDetailRequest{
 			{ProductID: intPtr(products["var_01"].ProductID), BarcodeID: intPtr(products["var_01"].BarcodeID), Quantity: 3, UnitPrice: 12, TaxID: intPtr(vat.TaxID)},
 		},
 		Payments: []models.POSPaymentLine{
-			{MethodID: paymentMethodIDs["Cash"], Amount: 20},
-			{MethodID: paymentMethodIDs["Card"], Amount: 22},
+			{MethodID: paymentMethodIDs["Cash"], Amount: 18.0},
+			{MethodID: paymentMethodIDs["Card"], Amount: 19.8},
 		},
 	}, "pos-split-1"); err != nil {
 		return nil, err
@@ -441,9 +466,10 @@ func seedDemoDataset(db *sql.DB) (*datasetSummary, error) {
 
 	reasonSaleReturn := "Customer exchange"
 	if _, err := returnsSvc.CreateSaleReturn(company.CompanyID, adminResp.UserID, &models.CreateSaleReturnRequest{
-		SaleID: saleCash.SaleID,
-		Reason: &reasonSaleReturn,
-		Items:  []models.CreateSaleReturnItemRequest{{ProductID: products["std_01"].ProductID, BarcodeID: intPtr(products["std_01"].BarcodeID), Quantity: 1, UnitPrice: 10}},
+		SaleID:           saleCash.SaleID,
+		Reason:           &reasonSaleReturn,
+		OverridePassword: strPtr(demoPassword),
+		Items:            []models.CreateSaleReturnItemRequest{{ProductID: products["std_01"].ProductID, BarcodeID: intPtr(products["std_01"].BarcodeID), Quantity: 1, UnitPrice: 10}},
 	}); err != nil {
 		return nil, err
 	}
@@ -834,6 +860,43 @@ func lookupLotID(db *sql.DB, barcodeID int, batchNumber string) (int, error) {
 	return id, err
 }
 
+func lookupPurchaseDetails(db *sql.DB, purchaseID int) ([]models.PurchaseDetail, error) {
+	rows, err := db.Query(`
+		SELECT purchase_detail_id, purchase_id, product_id, barcode_id,
+		       quantity, unit_price, discount_percentage, discount_amount,
+		       tax_amount, line_total, tax_id
+		FROM purchase_details
+		WHERE purchase_id = $1
+		ORDER BY purchase_detail_id
+	`, purchaseID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var details []models.PurchaseDetail
+	for rows.Next() {
+		var d models.PurchaseDetail
+		var discPct sql.NullFloat64
+		var taxID sql.NullInt64
+		if err := rows.Scan(
+			&d.PurchaseDetailID, &d.PurchaseID, &d.ProductID, &d.BarcodeID,
+			&d.Quantity, &d.UnitPrice, &discPct, &d.DiscountAmount,
+			&d.TaxAmount, &d.LineTotal, &taxID,
+		); err != nil {
+			return nil, err
+		}
+		if discPct.Valid {
+			d.DiscountPercentage = discPct.Float64
+		}
+		if taxID.Valid {
+			tid := int(taxID.Int64)
+			d.TaxID = &tid
+		}
+		details = append(details, d)
+	}
+	return details, rows.Err()
+}
+
 func writeReport(path string, summary *datasetSummary) error {
 	if summary == nil {
 		return fmt.Errorf("summary is nil")
@@ -874,5 +937,9 @@ func floatPtr(value float64) *float64 {
 }
 
 func boolPtr(value bool) *bool {
+	return &value
+}
+
+func strPtr(value string) *string {
 	return &value
 }
