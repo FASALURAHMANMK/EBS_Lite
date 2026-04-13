@@ -957,11 +957,11 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
+          SizedBox(
+            height: 120,
             child: TextField(
               controller: _reasonCtrl,
-              expands: true,
-              minLines: null,
+              minLines: 4,
               maxLines: null,
               textAlignVertical: TextAlignVertical.top,
               decoration: const InputDecoration(
@@ -1035,20 +1035,14 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
       expandChild: true,
       child: _hasLinkedReturnableLines
           ? Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const _ReturnableTableHeader(),
                 const SizedBox(height: 10),
-                Expanded(
-                  child: ListView.separated(
-                    padding: EdgeInsets.zero,
-                    itemCount: _returnableLines.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) => _ReturnableTableRow(
-                      line: _returnableLines[index],
+                ..._returnableLines.map((line) => _ReturnableTableRow(
+                      line: line,
                       onChanged: () => setState(() {}),
-                    ),
-                  ),
-                ),
+                    )),
               ],
             )
           : widget.mode == SaleReturnDocumentMode.refundInvoice
@@ -1060,8 +1054,8 @@ class _SaleReturnFormPageState extends ConsumerState<SaleReturnFormPage> {
                     icon: Icons.receipt_long_outlined,
                   ),
                 )
-              : ListView(
-                  padding: EdgeInsets.zero,
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     ..._buildLines(context),
                     const SizedBox(height: 10),

@@ -246,14 +246,10 @@ class _PoFormPageState extends ConsumerState<PoFormPage> {
                     'Add at least one product line to create the purchase order.',
               ),
             )
-          : desktopLayout
-              ? ListView(
-                  padding: EdgeInsets.zero,
-                  children: _buildLines(),
-                )
-              : Column(
-                  children: _buildLines(),
-                ),
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: _buildLines(),
+            ),
     );
   }
 

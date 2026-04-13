@@ -810,12 +810,12 @@ class _QuoteFormPageState extends ConsumerState<QuoteFormPage> {
           ),
           if (compactLayout) ...[
             const SizedBox(height: 14),
-            Expanded(
+            SizedBox(
+              height: 120,
               child: TextField(
                 controller: _notesCtrl,
                 enabled: !_readOnly,
-                expands: true,
-                minLines: null,
+                minLines: 4,
                 maxLines: null,
                 textAlignVertical: TextAlignVertical.top,
                 style: Theme.of(context).textTheme.bodySmall,

@@ -1151,12 +1151,10 @@ class _ReturnFormPageState extends ConsumerState<_ReturnFormPage> {
                 message: 'Add at least one line before saving the return.',
               ),
             )
-          : isDesktop
-              ? ListView(
-                  padding: EdgeInsets.zero,
-                  children: _buildLines(context),
-                )
-              : Column(children: _buildLines(context)),
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: _buildLines(context),
+            ),
     );
   }
 

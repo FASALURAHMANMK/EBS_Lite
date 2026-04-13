@@ -279,12 +279,10 @@ class _GrnFormPageState extends ConsumerState<GrnFormPage> {
                     'Add at least one item line before creating the goods receipt.',
               ),
             )
-          : desktopLayout
-              ? ListView(
-                  padding: EdgeInsets.zero,
-                  children: _buildLines(theme),
-                )
-              : Column(children: _buildLines(theme)),
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: _buildLines(theme),
+            ),
     );
   }
 
