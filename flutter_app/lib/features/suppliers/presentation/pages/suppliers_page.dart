@@ -35,6 +35,8 @@ class _SuppliersPageState extends ConsumerState<SuppliersPage> {
   final TextEditingController _searchCtrl = TextEditingController();
 
   int _detailRequestToken = 0;
+  int? _lastSyncedListHash;
+  int? _lastSyncedSupplierId;
 
   @override
   void initState() {
@@ -150,7 +152,17 @@ class _SuppliersPageState extends ConsumerState<SuppliersPage> {
 
   void _syncDesktopSelection(List<SupplierDto> filtered) {
     if (!AppBreakpoints.isDesktop(context)) return;
+    
+    // Compute a simple hash of the list to avoid repeated work
+    final listHash = filtered.isEmpty ? 0 : filtered.map((s) => s.supplierId).reduce((a, b) => a ^ b).hashCode;
+    final nextSupplierId = filtered.isEmpty ? null : filtered.first.supplierId;
+    
+    // Skip if we already processed this exact list and supplier
+    if (listHash == _lastSyncedListHash && nextSupplierId == _lastSyncedSupplierId) return;
+    
     if (filtered.isEmpty) {
+      _lastSyncedListHash = 0;
+      _lastSyncedSupplierId = null;
       if (_selectedSupplier != null ||
           _selectedSummary != null ||
           _detailError != null ||
@@ -176,6 +188,8 @@ class _SuppliersPageState extends ConsumerState<SuppliersPage> {
     final shouldReload = _selectedSupplier?.supplierId != next.supplierId ||
         (_selectedSummary == null && !_detailLoading && _detailError == null);
     if (shouldReload) {
+      _lastSyncedListHash = listHash;
+      _lastSyncedSupplierId = next.supplierId;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _selectSupplier(next);

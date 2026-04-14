@@ -80,7 +80,7 @@ func TestWorkflowService_ApproveRequest_TransitionsPendingPurchase(t *testing.T)
 	now := time.Date(2026, 3, 30, 10, 0, 0, 0, time.UTC)
 
 	mock.ExpectBegin()
-	mock.ExpectQuery("(?s)FROM workflow_requests wr.*WHERE wr\\.company_id = \\$1.*wr\\.approval_id = \\$2.*FOR UPDATE").
+	mock.ExpectQuery("(?s)FROM workflow_requests.*WHERE company_id = \\$1.*approval_id = \\$2.*FOR UPDATE").
 		WithArgs(1, 11).
 		WillReturnRows(workflowRequestRows(now))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT COALESCE(role_id, 0) FROM users WHERE user_id = $1")).
@@ -135,7 +135,7 @@ func TestWorkflowService_ApproveRequest_RejectsWrongApproverRole(t *testing.T) {
 	now := time.Date(2026, 3, 30, 10, 0, 0, 0, time.UTC)
 
 	mock.ExpectBegin()
-	mock.ExpectQuery("(?s)FROM workflow_requests wr.*WHERE wr\\.company_id = \\$1.*wr\\.approval_id = \\$2.*FOR UPDATE").
+	mock.ExpectQuery("(?s)FROM workflow_requests.*WHERE company_id = \\$1.*approval_id = \\$2.*FOR UPDATE").
 		WithArgs(1, 11).
 		WillReturnRows(workflowRequestRows(now))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT COALESCE(role_id, 0) FROM users WHERE user_id = $1")).

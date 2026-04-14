@@ -295,61 +295,15 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
                                 'Adjust the filters or create a new purchase order to begin the workflow.',
                             onRetry: _load,
                           )
-                        : ListView.separated(
-                            padding: EdgeInsets.zero,
-                            itemCount: filtered.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 10),
-                            itemBuilder: (context, index) {
-                              final po = filtered[index];
-                              final purchaseId = po['purchase_id'] as int?;
-                              return PurchaseDocumentListCard(
-                                title: po['purchase_number']?.toString() ??
-                                    'Purchase Order',
-                                subtitle: _subtitleForListRow(
-                                  context,
-                                  localePrefs,
-                                  po,
-                                ),
-                                selected: purchaseId != null &&
-                                    purchaseId == _selectedPurchaseId,
-                                badges: [
-                                  purchaseStatusBadge(
-                                    (po['status'] ?? '').toString(),
-                                  ),
-                                  if ((po['supplier']?['name'] ??
-                                          po['supplier_name'] ??
-                                          '')
-                                      .toString()
-                                      .trim()
-                                      .isNotEmpty)
-                                    ProfessionalBadge(
-                                      label: (po['supplier']?['name'] ??
-                                              po['supplier_name'])
-                                          .toString(),
-                                    ),
-                                ],
-                                trailing: IconButton(
-                                  tooltip: 'Open detail',
-                                  onPressed: purchaseId == null
-                                      ? null
-                                      : () async {
-                                          await Navigator.of(context).push(
-                                            MaterialPageRoute(
-                                              builder: (_) => PoDetailPage(
-                                                purchaseId: purchaseId,
-                                              ),
-                                            ),
-                                          );
-                                          await _load();
-                                        },
-                                  icon: const Icon(Icons.open_in_new_rounded),
-                                ),
-                                onTap: purchaseId == null
-                                    ? null
-                                    : () => _selectPurchase(purchaseId),
-                              );
-                            },
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (int index = 0; index < filtered.length; index++) ...[
+                                _buildPurchaseOrderCard(filtered[index], localePrefs),
+                                if (index < filtered.length - 1)
+                                  const SizedBox(height: 10),
+                              ],
+                            ],
                           ),
                   ),
                 ),
@@ -462,6 +416,64 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
     );
   }
 
+  Widget _buildPurchaseOrderCard(
+    Map<String, dynamic> po,
+    LocalePreferencesState localePrefs,
+  ) {
+    final purchaseId = po['purchase_id'] as int?;
+    return PurchaseDocumentListCard(
+      title: po['purchase_number']?.toString() ?? 'Purchase Order',
+      subtitle: _subtitleForListRow(context, localePrefs, po),
+      selected:
+          purchaseId != null && purchaseId == _selectedPurchaseId,
+      badges: [
+        purchaseStatusBadge((po['status'] ?? '').toString()),
+        if ((po['supplier']?['name'] ?? po['supplier_name'] ?? '')
+                .toString()
+                .trim()
+                .isNotEmpty)
+          ProfessionalBadge(
+            label:
+                (po['supplier']?['name'] ?? po['supplier_name']).toString(),
+          ),
+      ],
+      trailing: IconButton(
+        tooltip: 'Open detail',
+        onPressed: purchaseId == null
+            ? null
+            : () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PoDetailPage(purchaseId: purchaseId),
+                  ),
+                );
+                await _load();
+              },
+        icon: const Icon(Icons.open_in_new_rounded),
+      ),
+      onTap: purchaseId == null ? null : () => _selectPurchase(purchaseId),
+    );
+  }
+
+  Widget _buildLineItemCard(Map<String, dynamic> item) {
+    final ordered =
+        (item['quantity'] as num?)?.toDouble() ?? 0;
+    final received =
+        (item['received_quantity'] as num?)?.toDouble() ?? 0;
+    return PurchaseDocumentListCard(
+      title: item['product']?['name']?.toString() ??
+          'Product #${item['product_id']}',
+      subtitle:
+          'Ordered ${ordered.toStringAsFixed(2)} • Received ${received.toStringAsFixed(2)} • Unit ${((item['unit_price'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}',
+      badges: [
+        ProfessionalBadge(
+          label:
+              'Balance ${(ordered - received).clamp(0, double.infinity).toStringAsFixed(2)}',
+        ),
+      ],
+    );
+  }
+
   Widget _buildToolbar() {
     return ProfessionalSectionCard(
       title: 'Filters',
@@ -566,32 +578,34 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
     final canReceive = remainingQty > 0 &&
         (status == 'APPROVED' || status == 'PARTIALLY_RECEIVED');
 
-    return Column(
-      children: [
-        ProfessionalDocumentHeader(
-          title: detail['purchase_number']?.toString() ?? 'Purchase Order',
-          subtitle:
-              'Preview approval state, supplier context, and receiving readiness before opening the full document.',
-          badges: [
-            purchaseStatusBadge(status),
-            if ((detail['supplier']?['name'] ?? detail['supplier_name'] ?? '')
-                .toString()
-                .trim()
-                .isNotEmpty)
-              ProfessionalBadge(
-                label: (detail['supplier']?['name'] ?? detail['supplier_name'])
-                    .toString(),
-              ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ProfessionalDocumentHeader(
+            title: detail['purchase_number']?.toString() ?? 'Purchase Order',
+            subtitle:
+                'Preview approval state, supplier context, and receiving readiness before opening the full document.',
+            badges: [
+              purchaseStatusBadge(status),
+              if ((detail['supplier']?['name'] ?? detail['supplier_name'] ?? '')
+                      .toString()
+                      .trim()
+                      .isNotEmpty)
+                ProfessionalBadge(
+                  label: (detail['supplier']?['name'] ?? detail['supplier_name'])
+                      .toString(),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 flex: 6,
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     ProfessionalOverviewCard(
                       title: 'Overview',
@@ -638,50 +652,33 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Expanded(
-                      child: ProfessionalSectionCard(
-                        title: 'Line Snapshot',
-                        subtitle:
-                            'The first few lines stay visible for quick review from the list workbench.',
-                        expandChild: true,
-                        child: items.isEmpty
-                            ? const Center(
-                                child: ProfessionalDocumentEmptyState(
-                                  title: 'No lines available',
-                                  message:
-                                      'This purchase order does not contain any lines to preview.',
-                                ),
-                              )
-                            : ListView.separated(
-                                padding: EdgeInsets.zero,
-                                itemCount: items.length > 5 ? 5 : items.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 10),
-                                itemBuilder: (context, index) {
-                                  final item = items[index];
-                                  final ordered =
-                                      (item['quantity'] as num?)?.toDouble() ??
-                                          0;
-                                  final received =
-                                      (item['received_quantity'] as num?)
-                                              ?.toDouble() ??
-                                          0;
-                                  return PurchaseDocumentListCard(
-                                    title:
-                                        item['product']?['name']?.toString() ??
-                                            'Product #${item['product_id']}',
-                                    subtitle:
-                                        'Ordered ${ordered.toStringAsFixed(2)} • Received ${received.toStringAsFixed(2)} • Unit ${((item['unit_price'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}',
-                                    badges: [
-                                      ProfessionalBadge(
-                                        label:
-                                            'Balance ${(ordered - received).clamp(0, double.infinity).toStringAsFixed(2)}',
-                                      ),
-                                    ],
-                                  );
-                                },
+                    ProfessionalSectionCard(
+                      title: 'Line Snapshot',
+                      subtitle:
+                          'The first few lines stay visible for quick review from the list workbench.',
+                      expandChild: true,
+                      child: items.isEmpty
+                          ? const Center(
+                              child: ProfessionalDocumentEmptyState(
+                                title: 'No lines available',
+                                message:
+                                    'This purchase order does not contain any lines to preview.',
                               ),
-                      ),
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                for (int index = 0;
+                                    index <
+                                        (items.length > 5 ? 5 : items.length);
+                                    index++) ...[
+                                  _buildLineItemCard(items[index]),
+                                  if (index <
+                                      (items.length > 5 ? 5 : items.length) - 1)
+                                    const SizedBox(height: 10),
+                                ],
+                              ],
+                            ),
                     ),
                   ],
                 ),
@@ -830,8 +827,8 @@ class _PurchaseOrdersPageState extends ConsumerState<PurchaseOrdersPage> {
               ),
             ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -218,6 +219,13 @@ func (s *AuthService) RefreshToken(req *models.RefreshTokenRequest) (*models.Ref
 		return nil, fmt.Errorf("account is inactive or locked")
 	}
 
+	// Validate and reactivate session if it was deactivated due to idle timeout
+	if claims.SessionID != "" {
+		if err := s.validateAndReactivateSession(claims.SessionID, user.UserID, user.CompanyID); err != nil {
+			return nil, fmt.Errorf("session validation failed: %w", err)
+		}
+	}
+
 	// Generate new access token
 	accessToken, err := utils.GenerateAccessToken(user, claims.SessionID, s.cfg.JWTExpiry)
 	if err != nil {
@@ -227,6 +235,79 @@ func (s *AuthService) RefreshToken(req *models.RefreshTokenRequest) (*models.Ref
 	return &models.RefreshTokenResponse{
 		AccessToken: accessToken,
 	}, nil
+}
+
+// validateAndReactivateSession checks if the session is valid and reactivates it if it was
+// deactivated due to idle timeout. This allows users to refresh tokens after being idle.
+func (s *AuthService) validateAndReactivateSession(sessionID string, userID int, companyID *int) error {
+	var isActive bool
+	var lastSeen time.Time
+	err := s.db.QueryRow(`
+		SELECT is_active, COALESCE(last_seen, created_at)
+		FROM device_sessions
+		WHERE session_id = $1 AND user_id = $2
+	`, sessionID, userID).Scan(&isActive, &lastSeen)
+
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("session not found")
+	}
+	if err != nil {
+		return fmt.Errorf("failed to validate session: %w", err)
+	}
+
+	// If session is already active, nothing to do
+	if isActive {
+		return nil
+	}
+
+	// Session is inactive - check if it was due to idle timeout
+	// If so, reactivate it. Otherwise, reject the refresh.
+	idleTimeout := s.resolveSessionIdleTimeout(companyID)
+
+	// If the session exceeded idle timeout, reactivate it
+	// This is a legitimate user returning after being idle
+	if idleTimeout > 0 && time.Since(lastSeen.UTC()) > idleTimeout {
+		_, err = s.db.Exec(`
+			UPDATE device_sessions 
+			SET is_active = TRUE, last_seen = NOW()
+			WHERE session_id = $1 AND user_id = $2
+		`, sessionID, userID)
+		if err != nil {
+			return fmt.Errorf("failed to reactivate session: %w", err)
+		}
+		return nil
+	}
+
+	// Session was manually deactivated (not due to idle timeout) - reject
+	return fmt.Errorf("session is inactive")
+}
+
+// resolveSessionIdleTimeout returns the idle timeout for a company's security policy.
+func (s *AuthService) resolveSessionIdleTimeout(companyID *int) time.Duration {
+	defaultTimeout := time.Duration(utils.DefaultPasswordPolicy().SessionIdleTimeoutMins) * time.Minute
+	if companyID == nil || *companyID == 0 || s.db == nil {
+		return defaultTimeout
+	}
+
+	var value models.JSONB
+	err := s.db.QueryRow(`SELECT value FROM settings WHERE company_id = $1 AND key = 'security_policy'`, *companyID).Scan(&value)
+	if err != nil {
+		return defaultTimeout
+	}
+
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return defaultTimeout
+	}
+
+	var policy models.SecurityPolicySettings
+	if err := json.Unmarshal(raw, &policy); err != nil {
+		return defaultTimeout
+	}
+	normalized := utils.NormalizePasswordPolicy(utils.PasswordPolicy{
+		SessionIdleTimeoutMins: policy.SessionIdleTimeoutMins,
+	})
+	return time.Duration(normalized.SessionIdleTimeoutMins) * time.Minute
 }
 
 func (s *AuthService) ForgotPassword(req *models.ForgotPasswordRequest) error {

@@ -267,19 +267,16 @@ class _GoodsReceiptDetailPageState
             )
           : desktopLayout
               ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const _GrnItemsHeader(),
                     const SizedBox(height: 10),
-                    Expanded(
-                      child: ListView.separated(
-                        padding: EdgeInsets.zero,
-                        itemCount: _detail!.items.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) => _GrnItemDesktopRow(
-                          item: _detail!.items[index],
-                        ),
-                      ),
-                    ),
+                    for (int i = 0; i < _detail!.items.length; i++) ...[
+                      _GrnItemDesktopRow(item: _detail!.items[i]),
+                      if (i < _detail!.items.length - 1)
+                        const SizedBox(height: 10),
+                    ],
                   ],
                 )
               : Column(

@@ -418,60 +418,15 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
                                 'Create a goods receipt or adjust the search to review posted receipts.',
                             onRetry: () => _load(),
                           )
-                        : ListView.separated(
-                            padding: EdgeInsets.zero,
-                            itemCount: filtered.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 10),
-                            itemBuilder: (context, index) {
-                              final receipt = filtered[index];
-                              return PurchaseDocumentListCard(
-                                title: receipt.receiptNumber,
-                                subtitle: [
-                                  if ((receipt.supplierName ?? '')
-                                      .trim()
-                                      .isNotEmpty)
-                                    receipt.supplierName!,
-                                  AppDateTime.formatDate(
-                                    context,
-                                    localePrefs,
-                                    receipt.receivedDate,
-                                  ),
-                                ].join(' • '),
-                                selected: receipt.goodsReceiptId ==
-                                    _selectedReceiptId,
-                                badges: [
-                                  const ProfessionalBadge(
-                                    label: 'Posted',
-                                    backgroundColor: Color(0xFFE8F3EC),
-                                    foregroundColor: Color(0xFF255C35),
-                                  ),
-                                  if (receipt.purchaseId != null)
-                                    const ProfessionalBadge(
-                                      label: 'Linked PO',
-                                      backgroundColor: Color(0xFFEAF1F8),
-                                      foregroundColor: Color(0xFF23415F),
-                                    ),
-                                ],
-                                trailing: IconButton(
-                                  tooltip: 'Open detail',
-                                  onPressed: () async {
-                                    await Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => GoodsReceiptDetailPage(
-                                          goodsReceiptId:
-                                              receipt.goodsReceiptId,
-                                        ),
-                                      ),
-                                    );
-                                    await _load();
-                                  },
-                                  icon: const Icon(Icons.open_in_new_rounded),
-                                ),
-                                onTap: () =>
-                                    _selectReceipt(receipt.goodsReceiptId),
-                              );
-                            },
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (int index = 0; index < filtered.length; index++) ...[
+                                _buildReceiptCard(filtered[index], localePrefs),
+                                if (index < filtered.length - 1)
+                                  const SizedBox(height: 10),
+                              ],
+                            ],
                           ),
                   ),
                 ),
@@ -616,6 +571,60 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
     );
   }
 
+  Widget _buildReceiptCard(
+    GoodsReceiptDto receipt,
+    LocalePreferencesState localePrefs,
+  ) {
+    return PurchaseDocumentListCard(
+      title: receipt.receiptNumber,
+      subtitle: [
+        if ((receipt.supplierName ?? '').trim().isNotEmpty)
+          receipt.supplierName!,
+        AppDateTime.formatDate(context, localePrefs, receipt.receivedDate),
+      ].join(' • '),
+      selected: receipt.goodsReceiptId == _selectedReceiptId,
+      badges: [
+        const ProfessionalBadge(
+          label: 'Posted',
+          backgroundColor: Color(0xFFE8F3EC),
+          foregroundColor: Color(0xFF255C35),
+        ),
+        if (receipt.purchaseId != null)
+          const ProfessionalBadge(
+            label: 'Linked PO',
+            backgroundColor: Color(0xFFEAF1F8),
+            foregroundColor: Color(0xFF23415F),
+          ),
+      ],
+      trailing: IconButton(
+        tooltip: 'Open detail',
+        onPressed: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) =>
+                  GoodsReceiptDetailPage(goodsReceiptId: receipt.goodsReceiptId),
+            ),
+          );
+          await _load();
+        },
+        icon: const Icon(Icons.open_in_new_rounded),
+      ),
+      onTap: () => _selectReceipt(receipt.goodsReceiptId),
+    );
+  }
+
+  Widget _buildLineItemCard(GoodsReceiptItemDto item) {
+    return PurchaseDocumentListCard(
+      title: item.productName ?? 'Product #${item.productId}',
+      subtitle:
+          'Qty ${item.receivedQuantity.toStringAsFixed(2)} • Unit ${item.unitPrice.toStringAsFixed(2)} • Total ${item.lineTotal.toStringAsFixed(2)}',
+      badges: [
+        if ((item.sku ?? '').trim().isNotEmpty)
+          ProfessionalBadge(label: item.sku!),
+      ],
+    );
+  }
+
   Widget _buildDetailPreview(LocalePreferencesState localePrefs) {
     if (_detailLoading) {
       return const ProfessionalSectionCard(
@@ -665,15 +674,19 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
       (sum, addon) => sum + addon.totalAmount,
     );
 
-    return Column(
-      children: [
-        ProfessionalDocumentHeader(
-          title: detail.receiptNumber,
-          subtitle:
-              'Preview received quantities, source linkage, and posted add-ons before opening the full GRN detail page.',
-          badges: [
-            const ProfessionalBadge(
-              label: 'Posted',
+    final items = detail.items;
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ProfessionalDocumentHeader(
+            title: detail.receiptNumber,
+            subtitle:
+                'Preview received quantities, source linkage, and posted add-ons before opening the full GRN detail page.',
+            badges: [
+              const ProfessionalBadge(
+                label: 'Posted',
               backgroundColor: Color(0xFFE8F3EC),
               foregroundColor: Color(0xFF255C35),
             ),
@@ -682,14 +695,14 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
           ],
         ),
         const SizedBox(height: 12),
-        Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                flex: 6,
-                child: Column(
-                  children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 6,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                     ProfessionalOverviewCard(
                       title: 'Overview',
                       icon: Icons.receipt_long_rounded,
@@ -723,33 +736,38 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Expanded(
-                      child: ProfessionalSectionCard(
+                    ProfessionalSectionCard(
                         title: 'Line Snapshot',
                         subtitle:
                             'The first few posted lines stay visible for quick warehouse review.',
                         expandChild: true,
-                        child: ListView.separated(
-                          padding: EdgeInsets.zero,
-                          itemCount:
-                              detail.items.length > 5 ? 5 : detail.items.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, index) {
-                            final item = detail.items[index];
-                            return PurchaseDocumentListCard(
-                              title: item.productName ??
-                                  'Product #${item.productId}',
-                              subtitle:
-                                  'Qty ${item.receivedQuantity.toStringAsFixed(2)} • Unit ${item.unitPrice.toStringAsFixed(2)} • Total ${item.lineTotal.toStringAsFixed(2)}',
-                              badges: [
-                                if ((item.sku ?? '').trim().isNotEmpty)
-                                  ProfessionalBadge(label: item.sku!),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
+                        child: items.isEmpty
+                            ? const Center(
+                                child: ProfessionalDocumentEmptyState(
+                                  title: 'No lines available',
+                                  message:
+                                      'This goods receipt does not contain any lines to preview.',
+                                ),
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  for (int index = 0;
+                                      index <
+                                          (detail.items.length > 5
+                                              ? 5
+                                              : detail.items.length);
+                                      index++) ...[
+                                    _buildLineItemCard(detail.items[index]),
+                                    if (index <
+                                        (detail.items.length > 5
+                                            ? 5
+                                            : detail.items.length) -
+                                            1)
+                                      const SizedBox(height: 10),
+                                  ],
+                                ],
+                              ),
                     ),
                   ],
                 ),
@@ -757,60 +775,66 @@ class _GoodsReceiptsPageState extends ConsumerState<GoodsReceiptsPage> {
               const SizedBox(width: 12),
               Expanded(
                 flex: 4,
-                child: ProfessionalSummaryCard(
-                  title: 'GRN Summary',
-                  expandContent: true,
-                  rows: [
-                    (
-                      label: 'Line Count',
-                      value: '${detail.items.length}',
-                      emphasize: false,
-                    ),
-                    (
-                      label: 'Received Qty',
-                      value: receivedQty.toStringAsFixed(2),
-                      emphasize: false,
-                    ),
-                    (
-                      label: 'Items Total',
-                      value: totalValue.toStringAsFixed(2),
-                      emphasize: false,
-                    ),
-                    (
-                      label: 'Add-ons Total',
-                      value: addonsTotal.toStringAsFixed(2),
-                      emphasize: true,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ProfessionalSummaryCard(
+                      title: 'GRN Summary',
+                      expandContent: true,
+                      rows: [
+                        (
+                          label: 'Line Count',
+                          value: '${detail.items.length}',
+                          emphasize: false,
+                        ),
+                        (
+                          label: 'Received Qty',
+                          value: receivedQty.toStringAsFixed(2),
+                          emphasize: false,
+                        ),
+                        (
+                          label: 'Items Total',
+                          value: totalValue.toStringAsFixed(2),
+                          emphasize: false,
+                        ),
+                        (
+                          label: 'Add-ons Total',
+                          value: addonsTotal.toStringAsFixed(2),
+                          emphasize: true,
+                        ),
+                      ],
+                      footer: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => GoodsReceiptDetailPage(
+                                    goodsReceiptId: detail.goodsReceiptId,
+                                  ),
+                                ),
+                              );
+                              await _load();
+                            },
+                            icon: const Icon(Icons.open_in_new_rounded),
+                            label: const Text('Open Full Detail'),
+                            style: professionalCompactButtonStyle(
+                              context,
+                              outlined: true,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
-                  footer: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => GoodsReceiptDetailPage(
-                                goodsReceiptId: detail.goodsReceiptId,
-                              ),
-                            ),
-                          );
-                          await _load();
-                        },
-                        icon: const Icon(Icons.open_in_new_rounded),
-                        label: const Text('Open Full Detail'),
-                        style: professionalCompactButtonStyle(
-                          context,
-                          outlined: true,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

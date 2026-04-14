@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(sudo *)",
-      "Bash(redis-cli *)"
+      "Bash(redis-cli *)",
+      "Bash(go *)",
+      "Bash(whereis *)",
+      "Bash(/usr/local/go/bin/go *)",
+      "Bash(/usr/local/go/bin/gofmt *)"
     ]
   },
   "$version": 3

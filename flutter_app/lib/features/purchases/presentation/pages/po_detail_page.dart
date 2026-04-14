@@ -289,19 +289,15 @@ class _PoDetailPageState extends ConsumerState<PoDetailPage> {
             )
           : desktopLayout
               ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const _PoItemsHeader(),
                     const SizedBox(height: 10),
-                    Expanded(
-                      child: ListView.separated(
-                        padding: EdgeInsets.zero,
-                        itemCount: _items.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) => _PoItemDesktopRow(
-                          item: _items[index],
-                        ),
-                      ),
-                    ),
+                    for (int i = 0; i < _items.length; i++) ...[
+                      _PoItemDesktopRow(item: _items[i]),
+                      if (i < _items.length - 1) const SizedBox(height: 10),
+                    ],
                   ],
                 )
               : Column(

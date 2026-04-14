@@ -288,6 +288,7 @@ class _PurchaseReturnsPageState extends ConsumerState<PurchaseReturnsPage> {
                             onRetry: () => _load(),
                           )
                         : ListView.separated(
+                            shrinkWrap: true,
                             padding: EdgeInsets.zero,
                             itemCount: filtered.length,
                             separatorBuilder: (_, __) =>
@@ -512,52 +513,52 @@ class _PurchaseReturnsPageState extends ConsumerState<PurchaseReturnsPage> {
             children: [
               Expanded(
                 flex: 6,
-                child: Column(
-                  children: [
-                    ProfessionalOverviewCard(
-                      title: 'Overview',
-                      icon: Icons.assignment_return_rounded,
-                      child: ProfessionalFieldGrid(
-                        fields: [
-                          ProfessionalFieldGridItem(
-                            label: 'Supplier',
-                            value: (doc['supplier']?['name'] ?? '')
-                                    .toString()
-                                    .trim()
-                                    .isEmpty
-                                ? 'Not available'
-                                : doc['supplier']['name'].toString(),
-                          ),
-                          ProfessionalFieldGridItem(
-                            label: 'Return Date',
-                            value: AppDateTime.formatFlexibleDate(
-                              context,
-                              localePrefs,
-                              doc['return_date']?.toString(),
-                              fallback: doc['return_date']?.toString() ??
-                                  'Not available',
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      ProfessionalOverviewCard(
+                        title: 'Overview',
+                        icon: Icons.assignment_return_rounded,
+                        child: ProfessionalFieldGrid(
+                          fields: [
+                            ProfessionalFieldGridItem(
+                              label: 'Supplier',
+                              value: (doc['supplier']?['name'] ?? '')
+                                      .toString()
+                                      .trim()
+                                      .isEmpty
+                                  ? 'Not available'
+                                  : doc['supplier']['name'].toString(),
                             ),
-                          ),
-                          ProfessionalFieldGridItem(
-                            label: 'Source Purchase',
-                            value: sourcePurchase.isEmpty
-                                ? 'Not set'
-                                : sourcePurchase,
-                          ),
-                          ProfessionalFieldGridItem(
-                            label: 'Reason',
-                            value:
-                                (doc['reason'] ?? '').toString().trim().isEmpty
-                                    ? 'No reason recorded'
-                                    : doc['reason'].toString(),
-                            maxLines: 2,
-                          ),
-                        ],
+                            ProfessionalFieldGridItem(
+                              label: 'Return Date',
+                              value: AppDateTime.formatFlexibleDate(
+                                context,
+                                localePrefs,
+                                doc['return_date']?.toString(),
+                                fallback: doc['return_date']?.toString() ??
+                                    'Not available',
+                              ),
+                            ),
+                            ProfessionalFieldGridItem(
+                              label: 'Source Purchase',
+                              value: sourcePurchase.isEmpty
+                                  ? 'Not set'
+                                  : sourcePurchase,
+                            ),
+                            ProfessionalFieldGridItem(
+                              label: 'Reason',
+                              value:
+                                  (doc['reason'] ?? '').toString().trim().isEmpty
+                                      ? 'No reason recorded'
+                                      : doc['reason'].toString(),
+                              maxLines: 2,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Expanded(
-                      child: ProfessionalSectionCard(
+                      const SizedBox(height: 12),
+                      ProfessionalSectionCard(
                         title: 'Line Snapshot',
                         subtitle:
                             'The first few returned lines stay visible for quick purchasing and warehouse review.',
@@ -568,26 +569,30 @@ class _PurchaseReturnsPageState extends ConsumerState<PurchaseReturnsPage> {
                                 message:
                                     'This return does not contain line items.',
                               )
-                            : ListView.separated(
-                                padding: EdgeInsets.zero,
-                                itemCount: items.length > 5 ? 5 : items.length,
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 10),
-                                itemBuilder: (context, index) {
-                                  final item = items[index];
-                                  return PurchaseDocumentListCard(
-                                    title:
-                                        item['product']?['name']?.toString() ??
-                                            'Product #${item['product_id']}',
-                                    subtitle:
-                                        'Qty ${((item['quantity'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)} • Unit ${((item['unit_price'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}',
-                                    badges: const [],
-                                  );
-                                },
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  for (int i = 0;
+                                      i < (items.length > 5 ? 5 : items.length);
+                                      i++) ...[
+                                    PurchaseDocumentListCard(
+                                      title: items[i]['product']?['name']
+                                              ?.toString() ??
+                                          'Product #${items[i]['product_id']}',
+                                      subtitle:
+                                          'Qty ${((items[i]['quantity'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)} • Unit ${((items[i]['unit_price'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}',
+                                      badges: const [],
+                                    ),
+                                    if (i <
+                                        (items.length > 5 ? 5 : items.length) -
+                                            1)
+                                      const SizedBox(height: 10),
+                                  ],
+                                ],
                               ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(width: 12),

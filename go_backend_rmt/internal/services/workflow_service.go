@@ -457,24 +457,101 @@ func (s *WorkflowService) GetRequestByID(companyID, userID, approvalID int) (*mo
 	return req, nil
 }
 
+func wfPtrInt(i int) *int          { return &i }
+func wfPtrString(s string) *string { return &s }
+
 func (s *WorkflowService) lockRequestTx(tx *sql.Tx, companyID, approvalID int) (*models.WorkflowRequest, error) {
-	row := tx.QueryRow(
-		s.loadRequestAccessQuery()+`
-		WHERE wr.company_id = $1
-		  AND wr.approval_id = $2
+	// Lock only the workflow_requests row to avoid outer-join FOR UPDATE error.
+	row := tx.QueryRow(`
+		SELECT approval_id, company_id, location_id, module, entity_type, entity_id,
+		       action_type, title, summary, request_reason, status, priority,
+		       approver_role_id, NULL AS approver_role_name,
+		       COALESCE(payload, '{}'::jsonb),
+		       COALESCE(result_snapshot, '{}'::jsonb),
+		       due_at, escalation_level, created_by,
+		       '' AS created_by_name,
+		       updated_by, approved_by,
+		       '' AS approved_by_name,
+		       approved_at, decision_reason, created_at, updated_at
+		FROM workflow_requests
+		WHERE company_id = $1 AND approval_id = $2
 		FOR UPDATE
-	`,
-		companyID,
-		approvalID,
-	)
-	req, err := s.scanWorkflowRequest(row)
-	if err != nil {
+	`, companyID, approvalID)
+	var req models.WorkflowRequest
+	var locationID, entityID, approvedBy sql.NullInt32
+	var entityType, actionType, title, summary, requestReason, status, priority sql.NullString
+	var approverRoleID sql.NullInt32
+	var _approverRoleName, _createdByName, _approvedByName sql.NullString
+	var payload, resultSnapshot models.JSONB
+	var dueAt, approvedAt, createdAt, updatedAt sql.NullTime
+	var escalationLevel sql.NullInt32
+	var createdBy, updatedBy sql.NullInt32
+	if err := row.Scan(
+		&req.ApprovalID, &req.CompanyID, &locationID, &req.Module,
+		&entityType, &entityID, &actionType, &title, &summary, &requestReason,
+		&status, &priority, &approverRoleID, &_approverRoleName, &payload, &resultSnapshot,
+		&dueAt, &escalationLevel, &createdBy, &_createdByName, &updatedBy, &approvedBy,
+		&_approvedByName, &approvedAt, &requestReason, &createdAt, &updatedAt,
+	); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("workflow request not found")
 		}
 		return nil, fmt.Errorf("failed to lock workflow request: %w", err)
 	}
-	return req, nil
+	if locationID.Valid {
+		req.LocationID = wfPtrInt(int(locationID.Int32))
+	}
+	if entityType.Valid {
+		req.EntityType = entityType.String
+	}
+	if entityID.Valid {
+		req.EntityID = wfPtrInt(int(entityID.Int32))
+	}
+	if actionType.Valid {
+		req.ActionType = actionType.String
+	}
+	if title.Valid {
+		req.Title = title.String
+	}
+	if summary.Valid {
+		req.Summary = wfPtrString(summary.String)
+	}
+	if requestReason.Valid {
+		req.RequestReason = wfPtrString(requestReason.String)
+	}
+	if status.Valid {
+		req.Status = status.String
+	}
+	if priority.Valid {
+		req.Priority = priority.String
+	}
+	if approverRoleID.Valid {
+		req.ApproverRoleID = int(approverRoleID.Int32)
+	}
+	req.Payload = payload
+	req.ResultSnapshot = resultSnapshot
+	if dueAt.Valid {
+		req.DueAt = &dueAt.Time
+	}
+	if escalationLevel.Valid {
+		req.EscalationLevel = int(escalationLevel.Int32)
+	}
+	if createdBy.Valid {
+		req.CreatedBy = int(createdBy.Int32)
+	}
+	if updatedBy.Valid {
+		req.UpdatedBy = wfPtrInt(int(updatedBy.Int32))
+	}
+	if approvedBy.Valid {
+		req.ApprovedBy = wfPtrInt(int(approvedBy.Int32))
+	}
+	if approvedAt.Valid {
+		req.ApprovedAt = &approvedAt.Time
+	}
+	req.CreatedAt = createdAt.Time
+	req.UpdatedAt = updatedAt.Time
+
+	return &req, nil
 }
 
 func (s *WorkflowService) applyApprovedActionTx(tx *sql.Tx, req *models.WorkflowRequest, userID int) (models.JSONB, error) {

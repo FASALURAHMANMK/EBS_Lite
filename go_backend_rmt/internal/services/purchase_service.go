@@ -420,33 +420,16 @@ func (s *PurchaseService) CreatePurchase(companyID, locationID, userID int, req 
 		lineAmounts := computeTaxLineWithDiscount(item.Quantity, item.UnitPrice, discountPercent, discountAmount, item.DiscountAmount != nil, taxPercent, taxSettings.PriceMode)
 		finalLineTotal := lineAmounts.GrossAmount
 
-		// Validate serial numbers if product is serialized
+		// Validate product exists
 		meta, ok := productMetaByID[item.ProductID]
 		if !ok {
 			return nil, fmt.Errorf("product with ID %d not found", item.ProductID)
 		}
 		lineSnapshot := newPurchaseLineSnapshot(meta, item.Quantity, item.UnitPrice)
-		if meta.IsSerialized {
-			// quantity must be whole number and equal to serial count
-			if lineSnapshot.StockQuantity != float64(int(lineSnapshot.StockQuantity)) {
-				return nil, fmt.Errorf("quantity must be a whole number for serialized products (product_id=%d)", item.ProductID)
-			}
-			if len(item.SerialNumbers) != int(lineSnapshot.StockQuantity) {
-				return nil, fmt.Errorf("serial numbers count must equal quantity for serialized products (product_id=%d)", item.ProductID)
-			}
-			seen := make(map[string]struct{}, len(item.SerialNumbers))
-			for _, srl := range item.SerialNumbers {
-				if srl == "" {
-					return nil, fmt.Errorf("serial numbers cannot be empty for serialized products (product_id=%d)", item.ProductID)
-				}
-				if _, ok := seen[srl]; ok {
-					return nil, fmt.Errorf("duplicate serial number '%s' in purchase item (product_id=%d)", srl, item.ProductID)
-				}
-				seen[srl] = struct{}{}
-			}
-		} else if len(item.SerialNumbers) > 0 {
-			return nil, fmt.Errorf("serial numbers provided for a non-serialized product (product_id=%d)", item.ProductID)
-		}
+
+		// NOTE: Serial/batch validation is NOT required at PO creation stage.
+		// Serial/batch numbers are only mandatory at Goods Receipt when products are physically received.
+		// Validation for serialized products happens in ReceivePurchase/GoodsReceipt flows.
 
 		_, err = tx.Exec(`
             INSERT INTO purchase_details (purchase_id, product_id, barcode_id, quantity, unit_price,
@@ -1109,32 +1092,16 @@ func (s *PurchaseService) UpdatePurchase(purchaseID, companyID, userID int, req 
 			lineAmounts := computeTaxLineWithDiscount(item.Quantity, item.UnitPrice, discountPercent, discountAmount, item.DiscountAmount != nil, taxPercent, taxSettings.PriceMode)
 			finalLineTotal := lineAmounts.GrossAmount
 
-			// Validate serial numbers if product is serialized
+			// Validate product exists
 			meta, ok := productMetaByID[item.ProductID]
 			if !ok {
 				return fmt.Errorf("product with ID %d not found", item.ProductID)
 			}
 			lineSnapshot := newPurchaseLineSnapshot(meta, item.Quantity, item.UnitPrice)
-			if meta.IsSerialized {
-				if lineSnapshot.StockQuantity != float64(int(lineSnapshot.StockQuantity)) {
-					return fmt.Errorf("quantity must be a whole number for serialized products (product_id=%d)", item.ProductID)
-				}
-				if len(item.SerialNumbers) != int(lineSnapshot.StockQuantity) {
-					return fmt.Errorf("serial numbers count must equal quantity for serialized products (product_id=%d)", item.ProductID)
-				}
-				seen := make(map[string]struct{}, len(item.SerialNumbers))
-				for _, srl := range item.SerialNumbers {
-					if srl == "" {
-						return fmt.Errorf("serial numbers cannot be empty for serialized products (product_id=%d)", item.ProductID)
-					}
-					if _, ok := seen[srl]; ok {
-						return fmt.Errorf("duplicate serial number '%s' in purchase item (product_id=%d)", srl, item.ProductID)
-					}
-					seen[srl] = struct{}{}
-				}
-			} else if len(item.SerialNumbers) > 0 {
-				return fmt.Errorf("serial numbers provided for a non-serialized product (product_id=%d)", item.ProductID)
-			}
+
+			// NOTE: Serial/batch validation is NOT required at PO creation/update stage.
+			// Serial/batch numbers are only mandatory at Goods Receipt when products are physically received.
+			// Validation for serialized products happens in ReceivePurchase/GoodsReceipt flows.
 
 			_, err = tx.Exec(`
 				INSERT INTO purchase_details (purchase_id, product_id, barcode_id, quantity, unit_price,

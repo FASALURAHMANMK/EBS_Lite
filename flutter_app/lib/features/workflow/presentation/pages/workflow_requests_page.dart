@@ -307,7 +307,7 @@ class _WorkflowRequestDetailPageState
     final controller = TextEditingController();
     final ok = await showDialog<bool>(
           context: context,
-          builder: (_) => AlertDialog(
+          builder: (dialogContext) => AlertDialog(
             title: Text(title),
             content: TextField(
               controller: controller,
@@ -319,18 +319,18 @@ class _WorkflowRequestDetailPageState
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
+                onPressed: () => Navigator.of(dialogContext).pop(false),
                 child: const Text('Cancel'),
               ),
               FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
+                onPressed: () => Navigator.of(dialogContext).pop(true),
                 child: const Text('Continue'),
               ),
             ],
           ),
-        ) ??
-        false;
-    if (!ok) return null;
+        );
+    if (!mounted) return null;
+    if (ok != true) return null;
     return controller.text.trim();
   }
 

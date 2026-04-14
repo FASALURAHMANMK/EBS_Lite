@@ -344,12 +344,12 @@ class _PurchaseReceiptPageState extends ConsumerState<PurchaseReceiptPage> {
                     'This purchase order has no remaining quantities waiting for a goods receipt.',
               ),
             )
-          : ListView(
-              padding: EdgeInsets.zero,
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final line in _lines) ...[
-                  _buildReceiptLineCard(line),
-                  if (line != _lines.last) const SizedBox(height: 10),
+                for (int i = 0; i < _lines.length; i++) ...[
+                  _buildReceiptLineCard(_lines[i]),
+                  if (i < _lines.length - 1) const SizedBox(height: 10),
                 ],
               ],
             ),

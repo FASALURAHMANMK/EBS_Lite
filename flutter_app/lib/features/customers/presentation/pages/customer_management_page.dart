@@ -37,6 +37,8 @@ class _CustomerManagementPageState
   final TextEditingController _searchCtrl = TextEditingController();
 
   int _detailRequestToken = 0;
+  int? _lastSyncedListHash;
+  int? _lastSyncedCustomerId;
 
   @override
   void initState() {
@@ -63,9 +65,11 @@ class _CustomerManagementPageState
       final items = await repo.getCustomers(
         search: q.isEmpty ? null : q,
       );
+      // Exclude B2B customers (they have a dedicated page)
+      final nonB2B = items.where((c) => c.customerType.toUpperCase() != 'B2B').toList();
       if (!mounted) return;
       setState(() {
-        _customers = items;
+        _customers = nonB2B;
         if (_selectedCustomer != null &&
             !_customers
                 .any((c) => c.customerId == _selectedCustomer!.customerId)) {
@@ -148,7 +152,17 @@ class _CustomerManagementPageState
 
   void _syncDesktopSelection(List<CustomerDto> filtered) {
     if (!AppBreakpoints.isDesktop(context)) return;
+    
+    // Compute a simple hash of the list to avoid repeated work
+    final listHash = filtered.isEmpty ? 0 : filtered.map((c) => c.customerId).reduce((a, b) => a ^ b).hashCode;
+    final nextCustomerId = filtered.isEmpty ? null : filtered.first.customerId;
+    
+    // Skip if we already processed this exact list and customer
+    if (listHash == _lastSyncedListHash && nextCustomerId == _lastSyncedCustomerId) return;
+    
     if (filtered.isEmpty) {
+      _lastSyncedListHash = 0;
+      _lastSyncedCustomerId = null;
       if (_selectedCustomer != null ||
           _selectedSummary != null ||
           _detailError != null ||
@@ -174,6 +188,8 @@ class _CustomerManagementPageState
     final shouldReload = _selectedCustomer?.customerId != next.customerId ||
         (_selectedSummary == null && !_detailLoading && _detailError == null);
     if (shouldReload) {
+      _lastSyncedListHash = listHash;
+      _lastSyncedCustomerId = next.customerId;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _selectCustomer(next);
